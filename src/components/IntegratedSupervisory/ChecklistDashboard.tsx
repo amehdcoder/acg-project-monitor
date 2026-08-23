@@ -919,7 +919,7 @@ export default function ChecklistDashboard({
 
       {/* Evidence & pattern intelligence: daily new evidence, completion
           regression, geographic post-mortem and a signal-vs-noise filter. */}
-      <EvidenceIntelligencePanel parents={parents} />
+      <EvidenceIntelligencePanel parents={parents} onRefresh={onRefresh} />
 
 
       {/* Geospatial: community status + household medicine-offer maps */}

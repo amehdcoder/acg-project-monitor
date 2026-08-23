@@ -494,11 +494,27 @@ const VERDICT_STYLE: Record<GeoVerdict["verdict"], string> = {
   "Too few records": "border-slate-400 text-slate-500",
 };
 
-function GeoPostMortemTab({ parents }: { parents: Row[] }) {
+function GeoPostMortemTab({ parents, drill }: { parents: Row[]; drill: Drill }) {
   const [level, setLevel] = useState<GeoVerdict["level"]>("LGA");
   const [only, setOnly] = useState<"all" | "Worked" | "Failed">("all");
+  const [minN, setMinN] = useState(0);
+  const [compareMode, setCompareMode] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
   const rows = useMemo(() => buildGeoVerdicts(parents, level), [parents, level]);
-  const filtered = rows.filter((r) => only === "all" || r.verdict === only);
+  const filtered = rows.filter((r) => (only === "all" || r.verdict === only) && r.n >= minN);
+  const comparison = useMemo(() => compareUnits(rows, selected), [rows, selected]);
+
+  const toggle = (id: string) =>
+    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : s.length >= 6 ? s : [...s, id]));
+
+  const openUnit = (r: GeoVerdict) =>
+    drill({
+      title: `${r.level}: ${r.unit}`,
+      category: r.verdict,
+      color: r.verdict === "Worked" ? "#128B5B" : r.verdict === "Failed" ? "#DC2626" : "#D97706",
+      rows: r.rows,
+      note: r.why,
+    });
 
   return (
     <div className="space-y-4">
@@ -514,17 +530,140 @@ function GeoPostMortemTab({ parents }: { parents: Row[] }) {
             <Filter className="mr-1 h-3 w-3" />{f === "all" ? "All units" : f}
           </Button>
         ))}
+        <span className="mx-1 h-4 w-px bg-border" />
+        <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
+          Min records
+          <select
+            className="h-7 rounded-md border bg-background px-1 text-[11px]"
+            value={minN}
+            onChange={(e) => setMinN(Number(e.target.value))}
+          >
+            {[0, 3, 5, 10, 20, 30].map((v) => <option key={v} value={v}>{v || "any"}</option>)}
+          </select>
+        </label>
+        <Button
+          size="sm"
+          variant={compareMode ? "default" : "outline"}
+          className="h-7 text-[11px]"
+          onClick={() => setCompareMode((c) => !c)}
+        >
+          <Columns3 className="mr-1 h-3 w-3" /> Compare {level}s{selected.length ? ` (${selected.length})` : ""}
+        </Button>
+        {selected.length > 0 && (
+          <Button size="sm" variant="ghost" className="h-7 text-[11px]" onClick={() => setSelected([])}>Clear selection</Button>
+        )}
       </div>
+
+      {compareMode && (
+        <div className="space-y-3 rounded-lg border border-primary/40 bg-primary/5 p-3">
+          <p className="text-[11px] text-muted-foreground">
+            Tick up to six {level.toLowerCase()}s below to place them side by side. Differences are tested with a
+            two-proportion z-test, so only genuinely meaningful gaps are highlighted.
+          </p>
+
+          {comparison.units.length < 2 ? (
+            <p className="text-[11px] font-medium">Select at least two {level.toLowerCase()}s to compare.</p>
+          ) : (
+            <>
+              <div className="overflow-auto rounded-md border bg-background">
+                <table className="w-full min-w-[720px] text-xs">
+                  <thead className="bg-muted/60">
+                    <tr>
+                      <th className="px-2 py-2 text-left font-semibold">Metric</th>
+                      {comparison.units.map((u) => (
+                        <th key={geoUnitId(u)} className="px-2 py-2 text-left font-semibold">{u.unit}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-t">
+                      <td className="px-2 py-1.5 text-muted-foreground">Records</td>
+                      {comparison.units.map((u) => (
+                        <td key={geoUnitId(u)} className="px-2 py-1.5 tabular-nums">
+                          <button type="button" className="underline-offset-2 hover:underline" onClick={() => openUnit(u)}>{u.n}</button>
+                        </td>
+                      ))}
+                    </tr>
+                    <tr className="border-t">
+                      <td className="px-2 py-1.5 text-muted-foreground">Completion (95% CI)</td>
+                      {comparison.units.map((u) => (
+                        <td key={geoUnitId(u)} className="px-2 py-1.5 tabular-nums">
+                          <span className="font-semibold">{pct(u.rate)}</span>{" "}
+                          <span className="text-[10px] text-muted-foreground">({pct(u.ciLow)}–{pct(u.ciHigh)})</span>
+                        </td>
+                      ))}
+                    </tr>
+                    <tr className="border-t">
+                      <td className="px-2 py-1.5 text-muted-foreground">Verdict</td>
+                      {comparison.units.map((u) => (
+                        <td key={geoUnitId(u)} className="px-2 py-1.5">
+                          <Badge variant="outline" className={VERDICT_STYLE[u.verdict]}>{u.verdict}</Badge>
+                        </td>
+                      ))}
+                    </tr>
+                    {comparison.factors.slice(0, 10).map((f) => (
+                      <tr key={f.key} className={`border-t ${f.significant ? "bg-amber-50/50 dark:bg-amber-950/10" : ""}`}>
+                        <td className="px-2 py-1.5">
+                          <span className="font-medium">{f.label}</span>
+                          {f.significant && (
+                            <Badge variant="outline" className="ml-1 border-amber-500 text-[9px] text-amber-600">
+                              Meaningful gap · {pval(f.p)}
+                            </Badge>
+                          )}
+                        </td>
+                        {comparison.units.map((u) => {
+                          const c = f.byUnit[geoUnitId(u)];
+                          const worst = f.worst === geoUnitId(u);
+                          const best = f.best === geoUnitId(u);
+                          return (
+                            <td
+                              key={geoUnitId(u)}
+                              className={`px-2 py-1.5 tabular-nums ${f.significant && worst ? "font-semibold text-rose-600" : f.significant && best ? "font-semibold text-emerald-600" : ""}`}
+                            >
+                              {c ? `${pct(c.rate)} (n=${c.n})` : "—"}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="space-y-1">
+                {comparison.pairs.map((pr) => (
+                  <p key={`${pr.a}|${pr.b}`} className={`text-[11px] ${pr.significant ? "font-medium text-foreground" : "text-muted-foreground"}`}>
+                    <strong>{pr.a.split(" › ").pop()} vs {pr.b.split(" › ").pop()}:</strong> {pr.verdict} ({pval(pr.p)})
+                  </p>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {filtered.length === 0 ? (
         <SectionNote>No {level} meets this filter yet.</SectionNote>
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
           {filtered.slice(0, 40).map((r) => (
-            <div key={`${r.parent}|${r.unit}`} className="rounded-lg border bg-card p-3 shadow-sm">
+            <div
+              key={`${r.parent}|${r.unit}`}
+              className={`rounded-lg border bg-card p-3 shadow-sm ${selected.includes(geoUnitId(r)) ? "ring-2 ring-primary" : ""}`}
+            >
               <div className="mb-2 flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold">{r.unit}</p>
+                {compareMode && (
+                  <Checkbox
+                    className="mt-0.5"
+                    checked={selected.includes(geoUnitId(r))}
+                    onCheckedChange={() => toggle(geoUnitId(r))}
+                    aria-label={`Compare ${r.unit}`}
+                  />
+                )}
+                <div className="min-w-0 flex-1">
+                  <button type="button" className="truncate text-left text-sm font-semibold underline-offset-2 hover:underline" onClick={() => openUnit(r)}>
+                    {r.unit}
+                  </button>
                   {r.parent && <p className="truncate text-[10px] text-muted-foreground">{r.parent}</p>}
                 </div>
                 <Badge variant="outline" className={VERDICT_STYLE[r.verdict]}>{r.verdict}</Badge>
@@ -583,7 +722,7 @@ function GeoPostMortemTab({ parents }: { parents: Row[] }) {
 
 /* ---------------------------------------------------- 4. signal vs noise */
 
-function SignalTab({ parents }: { parents: Row[] }) {
+function SignalTab({ parents, drill }: { parents: Row[]; drill: Drill }) {
   const d = useMemo(() => distillFacts(parents), [parents]);
   return (
     <div className="space-y-4">
@@ -606,7 +745,11 @@ function SignalTab({ parents }: { parents: Row[] }) {
           ) : (
             <ol className="space-y-2 text-[11px]">
               {d.facts.map((f, i) => (
-                <li key={f.statement} className="rounded-md border bg-background/70 p-2">
+                <li
+                  key={f.statement}
+                  className="cursor-pointer rounded-md border bg-background/70 p-2 hover:bg-primary/5"
+                  onClick={() => drill({ title: f.statement, category: "Condition present", color: "#128B5B", rows: f.rows, note: f.detail })}
+                >
                   <p className="font-semibold">{i + 1}. {f.statement}</p>
                   <p className="text-muted-foreground">{f.detail} {pval(f.p)}</p>
                 </li>
@@ -621,7 +764,11 @@ function SignalTab({ parents }: { parents: Row[] }) {
           </p>
           <ul className="space-y-2 text-[11px]">
             {d.decoys.map((f) => (
-              <li key={f.statement} className="rounded-md border bg-background/60 p-2">
+              <li
+                key={f.statement}
+                className="cursor-pointer rounded-md border bg-background/60 p-2 hover:bg-primary/5"
+                onClick={() => drill({ title: f.statement, category: "Condition present", color: "#64748B", rows: f.rows, note: f.detail })}
+              >
                 <p className="font-medium">{f.statement}</p>
                 <p className="text-muted-foreground">{f.detail}</p>
                 <Badge variant="outline" className="mt-1 border-slate-400 text-[9px] text-slate-500">
@@ -638,9 +785,14 @@ function SignalTab({ parents }: { parents: Row[] }) {
 
 /* ------------------------------------------------------------------ shell */
 
-export default function EvidenceIntelligencePanel({ parents }: { parents: Row[] }) {
+export default function EvidenceIntelligencePanel({
+  parents, onRefresh,
+}: { parents: Row[]; onRefresh?: () => void | Promise<void> }) {
+  const [spec, setSpec] = useState<ChartDrillSpec | null>(null);
+  const drill: Drill = (s) => setSpec(s);
   return (
-    <Card className="overflow-hidden border-primary/30">
+    <>
+      <Card className="overflow-hidden border-primary/30">
       <CardHeader className="border-b bg-gradient-to-r from-primary/10 via-transparent to-transparent py-3 px-4">
         <CardTitle className="flex items-center gap-2 text-sm font-semibold">
           <Microscope className="h-4 w-4 text-primary" />
@@ -658,12 +810,14 @@ export default function EvidenceIntelligencePanel({ parents }: { parents: Row[] 
             <TabsTrigger value="geo" className="text-[11px]"><Filter className="mr-1 h-3.5 w-3.5" />What worked / failed</TabsTrigger>
             <TabsTrigger value="signal" className="text-[11px]"><Scale className="mr-1 h-3.5 w-3.5" />Signal vs noise</TabsTrigger>
           </TabsList>
-          <TabsContent value="ledger"><EvidenceLedgerTab parents={parents} /></TabsContent>
-          <TabsContent value="regression"><RegressionTab parents={parents} /></TabsContent>
-          <TabsContent value="geo"><GeoPostMortemTab parents={parents} /></TabsContent>
-          <TabsContent value="signal"><SignalTab parents={parents} /></TabsContent>
+          <TabsContent value="ledger"><EvidenceLedgerTab parents={parents} drill={drill} onRefresh={onRefresh} /></TabsContent>
+          <TabsContent value="regression"><RegressionTab parents={parents} drill={drill} /></TabsContent>
+          <TabsContent value="geo"><GeoPostMortemTab parents={parents} drill={drill} /></TabsContent>
+          <TabsContent value="signal"><SignalTab parents={parents} drill={drill} /></TabsContent>
         </Tabs>
       </CardContent>
     </Card>
+    <ChartRecordsDialog spec={spec} onClose={() => setSpec(null)} />
+    </>
   );
 }
