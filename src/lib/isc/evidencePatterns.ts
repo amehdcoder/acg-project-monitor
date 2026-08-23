@@ -127,12 +127,7 @@ export const PREDICTORS: PredictorDef[] = [
     read: (p) => { const t = tri("Has_CDI_CDD_been_trained", p.Has_CDI_CDD_been_trained); return t == null ? null : 1 - t; },
   },
   {
-    key: "no_stipend",
-    label: "CDD stipend not paid",
-    meaning: "The CDD had not received a stipend at the time of the visit",
-    read: (p) => { const t = tri("Did_CDI_CDD_receive_stipends", p.Did_CDI_CDD_receive_stipends); return t == null ? null : 1 - t; },
-  },
-  {
+
     key: "no_dose_pole",
     label: "Dose pole unavailable",
     meaning: "No dose pole was available for height-based dosing",
