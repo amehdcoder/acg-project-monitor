@@ -412,11 +412,21 @@ Deno.serve(async (req) => {
           return json({ error: `Filter "${method}" not allowed`, data: null }, 403);
         }
         const args = Array.isArray(f?.args) ? f.args : [];
+        const argErr = table === "profiles" ? null : rejectUnsafeFilterArgs(args);
+        if (argErr) return json({ error: argErr, data: null }, 403);
         q = q[method](...args);
       }
       for (const o of order) {
-        q = q.order(String(o?.column ?? ""), o?.options ?? undefined);
+        const column = String(o?.column ?? "");
+        if (column.includes(".") || column.includes("(")) {
+          return json({ error: "Ordering by a related table is not allowed", data: null }, 403);
+        }
+        const opts = o?.options && typeof o.options === "object"
+          ? { ascending: (o.options as any).ascending, nullsFirst: (o.options as any).nullsFirst }
+          : undefined;
+        q = q.order(column, opts as any);
       }
+
       if (typeof body?.rangeFrom === "number" && typeof body?.rangeTo === "number") {
         q = q.range(body.rangeFrom, body.rangeTo);
       }
