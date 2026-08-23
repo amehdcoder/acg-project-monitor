@@ -278,6 +278,8 @@ Deno.serve(async (req) => {
     }
 
     if (action === "test_connection" || action === "inspect") {
+      const forbid = await ensureAdmin();
+      if (forbid) return forbid;
       const { server_url, form_uid, api_token } = params;
       if (!server_url || !form_uid || !api_token) return j({ error: "Missing server_url/form_uid/api_token" }, 400);
       const res = await probe(server_url, form_uid, api_token);
