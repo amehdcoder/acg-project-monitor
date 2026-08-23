@@ -481,7 +481,15 @@ export default function ChecklistDashboard({
   );
 
   const [filters, setFilters] = useState<ChecklistFilterState>({ ...EMPTY_FILTERS });
-  const parents = useMemo(() => applyChecklistFilters(allParents, filters), [allParents, filters]);
+  // Selects/inputs update instantly; the (expensive) analytics recompute runs
+  // at a lower priority so the filter bar never feels frozen.
+  const appliedFilters = useDeferredValue(filters);
+  const recomputing = appliedFilters !== filters;
+  const parents = useMemo(
+    () => applyChecklistFilters(allParents, appliedFilters),
+    [allParents, appliedFilters],
+  );
+
   const parentKeys = useMemo(
     () => new Set(parents.map((p) => `${p._uuid ?? ""}|${p._id ?? ""}`)),
     [parents],
