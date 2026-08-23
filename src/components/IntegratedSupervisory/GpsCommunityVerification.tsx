@@ -80,8 +80,14 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
   const [running, setRunning] = useState(false);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<VerifyStatus | "all">("all");
+  const [reviewFilter, setReviewFilter] = useState<"all" | "reviewed" | "unreviewed" | "borderline">("all");
   const [sv, setSv] = useState<{ lat: number; lng: number; title: string } | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [preview, setPreview] = useState<VisitPoint | null>(null);
+  const [historyFor, setHistoryFor] = useState<VisitPoint | null>(null);
+  const [cacheInfo, setCacheInfo] = useState({ size: 0, hits: 0, network: 0, throttled: 0 });
+
+  const review = useGpsVerificationReview();
 
   /* ------------------------------------------------------------- raw points */
   const points = useMemo<VisitPoint[]>(() => {
@@ -110,13 +116,20 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
   const runVerification = async (force = false) => {
     if (running || points.length === 0) return;
     setRunning(true);
+    if (force) clearGeoCache();
     setProgress({ done: 0, total: points.length });
     const res = await reverseGeocodeBatch(
       points.map((p) => ({ lat: p.lat, lng: p.lng })),
       (done, total) => setProgress({ done, total }),
+      4,
+      force,
     );
     setGeoMap(new Map(res));
     setRunning(false);
+    setCacheInfo({
+      size: geoCacheSize(), hits: geoCacheStats.hits,
+      network: geoCacheStats.network, throttled: geoCacheStats.throttled,
+    });
   };
 
   useEffect(() => {
@@ -125,15 +138,31 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
   }, [points.length]);
 
   const verified = useMemo<VisitPoint[]>(
-    () => points.map((p) => ({
-      ...p,
-      verify: verifyPlace(
+    () => points.map((p) => {
+      const locKey = geoKey(p.lat, p.lng);
+      const base = verifyPlace(
         { community: p.community, ward: p.ward, lga: p.lga, state: p.state },
-        geoMap.get(geoKey(p.lat, p.lng)) ?? null,
-      ),
-    })),
-    [points, geoMap],
+        geoMap.get(locKey) ?? null,
+      );
+      const ovr = review.overrides[locKey];
+      return { ...p, locKey, baseVerify: base, override: ovr, verify: applyOverride(base, ovr) };
+    }),
+    [points, geoMap, review.overrides],
   );
+
+  // Record verdict snapshots so the per-location discrepancy history stays current.
+  useEffect(() => {
+    if (running || review.loading || geoMap.size === 0) return;
+    const snaps = verified
+      .filter((p) => p.baseVerify)
+      .map((p) => ({
+        locKey: p.locKey!, submissionId: p.id, community: p.community,
+        ward: p.ward, lga: p.lga, state: p.state, lat: p.lat, lng: p.lng,
+        verify: p.baseVerify!,
+      }));
+    void review.recordSnapshots(snaps);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [verified, running, review.loading]);
 
   const counts = useMemo(() => {
     const c: Record<VerifyStatus, number> = { verified: 0, nearby: 0, mismatch: 0, outside: 0, unknown: 0 };
@@ -141,19 +170,29 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
     return c;
   }, [verified]);
 
+  const reviewedCount = verified.filter((p) => p.override).length;
+  const borderlineCount = verified.filter(
+    (p) => !p.override && (p.baseVerify?.status === "nearby" || p.baseVerify?.status === "mismatch"),
+  ).length;
+
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
     return verified.filter((p) => {
       if (statusFilter !== "all" && p.verify?.status !== statusFilter) return false;
+      if (reviewFilter === "reviewed" && !p.override) return false;
+      if (reviewFilter === "unreviewed" && p.override) return false;
+      if (reviewFilter === "borderline" &&
+        !(!p.override && (p.baseVerify?.status === "nearby" || p.baseVerify?.status === "mismatch"))) return false;
       if (!q) return true;
       return [p.community, p.ward, p.lga, p.state, p.verify?.matchedName, p.verify?.displayName]
         .some((v) => (v || "").toLowerCase().includes(q));
     });
-  }, [verified, query, statusFilter]);
+  }, [verified, query, statusFilter, reviewFilter]);
 
   const confirmRate = points.length
     ? Math.round(((counts.verified + counts.nearby) / points.length) * 100)
     : 0;
+
 
   /* ------------------------------------------------------------------- maps */
   useEffect(() => {
