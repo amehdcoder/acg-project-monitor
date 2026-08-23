@@ -34,6 +34,8 @@ import {
   type GeoName, type VerifyResult, type VerifyStatus, type OverrideDecision,
 } from "@/lib/isc/gpsVerification";
 import { useGpsVerificationReview } from "@/hooks/useGpsVerificationReview";
+import { warmGrid3Index } from "@/lib/isc/grid3Nearest";
+
 import GpsPointPreviewDialog from "./GpsPointPreviewDialog";
 import GpsDiscrepancyHistoryDialog from "./GpsDiscrepancyHistoryDialog";
 import GpsConfidenceBreakdown from "./GpsConfidenceBreakdown";
