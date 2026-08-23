@@ -96,7 +96,15 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
   const [historyFor, setHistoryFor] = useState<VisitPoint | null>(null);
   const [cacheInfo, setCacheInfo] = useState({ size: 0, hits: 0, network: 0, throttled: 0 });
 
+  // Bulk admin review
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkDecision, setBulkDecision] = useState<OverrideDecision>("verified");
+  const [bulkName, setBulkName] = useState("");
+  const [bulkNote, setBulkNote] = useState("");
+  const [bulkSaving, setBulkSaving] = useState(false);
+
   const review = useGpsVerificationReview();
+
 
   /* ------------------------------------------------------------- raw points */
   const points = useMemo<VisitPoint[]>(() => {
