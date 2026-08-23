@@ -290,7 +290,7 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
   const virtualizer = useVirtualizer({
     count: paged.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 46,
+    estimateSize: () => 64,
     overscan: 14,
   });
   const virtualRows = virtualizer.getVirtualItems();
