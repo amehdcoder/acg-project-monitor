@@ -32,6 +32,7 @@ import {
 } from "./ChecklistStatusTables";
 import ChecklistPredictive from "./ChecklistPredictive";
 import ChecklistMaps from "./ChecklistMaps";
+import GpsCommunityVerification from "./GpsCommunityVerification";
 import HouseholdCoverageAnalysis from "./HouseholdCoverageAnalysis";
 import DataIntegrityBadge from "./DataIntegrityBadge";
 import { validate } from "@/lib/isc/chartValidation";
@@ -917,6 +918,9 @@ export default function ChecklistDashboard({
 
       {/* Geospatial: community status + household medicine-offer maps */}
       <ChecklistMaps parents={parents} respondents={respondents} filters={filters} />
+
+      {/* Google satellite / Street View GPS ⇄ community-name verification */}
+      <GpsCommunityVerification parents={parents} />
 
 
       {/* Household survey coverage generalised to Community → Ward → LGA → State */}
