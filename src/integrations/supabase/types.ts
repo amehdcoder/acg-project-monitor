@@ -7453,6 +7453,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "quiz_kobo_submissions_config_id_fkey"
+            columns: ["config_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_kobo_configs_safe"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "quiz_kobo_submissions_quiz_id_fkey"
             columns: ["quiz_id"]
             isOneToOne: false
@@ -9277,6 +9284,62 @@ export type Database = {
       }
     }
     Views: {
+      quiz_kobo_configs_safe: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          form_title: string | null
+          form_uid: string | null
+          id: string | null
+          identity_fields: Json | null
+          last_event_at: string | null
+          last_sync_at: string | null
+          question_config: Json | null
+          quiz_id: string | null
+          server_url: string | null
+          sync_mode: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          form_title?: string | null
+          form_uid?: string | null
+          id?: string | null
+          identity_fields?: Json | null
+          last_event_at?: string | null
+          last_sync_at?: string | null
+          question_config?: Json | null
+          quiz_id?: string | null
+          server_url?: string | null
+          sync_mode?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          form_title?: string | null
+          form_uid?: string | null
+          id?: string | null
+          identity_fields?: Json | null
+          last_event_at?: string | null
+          last_sync_at?: string | null
+          question_config?: Json | null
+          quiz_id?: string | null
+          server_url?: string | null
+          sync_mode?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_kobo_configs_quiz_id_fkey"
+            columns: ["quiz_id"]
+            isOneToOne: true
+            referencedRelation: "quizzes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_form_submissions_enriched: {
         Row: {
           client_submitted_at: string | null
