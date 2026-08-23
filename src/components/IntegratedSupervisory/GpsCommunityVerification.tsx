@@ -284,26 +284,46 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
           streetViewControl: true,
           fullscreenControl: true,
           mapTypeControl: true,
+          scaleControl: true,
+          rotateControl: true,
+          // Google serves imagery to z21 and interpolates beyond; allowing the
+          // deeper zoom lets supervisors inspect individual rooftops.
           maxZoom: 22,
+          mapTypeControlOptions: {
+            mapTypeIds: [
+              google.maps.MapTypeId.HYBRID,
+              google.maps.MapTypeId.SATELLITE,
+              google.maps.MapTypeId.ROADMAP,
+              google.maps.MapTypeId.TERRAIN,
+            ],
+          },
         });
         gmapRef.current = map;
         setProvider("google");
       } catch {
         if (cancelled) return;
-        const map = L.map(el, { zoomControl: true, attributionControl: false }).setView([9.082, 8.6753], 6);
+        const map = L.map(el, { zoomControl: true, attributionControl: false, maxZoom: 22 })
+          .setView([9.082, 8.6753], 6);
+        // Esri World Imagery publishes level-21 tiles over most of Nigeria
+        // (≈0.3 m/px); retina detection doubles the effective sharpness.
         L.tileLayer(
           "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-          { maxZoom: 23, maxNativeZoom: 19, detectRetina: true },
+          { maxZoom: 22, maxNativeZoom: 21, detectRetina: true, crossOrigin: true },
         ).addTo(map);
         L.tileLayer(
           "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
-          { maxZoom: 23, maxNativeZoom: 19, opacity: 0.9 },
+          { maxZoom: 22, maxNativeZoom: 19, opacity: 0.9 },
+        ).addTo(map);
+        L.tileLayer(
+          "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
+          { maxZoom: 22, maxNativeZoom: 19, opacity: 0.8 },
         ).addTo(map);
         lmapRef.current = map;
         lLayer.current = L.layerGroup().addTo(map);
         setTimeout(() => { try { map.invalidateSize(); } catch { /* noop */ } }, 60);
         setProvider("esri");
       }
+
     })();
     return () => {
       cancelled = true;
