@@ -33,6 +33,8 @@ import {
 import { exportEvidenceLedgerCSV, exportEvidenceLedgerPDF } from "@/lib/isc/evidenceLedgerExport";
 import { useEvidenceWatch } from "@/hooks/useEvidenceWatch";
 import ChartRecordsDialog, { type ChartDrillSpec } from "./ChartRecordsDialog";
+import UniqueSignalsTab from "./UniqueSignalsTab";
+
 
 /** Every tab receives this so any insight can open the records behind it. */
 type Drill = (spec: ChartDrillSpec) => void;
