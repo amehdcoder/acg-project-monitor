@@ -88,6 +88,16 @@ export default function GpsDiscrepancyHistoryDialog({
           </div>
         )}
 
+        {point.verify && (
+          <div className="rounded-lg border border-border p-3">
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Confidence breakdown — {point.verify.confidence}% overall
+            </div>
+            <ConfidenceBars verify={point.verify} />
+          </div>
+        )}
+
+
         {/* Timeline */}
         <div className="rounded-lg border border-border">
           <div className="border-b border-border bg-muted/50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
