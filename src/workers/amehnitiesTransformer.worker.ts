@@ -388,6 +388,17 @@ let tokensSeen = 0;
 let lastTelemetry = 0;
 let timer: ReturnType<typeof setTimeout> | null = null;
 
+/** Rolling training-metric series (one sample per telemetry post). */
+export interface MetricSample {
+  at: number; step: number; loss: number; gradNorm: number;
+  tokensPerSec: number; stepsPerSec: number; entropy: number; tokensSeen: number;
+}
+let metrics: MetricSample[] = [];
+let gradNormEMA = 0;
+let tokensPerSec = 0;
+let stepsPerSec = 0;
+let winTokens = 0, winSteps = 0, winStart = 0;
+
 function build(next: Partial<Cfg>, fresh = false) {
   const prev = fresh ? null : model;
   cfg = { ...cfg, ...next };
@@ -429,13 +440,23 @@ function tick() {
     }
     if (!used) break;
     if (used > 1) { const inv = 1 / used; for (const p of model.params) for (let i = 0; i < p.size; i++) p.g[i] *= inv; }
-    model.adam();
+    const gn = model.adam();
+    gradNormEMA = gradNormEMA === 0 ? gn : gradNormEMA * 0.9 + gn * 0.1;
     const loss = batchLoss / used;
     lossEMA = lossEMA === 0 ? loss : lossEMA * 0.95 + loss * 0.05;
     tokensSeen += cfg.ctx * used;
+    winTokens += cfg.ctx * used;
+    winSteps++;
     steps++;
   }
   const now = performance.now();
+  if (!winStart) winStart = t0;
+  const elapsed = now - winStart;
+  if (elapsed > 900) {
+    tokensPerSec = (winTokens * 1000) / elapsed;
+    stepsPerSec = (winSteps * 1000) / elapsed;
+    winTokens = 0; winSteps = 0; winStart = now;
+  }
   if (now - lastTelemetry > 250) { postTelemetry(); lastTelemetry = now; }
   // yield generously so the UI thread and the rest of the app stay smooth
   timer = setTimeout(tick, steps > 0 ? 24 : 400);
@@ -508,6 +529,17 @@ function postTelemetry(structural = false) {
     top = Array.from(ps, (p, id) => ({ id, p: p / sum })).sort((a, b) => b.p - a.p).slice(0, 5);
   }
 
+  const meanEntropy = headEntropy.length
+    ? headEntropy.reduce((a, b) => a + b, 0) / headEntropy.length
+    : (metrics.length ? metrics[metrics.length - 1].entropy : 0);
+  if (lossEMA > 0) {
+    metrics.push({
+      at: Date.now(), step: model.step, loss: lossEMA, gradNorm: gradNormEMA,
+      tokensPerSec, stepsPerSec, entropy: meanEntropy, tokensSeen,
+    });
+    if (metrics.length > 240) metrics = metrics.slice(-240);
+  }
+
   (self as unknown as Worker).postMessage({
     type: "telemetry",
     structural,
@@ -525,7 +557,62 @@ function postTelemetry(structural = false) {
     tokensSeen,
     streamSize: stream.length,
     ctx,
+    gradNorm: gradNormEMA,
+    tokensPerSec,
+    stepsPerSec,
+    entropy: meanEntropy,
+    metrics,
   });
+}
+
+/* ------------------------------------------------------------------ query */
+
+/**
+ * Autoregressively roll the model forward from the tail of the live stream and
+ * report each predicted token with its probability plus the attention row that
+ * produced it (the "evidence" behind the prediction).
+ */
+function runQuery(id: string, steps: number) {
+  const post = (payload: Record<string, unknown>) =>
+    (self as unknown as Worker).postMessage({ type: "query", id, ...payload });
+  if (!model || stream.length < 2) { post({ error: "The model has not seen enough activity yet." }); return; }
+  const T = cfg.ctx, V = cfg.vocab, D = cfg.dModel;
+  const ctxTokens: number[] = stream.slice(-T).map((t) => t % V);
+  while (ctxTokens.length < T) ctxTokens.unshift(0);
+  const prompt = [...ctxTokens];
+  const out: { id: number; p: number; entropy: number; alternatives: { id: number; p: number }[] }[] = [];
+  let evidence: { token: number; weight: number }[] = [];
+
+  for (let s = 0; s < steps; s++) {
+    const x = new Int32Array(T);
+    for (let i = 0; i < T; i++) x[i] = ctxTokens[ctxTokens.length - T + i];
+    const fwd = model.forward(x, x);
+    const logits = new Float32Array(V);
+    for (let c = 0; c < V; c++) {
+      let acc = model.headB.v[c];
+      for (let d = 0; d < D; d++) acc += fwd.lnF[(T - 1) * D + d] * model.head.v[d * V + c];
+      logits[c] = acc;
+    }
+    let max = -Infinity; for (let c = 0; c < V; c++) if (logits[c] > max) max = logits[c];
+    let sum = 0; const ps = new Float32Array(V);
+    for (let c = 0; c < V; c++) { ps[c] = Math.exp(logits[c] - max); sum += ps[c]; }
+    let ent = 0;
+    for (let c = 0; c < V; c++) { ps[c] /= sum; if (ps[c] > 1e-9) ent -= ps[c] * Math.log(ps[c]); }
+    const ranked = Array.from(ps, (p, tid) => ({ id: tid, p })).sort((a, b) => b.p - a.p);
+    out.push({ id: ranked[0].id, p: ranked[0].p, entropy: ent, alternatives: ranked.slice(0, 4) });
+
+    if (s === 0) {
+      // attention paid by the final position, averaged over heads of the last block
+      const last = fwd.caches[cfg.nLayers - 1].att;
+      const Tt = fwd.T, i = Tt - 1;
+      const w = new Array(Tt).fill(0);
+      for (let h = 0; h < cfg.nHeads; h++) for (let j = 0; j <= i; j++) w[j] += last[h * Tt * Tt + i * Tt + j] / cfg.nHeads;
+      evidence = w.map((weight, j) => ({ token: x[j], weight }))
+        .sort((a, b) => b.weight - a.weight).slice(0, 6);
+    }
+    ctxTokens.push(ranked[0].id);
+  }
+  post({ prompt: prompt.slice(-12), predictions: out, evidence, step: model.step, loss: lossEMA });
 }
 
 /* ------------------------------------------------------------- checkpoint */
@@ -591,15 +678,19 @@ self.onmessage = (e: MessageEvent) => {
   switch (msg.type) {
     case "init":
       stream = [];
-      lossEMA = 0; lossHistory = []; tokensSeen = 0; lastFwd = null;
+      lossEMA = 0; lossHistory = []; tokensSeen = 0; lastFwd = null; metrics = [];
       build(msg.cfg || {});
       break;
     case "tokens": {
       if (msg.vocabSize && msg.vocabSize > cfg.vocab) build({ vocab: Math.min(4096, Math.ceil(msg.vocabSize * 1.5)) });
+      if (msg.replace) stream = [];
       stream.push(...(msg.tokens as number[]));
       if (stream.length > 20000) stream = stream.slice(-20000);
       break;
     }
+    case "query":
+      runQuery(String(msg.id ?? "q"), Math.max(1, Math.min(24, msg.steps ?? 6)));
+      break;
     case "run":
       running = !!msg.running;
       if (running && !timer) timer = setTimeout(tick, 0);
@@ -629,7 +720,7 @@ self.onmessage = (e: MessageEvent) => {
       break;
     }
     case "restart": {
-      lossEMA = 0; lossHistory = []; tokensSeen = 0; lastFwd = null; lastTokens = null;
+      lossEMA = 0; lossHistory = []; tokensSeen = 0; lastFwd = null; lastTokens = null; metrics = []; gradNormEMA = 0;
       build(msg.patch || {}, msg.fresh !== false);
       break;
     }

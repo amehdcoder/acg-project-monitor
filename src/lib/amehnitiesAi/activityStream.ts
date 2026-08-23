@@ -98,9 +98,13 @@ export function encodeEvents(tk: Tokenizer, events: ActivityEvent[]): number[] {
  * Pull a bounded slice of recent activity per source. Bounded on purpose:
  * this must never turn into a heavy scan, even on very large projects.
  */
-export async function loadActivityCorpus(tk: Tokenizer, perSource = 400): Promise<Corpus> {
+export async function loadActivityCorpus(
+  tk: Tokenizer,
+  perSource = 400,
+  sources: ActivitySource[] = ACTIVITY_SOURCES,
+): Promise<Corpus> {
   const results = await Promise.all(
-    ACTIVITY_SOURCES.map(async (s) => {
+    sources.map(async (s) => {
       try {
         const { data, error } = await (supabase as any)
           .from(s.table)

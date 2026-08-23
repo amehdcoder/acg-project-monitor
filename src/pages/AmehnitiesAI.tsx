@@ -17,6 +17,11 @@ import { useAmehnitiesBrain } from "@/hooks/useAmehnitiesBrain";
 import NeuralNetworkCanvas from "@/components/AmehnitiesAI/NeuralNetworkCanvas";
 import AttentionMaps from "@/components/AmehnitiesAI/AttentionMaps";
 import LossSparkline from "@/components/AmehnitiesAI/LossSparkline";
+import TrainingControlPanel from "@/components/AmehnitiesAI/TrainingControlPanel";
+import TrainingMetricsDashboard from "@/components/AmehnitiesAI/TrainingMetricsDashboard";
+import DataSourcePanel from "@/components/AmehnitiesAI/DataSourcePanel";
+import AskModelPanel from "@/components/AmehnitiesAI/AskModelPanel";
+import CheckpointsPanel from "@/components/AmehnitiesAI/CheckpointsPanel";
 
 const fmt = (n: number) =>
   n >= 1e9 ? `${(n / 1e9).toFixed(2)}B` : n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : `${n}`;
@@ -39,7 +44,10 @@ export default function AmehnitiesAI() {
   const navigate = useNavigate();
   const {
     telemetry, running, toggle, budget, setBudget, grow, shrink,
-    feed, sourceCounts, corpusReady, synthetic, predictions,
+    feed, sourceCounts, corpusReady, synthetic, predictions, vocab,
+    allSources, enabledSources, toggleSource, setAllSources,
+    exportCheckpoint, importCheckpoint, inspectCheckpoint, applyConfig,
+    checkpoints, downloadSavedCheckpoint, askModel,
   } = useAmehnitiesBrain();
 
   const cfg = telemetry?.cfg;
@@ -222,6 +230,42 @@ export default function AmehnitiesAI() {
               </div>
             </Card>
           </div>
+        </div>
+
+        {/* Training telemetry dashboard */}
+        <div className="mt-4">
+          <TrainingMetricsDashboard metrics={telemetry?.metrics ?? []} running={running} />
+        </div>
+
+        {/* Control, sources, inference and checkpoints */}
+        <div className="mt-4 grid gap-4 lg:grid-cols-3">
+          <TrainingControlPanel
+            telemetry={telemetry}
+            budget={budget}
+            exportCheckpoint={exportCheckpoint}
+            importCheckpoint={importCheckpoint}
+            applyConfig={applyConfig}
+          />
+          <DataSourcePanel
+            allSources={allSources}
+            enabledSources={enabledSources}
+            toggleSource={toggleSource}
+            setAllSources={setAllSources}
+            sourceCounts={sourceCounts}
+            running={running}
+            onToggleRunning={toggle}
+            corpusReady={corpusReady}
+          />
+          <AskModelPanel askModel={askModel} vocab={vocab} />
+        </div>
+
+        <div className="mt-4">
+          <CheckpointsPanel
+            checkpoints={checkpoints}
+            downloadSavedCheckpoint={downloadSavedCheckpoint}
+            inspectCheckpoint={inspectCheckpoint}
+            importCheckpoint={importCheckpoint}
+          />
         </div>
       </div>
     </div>
