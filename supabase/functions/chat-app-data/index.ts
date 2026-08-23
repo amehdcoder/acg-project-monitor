@@ -305,7 +305,6 @@ Deno.serve(async (req) => {
           ...trimmed,
         ],
       }),
-      }),
     });
 
     if (!upstream.ok || !upstream.body) {
