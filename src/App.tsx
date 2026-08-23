@@ -170,6 +170,7 @@ const App = () => (
 
                     <Route path="/__test/microplan-kpi" element={<MicroplanKpiHarness />} />
                     <Route path="/__test/xlsform-cover" element={<XlsFormCoverHarness />} />
+                    <Route path="/__test/amehnities-ai" element={<Suspense fallback={null}><AmehnitiesAI /></Suspense>} />
                     <Route path="/shared/dashboard/:token" element={<SharedDashboard />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
