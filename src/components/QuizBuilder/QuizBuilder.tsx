@@ -26,7 +26,7 @@ import {
   Plus, Trash2, Save, Eye, Send, ChevronUp, ChevronDown,
   BookOpen, Award, Clock, BarChart3, Loader2, CheckCircle, CalendarIcon, Users, UserPlus, Archive, Eraser,
   Lock, LockOpen, DoorOpen, DoorClosed, Sparkles, RotateCcw, Mail, TrendingUp, AlertTriangle, Copy, ArrowRight, Pencil,
-  PlugZap,
+  PlugZap, ShieldCheck,
 } from "lucide-react";
 import QuizKoboSyncDialog from "./QuizKoboSyncDialog";
 import KoboQuestionList from "./KoboQuestionList";
