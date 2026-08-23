@@ -21,6 +21,34 @@ interface ChatMessage { id: string; role: "user" | "assistant"; content: string 
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
 
+/** Markdown renderers styled with the app's semantic tokens (no typography plugin needed). */
+const MD = {
+  p: (p: any) => <p className="text-sm text-foreground" {...p} />,
+  strong: (p: any) => <strong className="font-semibold text-foreground" {...p} />,
+  em: (p: any) => <em className="italic" {...p} />,
+  ul: (p: any) => <ul className="ml-4 list-disc space-y-1 text-sm text-foreground" {...p} />,
+  ol: (p: any) => <ol className="ml-4 list-decimal space-y-1 text-sm text-foreground" {...p} />,
+  li: (p: any) => <li className="marker:text-primary" {...p} />,
+  h1: (p: any) => <h4 className="text-sm font-semibold text-foreground" {...p} />,
+  h2: (p: any) => <h4 className="text-sm font-semibold text-foreground" {...p} />,
+  h3: (p: any) => <h5 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground" {...p} />,
+  a: (p: any) => <a className="text-primary underline underline-offset-2" target="_blank" rel="noreferrer" {...p} />,
+  code: ({ inline, ...p }: any) =>
+    inline
+      ? <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]" {...p} />
+      : <code className="block overflow-x-auto rounded-lg bg-muted p-3 font-mono text-[11px]" {...p} />,
+  blockquote: (p: any) => <blockquote className="border-l-2 border-primary/50 pl-3 text-sm text-muted-foreground" {...p} />,
+  table: (p: any) => (
+    <div className="overflow-x-auto rounded-lg border border-border/60">
+      <table className="w-full border-collapse text-xs" {...p} />
+    </div>
+  ),
+  thead: (p: any) => <thead className="bg-muted/60" {...p} />,
+  th: (p: any) => <th className="border-b border-border/60 px-2.5 py-1.5 text-left font-semibold text-foreground" {...p} />,
+  td: (p: any) => <td className="border-b border-border/40 px-2.5 py-1.5 text-muted-foreground" {...p} />,
+  hr: () => <hr className="border-border/60" />,
+};
+
 export default function AmehnitiesChatBox({
   telemetry, corpusEvents,
 }: { telemetry: Telemetry | null; corpusEvents: number }) {
