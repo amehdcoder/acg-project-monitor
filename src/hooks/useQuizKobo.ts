@@ -61,7 +61,16 @@ export function useQuizKobo(quizId: string | null | undefined) {
       supabase.from("quiz_kobo_submissions").select("*").eq("quiz_id", quizId)
         .order("submitted_at", { ascending: false }).limit(5000),
     ]);
-    setConfig((cfg as unknown as QuizKoboConfig) ?? null);
+    let resolved = (cfg as unknown as QuizKoboConfig) ?? null;
+    if (!resolved) {
+      // Non-admin analytics viewers cannot read the config table directly (it
+      // stores the KoboToolbox API token). Fall back to the credential-free RPC.
+      const { data: safe } = await supabase.rpc("get_quiz_kobo_config_safe", { _quiz_id: quizId });
+      const row = Array.isArray(safe) ? safe[0] : null;
+      resolved = (row as unknown as QuizKoboConfig) ?? null;
+    }
+    setConfig(resolved);
+
     setSubmissions(((subs ?? []) as unknown as QuizKoboSubmissionRow[]));
     setLoading(false);
   }, [quizId]);

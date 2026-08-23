@@ -9636,6 +9636,24 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_quiz_kobo_config_safe: {
+        Args: { _quiz_id: string }
+        Returns: {
+          created_at: string
+          created_by: string
+          form_title: string
+          form_uid: string
+          id: string
+          identity_fields: Json
+          last_event_at: string
+          last_sync_at: string
+          question_config: Json
+          quiz_id: string
+          server_url: string
+          sync_mode: string
+          updated_at: string
+        }[]
+      }
       get_quiz_questions_for_attempt: {
         Args: { p_quiz_id: string }
         Returns: {
