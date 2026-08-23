@@ -586,7 +586,7 @@ function runQuery(id: string, steps: number) {
   for (let s = 0; s < steps; s++) {
     const x = new Int32Array(T);
     for (let i = 0; i < T; i++) x[i] = ctxTokens[ctxTokens.length - T + i];
-    const fwd = model.forward(x);
+    const fwd = model.forward(x, x);
     const logits = new Float32Array(V);
     for (let c = 0; c < V; c++) {
       let acc = model.headB.v[c];
