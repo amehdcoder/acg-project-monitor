@@ -587,8 +587,10 @@ function tick() {
     if (!used) break;
     if (used > 1) { const inv = 1 / used; for (const p of model.params) for (let i = 0; i < p.size; i++) p.g[i] *= inv; }
     const gn = model.adam();
-    gradNormEMA = gradNormEMA === 0 ? gn : gradNormEMA * 0.9 + gn * 0.1;
     const loss = batchLoss / used;
+    checkDivergence(gn, loss);
+    if (!running) { postTelemetry(true); return; }
+    gradNormEMA = gradNormEMA === 0 ? gn : gradNormEMA * 0.9 + gn * 0.1;
     lossEMA = lossEMA === 0 ? loss : lossEMA * 0.95 + loss * 0.05;
     tokensSeen += cfg.ctx * used;
     winTokens += cfg.ctx * used;
@@ -602,6 +604,11 @@ function tick() {
     tokensPerSec = (winTokens * 1000) / elapsed;
     stepsPerSec = (winSteps * 1000) / elapsed;
     winTokens = 0; winSteps = 0; winStart = now;
+  }
+  // Held-out evaluation, throttled so it never competes with training for CPU.
+  if (evalEnabled && steps > 0 && Date.now() - lastEvalAt > evalEveryMs) {
+    lastEvalAt = Date.now();
+    evaluateValidation();
   }
   if (now - lastTelemetry > 250) { postTelemetry(); lastTelemetry = now; }
   // yield generously so the UI thread and the rest of the app stay smooth
