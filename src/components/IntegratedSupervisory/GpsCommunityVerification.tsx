@@ -160,7 +160,9 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
       const base = verifyPlace(
         { community: p.community, ward: p.ward, lga: p.lga, state: p.state },
         geoMap.get(locKey) ?? null,
+        { lat: p.lat, lng: p.lng },
       );
+
       const ovr = review.overrides[locKey];
       return { ...p, locKey, baseVerify: base, override: ovr, verify: applyOverride(base, ovr) };
     }),
