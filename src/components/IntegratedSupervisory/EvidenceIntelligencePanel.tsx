@@ -274,7 +274,13 @@ const TARGETS: { key: "any" | MdaClass; label: string }[] = [
   { key: "Halted", label: "Halted" },
 ];
 
-function RegressionTab({ parents }: { parents: Row[] }) {
+const DIAG_STYLE = {
+  pass: "border-emerald-500 text-emerald-600",
+  warn: "border-amber-500 text-amber-600",
+  fail: "border-rose-500 text-rose-600",
+} as const;
+
+function RegressionTab({ parents, drill }: { parents: Row[]; drill: Drill }) {
   const [target, setTarget] = useState<"any" | MdaClass>("any");
   const model = useMemo(() => runCompletionRegression(parents, target), [parents, target]);
 
@@ -333,7 +339,15 @@ function RegressionTab({ parents }: { parents: Row[] }) {
                   contentStyle={TOOLTIP_STYLE}
                   formatter={(v: number, _n, e: any) => [`β=${v} · odds ×${e?.payload?.or?.toFixed(2)}`, "Effect"]}
                 />
-                <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                <Bar
+                  dataKey="value"
+                  radius={[0, 4, 4, 0]}
+                  cursor="pointer"
+                  onClick={(d: any) => {
+                    const t = model.terms.find((x) => x.label === d?.name);
+                    if (t) drill({ title: t.label, category: "Risk condition present", color: "#DC2626", rows: t.rowsPresent, note: t.meaning });
+                  }}
+                >
                   {chart.map((c, i) => (
                     <Cell key={i} fill={c.value >= 0 ? (c.sig ? "#DC2626" : "#F59E0B") : (c.sig ? "#128B5B" : "#94A3B8")} />
                   ))}
@@ -357,13 +371,19 @@ function RegressionTab({ parents }: { parents: Row[] }) {
                   <th className="px-2 py-2 text-right font-semibold">β</th>
                   <th className="px-2 py-2 text-right font-semibold">Odds ratio (95% CI)</th>
                   <th className="px-2 py-2 text-right font-semibold">p-value</th>
+                  <th className="px-2 py-2 text-right font-semibold">VIF</th>
                   <th className="px-2 py-2 text-right font-semibold">Prevalence</th>
                   <th className="px-2 py-2 text-right font-semibold">Fail rate present → absent</th>
                 </tr>
               </thead>
               <tbody>
                 {model.terms.map((t) => (
-                  <tr key={t.key} className={`border-t ${t.significant ? "bg-rose-50/40 dark:bg-rose-950/10" : ""}`}>
+                  <tr
+                    key={t.key}
+                    className={`cursor-pointer border-t hover:bg-primary/5 ${t.significant ? "bg-rose-50/40 dark:bg-rose-950/10" : ""}`}
+                    title="Open the records where this condition was present"
+                    onClick={() => drill({ title: t.label, category: "Risk condition present", color: "#DC2626", rows: t.rowsPresent, note: t.meaning })}
+                  >
                     <td className="px-2 py-1.5">
                       <span className="font-medium">{t.label}</span>
                       <p className="text-[10px] text-muted-foreground">{t.meaning}</p>
@@ -376,6 +396,9 @@ function RegressionTab({ parents }: { parents: Row[] }) {
                     <td className={`px-2 py-1.5 text-right tabular-nums ${t.significant ? "font-semibold text-rose-600" : "text-muted-foreground"}`}>
                       {pval(t.p)}
                     </td>
+                    <td className={`px-2 py-1.5 text-right tabular-nums ${t.vif >= 10 ? "font-semibold text-rose-600" : t.vif >= 5 ? "text-amber-600" : "text-muted-foreground"}`}>
+                      {Number.isFinite(t.vif) ? t.vif.toFixed(2) : "—"}
+                    </td>
                     <td className="px-2 py-1.5 text-right tabular-nums">{pct(t.prevalence)}</td>
                     <td className="px-2 py-1.5 text-right tabular-nums">
                       {pct(t.failWhenPresent)} → {pct(t.failWhenAbsent)}
@@ -385,6 +408,59 @@ function RegressionTab({ parents }: { parents: Row[] }) {
               </tbody>
             </table>
           </div>
+
+          {model.diagnostics && (
+            <div className="rounded-lg border bg-muted/20 p-3">
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold">
+                <ShieldCheck className="h-3.5 w-3.5 text-primary" /> Model diagnostics — can these odds ratios be trusted?
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {model.diagnostics.checks.map((c) => (
+                  <div key={c.key} className="rounded-md border bg-background/70 p-2">
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-semibold">{c.label}</span>
+                      <Badge variant="outline" className={`text-[9px] ${DIAG_STYLE[c.status]}`}>
+                        {c.status === "pass" ? "OK" : c.status === "warn" ? "Caution" : "Weak"}
+                      </Badge>
+                    </div>
+                    <p className="font-display text-sm font-bold tabular-nums">{c.value}</p>
+                    <p className="mt-0.5 text-[10px] leading-relaxed text-muted-foreground">{c.explanation}</p>
+                  </div>
+                ))}
+              </div>
+
+              <p className="mt-3 mb-1 text-[11px] font-semibold">Calibration curve — predicted vs observed non-completion</p>
+              <div className="h-[200px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={model.diagnostics.calibration.map((b) => ({
+                      bin: `B${b.bin}`,
+                      Predicted: Number((b.predicted * 100).toFixed(1)),
+                      Observed: Number((b.observed * 100).toFixed(1)),
+                      n: b.n,
+                    }))}
+                    margin={{ top: 8, right: 12, left: 0, bottom: 4 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+                    <XAxis dataKey="bin" tick={{ fontSize: 10 }} />
+                    <YAxis tick={{ fontSize: 10 }} unit="%" />
+                    <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number, n) => [`${v}%`, String(n)]} />
+                    <Bar dataKey="Predicted" fill="#94A3B8" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="Observed" fill="#1668DC" radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <SectionNote>
+                Records are ranked by predicted risk and split into equal bands. When the blue (observed) bars track the
+                grey (predicted) bars, the model's probabilities are honest. Brier score{" "}
+                <strong>{model.diagnostics.brier.toFixed(3)}</strong> (lower is better) and AUC{" "}
+                <strong>{model.diagnostics.auc.toFixed(3)}</strong> summarise accuracy and ranking power. Assumptions
+                checked here: adequate events per variable, no crippling multicollinearity, no complete separation,
+                convergence, calibration and missing-data load. Independence of observations is assumed — each row is one
+                community visit.
+              </SectionNote>
+            </div>
+          )}
 
           {model.terms.filter((t) => t.significant && t.coef > 0).length > 0 && (
             <div className="rounded-lg border border-rose-300 bg-rose-50/60 p-3 dark:bg-rose-950/20">
