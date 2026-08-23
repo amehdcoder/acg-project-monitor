@@ -156,13 +156,55 @@ export function useGpsVerificationReview() {
     return true;
   }, [isAdmin, user]);
 
-  const clearOverride = useCallback(async (locKey: string) => {
+  /** Apply the same decision + note to many locations in one round trip. */
+  const saveOverridesBulk = useCallback(async (
+    items: { locKey: string; submissionId?: string; community: string; lat: number; lng: number }[],
+    opts: { decision: OverrideDecision; correctedName?: string; note?: string },
+  ) => {
+    if (!isAdmin || !user) { toast.error("Only administrators can review GPS matches."); return false; }
+    if (!items.length) { toast.error("Select at least one point to review."); return false; }
+    const reviewedAt = new Date().toISOString();
+    const rows = items.map((p) => ({
+      loc_key: p.locKey,
+      submission_id: p.submissionId ?? null,
+      community: p.community,
+      lat: p.lat,
+      lng: p.lng,
+      decision: opts.decision,
+      corrected_name: opts.correctedName ?? "",
+      note: opts.note ?? "",
+      reviewed_by: user.id,
+      reviewed_at: reviewedAt,
+    }));
+    const { data, error } = await supabase
+      .from("gps_verification_overrides")
+      .upsert(rows, { onConflict: "loc_key" })
+      .select("*");
+    if (error) { toast.error(`Bulk review failed: ${error.message}`); return false; }
+    if (data) {
+      setOverrides((p) => {
+        const n = { ...p };
+        (data as GpsOverride[]).forEach((r) => { n[r.loc_key] = r; });
+        return n;
+      });
+    }
+    toast.success(`${rows.length} point${rows.length === 1 ? "" : "s"} marked ${opts.decision}`);
+    return true;
+  }, [isAdmin, user]);
+
+  const clearOverridesBulk = useCallback(async (locKeys: string[]) => {
     if (!isAdmin) { toast.error("Only administrators can review GPS matches."); return; }
-    const { error } = await supabase.from("gps_verification_overrides").delete().eq("loc_key", locKey);
+    if (!locKeys.length) return;
+    const { error } = await supabase.from("gps_verification_overrides").delete().in("loc_key", locKeys);
     if (error) { toast.error(error.message); return; }
-    setOverrides((p) => { const n = { ...p }; delete n[locKey]; return n; });
-    toast.success("Override removed");
+    setOverrides((p) => { const n = { ...p }; locKeys.forEach((k) => delete n[k]); return n; });
+    toast.success(`${locKeys.length} override${locKeys.length === 1 ? "" : "s"} removed`);
   }, [isAdmin]);
 
-  return { overrides, historyByKey, loading, isAdmin, saveOverride, clearOverride, recordSnapshots, reload: load };
+  return {
+    overrides, historyByKey, loading, isAdmin,
+    saveOverride, clearOverride, saveOverridesBulk, clearOverridesBulk,
+    recordSnapshots, reload: load,
+  };
 }
+
