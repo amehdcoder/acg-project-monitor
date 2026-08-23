@@ -148,13 +148,15 @@ export function splitFollowups(raw: string): { answer: string; followups: string
 /** Citation markers actually referenced by an answer, in first-appearance order. */
 export function usedCitations(answer: string, catalog: Citation[]): Citation[] {
   const seen: string[] = [];
-  for (const m of answer.matchAll(/\[(E\d+)\]/g)) {
+  // [E#] = application record, [W#] = published internet evidence.
+  for (const m of answer.matchAll(/\[([EW]\d+)\]/g)) {
     if (!seen.includes(m[1])) seen.push(m[1]);
   }
   return seen
     .map((ref) => catalog.find((c) => c.ref === ref))
     .filter((c): c is Citation => Boolean(c));
 }
+
 
 /* ------------------------------------------------------------------ *
  * Reinforcement-learning loop
