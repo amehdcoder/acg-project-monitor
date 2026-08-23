@@ -14,7 +14,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
   Bot, User, SendHorizontal, Loader2, Trash2, Radio, History, Plus,
-  Database, Clock, Hash, MessageSquare, Sparkles,
+  Database, Clock, Hash, MessageSquare, Sparkles, ThumbsUp, ThumbsDown,
+  RefreshCw, GraduationCap, Check, BrainCircuit,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,8 +28,9 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Telemetry } from "@/hooks/useAmehnitiesBrain";
 import {
-  type Citation, type Conversation, createConversation, deleteConversation,
-  listConversations, loadMessages, saveMessage, splitFollowups, titleFromQuestion, usedCitations,
+  type Citation, type Conversation, type PolicyApplied, countLearnedRules,
+  createConversation, deleteConversation, listConversations, loadMessages, saveMessage,
+  sendFeedback, splitFollowups, titleFromQuestion, usedCitations,
 } from "@/lib/amehnitiesAi/chatHistory";
 
 interface ChatMessage {
