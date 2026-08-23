@@ -440,13 +440,23 @@ function tick() {
     }
     if (!used) break;
     if (used > 1) { const inv = 1 / used; for (const p of model.params) for (let i = 0; i < p.size; i++) p.g[i] *= inv; }
-    model.adam();
+    const gn = model.adam();
+    gradNormEMA = gradNormEMA === 0 ? gn : gradNormEMA * 0.9 + gn * 0.1;
     const loss = batchLoss / used;
     lossEMA = lossEMA === 0 ? loss : lossEMA * 0.95 + loss * 0.05;
     tokensSeen += cfg.ctx * used;
+    winTokens += cfg.ctx * used;
+    winSteps++;
     steps++;
   }
   const now = performance.now();
+  if (!winStart) winStart = t0;
+  const elapsed = now - winStart;
+  if (elapsed > 900) {
+    tokensPerSec = (winTokens * 1000) / elapsed;
+    stepsPerSec = (winSteps * 1000) / elapsed;
+    winTokens = 0; winSteps = 0; winStart = now;
+  }
   if (now - lastTelemetry > 250) { postTelemetry(); lastTelemetry = now; }
   // yield generously so the UI thread and the rest of the app stay smooth
   timer = setTimeout(tick, steps > 0 ? 24 : 400);
