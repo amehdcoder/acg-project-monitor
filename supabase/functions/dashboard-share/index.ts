@@ -351,11 +351,18 @@ Deno.serve(async (req) => {
     // Column selection is sanitized so sensitive PII (profile emails/phones)
     // can never be returned through a share link.
     const rawColumns = typeof body?.columns === "string" ? body.columns : "*";
+    const embedErr = rejectEmbeddedSelect(rawColumns);
+    if (embedErr) return json({ error: embedErr, data: null }, 403);
     const columns = sanitizeColumns(table, rawColumns);
-    const selectOptions = body?.selectOptions && typeof body.selectOptions === "object"
-      ? body.selectOptions : undefined;
+    const rawSelectOptions = body?.selectOptions && typeof body.selectOptions === "object"
+      ? body.selectOptions as Record<string, unknown> : undefined;
+    // Only `count`/`head` are honoured — never a referenced-table traversal.
+    const selectOptions = rawSelectOptions
+      ? { count: rawSelectOptions.count, head: rawSelectOptions.head } as any
+      : undefined;
     const filters = Array.isArray(body?.filters) ? body.filters : [];
     const order = Array.isArray(body?.order) ? body.order : [];
+
 
     // Every query is scoped to the share's own project. Tables without a
     // project dimension that could expose per-user PII (e.g. profiles) are
