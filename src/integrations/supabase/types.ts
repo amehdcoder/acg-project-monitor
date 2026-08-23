@@ -757,6 +757,123 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_review_queue: {
+        Row: {
+          answer: string
+          citations: number
+          conversation_id: string | null
+          created_at: string
+          downvotes: number
+          id: string
+          message_id: string | null
+          model: string
+          policy_ids: Json
+          question: string
+          question_class: string
+          reason: string
+          resolved_at: string | null
+          reviewer_correction: string | null
+          reviewer_id: string | null
+          reward: number
+          severity: number
+          status: string
+          submitted_by: string | null
+          tier: string
+        }
+        Insert: {
+          answer?: string
+          citations?: number
+          conversation_id?: string | null
+          created_at?: string
+          downvotes?: number
+          id?: string
+          message_id?: string | null
+          model?: string
+          policy_ids?: Json
+          question?: string
+          question_class?: string
+          reason?: string
+          resolved_at?: string | null
+          reviewer_correction?: string | null
+          reviewer_id?: string | null
+          reward?: number
+          severity?: number
+          status?: string
+          submitted_by?: string | null
+          tier?: string
+        }
+        Update: {
+          answer?: string
+          citations?: number
+          conversation_id?: string | null
+          created_at?: string
+          downvotes?: number
+          id?: string
+          message_id?: string | null
+          model?: string
+          policy_ids?: Json
+          question?: string
+          question_class?: string
+          reason?: string
+          resolved_at?: string | null
+          reviewer_correction?: string | null
+          reviewer_id?: string | null
+          reward?: number
+          severity?: number
+          status?: string
+          submitted_by?: string | null
+          tier?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_review_queue_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "ai_chat_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_review_queue_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "ai_chat_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_route_stats: {
+        Row: {
+          avg_reward: number
+          id: string
+          model: string
+          question_class: string
+          reward_sum: number
+          tier: string
+          trials: number
+          updated_at: string
+        }
+        Insert: {
+          avg_reward?: number
+          id?: string
+          model?: string
+          question_class: string
+          reward_sum?: number
+          tier: string
+          trials?: number
+          updated_at?: string
+        }
+        Update: {
+          avg_reward?: number
+          id?: string
+          model?: string
+          question_class?: string
+          reward_sum?: number
+          tier?: string
+          trials?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       antidepressant_stock: {
         Row: {
           created_at: string
@@ -9733,6 +9850,10 @@ export type Database = {
       accessible_project_ids: { Args: { _user_id: string }; Returns: string[] }
       ai_policy_reward: {
         Args: { _policy_id: string; _reward: number }
+        Returns: undefined
+      }
+      ai_route_reward: {
+        Args: { _class: string; _model: string; _reward: number; _tier: string }
         Returns: undefined
       }
       approve_after_hours_request: {
