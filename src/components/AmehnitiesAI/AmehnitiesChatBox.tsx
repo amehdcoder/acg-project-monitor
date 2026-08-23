@@ -139,6 +139,8 @@ export default function AmehnitiesChatBox({
     }
 
     let catalog: Citation[] = [];
+    let policyIds: string[] = [];
+    let policyApplied: PolicyApplied[] = [];
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-app-data`, {
@@ -188,8 +190,10 @@ export default function AmehnitiesChatBox({
           if (!data || data === "[DONE]") continue;
           try {
             const parsed = JSON.parse(data);
-            if (parsed?.amehnities?.citations) {
-              catalog = parsed.amehnities.citations as Citation[];
+            if (parsed?.amehnities) {
+              catalog = (parsed.amehnities.citations ?? []) as Citation[];
+              policyIds = (parsed.amehnities.policyIds ?? []) as string[];
+              policyApplied = (parsed.amehnities.policyApplied ?? []) as PolicyApplied[];
               continue;
             }
             const delta = parsed?.choices?.[0]?.delta?.content;
@@ -206,14 +210,16 @@ export default function AmehnitiesChatBox({
       const body = finalAnswer || "_I could not determine an answer from the available application data._";
       const cites = usedCitations(body, catalog);
       setMessages((m) => m.map((x) => (x.id === replyId
-        ? { ...x, content: body, citations: cites, followups }
+        ? { ...x, content: body, citations: cites, followups, policyIds, policyApplied, question }
         : x)));
 
       if (convIdRef.current) {
         try {
-          await saveMessage(convIdRef.current, {
+          const rowId = await saveMessage(convIdRef.current, {
             role: "assistant", content: body, citations: cites, followups,
           });
+          // Adopt the database row id so feedback can be attached to this answer.
+          setMessages((m) => m.map((x) => (x.id === replyId ? { ...x, id: rowId } : x)));
           void refreshConversations();
         } catch (e: any) {
           toast.error("Answer could not be saved to history", { description: e?.message });
