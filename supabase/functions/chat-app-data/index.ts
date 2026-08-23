@@ -277,7 +277,9 @@ Deno.serve(async (req) => {
     }
 
     const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-    const ctx = await buildContext(token);
+    const lastQuestion = String(messages[messages.length - 1]?.content ?? "").slice(0, 2000);
+    const [ctx, policy] = await Promise.all([buildContext(token), retrievePolicy(lastQuestion)]);
+    const learned = policyBlock(policy.rules, policy.exemplars);
 
     const trimmed = messages.slice(-16).map((m: { role: string; content: string }) => ({
       role: m.role === "assistant" ? "assistant" : "user",
@@ -296,9 +298,11 @@ Deno.serve(async (req) => {
         stream: true,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
+          ...(learned ? [{ role: "system", content: learned }] : []),
           { role: "system", content: `LIVE APPLICATION CONTEXT\n\n${contextBlock(ctx, modelStats)}` },
           ...trimmed,
         ],
+      }),
       }),
     });
 
