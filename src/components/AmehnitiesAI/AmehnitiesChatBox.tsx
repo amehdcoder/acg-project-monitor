@@ -671,7 +671,29 @@ export default function AmehnitiesChatBox({
               {openCitation?.label}
             </DialogTitle>
           </DialogHeader>
-          {openCitation && (
+          {openCitation?.kind === "web" ? (
+            <div className="space-y-2.5 text-sm">
+              <div className="flex items-start gap-2">
+                <Globe className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <div className="min-w-0">
+                  <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Published source</p>
+                  <p className="text-xs text-foreground">
+                    {openCitation.publisher ?? "Web"}
+                    {openCitation.timestamp?.slice(0, 4) ? ` · ${openCitation.timestamp.slice(0, 4)}` : ""}
+                  </p>
+                  <p className="break-all font-mono text-[10px] text-muted-foreground">{openCitation.url}</p>
+                </div>
+              </div>
+              {openCitation.detail && (
+                <p className="rounded-lg border border-border/60 bg-muted/30 p-2.5 text-xs leading-relaxed text-muted-foreground">
+                  {openCitation.detail}
+                </p>
+              )}
+              <Button size="sm" variant="outline" className="w-full" asChild>
+                <a href={openCitation.url} target="_blank" rel="noreferrer">Open source</a>
+              </Button>
+            </div>
+          ) : openCitation && (
             <div className="space-y-2.5 text-sm">
               <div className="flex items-start gap-2">
                 <Hash className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
@@ -708,6 +730,7 @@ export default function AmehnitiesChatBox({
                 Copy event ID
               </Button>
             </div>
+
           )}
         </DialogContent>
       </Dialog>
