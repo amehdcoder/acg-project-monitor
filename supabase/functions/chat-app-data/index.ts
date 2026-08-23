@@ -260,6 +260,19 @@ async function retrievePolicy(question: string) {
   return { rules, exemplars, ids: [...rules, ...exemplars].map((r) => r.id) };
 }
 
+/** Learned routing evidence — reward per (question class, model tier). */
+async function loadRouteStats() {
+  const url = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !serviceKey) return [];
+  const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
+  const { data } = await admin
+    .from("ai_route_stats")
+    .select("question_class,tier,avg_reward,trials")
+    .limit(200);
+  return (data ?? []) as { question_class: string; tier: Tier; avg_reward: number; trials: number }[];
+}
+
 function policyBlock(rules: PolicyRow[], exemplars: PolicyRow[]) {
   if (!rules.length && !exemplars.length) return "";
   const lines: string[] = [];
@@ -365,6 +378,15 @@ Deno.serve(async (req) => {
         policyIds: policy.ids,
         policyApplied: policy.rules.map((r) => ({ topic: r.topic, content: r.content, avgReward: Number(r.avg_reward) })),
         precedents: policy.exemplars.length,
+        route: {
+          tier,
+          model,
+          label: TIER_LABEL[tier],
+          questionClass,
+          heuristicTier,
+          learned: routed.learned,
+          evidence: routed.evidence,
+        },
       },
     })}\n\n`;
 
