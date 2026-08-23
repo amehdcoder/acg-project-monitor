@@ -367,6 +367,7 @@ export function runCompletionRegression(parents: Row[], target: "any" | MdaClass
   if (n < 12 || events === 0 || events === n || active.length === 0) {
     return {
       n, events, baseRate: n ? events / n : 0, terms: [], pseudoR2: 0, accuracy: 0, converged: false,
+      rows: usable, diagnostics: null,
       note:
         n < 12
           ? "Not enough completed checklists yet — the model needs at least 12 records with a recorded MDA status."
@@ -381,6 +382,7 @@ export function runCompletionRegression(parents: Row[], target: "any" | MdaClass
   // Design matrix, mean-imputed for unanswered items.
   const X = usable.map((_, i) => [1, ...active.map((c) => (c.vals[i] == null ? c.mean : (c.vals[i] as number)))]);
   const fit = fitLogistic(X, y);
+  const vifs = computeVIF(X.map((r) => r.slice(1)));
 
   const terms: RegressionTerm[] = active.map((c, j) => {
     const coef = fit.beta[j + 1];
@@ -406,13 +408,195 @@ export function runCompletionRegression(parents: Row[], target: "any" | MdaClass
       failWhenAbsent: nA ? failA / nA : 0,
       n: c.answered,
       significant: p < 0.05,
+      vif: vifs[j] ?? 1,
+      rowsPresent: usable.filter((_, i) => c.vals[i] === 1),
+      rowsAbsent: usable.filter((_, i) => c.vals[i] === 0),
     };
   }).sort((a, b) => Math.abs(b.z) - Math.abs(a.z));
+
+  const predicted = X.map((row) => {
+    const eta = row.reduce((s2, v, j) => s2 + v * fit.beta[j], 0);
+    return 1 / (1 + Math.exp(-Math.max(-30, Math.min(30, eta))));
+  });
+  const imputed = active.reduce((s2, c) => s2 + c.vals.filter((v) => v == null).length, 0);
+  const diagnostics = buildDiagnostics({
+    y, predicted, terms, converged: fit.converged,
+    imputedShare: imputed / Math.max(active.length * n, 1),
+  });
 
   return {
     n, events, baseRate: events / n, terms,
     pseudoR2: fit.pseudoR2, accuracy: fit.accuracy, converged: fit.converged,
+    rows: usable, diagnostics,
   };
+}
+
+/* ------------------------------------------------- regression diagnostics */
+
+/** Upper-tail p-value of a chi-square statistic (regularized incomplete gamma Q). */
+export function chiSquareP(x: number, df: number): number {
+  if (!isFinite(x) || x <= 0 || df <= 0) return 1;
+  const a = df / 2;
+  const xx = x / 2;
+  const lg = lnGamma(a);
+  if (xx < a + 1) {
+    // series expansion for P(a, x)
+    let ap = a, sum = 1 / a, del = sum;
+    for (let i = 0; i < 500; i++) {
+      ap++; del *= xx / ap; sum += del;
+      if (Math.abs(del) < Math.abs(sum) * 1e-12) break;
+    }
+    const P = sum * Math.exp(-xx + a * Math.log(xx) - lg);
+    return Math.min(1, Math.max(0, 1 - P));
+  }
+  // continued fraction for Q(a, x)
+  let b = xx + 1 - a, c = 1e30, d = 1 / b, h = d;
+  for (let i = 1; i < 500; i++) {
+    const an = -i * (i - a);
+    b += 2; d = an * d + b; if (Math.abs(d) < 1e-30) d = 1e-30;
+    c = b + an / c; if (Math.abs(c) < 1e-30) c = 1e-30;
+    d = 1 / d;
+    const del = d * c; h *= del;
+    if (Math.abs(del - 1) < 1e-12) break;
+  }
+  const Q = Math.exp(-xx + a * Math.log(xx) - lg) * h;
+  return Math.min(1, Math.max(0, Q));
+}
+
+function lnGamma(x: number): number {
+  const c = [76.18009172947146, -86.50532032941677, 24.01409824083091,
+    -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5];
+  let y = x, tmp = x + 5.5;
+  tmp -= (x + 0.5) * Math.log(tmp);
+  let ser = 1.000000000190015;
+  for (let j = 0; j < 6; j++) ser += c[j] / ++y;
+  return -tmp + Math.log((2.5066282746310005 * ser) / x);
+}
+
+/** Variance inflation factors from the predictor block (no intercept column). */
+export function computeVIF(cols: number[][]): number[] {
+  const n = cols.length;
+  const k = n ? cols[0].length : 0;
+  if (k < 2) return new Array(k).fill(1);
+  const mean = Array.from({ length: k }, (_, j) => cols.reduce((s, r) => s + r[j], 0) / n);
+  const sd = Array.from({ length: k }, (_, j) =>
+    Math.sqrt(cols.reduce((s, r) => s + (r[j] - mean[j]) ** 2, 0) / Math.max(n - 1, 1)));
+  const corr: number[][] = Array.from({ length: k }, () => new Array(k).fill(0));
+  for (let a = 0; a < k; a++) {
+    for (let b2 = 0; b2 < k; b2++) {
+      if (!sd[a] || !sd[b2]) { corr[a][b2] = a === b2 ? 1 : 0; continue; }
+      const cov = cols.reduce((s, r) => s + (r[a] - mean[a]) * (r[b2] - mean[b2]), 0) / Math.max(n - 1, 1);
+      corr[a][b2] = cov / (sd[a] * sd[b2]);
+    }
+  }
+  for (let a = 0; a < k; a++) corr[a][a] += 1e-8;
+  const inv = invert(corr);
+  if (!inv) return new Array(k).fill(NaN);
+  return Array.from({ length: k }, (_, j) => Math.max(1, inv[j][j]));
+}
+
+function buildDiagnostics(args: {
+  y: number[];
+  predicted: number[];
+  terms: RegressionTerm[];
+  converged: boolean;
+  imputedShare: number;
+}): RegressionDiagnostics {
+  const { y, predicted, terms, converged, imputedShare } = args;
+  const events = y.reduce((s, v) => s + v, 0);
+  const epv = terms.length ? Math.min(events, y.length - events) / terms.length : 0;
+  const maxVif = terms.reduce((m, t) => Math.max(m, Number.isFinite(t.vif) ? t.vif : 0), 0);
+  const separation = terms.some((t) => Math.abs(t.coef) > 5 || t.ciHigh > 500 || (t.ciLow > 0 && t.ciLow < 1e-3));
+
+  // Calibration: order by predicted risk, split into up to 10 equal bins.
+  const idx = predicted.map((p, i) => i).sort((a, b2) => predicted[a] - predicted[b2]);
+  const g = Math.max(2, Math.min(10, Math.floor(y.length / 10) || 2));
+  const calibration: CalibrationBin[] = [];
+  let hl = 0;
+  for (let b2 = 0; b2 < g; b2++) {
+    const slice = idx.slice(Math.floor((b2 * idx.length) / g), Math.floor(((b2 + 1) * idx.length) / g));
+    if (!slice.length) continue;
+    const exp = slice.reduce((s, i) => s + predicted[i], 0);
+    const obs = slice.reduce((s, i) => s + y[i], 0);
+    const nb = slice.length;
+    const pbar = exp / nb;
+    if (pbar > 0 && pbar < 1) hl += ((obs - exp) ** 2) / (nb * pbar * (1 - pbar));
+    calibration.push({ bin: calibration.length + 1, n: nb, predicted: pbar, observed: obs / nb });
+  }
+  const hlDf = Math.max(1, calibration.length - 2);
+  const hlP = chiSquareP(hl, hlDf);
+
+  const brier = y.reduce((s, yi, i) => s + (predicted[i] - yi) ** 2, 0) / Math.max(y.length, 1);
+
+  // AUC via rank statistic.
+  const pos = y.map((v, i) => (v === 1 ? predicted[i] : null)).filter((v): v is number => v != null);
+  const neg = y.map((v, i) => (v === 0 ? predicted[i] : null)).filter((v): v is number => v != null);
+  let auc = 0.5;
+  if (pos.length && neg.length) {
+    let wins = 0;
+    for (const a of pos) for (const b2 of neg) wins += a > b2 ? 1 : a === b2 ? 0.5 : 0;
+    auc = wins / (pos.length * neg.length);
+  }
+
+  const checks: DiagnosticCheck[] = [
+    {
+      key: "epv",
+      label: "Events per variable",
+      status: epv >= 10 ? "pass" : epv >= 5 ? "warn" : "fail",
+      value: epv.toFixed(1),
+      explanation:
+        "At least 10 outcomes per predictor keeps the odds ratios stable. Below 5 the coefficients can swing wildly with one extra record.",
+    },
+    {
+      key: "vif",
+      label: "Multicollinearity (max VIF)",
+      status: maxVif < 5 ? "pass" : maxVif < 10 ? "warn" : "fail",
+      value: Number.isFinite(maxVif) ? maxVif.toFixed(2) : "n/a",
+      explanation:
+        "VIF under 5 means the predictors carry independent information. Above 10 two factors are effectively the same measurement and their individual odds ratios cannot be separated.",
+    },
+    {
+      key: "separation",
+      label: "Complete separation",
+      status: separation ? "warn" : "pass",
+      value: separation ? "Detected" : "None",
+      explanation:
+        "Separation happens when a factor perfectly predicts the outcome; ridge regularisation keeps the fit finite, but the affected odds ratio should be read as directional only.",
+    },
+    {
+      key: "convergence",
+      label: "Model convergence",
+      status: converged ? "pass" : "warn",
+      value: converged ? "Converged" : "Iteration limit",
+      explanation: "The IRLS solver reached a stable solution; otherwise the estimates are the best available approximation.",
+    },
+    {
+      key: "hl",
+      label: "Calibration (Hosmer–Lemeshow)",
+      status: hlP >= 0.05 ? "pass" : "warn",
+      value: `χ²=${hl.toFixed(2)}, ${hlP < 0.001 ? "p<0.001" : `p=${hlP.toFixed(3)}`}`,
+      explanation:
+        "A high p-value means predicted risk matches observed failure rates across risk bands — the model is honest about how likely non-completion really is.",
+    },
+    {
+      key: "auc",
+      label: "Discrimination (AUC)",
+      status: auc >= 0.7 ? "pass" : auc >= 0.6 ? "warn" : "fail",
+      value: auc.toFixed(3),
+      explanation:
+        "Probability the model scores a genuinely failing community higher than a completed one. 0.5 is a coin toss, 0.7+ is useful.",
+    },
+    {
+      key: "missing",
+      label: "Imputed answers",
+      status: imputedShare < 0.1 ? "pass" : imputedShare < 0.25 ? "warn" : "fail",
+      value: `${Math.round(imputedShare * 100)}%`,
+      explanation:
+        "Unanswered checklist items are filled with the factor's average. The more imputation, the more the effects are pulled toward zero.",
+    },
+  ];
+
+  return { epv, maxVif, imputedShare, separation, calibration, hlChiSq: hl, hlDf, hlP, brier, auc, checks };
 }
 
 /* -------------------------------------------- 1. daily new-evidence ledger */
