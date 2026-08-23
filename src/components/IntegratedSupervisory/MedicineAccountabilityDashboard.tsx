@@ -29,6 +29,7 @@ import {
 import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Line, ComposedChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
+import CustodianLedgerTables from "./CustodianLedgerTables";
 import { toast } from "@/hooks/use-toast";
 import {
   applyFilters, computeAccountability, computeSupplyIntegrity, loadAllocations, medicineLabel, parseLogistics,
@@ -677,6 +678,7 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
           <TabsTrigger value="supply"><Scale className="h-4 w-4 mr-1" /> Integrity, loss & equity</TabsTrigger>
 
           <TabsTrigger value="patterns"><Brain className="h-4 w-4 mr-1" /> Human patterns & networks</TabsTrigger>
+          <TabsTrigger value="custodians"><ClipboardCheck className="h-4 w-4 mr-1" /> Custodian ledgers</TabsTrigger>
           <TabsTrigger value="personnel"><Users className="h-4 w-4 mr-1" /> Personnel accountability</TabsTrigger>
           <TabsTrigger value="integrity"><ShieldAlert className="h-4 w-4 mr-1" /> Data integrity</TabsTrigger>
         </TabsList>
@@ -1021,6 +1023,10 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
             scopeLabel={scopeLabel}
             canExport={canExport}
           />
+        </TabsContent>
+
+        <TabsContent value="custodians" className="mt-4">
+          <CustodianLedgerTables dataset={filtered} />
         </TabsContent>
 
         <TabsContent value="personnel" className="mt-4">
