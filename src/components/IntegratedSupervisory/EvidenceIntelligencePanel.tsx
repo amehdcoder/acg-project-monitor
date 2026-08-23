@@ -806,15 +806,18 @@ export default function EvidenceIntelligencePanel({
         <Tabs defaultValue="ledger">
           <TabsList className="mb-3 flex h-auto w-full flex-wrap justify-start gap-1 bg-muted/60 p-1">
             <TabsTrigger value="ledger" className="text-[11px]"><Layers className="mr-1 h-3.5 w-3.5" />Daily new evidence</TabsTrigger>
+            <TabsTrigger value="unique" className="text-[11px]"><Sparkles className="mr-1 h-3.5 w-3.5" />Unique signals (ML)</TabsTrigger>
             <TabsTrigger value="regression" className="text-[11px]"><BrainCircuit className="mr-1 h-3.5 w-3.5" />Why MDA is not completed</TabsTrigger>
             <TabsTrigger value="geo" className="text-[11px]"><Filter className="mr-1 h-3.5 w-3.5" />What worked / failed</TabsTrigger>
             <TabsTrigger value="signal" className="text-[11px]"><Scale className="mr-1 h-3.5 w-3.5" />Signal vs noise</TabsTrigger>
           </TabsList>
           <TabsContent value="ledger"><EvidenceLedgerTab parents={parents} drill={drill} onRefresh={onRefresh} /></TabsContent>
+          <TabsContent value="unique"><UniqueSignalsTab parents={parents} drill={drill} /></TabsContent>
           <TabsContent value="regression"><RegressionTab parents={parents} drill={drill} /></TabsContent>
           <TabsContent value="geo"><GeoPostMortemTab parents={parents} drill={drill} /></TabsContent>
           <TabsContent value="signal"><SignalTab parents={parents} drill={drill} /></TabsContent>
         </Tabs>
+
       </CardContent>
     </Card>
     <ChartRecordsDialog spec={spec} onClose={() => setSpec(null)} />
