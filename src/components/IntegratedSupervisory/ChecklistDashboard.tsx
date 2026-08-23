@@ -917,6 +917,11 @@ export default function ChecklistDashboard({
       {/* Medicine offered — geography breakdown (State & LGA) */}
       <MedicineOfferedGeo respondents={respondents} />
 
+      {/* Evidence & pattern intelligence: daily new evidence, completion
+          regression, geographic post-mortem and a signal-vs-noise filter. */}
+      <EvidenceIntelligencePanel parents={parents} />
+
+
       {/* Geospatial: community status + household medicine-offer maps */}
       <ChecklistMaps parents={parents} respondents={respondents} filters={filters} />
 
