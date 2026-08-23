@@ -13,8 +13,9 @@ import {
   ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import {
-  AlertTriangle, BrainCircuit, CheckCircle2, Filter, Layers, Microscope,
-  Scale, Sparkles, TrendingDown, TrendingUp, XCircle,
+  AlertTriangle, BellRing, BellOff, BrainCircuit, CheckCircle2, Columns3, Filter,
+  FileSpreadsheet, FileText, Layers, Microscope, RefreshCw, Scale, ShieldCheck,
+  Sparkles, TrendingDown, TrendingUp, XCircle,
 } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,10 +23,19 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import {
-  buildEvidenceLedger, buildGeoVerdicts, distillFacts, runCompletionRegression,
-  type GeoVerdict, type MdaClass, type Row,
+  buildEvidenceLedger, buildGeoVerdicts, compareUnits, distillFacts,
+  geoUnitId, runCompletionRegression,
+  type EvidenceFact, type GeoVerdict, type MdaClass, type Row,
 } from "@/lib/isc/evidencePatterns";
+import { exportEvidenceLedgerCSV, exportEvidenceLedgerPDF } from "@/lib/isc/evidenceLedgerExport";
+import { useEvidenceWatch } from "@/hooks/useEvidenceWatch";
+import ChartRecordsDialog, { type ChartDrillSpec } from "./ChartRecordsDialog";
+
+/** Every tab receives this so any insight can open the records behind it. */
+type Drill = (spec: ChartDrillSpec) => void;
 
 const pct = (v: number) => `${(v * 100).toFixed(0)}%`;
 const pval = (p: number) => (p < 0.001 ? "p<0.001" : `p=${p.toFixed(3)}`);
