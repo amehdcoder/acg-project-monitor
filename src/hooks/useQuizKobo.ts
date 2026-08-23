@@ -50,13 +50,15 @@ export function useQuizKobo(quizId: string | null | undefined) {
   const [submissions, setSubmissions] = useState<QuizKoboSubmissionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [live, setLive] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [lastEventAt, setLastEventAt] = useState<Date | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async (silent = false) => {
     if (!quizId) { setConfig(null); setSubmissions([]); setLoading(false); return; }
     if (!silent) setLoading(true);
-    const [{ data: cfg }, { data: subs }] = await Promise.all([
+    const [{ data: cfg, error: cfgErr }, { data: subs, error: subErr }] = await Promise.all([
       supabase.from("quiz_kobo_configs").select("*").eq("quiz_id", quizId).maybeSingle(),
       supabase.from("quiz_kobo_submissions").select("*").eq("quiz_id", quizId)
         .order("submitted_at", { ascending: false }).limit(5000),
@@ -72,6 +74,10 @@ export function useQuizKobo(quizId: string | null | undefined) {
     setConfig(resolved);
 
     setSubmissions(((subs ?? []) as unknown as QuizKoboSubmissionRow[]));
+    // Missing config is a normal state (quiz not linked); a hard query failure is not.
+    const failure = subErr ?? (resolved ? null : (cfgErr?.code === "PGRST116" ? null : cfgErr));
+    setError(failure ? (failure.message || "Sync fetch failed") : null);
+    if (!failure) setLastSyncedAt(new Date());
     setLoading(false);
   }, [quizId]);
 
@@ -116,7 +122,7 @@ export function useQuizKobo(quizId: string | null | undefined) {
   }, [quizId, load]);
 
 
-  return { config, submissions, loading, live, lastEventAt, reload: load, setConfig };
+  return { config, submissions, loading, live, error, lastEventAt, lastSyncedAt, reload: load, setConfig };
 }
 
 export default useQuizKobo;
