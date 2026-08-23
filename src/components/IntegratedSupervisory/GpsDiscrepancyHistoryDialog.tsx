@@ -14,6 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { History, ShieldCheck, PencilLine, Ban, Trash2 } from "lucide-react";
 import { STATUS_META, OVERRIDE_META, type GpsOverride, type OverrideDecision, type VerifyResult, type VerifyStatus } from "@/lib/isc/gpsVerification";
 import type { GpsHistoryRow } from "@/hooks/useGpsVerificationReview";
+import { ConfidenceBars } from "./GpsConfidenceBreakdown";
+
 
 interface Props {
   open: boolean;
@@ -87,6 +89,16 @@ export default function GpsDiscrepancyHistoryDialog({
             {override.note && <p className="mt-1 text-xs text-muted-foreground">{override.note}</p>}
           </div>
         )}
+
+        {point.verify && (
+          <div className="rounded-lg border border-border p-3">
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Confidence breakdown — {point.verify.confidence}% overall
+            </div>
+            <ConfidenceBars verify={point.verify} />
+          </div>
+        )}
+
 
         {/* Timeline */}
         <div className="rounded-lg border border-border">

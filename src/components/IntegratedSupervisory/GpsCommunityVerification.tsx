@@ -19,20 +19,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import {
   Satellite, Eye, RefreshCw, Search, MapPin, ShieldCheck, ShieldAlert, Loader2, History, Database, Gavel,
+  PencilLine, Ban, Trash2, CheckSquare,
 } from "lucide-react";
 import GoogleStreetViewPanel from "@/components/maps/GoogleStreetViewPanel";
 import { loadGoogleMaps, googleMapsAuthFailed } from "@/lib/maps/googleMapsLoader";
 import {
   reverseGeocodeBatch, verifyPlace, geoKey, STATUS_META, OVERRIDE_META, applyOverride,
   geoCacheStats, geoCacheSize, clearGeoCache,
-  type GeoName, type VerifyResult, type VerifyStatus,
+  type GeoName, type VerifyResult, type VerifyStatus, type OverrideDecision,
 } from "@/lib/isc/gpsVerification";
 import { useGpsVerificationReview } from "@/hooks/useGpsVerificationReview";
 import GpsPointPreviewDialog from "./GpsPointPreviewDialog";
 import GpsDiscrepancyHistoryDialog from "./GpsDiscrepancyHistoryDialog";
+import GpsConfidenceBreakdown from "./GpsConfidenceBreakdown";
+
 
 
 type Row = Record<string, unknown>;
@@ -91,7 +96,15 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
   const [historyFor, setHistoryFor] = useState<VisitPoint | null>(null);
   const [cacheInfo, setCacheInfo] = useState({ size: 0, hits: 0, network: 0, throttled: 0 });
 
+  // Bulk admin review
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkDecision, setBulkDecision] = useState<OverrideDecision>("verified");
+  const [bulkName, setBulkName] = useState("");
+  const [bulkNote, setBulkNote] = useState("");
+  const [bulkSaving, setBulkSaving] = useState(false);
+
   const review = useGpsVerificationReview();
+
 
   /* ------------------------------------------------------------- raw points */
   const points = useMemo<VisitPoint[]>(() => {
@@ -147,7 +160,9 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
       const base = verifyPlace(
         { community: p.community, ward: p.ward, lga: p.lga, state: p.state },
         geoMap.get(locKey) ?? null,
+        { lat: p.lat, lng: p.lng },
       );
+
       const ovr = review.overrides[locKey];
       return { ...p, locKey, baseVerify: base, override: ovr, verify: applyOverride(base, ovr) };
     }),
@@ -196,6 +211,59 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
   const confirmRate = points.length
     ? Math.round(((counts.verified + counts.nearby) / points.length) * 100)
     : 0;
+
+  const avgConfidence = verified.length
+    ? Math.round(verified.reduce((s, p) => s + (p.verify?.confidence ?? 0), 0) / verified.length)
+    : 0;
+
+  /* ------------------------------------------------------- bulk admin review */
+  const selectedPoints = useMemo(
+    () => shown.filter((p) => selected.has(p.locKey || "")),
+    [shown, selected],
+  );
+  const allShownSelected = shown.length > 0 && shown.every((p) => selected.has(p.locKey || ""));
+
+  const toggleOne = (locKey: string) =>
+    setSelected((prev) => {
+      const n = new Set(prev);
+      n.has(locKey) ? n.delete(locKey) : n.add(locKey);
+      return n;
+    });
+
+  const toggleAllShown = () =>
+    setSelected(allShownSelected ? new Set() : new Set(shown.map((p) => p.locKey || "")));
+
+  const selectBorderline = () =>
+    setSelected(new Set(
+      verified
+        .filter((p) => !p.override && (p.baseVerify?.status === "nearby" || p.baseVerify?.status === "mismatch"))
+        .map((p) => p.locKey || ""),
+    ));
+
+  const applyBulk = async () => {
+    setBulkSaving(true);
+    const ok = await review.saveOverridesBulk(
+      selectedPoints.map((p) => ({
+        locKey: p.locKey!, submissionId: p.id, community: p.community, lat: p.lat, lng: p.lng,
+      })),
+      {
+        decision: bulkDecision,
+        correctedName: bulkDecision === "corrected" ? bulkName.trim() : "",
+        note: bulkNote.trim(),
+      },
+    );
+    setBulkSaving(false);
+    if (ok) { setSelected(new Set()); setBulkNote(""); setBulkName(""); }
+  };
+
+  const clearBulk = async () => {
+    setBulkSaving(true);
+    await review.clearOverridesBulk(selectedPoints.filter((p) => p.override).map((p) => p.locKey!));
+    setBulkSaving(false);
+    setSelected(new Set());
+  };
+
+
 
 
   /* ------------------------------------------------------------------- maps */
@@ -345,9 +413,11 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
 
       <CardContent className="space-y-4">
         {/* KPI strip */}
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">
           <Kpi label="GPS points" value={points.length} icon={MapPin} color="#0f172a" />
           <Kpi label="Confirmed rate" value={`${confirmRate}%`} icon={ShieldCheck} color="#16a34a" />
+          <Kpi label="Avg confidence" value={`${avgConfidence}%`} icon={Gavel} color="#2563eb" />
+
           {(["verified", "nearby", "mismatch", "outside"] as VerifyStatus[]).map((k) => (
             <button
               key={k}
@@ -440,28 +510,124 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
           />
         </div>
 
+        {/* Bulk admin review */}
+        {review.isAdmin && (
+          <div className="rounded-xl border border-border bg-muted/30 p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <Gavel className="h-3.5 w-3.5" /> Bulk admin review
+              </span>
+              <Badge variant={selectedPoints.length ? "default" : "secondary"} className="text-[10px]">
+                {selectedPoints.length} selected
+              </Badge>
+              <Button size="sm" variant="outline" className="h-8 px-2 text-[11px]" onClick={toggleAllShown}>
+                <CheckSquare className="mr-1 h-3 w-3" /> {allShownSelected ? "Clear selection" : `Select all ${shown.length} shown`}
+              </Button>
+              <Button size="sm" variant="outline" className="h-8 px-2 text-[11px]" onClick={selectBorderline}>
+                Select {borderlineCount} borderline
+              </Button>
+            </div>
+
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {([
+                { k: "verified" as const, icon: ShieldCheck },
+                { k: "corrected" as const, icon: PencilLine },
+                { k: "rejected" as const, icon: Ban },
+              ]).map(({ k, icon: Icon }) => (
+                <Button
+                  key={k}
+                  size="sm"
+                  variant={bulkDecision === k ? "default" : "outline"}
+                  className="h-8 px-2 text-[11px]"
+                  onClick={() => setBulkDecision(k)}
+                  style={bulkDecision === k ? { background: OVERRIDE_META[k].color } : undefined}
+                >
+                  <Icon className="mr-1 h-3 w-3" /> {OVERRIDE_META[k].label}
+                </Button>
+              ))}
+              {bulkDecision === "corrected" && (
+                <Input
+                  value={bulkName}
+                  onChange={(e) => setBulkName(e.target.value)}
+                  placeholder="Corrected settlement name applied to every selected point"
+                  className="h-8 w-full max-w-xs text-xs"
+                />
+              )}
+            </div>
+
+            <Textarea
+              value={bulkNote}
+              onChange={(e) => setBulkNote(e.target.value)}
+              placeholder="Shared reviewer note — applied identically to every selected point (e.g. “Imagery sweep 23 Aug: spelling variants confirmed against ward register”)."
+              className="mt-2 min-h-[56px] text-xs"
+            />
+
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                className="h-9 text-xs"
+                disabled={bulkSaving || !selectedPoints.length || (bulkDecision === "corrected" && !bulkName.trim())}
+                onClick={() => void applyBulk()}
+              >
+                {bulkSaving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Gavel className="mr-1.5 h-3.5 w-3.5" />}
+                Apply to {selectedPoints.length} point{selectedPoints.length === 1 ? "" : "s"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-9 text-xs"
+                disabled={bulkSaving || !selectedPoints.some((p) => p.override)}
+                onClick={() => void clearBulk()}
+              >
+                <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Remove overrides
+              </Button>
+              <p className="self-center text-[10px] text-muted-foreground">
+                Decisions re-rank the verdict, feed the review filters and are timestamped against your account.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Verification register */}
         <div className="max-h-[420px] overflow-auto rounded-xl border border-border">
           <table className="w-full text-xs">
             <thead className="sticky top-0 z-10 bg-muted/80 backdrop-blur">
               <tr className="text-left">
-                {["Community (Kobo)", "Basemap place name", "Verdict", "Match", "Ward / LGA / State", "Coordinates", ""].map((h) => (
+                {review.isAdmin && (
+                  <th className="w-8 px-2.5 py-2">
+                    <Checkbox checked={allShownSelected} onCheckedChange={toggleAllShown} aria-label="Select all shown" />
+                  </th>
+                )}
+                {["Community (Kobo)", "Basemap place name", "Verdict", "Match", "Confidence", "Ward / LGA / State", "Coordinates", ""].map((h) => (
                   <th key={h} className="whitespace-nowrap px-2.5 py-2 font-semibold">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {shown.length === 0 && (
-                <tr><td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">No matching GPS records.</td></tr>
+                <tr><td colSpan={review.isAdmin ? 9 : 8} className="px-3 py-6 text-center text-muted-foreground">No matching GPS records.</td></tr>
+
               )}
               {shown.map((p) => {
                 const meta = STATUS_META[p.verify?.status ?? "unknown"];
+                const isSel = selected.has(p.locKey || "");
                 return (
                   <tr
                     key={p.id + p.lat}
                     onClick={() => focus(p)}
-                    className={`cursor-pointer border-t border-border/60 transition hover:bg-muted/40 ${activeId === p.id ? "bg-primary/5" : ""}`}
+                    className={`cursor-pointer border-t border-border/60 transition hover:bg-muted/40 ${
+                      isSel ? "bg-primary/10" : activeId === p.id ? "bg-primary/5" : ""
+                    }`}
                   >
+                    {review.isAdmin && (
+                      <td className="px-2.5 py-2" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={isSel}
+                          onCheckedChange={() => toggleOne(p.locKey || "")}
+                          aria-label={`Select ${p.community}`}
+                        />
+                      </td>
+                    )}
                     <td className="px-2.5 py-2 font-semibold">{p.community}</td>
                     <td className="px-2.5 py-2">
                       <div className="font-medium">{p.verify?.matchedName || "—"}</div>
@@ -488,7 +654,18 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
                       <div className="mt-0.5 max-w-[260px] text-[10px] text-muted-foreground">{p.verify?.reason}</div>
                     </td>
                     <td className="px-2.5 py-2 font-mono font-bold" style={{ color: meta.color }}>{p.verify?.score ?? 0}%</td>
+                    <td className="px-2.5 py-2">
+                      {p.verify && <GpsConfidenceBreakdown verify={p.verify} community={p.community} />}
+                      <div className="mt-0.5 text-[9px] text-muted-foreground">
+                        {p.verify?.distanceM === null || p.verify?.distanceM === undefined
+                          ? "distance n/a"
+                          : p.verify.distanceM < 1000
+                            ? `${p.verify.distanceM} m off`
+                            : `${(p.verify.distanceM / 1000).toFixed(1)} km off`}
+                      </div>
+                    </td>
                     <td className="px-2.5 py-2 text-muted-foreground">{[p.ward, p.lga, p.state].filter(Boolean).join(" · ") || "—"}</td>
+
                     <td className="px-2.5 py-2 font-mono text-[10px] text-muted-foreground">{p.lat.toFixed(5)}, {p.lng.toFixed(5)}</td>
                     <td className="px-2.5 py-2">
                       <div className="flex flex-wrap gap-1">

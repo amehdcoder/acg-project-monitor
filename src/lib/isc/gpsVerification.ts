@@ -12,9 +12,27 @@ import { supabase } from "@/integrations/supabase/client";
 export interface GeoName {
   display_name?: string | null;
   address?: Record<string, string> | null;
+  /** Coordinates of the feature the provider matched (used for distance evidence). */
+  lat?: number | string | null;
+  lon?: number | string | null;
 }
 
 export type VerifyStatus = "verified" | "nearby" | "mismatch" | "outside" | "unknown";
+
+/** One explainable component of the confidence verdict. */
+export interface ConfidenceFactor {
+  key: "name" | "distance" | "evidence" | "admin";
+  label: string;
+  /** 0-100 contribution strength. */
+  value: number;
+  /** Relative weight in the blended confidence score. */
+  weight: number;
+  /** Short verdict word shown next to the bar. */
+  verdict: string;
+  /** Plain-language explanation of what was measured. */
+  detail: string;
+  color: string;
+}
 
 export interface VerifyResult {
   status: VerifyStatus;
@@ -25,7 +43,13 @@ export interface VerifyResult {
   lgaOk: boolean | null;
   stateOk: boolean | null;
   reason: string;             // human sentence for the UI
+  /** Distance in metres between the captured GPS fix and the matched feature. */
+  distanceM: number | null;
+  /** Weighted 0-100 confidence blended from every factor below. */
+  confidence: number;
+  factors: ConfidenceFactor[];
 }
+
 
 const norm = (v: string) =>
   (v || "")
@@ -77,13 +101,125 @@ export interface CapturedPlace {
   state?: string;
 }
 
+/** Great-circle distance in metres. */
+export function haversineM(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  const R = 6371000, toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(bLat - aLat), dLng = toRad(bLng - aLng);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2;
+  return Math.round(2 * R * Math.asin(Math.min(1, Math.sqrt(h))));
+}
+
+/** Distance thresholds (metres) used to grade how tight the basemap match is. */
+export const DISTANCE_THRESHOLDS = { exact: 150, close: 500, loose: 2000 };
+
+const band = (v: number) => (v >= 80 ? "#16a34a" : v >= 55 ? "#2563eb" : v >= 30 ? "#f59e0b" : "#dc2626");
+
+function buildFactors(args: {
+  nameScore: number;            // 0..1
+  wardScore: number;            // 0..1
+  bestName: string;
+  community: string;
+  distanceM: number | null;
+  candidates: string[];
+  displayName: string;
+  lgaOk: boolean | null;
+  stateOk: boolean | null;
+  lgaRef: string;
+  stateRef: string;
+}): { factors: ConfidenceFactor[]; confidence: number } {
+  const {
+    nameScore, wardScore, bestName, community, distanceM, candidates,
+    displayName, lgaOk, stateOk, lgaRef, stateRef,
+  } = args;
+
+  /* 1 — Name similarity */
+  const nameValue = Math.round(Math.max(nameScore, wardScore * 0.85) * 100);
+  const nameFactor: ConfidenceFactor = {
+    key: "name",
+    label: "Name match score",
+    value: nameValue,
+    weight: 0.45,
+    verdict: nameValue >= 80 ? "Same name" : nameValue >= 55 ? "Spelling variant" : nameValue >= 30 ? "Weak overlap" : "Different name",
+    detail: bestName
+      ? `Kobo recorded “${community}”; the closest basemap feature is “${bestName}” (${nameValue}% character similarity after stripping words like village/community).`
+      : `The basemap publishes no named settlement here to compare with “${community}”.`,
+    color: band(nameValue),
+  };
+
+  /* 2 — Distance threshold */
+  let distValue = 45;
+  let distVerdict = "Not measurable";
+  let distDetail = "The provider returned no coordinate for the matched feature, so proximity could not be measured.";
+  if (distanceM !== null) {
+    if (distanceM <= DISTANCE_THRESHOLDS.exact) {
+      distValue = 100; distVerdict = "On the feature";
+      distDetail = `The GPS fix sits ${distanceM} m from the matched feature — inside the ${DISTANCE_THRESHOLDS.exact} m "same place" threshold.`;
+    } else if (distanceM <= DISTANCE_THRESHOLDS.close) {
+      distValue = 75; distVerdict = "Within settlement";
+      distDetail = `${distanceM} m away — beyond ${DISTANCE_THRESHOLDS.exact} m but still inside the ${DISTANCE_THRESHOLDS.close} m settlement radius.`;
+    } else if (distanceM <= DISTANCE_THRESHOLDS.loose) {
+      distValue = 45; distVerdict = "Edge of area";
+      distDetail = `${(distanceM / 1000).toFixed(2)} km from the named feature — the point may be on the outskirts or in an adjacent hamlet.`;
+    } else {
+      distValue = 12; distVerdict = "Far away";
+      distDetail = `${(distanceM / 1000).toFixed(1)} km from the nearest named feature — well outside the ${DISTANCE_THRESHOLDS.loose} m tolerance.`;
+    }
+  }
+  const distFactor: ConfidenceFactor = {
+    key: "distance", label: "Distance threshold", value: distValue, weight: 0.2,
+    verdict: distVerdict, detail: distDetail, color: band(distValue),
+  };
+
+  /* 3 — Reverse-geocode evidence quality */
+  const evValue = Math.min(100, (candidates.length ? 40 : 0) + Math.min(30, candidates.length * 10) + (displayName ? 30 : 0));
+  const evFactor: ConfidenceFactor = {
+    key: "evidence", label: "Reverse-geocode evidence", value: evValue, weight: 0.15,
+    verdict: evValue >= 80 ? "Rich" : evValue >= 50 ? "Partial" : "Sparse",
+    detail: candidates.length
+      ? `${candidates.length} named feature${candidates.length === 1 ? "" : "s"} returned at this coordinate (${candidates.slice(0, 4).join(", ")}${candidates.length > 4 ? "…" : ""}). Full address line: ${displayName || "not published"}.`
+      : "The provider returned an address line but no named locality or road, so there is little to compare against.",
+    color: band(evValue),
+  };
+
+  /* 4 — Administrative agreement */
+  const adminChecks = [stateOk, lgaOk].filter((v) => v !== null) as boolean[];
+  const adminValue = adminChecks.length
+    ? Math.round((adminChecks.filter(Boolean).length / adminChecks.length) * 100)
+    : 50;
+  const adminFactor: ConfidenceFactor = {
+    key: "admin", label: "Administrative agreement", value: adminValue, weight: 0.2,
+    verdict: adminChecks.length === 0 ? "Unverifiable" : adminValue === 100 ? "LGA & State agree" : adminValue === 0 ? "Both differ" : "Partial",
+    detail: adminChecks.length
+      ? `Basemap places this point in ${stateRef || "an unnamed state"}${lgaRef ? ` / ${lgaRef}` : ""}. ` +
+        `${stateOk === false ? "The State does not match the record. " : stateOk ? "State matches. " : ""}` +
+        `${lgaOk === false ? "The LGA does not match the record." : lgaOk ? "LGA matches." : ""}`.trim()
+      : "The provider published no State or LGA for this coordinate, so administrative agreement could not be checked.",
+    color: band(adminValue),
+  };
+
+  const factors = [nameFactor, distFactor, evFactor, adminFactor];
+  const confidence = Math.round(factors.reduce((sum, f) => sum + f.value * f.weight, 0));
+  return { factors, confidence };
+}
+
 /** Compare a captured Kobo place against the reverse-geocoded reality. */
-export function verifyPlace(captured: CapturedPlace, geo: GeoName | null): VerifyResult {
+export function verifyPlace(
+  captured: CapturedPlace,
+  geo: GeoName | null,
+  at?: { lat: number; lng: number },
+): VerifyResult {
   if (!geo || (!geo.display_name && !geo.address)) {
+    const { factors, confidence } = buildFactors({
+      nameScore: 0, wardScore: 0, bestName: "", community: captured.community,
+      distanceM: null, candidates: [], displayName: "", lgaOk: null, stateOk: null, lgaRef: "", stateRef: "",
+    });
     return {
       status: "unknown", score: 0, matchedName: "", displayName: "",
       candidates: [], lgaOk: null, stateOk: null,
       reason: "No basemap reference data is published for this location.",
+      distanceM: null, confidence, factors,
     };
   }
   const a = geo.address ?? {};
@@ -102,42 +238,53 @@ export function verifyPlace(captured: CapturedPlace, geo: GeoName | null): Verif
   const lgaOk = captured.lga && lgaRef ? similarity(captured.lga, lgaRef) >= 0.72 : null;
   const stateOk = captured.state && stateRef ? similarity(captured.state, stateRef) >= 0.72 : null;
 
+  const fLat = Number(geo.lat), fLng = Number(geo.lon);
+  const distanceM = at && Number.isFinite(fLat) && Number.isFinite(fLng)
+    ? haversineM(at.lat, at.lng, fLat, fLng)
+    : null;
+
+  const { factors, confidence } = buildFactors({
+    nameScore: bestScore, wardScore, bestName: best, community: captured.community,
+    distanceM, candidates: cands, displayName: geo.display_name || "",
+    lgaOk, stateOk, lgaRef, stateRef,
+  });
+
   const score = Math.round(bestScore * 100);
+  const common = {
+    score, candidates: cands, lgaOk, stateOk, distanceM, confidence, factors,
+    displayName: geo.display_name || "",
+  };
 
   if (stateOk === false) {
     return {
-      status: "outside", score, matchedName: best, displayName: geo.display_name || "",
-      candidates: cands, lgaOk, stateOk,
+      ...common, status: "outside", matchedName: best,
       reason: `GPS falls in ${stateRef || "another state"}, but the record was filed under ${captured.state}.`,
     };
   }
   if (bestScore >= 0.8) {
     return {
-      status: "verified", score, matchedName: best, displayName: geo.display_name || "",
-      candidates: cands, lgaOk, stateOk,
+      ...common, status: "verified", matchedName: best,
       reason: `Basemap names this place “${best}” — matches the captured community.`,
     };
   }
   if (bestScore >= 0.55 || wardScore >= 0.75) {
     return {
-      status: "nearby", score, matchedName: best || (captured.ward ?? ""), displayName: geo.display_name || "",
-      candidates: cands, lgaOk, stateOk,
+      ...common, status: "nearby", matchedName: best || (captured.ward ?? ""),
       reason: `Close but not exact — basemap says “${best || "—"}”. Likely a spelling variant or an adjacent settlement.`,
     };
   }
   if (lgaOk === false) {
     return {
-      status: "outside", score, matchedName: best, displayName: geo.display_name || "",
-      candidates: cands, lgaOk, stateOk,
+      ...common, status: "outside", matchedName: best,
       reason: `GPS sits in ${lgaRef || "a different LGA"}, not ${captured.lga}.`,
     };
   }
   return {
-    status: "mismatch", score, matchedName: best, displayName: geo.display_name || "",
-    candidates: cands, lgaOk, stateOk,
+    ...common, status: "mismatch", matchedName: best,
     reason: `Basemap reports “${best || geo.display_name?.split(",")[0] || "unnamed place"}” here, which does not match “${captured.community}”.`,
   };
 }
+
 
 export const STATUS_META: Record<VerifyStatus, { label: string; color: string; hint: string }> = {
   verified: { label: "Name confirmed", color: "#16a34a", hint: "GPS point matches the captured community name" },
@@ -334,16 +481,42 @@ export const OVERRIDE_META: Record<OverrideDecision, { label: string; color: str
   rejected:  { label: "Admin rejected", color: "#be123c" },
 };
 
+/** A synthetic factor appended when an administrator has ruled on the point. */
+function adminFactor(ovr: GpsOverride): ConfidenceFactor {
+  const value = ovr.decision === "rejected" ? 0 : ovr.decision === "corrected" ? 90 : 100;
+  return {
+    key: "admin",
+    label: "Administrator ruling",
+    value,
+    weight: 0,
+    verdict: OVERRIDE_META[ovr.decision].label,
+    detail:
+      (ovr.decision === "corrected"
+        ? `An administrator corrected the settlement name to “${ovr.corrected_name || "—"}” after inspecting the imagery. `
+        : ovr.decision === "rejected"
+          ? "An administrator inspected the imagery and rejected this GPS point. "
+          : "An administrator inspected the imagery and confirmed this GPS point. ") +
+      (ovr.note ? `Note: ${ovr.note}` : "No reviewer note was left."),
+    color: OVERRIDE_META[ovr.decision].color,
+  };
+}
+
 /** Apply an admin decision on top of the computed verdict. */
 export function applyOverride(base: VerifyResult, ovr?: GpsOverride | null): VerifyResult {
   if (!ovr) return base;
+  const factors = [...base.factors.filter((f) => f.key !== "admin" || f.label !== "Administrator ruling"), adminFactor(ovr)];
   if (ovr.decision === "rejected") {
-    return { ...base, status: "mismatch", reason: `Admin rejected this point. ${ovr.note || ""}`.trim() };
+    return {
+      ...base, status: "mismatch", factors, confidence: 0,
+      reason: `Admin rejected this point. ${ovr.note || ""}`.trim(),
+    };
   }
   return {
     ...base,
     status: "verified",
     score: Math.max(base.score, ovr.decision === "corrected" ? 90 : 100),
+    confidence: ovr.decision === "corrected" ? Math.max(base.confidence, 90) : 100,
+    factors,
     matchedName: ovr.corrected_name || base.matchedName,
     reason:
       ovr.decision === "corrected"
@@ -351,4 +524,5 @@ export function applyOverride(base: VerifyResult, ovr?: GpsOverride | null): Ver
         : `Admin manually verified this GPS point. ${ovr.note || ""}`.trim(),
   };
 }
+
 
