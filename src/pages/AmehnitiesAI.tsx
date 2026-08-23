@@ -17,6 +17,11 @@ import { useAmehnitiesBrain } from "@/hooks/useAmehnitiesBrain";
 import NeuralNetworkCanvas from "@/components/AmehnitiesAI/NeuralNetworkCanvas";
 import AttentionMaps from "@/components/AmehnitiesAI/AttentionMaps";
 import LossSparkline from "@/components/AmehnitiesAI/LossSparkline";
+import TrainingControlPanel from "@/components/AmehnitiesAI/TrainingControlPanel";
+import TrainingMetricsDashboard from "@/components/AmehnitiesAI/TrainingMetricsDashboard";
+import DataSourcePanel from "@/components/AmehnitiesAI/DataSourcePanel";
+import AskModelPanel from "@/components/AmehnitiesAI/AskModelPanel";
+import CheckpointsPanel from "@/components/AmehnitiesAI/CheckpointsPanel";
 
 const fmt = (n: number) =>
   n >= 1e9 ? `${(n / 1e9).toFixed(2)}B` : n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : `${n}`;
