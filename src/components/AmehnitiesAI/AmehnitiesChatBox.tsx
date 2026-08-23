@@ -70,6 +70,10 @@ export default function AmehnitiesChatBox({
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [openCitation, setOpenCitation] = useState<Citation | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [correcting, setCorrecting] = useState<string | null>(null);
+  const [correction, setCorrection] = useState("");
+  const [learnedRules, setLearnedRules] = useState(0);
+  const [rewarding, setRewarding] = useState<string | null>(null);
   const feedRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const convIdRef = useRef<string | undefined>(conversationId);
@@ -86,7 +90,11 @@ export default function AmehnitiesChatBox({
     try { setConversations(await listConversations()); } catch { /* history unavailable */ }
   }, []);
 
-  useEffect(() => { void refreshConversations(); }, [refreshConversations]);
+  const refreshLearned = useCallback(async () => {
+    try { setLearnedRules(await countLearnedRules()); } catch { /* policy unavailable */ }
+  }, []);
+
+  useEffect(() => { void refreshConversations(); void refreshLearned(); }, [refreshConversations, refreshLearned]);
 
   // Load whichever conversation the route points at.
   useEffect(() => {
@@ -249,6 +257,48 @@ export default function AmehnitiesChatBox({
       toast.error("Could not delete conversation", { description: e?.message });
     }
   }, [startNewChat]);
+
+  /**
+   * Reinforcement signal. The rating (plus any written correction) is shaped
+   * into a reward server-side, credited to the policy entries that produced the
+   * answer, and distilled into a durable rule the assistant follows next time.
+   */
+  const rate = useCallback(async (msg: ChatMessage, rating: -1 | 1, note?: string) => {
+    setRewarding(msg.id);
+    try {
+      const { reward, learned } = await sendFeedback({
+        messageId: /^[0-9a-f-]{36}$/i.test(msg.id) ? msg.id : undefined,
+        conversationId: convIdRef.current,
+        question: msg.question ?? "",
+        answer: msg.content,
+        rating,
+        correction: note,
+        citations: msg.citations?.length ?? 0,
+        followups: msg.followups?.length ?? 0,
+        policyIds: msg.policyIds ?? [],
+      });
+      setMessages((m) => m.map((x) => (x.id === msg.id ? { ...x, rated: rating } : x)));
+      setCorrecting(null);
+      setCorrection("");
+      void refreshLearned();
+      toast.success(learned ? "Learned from your feedback" : "Feedback recorded", {
+        description: learned
+          ? `New rule (${learned.topic}): ${learned.rule}`
+          : `Reward signal ${reward > 0 ? "+" : ""}${reward.toFixed(2)} applied to the assistant's policy.`,
+      });
+    } catch (e: any) {
+      toast.error("Feedback could not be sent", { description: e?.message });
+    } finally {
+      setRewarding(null);
+    }
+  }, [refreshLearned]);
+
+  /** Re-ask the same question — now conditioned on the updated policy. */
+  const regenerate = useCallback((msg: ChatMessage) => {
+    if (!msg.question || busy) return;
+    setMessages((m) => m.filter((x) => x.id !== msg.id));
+    void send(msg.question);
+  }, [busy, send]);
 
   /** Markdown renderers styled with the app's semantic tokens. */
   const MD = useMemo(() => {
