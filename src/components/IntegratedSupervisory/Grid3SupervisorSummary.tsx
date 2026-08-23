@@ -9,7 +9,6 @@
 import { useMemo, useState } from "react";
 import { Users, CalendarRange, Layers, TrendingDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -151,11 +150,12 @@ export default function Grid3SupervisorSummary({ rows }: { rows: SummaryInput[] 
                   <td className="px-2.5 py-1.5">{g.days.size}</td>
                   <td className="px-2.5 py-1.5">
                     <div className="flex items-center gap-2">
-                      <Progress
-                        value={g.rate * 100}
-                        className="h-1.5 w-24"
-                        indicatorClassName={rateTone(g.rate)}
-                      />
+                      <span className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
+                        <span
+                          className={`block h-full rounded-full ${rateTone(g.rate)}`}
+                          style={{ width: `${Math.max(2, g.rate * 100)}%` }}
+                        />
+                      </span>
                       <span className={`font-semibold ${g.rate >= 0.5 ? "text-rose-700" : g.rate >= 0.25 ? "text-amber-700" : "text-emerald-700"}`}>
                         {Math.round(g.rate * 100)}%
                       </span>
