@@ -128,6 +128,12 @@ export default function AmehnitiesAI() {
           </p>
         </Card>
 
+        {/* Grounded assistant over live application data */}
+        <div className="mt-4">
+          <AmehnitiesChatBox telemetry={telemetry} corpusEvents={totalEvents} />
+        </div>
+
+
         <div className="mt-4 grid gap-4 lg:grid-cols-3">
           <Card className="border-border/60 bg-card/70 p-4 backdrop-blur lg:col-span-2">
             <Tabs defaultValue="attention">
