@@ -229,6 +229,8 @@ export interface IssueTx extends BaseTx {
   level: "level_2";
   medicine: string;
   batch: string;
+  /** Batch expiry date (ISO) when the facility issue record carries one. */
+  expiry: string;
   facility: string;
   inCharge: string;
   priorBalance: number;
@@ -240,6 +242,8 @@ export interface IssueTx extends BaseTx {
 export interface CddTx extends BaseTx {
   level: "level_3";
   medicine: string;
+  batch: string;
+  expiry: string;
   facility: string;
   community: string;
   cddName: string;
@@ -401,6 +405,7 @@ export function parseLogistics(raws: any[]): LogisticsDataset {
         level: "level_2",
         medicine: medicine || "unspecified",
         batch: str(get(item, "Batch_Lot_Number_001")) || "—",
+        expiry: str(getAny(item, ["l2_expiry_date", "Expiry_Date_001", "Expiry_Date_Issued", "Expiry_Date"])),
         facility: str(get(raw, "Health_Facility_Name")) || "—",
         inCharge: str(get(raw, "Health_Facility_In_Charge_Name")) || "—",
         priorBalance: num(get(item, "current_balanace")),
@@ -423,6 +428,8 @@ export function parseLogistics(raws: any[]): LogisticsDataset {
           ...base,
           level: "level_3",
           medicine: medicine || "unspecified",
+          batch: str(getAny(item, ["Batch_Lot_Number_003", "l3_batch_lot_number", "Batch_Lot_Number_CDD", "Batch_Lot_Number"])) || "—",
+          expiry: str(getAny(item, ["l3_expiry_date", "Expiry_Date_002", "Expiry_Date_CDD", "Expiry_Date"])),
           facility,
           community: communityName,
           cddName,
@@ -561,14 +568,25 @@ export interface Filters {
   medicine?: string;
   from?: string;
   to?: string;
+  /** Advanced (custodian-level) filters — applied only to the levels that
+   * actually carry the field, so cross-level reconciliation stays comparable. */
+  ward?: string;
+  facility?: string;
+  /** FLHF health worker / facility in-charge. */
+  worker?: string;
+  cdd?: string;
 }
 
 const inRange = (d: string, f: Filters) =>
   (!f.from || d >= f.from) && (!f.to || d <= f.to);
 
-const matches = (t: { state: string; lga: string; medicine: string; date: string }, f: Filters) =>
+const eq = (want: string | undefined, got: string | undefined) =>
+  !want || (got ?? "").trim().toLowerCase() === want.trim().toLowerCase();
+
+const matches = (t: { state: string; lga: string; ward?: string; medicine: string; date: string }, f: Filters) =>
   (!f.state || t.state === f.state) &&
   (!f.lga || t.lga === f.lga) &&
+  eq(f.ward, t.ward) &&
   (!f.medicine || t.medicine === f.medicine) &&
   inRange(t.date, f);
 
@@ -577,11 +595,24 @@ export function applyFilters(ds: LogisticsDataset, f: Filters): LogisticsDataset
     dispatches: ds.dispatches.filter((t) => matches(t, f)),
 
     receipts: ds.receipts.filter((t) => matches(t, f)),
-    issues: ds.issues.filter((t) => matches(t, f)),
-    cddIssues: ds.cddIssues.filter((t) => matches(t, f)),
+    issues: ds.issues.filter((t) => matches(t, f) && eq(f.facility, t.facility) && eq(f.worker, t.inCharge)),
+    cddIssues: ds.cddIssues.filter(
+      (t) => matches(t, f) && eq(f.facility, t.facility) && eq(f.cdd, t.cddName)),
     returns: (ds.returns ?? []).filter((t) => matches(t, f)),
 
     submissions: ds.submissions,
+  };
+}
+
+/** Distinct option lists for the advanced filter controls. */
+export function filterOptions(ds: LogisticsDataset) {
+  const uniq = (xs: string[]) =>
+    Array.from(new Set(xs.map((x) => (x ?? "").trim()).filter((x) => x && x !== "—"))).sort((a, b) => a.localeCompare(b));
+  return {
+    wards: uniq([...ds.receipts, ...ds.issues, ...ds.cddIssues].map((t) => t.ward)),
+    facilities: uniq([...ds.issues.map((t) => t.facility), ...ds.cddIssues.map((t) => t.facility)]),
+    workers: uniq(ds.issues.map((t) => t.inCharge)),
+    cdds: uniq(ds.cddIssues.map((t) => t.cddName)),
   };
 }
 
