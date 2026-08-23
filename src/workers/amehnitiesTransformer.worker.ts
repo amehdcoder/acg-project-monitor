@@ -555,10 +555,12 @@ function build(next: Partial<Cfg>, fresh = false) {
   postTelemetry(true);
 }
 
+/** Sample a training window — strictly from the training split. */
 function sampleWindow(): { x: Int32Array; y: Int32Array } | null {
   const T = cfg.ctx;
   if (stream.length < T + 1) return null;
-  const start = Math.floor(rand() * (stream.length - T - 1));
+  const limit = Math.max(T + 1, trainEndIndex()) - T - 1;
+  const start = Math.max(0, Math.floor(rand() * Math.max(1, limit)));
   const x = new Int32Array(T), y = new Int32Array(T);
   for (let i = 0; i < T; i++) { x[i] = stream[start + i] % cfg.vocab; y[i] = stream[start + i + 1] % cfg.vocab; }
   return { x, y };
