@@ -4,6 +4,11 @@
  * Pulls a bounded, real-time slice of application activity straight from the
  * database, hands it to Lovable AI together with the live Transformer metrics
  * the browser reports, and streams the grounded answer back to the client.
+ *
+ * Every sampled row is registered in a citation catalog ([E1], [E2] …) that
+ * carries the real event id and timestamp, so the assistant can attribute each
+ * factual claim to a clickable source. The catalog is emitted as the first SSE
+ * frame before the model tokens start streaming.
  */
 import { guardRequest } from "../_shared/authGuard.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -16,20 +21,46 @@ const corsHeaders = {
 
 const SYSTEM_PROMPT = `You are the official Amehnities Data Assistant. Provide accurate, factual answers to user questions using ONLY the provided application activity context and live metrics. Do not invent data. If the answer cannot be determined from the application data, state that clearly.
 
-Formatting: reply in clean Markdown. Use tables for comparisons and breakdowns, bullet points for lists, and bold for key figures. Always quote the exact counts you were given. Keep answers under 350 words unless the user asks for more detail.`;
+CITATIONS (mandatory): every factual claim drawn from the activity context must end with one or more citation markers taken from the SOURCE EVENTS catalog, written exactly as [E12] or [E3][E7]. Never invent a marker that is not in the catalog. Claims about the live Transformer metrics use [MODEL] instead. Sentences that are purely interpretation may go uncited.
+
+Formatting: reply in clean Markdown. Use tables for comparisons and breakdowns, bullet points for lists, and bold for key figures. Always quote the exact counts you were given. Keep answers under 350 words unless the user asks for more detail.
+
+FOLLOW-UPS (mandatory): finish your reply with a final line, on its own, in exactly this form:
+FOLLOWUPS: question one | question two | question three
+Each follow-up must be a specific, answerable question about something you actually observed in the supplied data (name the stream, status, or figure). No generic questions. Nothing may come after that line.`;
 
 /** Bounded pulls — never a heavy scan, even on very large projects. */
-const SOURCES: { table: string; label: string; timeColumn: string; select: string; kind?: string }[] = [
-  { table: "form_submissions", label: "Submissions", timeColumn: "created_at", select: "created_at,status", kind: "status" },
-  { table: "audit_logs", label: "Audit trail", timeColumn: "created_at", select: "created_at,action", kind: "action" },
-  { table: "app_usage_tracking", label: "App usage", timeColumn: "created_at", select: "created_at,action", kind: "action" },
-  { table: "field_activity", label: "Field activity", timeColumn: "created_at", select: "created_at,within_geofence", kind: "within_geofence" },
-  { table: "attendance_records", label: "Attendance", timeColumn: "created_at", select: "created_at,status", kind: "status" },
-  { table: "forum_posts", label: "Forum", timeColumn: "created_at", select: "created_at,category", kind: "category" },
+const SOURCES: {
+  table: string;
+  label: string;
+  timeColumn: string;
+  select: string;
+  kind?: string;
+  descriptors: string[];
+}[] = [
+  { table: "form_submissions", label: "Submissions", timeColumn: "created_at", select: "id,created_at,status", kind: "status", descriptors: ["status"] },
+  { table: "audit_logs", label: "Audit trail", timeColumn: "created_at", select: "id,created_at,action", kind: "action", descriptors: ["action"] },
+  { table: "app_usage_tracking", label: "App usage", timeColumn: "created_at", select: "id,created_at,action", kind: "action", descriptors: ["action"] },
+  { table: "field_activity", label: "Field activity", timeColumn: "created_at", select: "id,created_at,within_geofence", kind: "within_geofence", descriptors: ["within_geofence"] },
+  { table: "attendance_records", label: "Attendance", timeColumn: "created_at", select: "id,created_at,status", kind: "status", descriptors: ["status"] },
+  { table: "forum_posts", label: "Forum", timeColumn: "created_at", select: "id,created_at,category", kind: "category", descriptors: ["category"] },
 ];
+
+/** How many individual rows per stream get a citable [E#] reference. */
+const CITED_PER_STREAM = 8;
+
+interface Citation {
+  ref: string;
+  table: string;
+  label: string;
+  eventId: string;
+  timestamp: string;
+  detail: string;
+}
 
 interface Bucket {
   label: string;
+  table: string;
   total: number;
   kinds: Record<string, number>;
   last24h: number;
@@ -37,6 +68,7 @@ interface Bucket {
   newest: string | null;
   oldest: string | null;
   error?: string;
+  citations: Citation[];
 }
 
 async function buildContext(token: string) {
@@ -50,7 +82,10 @@ async function buildContext(token: string) {
 
   const buckets = await Promise.all(
     SOURCES.map(async (s): Promise<Bucket> => {
-      const b: Bucket = { label: s.label, total: 0, kinds: {}, last24h: 0, last7d: 0, newest: null, oldest: null };
+      const b: Bucket = {
+        label: s.label, table: s.table, total: 0, kinds: {},
+        last24h: 0, last7d: 0, newest: null, oldest: null, citations: [],
+      };
       try {
         const { data, error } = await supabase
           .from(s.table)
@@ -58,7 +93,8 @@ async function buildContext(token: string) {
           .order(s.timeColumn, { ascending: false })
           .limit(300);
         if (error) { b.error = error.message; return b; }
-        for (const row of (data as Record<string, unknown>[]) ?? []) {
+        const rows = (data as Record<string, unknown>[]) ?? [];
+        for (const row of rows) {
           const at = new Date(String(row[s.timeColumn])).getTime();
           if (!Number.isFinite(at)) continue;
           b.total++;
@@ -69,6 +105,20 @@ async function buildContext(token: string) {
           const iso = new Date(at).toISOString();
           if (!b.newest || iso > b.newest) b.newest = iso;
           if (!b.oldest || iso < b.oldest) b.oldest = iso;
+
+          if (b.citations.length < CITED_PER_STREAM && row.id) {
+            const detail = s.descriptors
+              .map((d) => `${d}=${String(row[d] ?? "unspecified")}`)
+              .join(", ");
+            b.citations.push({
+              ref: "", // assigned globally below
+              table: s.table,
+              label: s.label,
+              eventId: String(row.id),
+              timestamp: iso,
+              detail,
+            });
+          }
         }
       } catch (e) {
         b.error = e instanceof Error ? e.message : "unavailable";
@@ -77,7 +127,21 @@ async function buildContext(token: string) {
     }),
   );
 
-  return { generatedAt: new Date().toISOString(), windowNote: "Up to the 300 most recent rows per stream.", streams: buckets };
+  // Assign stable global refs E1..En across all streams.
+  const citations: Citation[] = [];
+  for (const b of buckets) {
+    for (const c of b.citations) {
+      c.ref = `E${citations.length + 1}`;
+      citations.push(c);
+    }
+  }
+
+  return {
+    generatedAt: new Date().toISOString(),
+    windowNote: "Up to the 300 most recent rows per stream; the most recent rows per stream are individually citable.",
+    streams: buckets,
+    citations,
+  };
 }
 
 function contextBlock(ctx: Awaited<ReturnType<typeof buildContext>>, model: Record<string, unknown> | undefined) {
@@ -89,14 +153,20 @@ function contextBlock(ctx: Awaited<ReturnType<typeof buildContext>>, model: Reco
     if (s.error) { lines.push(`- ${s.label}: unavailable to this user (${s.error}).`); continue; }
     const kinds = Object.entries(s.kinds).sort((a, b) => b[1] - a[1]).slice(0, 8)
       .map(([k, v]) => `${k}=${v}`).join(", ") || "none";
-    lines.push(`- ${s.label}: ${s.total} records sampled | last 24h: ${s.last24h} | last 7d: ${s.last7d} | newest: ${s.newest ?? "n/a"} | oldest: ${s.oldest ?? "n/a"} | breakdown: ${kinds}`);
+    const refs = s.citations.map((c) => `[${c.ref}]`).join("") || "—";
+    lines.push(`- ${s.label}: ${s.total} records sampled | last 24h: ${s.last24h} | last 7d: ${s.last7d} | newest: ${s.newest ?? "n/a"} | oldest: ${s.oldest ?? "n/a"} | breakdown: ${kinds} | sample sources: ${refs}`);
   }
   const totalEvents = ctx.streams.reduce((a, s) => a + s.total, 0);
   lines.push("");
   lines.push(`TOTAL SAMPLED EVENTS: ${totalEvents}`);
+  lines.push("");
+  lines.push("SOURCE EVENTS CATALOG (cite these markers)");
+  for (const c of ctx.citations) {
+    lines.push(`[${c.ref}] ${c.label} · table=${c.table} · event_id=${c.eventId} · at=${c.timestamp} · ${c.detail}`);
+  }
   if (model && Object.keys(model).length) {
     lines.push("");
-    lines.push("LIVE TRANSFORMER METRICS (browser-trained model)");
+    lines.push("LIVE TRANSFORMER METRICS (browser-trained model) — cite as [MODEL]");
     for (const [k, v] of Object.entries(model)) lines.push(`- ${k}: ${typeof v === "number" ? v : String(v)}`);
   }
   return lines.join("\n");
@@ -162,7 +232,31 @@ Deno.serve(async (req) => {
       });
     }
 
-    return new Response(upstream.body, {
+    // Emit the citation catalog first, then relay the model stream untouched.
+    const encoder = new TextEncoder();
+    const catalogFrame = `data: ${JSON.stringify({
+      amehnities: { citations: ctx.citations, generatedAt: ctx.generatedAt },
+    })}\n\n`;
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        controller.enqueue(encoder.encode(catalogFrame));
+        const reader = upstream.body!.getReader();
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            controller.enqueue(value);
+          }
+        } catch {
+          /* client or upstream disconnected */
+        } finally {
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(stream, {
       headers: {
         ...corsHeaders,
         "Content-Type": "text/event-stream",
