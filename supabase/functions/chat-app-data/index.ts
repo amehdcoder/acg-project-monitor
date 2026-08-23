@@ -365,6 +365,8 @@ Deno.serve(async (req) => {
           { role: "system", content: PUBLIC_HEALTH_EXPERTISE },
           { role: "system", content: tierDirective(tier) },
           ...(learned ? [{ role: "system", content: learned }] : []),
+          ...(webBlock ? [{ role: "system", content: webBlock }] : []),
+
           { role: "system", content: `LIVE APPLICATION CONTEXT\n\n${contextBlock(ctx, modelStats)}` },
           ...trimmed,
         ],
