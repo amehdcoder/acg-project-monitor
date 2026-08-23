@@ -27,8 +27,73 @@ export interface CheckpointFile {
     paramCount: number;
   };
   vocabulary: string[];
+  /** Per-tensor sizes, in parameter order — used to validate architecture match. */
+  shapes?: { size: number }[];
   weights: { dtype: "float32"; length: number; base64: string };
   optimizer: null | { dtype: "float32"; m: string; v: string };
+}
+
+export const CHECKPOINT_FORMAT = "amehnities-ai-checkpoint";
+export const SUPPORTED_VERSIONS = [1];
+
+export interface CheckpointIssue {
+  level: "error" | "warning";
+  title: string;
+  detail: string;
+}
+
+/**
+ * Deep validation of a parsed checkpoint against the currently running model:
+ * format, version, architecture and tensor shapes.
+ */
+export function validateCheckpoint(file: CheckpointFile, current?: CheckpointCfg | null): CheckpointIssue[] {
+  const issues: CheckpointIssue[] = [];
+  if (file?.format !== CHECKPOINT_FORMAT) {
+    issues.push({ level: "error", title: "Unrecognised file", detail: `Expected format "${CHECKPOINT_FORMAT}", found "${String(file?.format ?? "none")}".` });
+    return issues;
+  }
+  if (!SUPPORTED_VERSIONS.includes(file.version)) {
+    issues.push({ level: "error", title: "Unsupported version", detail: `Checkpoint version ${file.version} — this build reads version ${SUPPORTED_VERSIONS.join(", ")}.` });
+  }
+  const m = file.model;
+  const required: (keyof CheckpointCfg)[] = ["dModel", "nHeads", "nLayers", "dFF", "ctx", "vocab"];
+  const missing = required.filter((k) => !Number.isFinite(m?.[k] as number));
+  if (missing.length) {
+    issues.push({ level: "error", title: "Incomplete architecture", detail: `Missing model fields: ${missing.join(", ")}.` });
+    return issues;
+  }
+  if (m.dModel % m.nHeads !== 0) {
+    issues.push({ level: "error", title: "Invalid head split", detail: `dModel ${m.dModel} is not divisible by ${m.nHeads} heads.` });
+  }
+  const declared = file.weights?.length ?? 0;
+  if (!declared) issues.push({ level: "error", title: "No weights", detail: "The checkpoint contains no weight tensor." });
+  const expected = expectedParamCount(m);
+  if (declared && declared !== expected) {
+    issues.push({ level: "error", title: "Tensor shape mismatch", detail: `Weights hold ${declared.toLocaleString()} values but this architecture needs ${expected.toLocaleString()}.` });
+  }
+  if (file.shapes?.length) {
+    const sum = file.shapes.reduce((a, s) => a + (s?.size || 0), 0);
+    if (sum !== declared) {
+      issues.push({ level: "error", title: "Corrupt tensor map", detail: `Declared tensor sizes total ${sum.toLocaleString()}, weights hold ${declared.toLocaleString()}.` });
+    }
+  }
+  if (current) {
+    const diffs = required.filter((k) => current[k] !== m[k]).map((k) => `${k}: ${current[k]} → ${m[k]}`);
+    if (diffs.length) {
+      issues.push({ level: "warning", title: "Architecture differs from the running model", detail: `Loading will rebuild the network (${diffs.join(", ")}).` });
+    }
+  }
+  if (file.optimizer && (!file.optimizer.m || !file.optimizer.v)) {
+    issues.push({ level: "warning", title: "Partial optimiser state", detail: "Adam moments are incomplete and will be re-initialised." });
+  }
+  return issues;
+}
+
+/** Parameter count implied by a config — mirrors the worker's tensor layout. */
+export function expectedParamCount(c: CheckpointCfg): number {
+  const { dModel: D, dFF: F, nLayers: L, ctx, vocab: V } = c;
+  const perLayer = 4 * (D * D + D) /* q,k,v,o */ + (D * F + F) + (F * D + D) /* ffn */ + 4 * D /* two layernorms */;
+  return V * D /* emb */ + ctx * D /* pos */ + L * perLayer + 2 * D /* final ln */ + D * V + V /* head */;
 }
 
 export function f32ToBase64(arr: Float32Array): string {
