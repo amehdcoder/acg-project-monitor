@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  buildCheckpointFile, downloadCheckpoint, parseCheckpointFile, validateCheckpoint,
+  buildCheckpointFile, downloadCheckpoint, parseCheckpointFile, toWorkerCheckpoint, validateCheckpoint,
   type CheckpointFile, type CheckpointIssue,
 } from "@/lib/amehnitiesAi/checkpoint";
 import {
@@ -23,6 +23,16 @@ import {
 export interface MetricSample {
   at: number; step: number; loss: number; gradNorm: number;
   tokensPerSec: number; stepsPerSec: number; entropy: number; tokensSeen: number;
+}
+
+export interface EvalSample {
+  at: number; step: number; loss: number; perplexity: number;
+  accuracy: number; top5: number; confidence: number; windows: number;
+}
+
+export interface DivergenceAlert {
+  at: number; reason: string; title: string; detail: string;
+  metrics: Record<string, number>; suggestions: string[];
 }
 
 export interface Telemetry {
@@ -46,6 +56,14 @@ export interface Telemetry {
   stepsPerSec: number;
   entropy: number;
   metrics: MetricSample[];
+  running: boolean;
+  evaluation: EvalSample | null;
+  evalSeries: EvalSample[];
+  evalEnabled: boolean;
+  guardEnabled: boolean;
+  alert: DivergenceAlert | null;
+  trainTokens: number;
+  valTokens: number;
 }
 
 export interface QueryResult {
@@ -65,7 +83,16 @@ export interface CheckpointRecord {
   bytes: number;
   withOptimizer: boolean;
   file: CheckpointFile;
+  /** Auto-saved best-checkpoint metadata (absent for manual exports). */
+  auto?: boolean;
+  score?: number;
+  valLoss?: number;
+  accuracy?: number;
+  confidence?: number;
 }
+
+/** How an auto-saved checkpoint is judged to be "the best so far". */
+export type BestMetric = "loss" | "confidence";
 
 const SOURCE_LABELS = ACTIVITY_SOURCES.map((s) => s.label);
 
@@ -84,6 +111,12 @@ export function useAmehnitiesBrain() {
   const [synthetic, setSynthetic] = useState(false);
   const [enabledSources, setEnabledSources] = useState<string[]>(SOURCE_LABELS);
   const [checkpoints, setCheckpoints] = useState<CheckpointRecord[]>([]);
+  const [bestCheckpoints, setBestCheckpoints] = useState<CheckpointRecord[]>([]);
+  const [autoSave, setAutoSave] = useState(true);
+  const [bestMetric, setBestMetric] = useState<BestMetric>("loss");
+  const [autoSaving, setAutoSaving] = useState(false);
+  const lastEvalAtRef = useRef(0);
+  const bestScoreRef = useRef<number | null>(null);
   const enabledRef = useRef(enabledSources);
   enabledRef.current = enabledSources;
 
@@ -171,6 +204,12 @@ export function useAmehnitiesBrain() {
 
   useEffect(() => { workerRef.current?.postMessage({ type: "budget", ms: budget }); }, [budget]);
 
+  // The guardrail pauses training inside the worker; mirror that in UI state so
+  // the controls (and the visibility watcher) never silently resume a diverged run.
+  useEffect(() => {
+    if (telemetry?.alert) setRunning(false);
+  }, [telemetry?.alert?.at]);
+
   const toggleSource = useCallback((label: string) => {
     setEnabledSources((cur) => (cur.includes(label) ? cur.filter((l) => l !== label) : [...cur, label]));
   }, []);
@@ -208,6 +247,111 @@ export function useAmehnitiesBrain() {
     ].slice(0, 12));
     return { file, bytes };
   }, [captureCheckpoint]);
+
+  /** Snapshot the current weights into memory (no download) — used by auto-save. */
+  const snapshotCheckpoint = useCallback(async (meta: Partial<CheckpointRecord>) => {
+    const payload = await captureCheckpoint(true);
+    const file = buildCheckpointFile(payload, tokenizerRef.current.vocab);
+    if (payload.shapes) file.shapes = payload.shapes;
+    const rec: CheckpointRecord = {
+      id: `auto-${file.createdAt}-${file.training.step}`,
+      createdAt: file.createdAt,
+      step: file.training.step,
+      loss: file.training.loss,
+      params: file.training.paramCount,
+      bytes: JSON.stringify(file).length,
+      withOptimizer: !!file.optimizer,
+      file,
+      auto: true,
+      ...meta,
+    };
+    return rec;
+  }, [captureCheckpoint]);
+
+  /**
+   * Auto-save the best-performing checkpoints.
+   *
+   * Every time a fresh held-out evaluation lands, the run is scored (lowest
+   * validation loss or highest prediction confidence). Only genuine
+   * improvements are kept, and at most five snapshots are retained.
+   */
+  useEffect(() => {
+    const ev = telemetry?.evaluation;
+    if (!autoSave || !ev || autoSaving) return;
+    if (ev.at === lastEvalAtRef.current) return;
+    lastEvalAtRef.current = ev.at;
+    const score = bestMetric === "loss" ? -ev.loss : ev.confidence;
+    if (!Number.isFinite(score)) return;
+    const prev = bestScoreRef.current;
+    // require a meaningful improvement so we don't churn on noise
+    if (prev !== null && score <= prev + Math.abs(prev || 1) * 0.002) return;
+    bestScoreRef.current = score;
+    setAutoSaving(true);
+    snapshotCheckpoint({
+      score, valLoss: ev.loss, accuracy: ev.accuracy, confidence: ev.confidence,
+    })
+      .then((rec) => {
+        setBestCheckpoints((cur) => {
+          const next = [rec, ...cur].sort((a, b) => (b.score ?? -Infinity) - (a.score ?? -Infinity));
+          return next.slice(0, 5);
+        });
+      })
+      .catch(() => { /* a missed snapshot is never fatal — the next eval retries */ })
+      .finally(() => setAutoSaving(false));
+  }, [telemetry?.evaluation, autoSave, bestMetric, autoSaving, snapshotCheckpoint]);
+
+  /** Switching the ranking metric re-baselines the "best so far" comparison. */
+  const changeBestMetric = useCallback((m: BestMetric) => {
+    setBestMetric(m);
+    setBestCheckpoints((cur) => {
+      const rescored = cur.map((c) => ({
+        ...c,
+        score: m === "loss" ? -(c.valLoss ?? c.loss) : (c.confidence ?? 0),
+      })).sort((a, b) => (b.score ?? -Infinity) - (a.score ?? -Infinity));
+      bestScoreRef.current = rescored.length ? rescored[0].score ?? null : null;
+      return rescored;
+    });
+  }, []);
+
+  /** Roll the live model back to one of the auto-saved best checkpoints. */
+  const rollbackTo = useCallback((id: string) => {
+    const rec = [...bestCheckpoints, ...checkpoints].find((c) => c.id === id);
+    if (!rec) throw new Error("That checkpoint is no longer available");
+    workerRef.current?.postMessage({ type: "load", ckpt: toWorkerCheckpoint(rec.file) });
+    bestScoreRef.current = rec.score ?? bestScoreRef.current;
+    return rec;
+  }, [bestCheckpoints, checkpoints]);
+
+  /** Download an auto-saved best checkpoint. */
+  const downloadBestCheckpoint = useCallback((id: string) => {
+    const rec = bestCheckpoints.find((c) => c.id === id);
+    if (!rec) throw new Error("Checkpoint no longer available");
+    return downloadCheckpoint(rec.file);
+  }, [bestCheckpoints]);
+
+  const clearBestCheckpoints = useCallback(() => {
+    setBestCheckpoints([]);
+    bestScoreRef.current = null;
+  }, []);
+
+  /** Held-out evaluation controls. */
+  const runEvaluation = useCallback((windows = 8) => {
+    workerRef.current?.postMessage({ type: "eval", now: true, windows });
+  }, []);
+  const setEvalEnabled = useCallback((enabled: boolean) => {
+    workerRef.current?.postMessage({ type: "eval", enabled });
+  }, []);
+  const setEvalInterval = useCallback((everyMs: number) => {
+    workerRef.current?.postMessage({ type: "eval", everyMs });
+  }, []);
+
+  /** Divergence guardrails. */
+  const setGuardEnabled = useCallback((enabled: boolean) => {
+    workerRef.current?.postMessage({ type: "guard", enabled });
+  }, []);
+  const dismissAlert = useCallback(() => {
+    workerRef.current?.postMessage({ type: "dismissAlert" });
+  }, []);
 
   /** Re-download a checkpoint that was captured earlier in this session. */
   const downloadSavedCheckpoint = useCallback((id: string) => {
@@ -297,5 +441,16 @@ export function useAmehnitiesBrain() {
     allSources: SOURCE_LABELS, enabledSources, toggleSource, setAllSources,
     exportCheckpoint, importCheckpoint, inspectCheckpoint, applyConfig,
     checkpoints, downloadSavedCheckpoint, askModel,
+    evaluation: telemetry?.evaluation ?? null,
+    evalSeries: telemetry?.evalSeries ?? [],
+    evalEnabled: telemetry?.evalEnabled ?? true,
+    valTokens: telemetry?.valTokens ?? 0,
+    trainTokens: telemetry?.trainTokens ?? 0,
+    runEvaluation, setEvalEnabled, setEvalInterval,
+    alert: telemetry?.alert ?? null,
+    guardEnabled: telemetry?.guardEnabled ?? true,
+    setGuardEnabled, dismissAlert,
+    bestCheckpoints, autoSave, setAutoSave, bestMetric, setBestMetric: changeBestMetric,
+    autoSaving, rollbackTo, downloadBestCheckpoint, clearBestCheckpoints,
   };
 }

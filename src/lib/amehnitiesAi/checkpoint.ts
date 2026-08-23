@@ -156,6 +156,23 @@ export function downloadCheckpoint(file: CheckpointFile) {
   return blob.size;
 }
 
+/** Convert an in-memory checkpoint document into a worker-loadable payload. */
+export function toWorkerCheckpoint(file: CheckpointFile) {
+  if (!file?.weights?.base64) throw new Error("Checkpoint has no weights");
+  const weights = base64ToF32(file.weights.base64);
+  return {
+    cfg: file.model,
+    step: file.training.step,
+    tokensSeen: file.training.tokensSeen,
+    lossEMA: file.training.loss,
+    lossHistory: file.training.lossHistory,
+    weights,
+    optimizer: file.optimizer
+      ? { m: base64ToF32(file.optimizer.m), v: base64ToF32(file.optimizer.v) }
+      : null,
+  };
+}
+
 /** Parse a checkpoint document back into a worker-loadable payload. */
 export function parseCheckpointFile(text: string) {
   const file = JSON.parse(text) as CheckpointFile;
