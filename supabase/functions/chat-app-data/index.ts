@@ -319,10 +319,21 @@ Deno.serve(async (req) => {
 
     const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
     const lastQuestion = String(messages[messages.length - 1]?.content ?? "").slice(0, 2000);
-    const [ctx, policy, routeStats] = await Promise.all([
-      buildContext(token), retrievePolicy(lastQuestion), loadRouteStats(),
+
+    // Web grounding: on by default, skipped for pure record look-ups, and
+    // overridable per request with `useWeb`.
+    const webRequested = body?.useWeb === undefined ? null : Boolean(body.useWeb);
+    const wantWeb = webRequested === null ? shouldSearchWeb(lastQuestion) : webRequested;
+
+    const [ctx, policy, routeStats, webSources] = await Promise.all([
+      buildContext(token),
+      retrievePolicy(lastQuestion),
+      loadRouteStats(),
+      wantWeb ? retrieveWebKnowledge(lastQuestion).catch(() => []) : Promise.resolve([]),
     ]);
     const learned = policyBlock(policy.rules, policy.exemplars);
+    const webBlock = webKnowledgeBlock(webSources);
+
 
     // ---- Automatic model routing -------------------------------------------
     const { questionClass, heuristicTier } = classifyQuestion(lastQuestion);
