@@ -840,6 +840,7 @@ self.onmessage = (e: MessageEvent) => {
     case "init":
       stream = [];
       lossEMA = 0; lossHistory = []; tokensSeen = 0; lastFwd = null; metrics = [];
+      evalSeries = []; lastEval = null; lastAlert = null; gradSpikes = 0;
       build(msg.cfg || {});
       break;
     case "tokens": {
@@ -854,7 +855,25 @@ self.onmessage = (e: MessageEvent) => {
       break;
     case "run":
       running = !!msg.running;
+      // resuming always clears the divergence warning and its spike counter
+      if (running) { lastAlert = null; gradSpikes = 0; }
       if (running && !timer) timer = setTimeout(tick, 0);
+      break;
+    case "eval": {
+      if (msg.enabled !== undefined) evalEnabled = !!msg.enabled;
+      if (msg.everyMs !== undefined) evalEveryMs = Math.max(1000, Math.min(60000, msg.everyMs));
+      if (msg.now) { lastEvalAt = Date.now(); evaluateValidation(Math.max(1, Math.min(16, msg.windows ?? 8))); }
+      postTelemetry(true);
+      break;
+    }
+    case "guard":
+      guardEnabled = !!msg.enabled;
+      if (!guardEnabled) { lastAlert = null; gradSpikes = 0; }
+      postTelemetry(true);
+      break;
+    case "dismissAlert":
+      lastAlert = null; gradSpikes = 0;
+      postTelemetry(true);
       break;
     case "budget":
       budgetMs = Math.max(2, Math.min(40, msg.ms || 12));
