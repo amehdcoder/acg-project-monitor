@@ -32,6 +32,7 @@ import QuizKoboSyncDialog from "./QuizKoboSyncDialog";
 import KoboQuestionList from "./KoboQuestionList";
 import QuizAnalyticsAccessDialog from "./QuizAnalyticsAccessDialog";
 import { useQuizKobo } from "@/hooks/useQuizKobo";
+import { KoboSyncStatusBar } from "@/components/QuizBuilder/KoboSyncStatusBar";
 import { useQuizAnalyticsAccess } from "@/hooks/useQuizAnalyticsAccess";
 import { validateMessageTokens, KNOWN_QUIZ_TOKENS } from "@/lib/quizTokens";
 import { useAuth } from "@/hooks/useAuth";
@@ -107,7 +108,11 @@ const QuizBuilder = () => {
 
   // KoboToolbox sync settings for the selected quiz
   const [showKoboSync, setShowKoboSync] = useState(false);
-  const { config: koboConfig, reload: reloadKobo } = useQuizKobo(selectedQuiz?.id ?? null);
+  const {
+    config: koboConfig, reload: reloadKobo, submissions: koboSubmissions,
+    loading: koboLoading, live: koboLive, error: koboError,
+    lastSyncedAt: koboLastSyncedAt, lastEventAt: koboLastEventAt,
+  } = useQuizKobo(selectedQuiz?.id ?? null);
 
   // Analytics-tab access (admins/owners always; others need an explicit grant)
   const { canViewAnalytics } = useQuizAnalyticsAccess(selectedQuiz?.id ?? null);
@@ -1004,6 +1009,18 @@ const QuizBuilder = () => {
             <CardHeader>
               <CardTitle className="text-lg">{selectedQuiz.title}</CardTitle>
               {selectedQuiz.description && <CardDescription>{selectedQuiz.description}</CardDescription>}
+              {koboConfig && (
+                <KoboSyncStatusBar
+                  formTitle={koboConfig.form_title}
+                  loading={koboLoading}
+                  live={koboLive}
+                  error={koboError}
+                  submissionCount={koboSubmissions.length}
+                  lastSyncedAt={koboLastSyncedAt}
+                  lastEventAt={koboLastEventAt}
+                  onRefresh={() => { void reloadKobo(); }}
+                />
+              )}
               <div className="flex gap-2 flex-wrap pt-2">
                 {canViewAnalytics && (
                   <Button size="sm" variant="outline" onClick={() => setShowAnalytics(selectedQuiz)} className="gap-1">
