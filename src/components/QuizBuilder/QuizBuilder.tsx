@@ -1005,6 +1005,11 @@ const QuizBuilder = () => {
               <CardTitle className="text-lg">{selectedQuiz.title}</CardTitle>
               {selectedQuiz.description && <CardDescription>{selectedQuiz.description}</CardDescription>}
               <div className="flex gap-2 flex-wrap pt-2">
+                {canViewAnalytics && (
+                  <Button size="sm" variant="outline" onClick={() => setShowAnalytics(selectedQuiz)} className="gap-1">
+                    <BarChart3 className="h-3 w-3" /> Analytics
+                  </Button>
+                )}
                 {isAdmin && (
                   <>
                     <Button size="sm" variant="outline" onClick={() => openRenameDialog(selectedQuiz)} className="gap-1">
@@ -1013,9 +1018,6 @@ const QuizBuilder = () => {
 
                     <Button size="sm" variant="outline" onClick={() => togglePublish(selectedQuiz)} className="gap-1">
                       <Send className="h-3 w-3" /> {selectedQuiz.is_published ? "Unpublish" : "Publish"}
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => setShowAnalytics(selectedQuiz)} className="gap-1">
-                      <BarChart3 className="h-3 w-3" /> Analytics
                     </Button>
                     <Button
                       size="sm" variant="outline" onClick={() => setShowAnalyticsAccess(true)}
@@ -1351,6 +1353,12 @@ const QuizBuilder = () => {
                   </CardContent>
                 </Card>
               )}
+
+              <KoboQuestionList
+                questions={koboConfig?.question_config ?? []}
+                identity={koboConfig?.identity_fields}
+                formTitle={koboConfig?.form_title}
+              />
             </div>
           )}
 
@@ -1606,6 +1614,16 @@ const QuizBuilder = () => {
           quizTitle={selectedQuiz.title}
           config={koboConfig}
           onSaved={() => { void reloadKobo(); }}
+        />
+      )}
+
+      {/* Analytics tab access grants */}
+      {selectedQuiz && (
+        <QuizAnalyticsAccessDialog
+          open={showAnalyticsAccess}
+          onOpenChange={setShowAnalyticsAccess}
+          quizId={selectedQuiz.id}
+          quizTitle={selectedQuiz.title}
         />
       )}
 
