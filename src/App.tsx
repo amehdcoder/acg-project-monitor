@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider, QueryCache, keepPreviousData } from "
 import { toast as sonnerToast } from "sonner";
 import { isTransientBackendError, describeBackendError } from "@/lib/safeData";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, lazy, Suspense } from "react";
 import { AuthProvider } from "@/hooks/useAuth";
 import { LanguageProvider } from "@/hooks/useLanguage";
 import { ImpersonationProvider } from "@/hooks/useImpersonation";
@@ -24,6 +24,7 @@ import MdaLensHarness from "./pages/MdaLensHarness";
 import MicroplanKpiHarness from "./pages/MicroplanKpiHarness";
 import XlsFormCoverHarness from "./pages/XlsFormCoverHarness";
 import LearningLog from "./pages/LearningLog";
+const AmehnitiesAI = lazy(() => import("./pages/AmehnitiesAI"));
 import SharedDashboard from "./pages/SharedDashboard";
 import InstallBanner from "./components/InstallBanner";
 import PWAUpdatePrompt from "./components/PWAUpdatePrompt";
@@ -161,6 +162,7 @@ const App = () => (
                    <Route path="/kobo-hub" element={<ProtectedRoute><KoboHubPage /></ProtectedRoute>} />
                    <Route path="/kobo-hub/manage" element={<ProtectedRoute><KoboHubPage manage /></ProtectedRoute>} />
                    <Route path="/learning-log" element={<ProtectedRoute><LearningLog /></ProtectedRoute>} />
+                   <Route path="/amehnities-ai" element={<ProtectedRoute><Suspense fallback={null}><AmehnitiesAI /></Suspense></ProtectedRoute>} />
                     <Route path="/__test/mda-analyses" element={<MdaAnalysesHarness />} />
                     <Route path="/__test/mda-lens" element={<MdaLensHarness />} />
                     {/* Extra path segments must not unlock anything — same guarded harness. */}
