@@ -32,7 +32,7 @@ import {
 } from "./ChecklistStatusTables";
 import ChecklistPredictive from "./ChecklistPredictive";
 import ChecklistMaps from "./ChecklistMaps";
-import GpsCommunityVerification from "./GpsCommunityVerification";
+import Grid3AccuracyTable from "./Grid3AccuracyTable";
 import HouseholdCoverageAnalysis from "./HouseholdCoverageAnalysis";
 import DataIntegrityBadge from "./DataIntegrityBadge";
 import { validate } from "@/lib/isc/chartValidation";
