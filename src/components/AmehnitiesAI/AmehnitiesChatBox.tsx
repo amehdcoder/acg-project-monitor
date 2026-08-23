@@ -349,8 +349,13 @@ export default function AmehnitiesChatBox({
             <button
               type="button"
               onClick={() => cite && setOpenCitation(cite)}
-              title={cite ? `${cite.label} · ${fmtTime(cite.timestamp)}` : "Source unavailable"}
-              className="mx-0.5 inline-flex items-center rounded-md border border-primary/40 bg-primary/10 px-1.5 py-px align-baseline font-mono text-[10px] font-semibold text-primary transition-colors hover:bg-primary/20"
+              title={cite ? `${cite.label} · ${cite.kind === "web" ? (cite.publisher ?? "Web source") : fmtTime(cite.timestamp)}` : "Source unavailable"}
+              className={`mx-0.5 inline-flex items-center rounded-md border px-1.5 py-px align-baseline font-mono text-[10px] font-semibold transition-colors ${
+                cite?.kind === "web"
+                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400"
+                  : "border-primary/40 bg-primary/10 text-primary hover:bg-primary/20"
+              }`}
+
             >
               {ref}
             </button>
