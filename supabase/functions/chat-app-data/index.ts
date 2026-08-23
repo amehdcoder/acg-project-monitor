@@ -14,7 +14,9 @@ import { guardRequest } from "../_shared/authGuard.ts";
 import {
   applyLearnedRoute, classifyQuestion, TIER_LABEL, TIER_MODEL, tierDirective, type Tier,
 } from "../_shared/modelRouter.ts";
+import { retrieveWebKnowledge, shouldSearchWeb, webKnowledgeBlock } from "../_shared/webKnowledge.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
