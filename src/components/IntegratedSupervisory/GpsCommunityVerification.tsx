@@ -477,20 +477,44 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
                         {p.verify?.status === "verified" ? <ShieldCheck className="h-3 w-3" /> : <ShieldAlert className="h-3 w-3" />}
                         {meta.label}
                       </span>
+                      {p.override && (
+                        <span
+                          className="ml-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
+                          style={{ background: OVERRIDE_META[p.override.decision].color }}
+                        >
+                          <Gavel className="h-3 w-3" /> {OVERRIDE_META[p.override.decision].label}
+                        </span>
+                      )}
                       <div className="mt-0.5 max-w-[260px] text-[10px] text-muted-foreground">{p.verify?.reason}</div>
                     </td>
                     <td className="px-2.5 py-2 font-mono font-bold" style={{ color: meta.color }}>{p.verify?.score ?? 0}%</td>
                     <td className="px-2.5 py-2 text-muted-foreground">{[p.ward, p.lga, p.state].filter(Boolean).join(" · ") || "—"}</td>
                     <td className="px-2.5 py-2 font-mono text-[10px] text-muted-foreground">{p.lat.toFixed(5)}, {p.lng.toFixed(5)}</td>
                     <td className="px-2.5 py-2">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="h-7 px-2 text-[10px]"
-                        onClick={(e) => { e.stopPropagation(); setSv({ lat: p.lat, lng: p.lng, title: `${p.community} — Street View` }); }}
-                      >
-                        <Eye className="mr-1 h-3 w-3" /> Street View
-                      </Button>
+                      <div className="flex flex-wrap gap-1">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-8 px-2 text-[10px]"
+                          onClick={(e) => { e.stopPropagation(); setPreview(p); }}
+                        >
+                          <Eye className="mr-1 h-3 w-3" /> Preview pin
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 px-2 text-[10px]"
+                          onClick={(e) => { e.stopPropagation(); setHistoryFor(p); }}
+                        >
+                          <History className="mr-1 h-3 w-3" />
+                          {review.isAdmin ? "History / review" : "History"}
+                          {(review.historyByKey.get(p.locKey || "")?.length ?? 0) > 1 && (
+                            <span className="ml-1 rounded-full bg-amber-500 px-1 text-[9px] font-bold text-white">
+                              {review.historyByKey.get(p.locKey || "")!.length}
+                            </span>
+                          )}
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -500,6 +524,28 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
         </div>
       </CardContent>
 
+      <GpsPointPreviewDialog
+        open={!!preview}
+        onOpenChange={(o) => !o && setPreview(null)}
+        point={preview}
+        onLaunchStreetView={() => {
+          if (!preview) return;
+          setSv({ lat: preview.lat, lng: preview.lng, title: `${preview.community} — Street View` });
+          setPreview(null);
+        }}
+      />
+
+      <GpsDiscrepancyHistoryDialog
+        open={!!historyFor}
+        onOpenChange={(o) => !o && setHistoryFor(null)}
+        point={historyFor ? { ...historyFor, locKey: historyFor.locKey || geoKey(historyFor.lat, historyFor.lng) } : null}
+        history={historyFor ? (review.historyByKey.get(historyFor.locKey || geoKey(historyFor.lat, historyFor.lng)) ?? []) : []}
+        override={historyFor?.override ?? null}
+        isAdmin={review.isAdmin}
+        onSave={review.saveOverride}
+        onClear={review.clearOverride}
+      />
+
       <GoogleStreetViewPanel
         open={!!sv}
         onOpenChange={(o) => !o && setSv(null)}
@@ -507,6 +553,7 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
         lng={sv?.lng ?? null}
         title={sv?.title ?? "Street View"}
       />
+
     </Card>
   );
 }
