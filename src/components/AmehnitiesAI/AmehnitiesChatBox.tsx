@@ -37,6 +37,12 @@ interface ChatMessage {
   content: string;
   citations?: Citation[];
   followups?: string[];
+  /** Learned-policy entries that shaped this answer — used for reward credit. */
+  policyIds?: string[];
+  policyApplied?: PolicyApplied[];
+  /** The question this answer responded to (needed by the learning loop). */
+  question?: string;
+  rated?: -1 | 0 | 1;
 }
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
