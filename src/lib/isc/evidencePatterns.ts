@@ -742,6 +742,10 @@ export interface GeoVerdict {
   worked: { label: string; rate: number; n: number }[];
   failed: { label: string; rate: number; gap: number; n: number }[];
   why: string;
+  /** Records behind this verdict (drill-down evidence). */
+  rows: Row[];
+  /** Risk prevalence per predictor key, used by the side-by-side comparison. */
+  factors: Record<string, { rate: number; n: number }>;
 }
 
 const UNIT_KEYS: Record<GeoVerdict["level"], string[]> = {
@@ -783,6 +787,12 @@ export function buildGeoVerdicts(parents: Row[], level: GeoVerdict["level"], min
       if (riskRate >= 0.4) failed.push({ label: d.label, rate: riskRate, gap: riskRate, n: vals.length });
       else if (riskRate <= 0.1) worked.push({ label: d.label.replace(/^No\s+/i, "").replace(/\bnot\b\s*/i, ""), rate: 1 - riskRate, n: vals.length });
     }
+    const factors: GeoVerdict["factors"] = {};
+    for (const d of PREDICTORS) {
+      const vals = rows.map((r) => d.read(r)).filter((v) => v != null) as number[];
+      if (!vals.length) continue;
+      factors[d.key] = { rate: vals.reduce((s2, v) => s2 + v, 0) / vals.length, n: vals.length };
+    }
     failed.sort((a, b) => b.gap - a.gap);
     worked.sort((a, b) => b.rate - a.rate);
 
@@ -807,6 +817,8 @@ export function buildGeoVerdicts(parents: Row[], level: GeoVerdict["level"], min
       worked: worked.slice(0, 4),
       failed: failed.slice(0, 4),
       why,
+      rows,
+      factors,
     });
   }
 
@@ -824,6 +836,8 @@ export interface DistilledFact {
   kind: "fact" | "decoy";
   /** Why a claim was discarded (decoys only). */
   discardReason?: string;
+  /** Records where the condition was present (drill-down evidence). */
+  rows: Row[];
 }
 
 export interface Distillation {
@@ -852,26 +866,27 @@ export function distillFacts(parents: Row[], minSample = 20): Distillation {
       if (v === 1) { nP++; failP += fail; } else { nA++; failA += fail; }
     }
     const n = nP + nA;
+    const evidenceRows = scored.filter((p) => d.read(p) === 1);
     if (!nP || !nA) {
       decoys.push({
         statement: d.label,
         detail: `Observed on only one side (${nP} present / ${nA} absent) — no comparison possible.`,
-        n, effect: 0, p: 1, kind: "decoy", discardReason: "No contrast group",
+        n, effect: 0, p: 1, kind: "decoy", discardReason: "No contrast group", rows: evidenceRows,
       });
       continue;
     }
     const { p: pv, diff } = twoProportionTest(failP, nP, failA, nA);
     const detail = `Non-completion ${Math.round((failP / nP) * 100)}% when present vs ${Math.round((failA / nA) * 100)}% when absent (n=${n}).`;
     if (n < minSample) {
-      decoys.push({ statement: d.label, detail, n, effect: diff, p: pv, kind: "decoy", discardReason: `Sample too small (n=${n} < ${minSample})` });
+      decoys.push({ statement: d.label, detail, n, effect: diff, p: pv, kind: "decoy", discardReason: `Sample too small (n=${n} < ${minSample})`, rows: evidenceRows });
     } else if (Math.abs(diff) < 0.15) {
-      decoys.push({ statement: d.label, detail, n, effect: diff, p: pv, kind: "decoy", discardReason: `Effect too small (${Math.round(Math.abs(diff) * 100)} pts < 15 pts)` });
+      decoys.push({ statement: d.label, detail, n, effect: diff, p: pv, kind: "decoy", discardReason: `Effect too small (${Math.round(Math.abs(diff) * 100)} pts < 15 pts)`, rows: evidenceRows });
     } else if (pv >= 0.05) {
-      decoys.push({ statement: d.label, detail, n, effect: diff, p: pv, kind: "decoy", discardReason: `Not statistically distinguishable from chance (p=${pv.toFixed(2)})` });
+      decoys.push({ statement: d.label, detail, n, effect: diff, p: pv, kind: "decoy", discardReason: `Not statistically distinguishable from chance (p=${pv.toFixed(2)})`, rows: evidenceRows });
     } else {
       facts.push({
         statement: `${d.label} moves non-completion by ${diff > 0 ? "+" : ""}${Math.round(diff * 100)} points`,
-        detail, n, effect: diff, p: pv, kind: "fact",
+        detail, n, effect: diff, p: pv, kind: "fact", rows: evidenceRows,
       });
     }
   }
@@ -880,3 +895,81 @@ export function distillFacts(parents: Row[], minSample = 20): Distillation {
   decoys.sort((a, b) => b.n - a.n);
   return { facts, decoys, screened: PREDICTORS.length, minSample };
 }
+
+
+/* ------------------------------------- 5. side-by-side unit comparison */
+
+export interface UnitPairDiff {
+  a: string;
+  b: string;
+  diff: number;
+  p: number;
+  significant: boolean;
+  verdict: string;
+}
+
+export interface FactorSpread {
+  key: string;
+  label: string;
+  /** Risk prevalence per selected unit id. */
+  byUnit: Record<string, { rate: number; n: number }>;
+  spread: number;
+  best: string;
+  worst: string;
+  p: number;
+  significant: boolean;
+}
+
+export interface UnitComparison {
+  units: GeoVerdict[];
+  pairs: UnitPairDiff[];
+  factors: FactorSpread[];
+}
+
+const unitId = (v: GeoVerdict) => (v.parent ? `${v.parent} › ${v.unit}` : v.unit);
+
+/**
+ * Compare several States / LGAs / Wards side by side and flag the differences
+ * that are statistically meaningful rather than cosmetic.
+ */
+export function compareUnits(verdicts: GeoVerdict[], selected: string[]): UnitComparison {
+  const units = verdicts.filter((v) => selected.includes(unitId(v)));
+  const pairs: UnitPairDiff[] = [];
+  for (let i = 0; i < units.length; i++) {
+    for (let j = i + 1; j < units.length; j++) {
+      const A = units[i], B = units[j];
+      const { p, diff } = twoProportionTest(A.completed, A.n, B.completed, B.n);
+      const significant = p < 0.05;
+      pairs.push({
+        a: unitId(A), b: unitId(B), diff, p, significant,
+        verdict: significant
+          ? `${diff > 0 ? A.unit : B.unit} completes ${Math.abs(Math.round(diff * 100))} points more often — a real difference.`
+          : `The ${Math.abs(Math.round(diff * 100))}-point gap is within sampling noise; treat these units as equivalent for now.`,
+      });
+    }
+  }
+
+  const factors: FactorSpread[] = [];
+  for (const d of PREDICTORS) {
+    const byUnit: FactorSpread["byUnit"] = {};
+    for (const u of units) {
+      const f = u.factors[d.key];
+      if (f && f.n >= 2) byUnit[unitId(u)] = f;
+    }
+    const ids = Object.keys(byUnit);
+    if (ids.length < 2) continue;
+    const sorted = ids.slice().sort((a, b) => byUnit[a].rate - byUnit[b].rate);
+    const best = sorted[0];
+    const worst = sorted[sorted.length - 1];
+    const spread = byUnit[worst].rate - byUnit[best].rate;
+    const { p } = twoProportionTest(
+      Math.round(byUnit[worst].rate * byUnit[worst].n), byUnit[worst].n,
+      Math.round(byUnit[best].rate * byUnit[best].n), byUnit[best].n,
+    );
+    factors.push({ key: d.key, label: d.label, byUnit, spread, best, worst, p, significant: p < 0.05 && spread >= 0.15 });
+  }
+  factors.sort((a, b) => Number(b.significant) - Number(a.significant) || b.spread - a.spread);
+  return { units, pairs, factors };
+}
+
+export { unitId as geoUnitId };
