@@ -19,12 +19,12 @@ export interface ActivitySource {
 }
 
 export const ACTIVITY_SOURCES: ActivitySource[] = [
-  { table: "form_submissions", label: "Submissions", timeColumn: "created_at", select: "created_at" },
+  { table: "form_submissions", label: "Submissions", timeColumn: "created_at", select: "created_at,status", kindColumn: "status" },
   { table: "audit_logs", label: "Audit trail", timeColumn: "created_at", select: "created_at,action", kindColumn: "action" },
-  { table: "app_usage_tracking", label: "App usage", timeColumn: "created_at", select: "created_at" },
-  { table: "field_activity", label: "Field activity", timeColumn: "created_at", select: "created_at,activity_type", kindColumn: "activity_type" },
-  { table: "attendance_records", label: "Attendance", timeColumn: "created_at", select: "created_at" },
-  { table: "forum_posts", label: "Forum", timeColumn: "created_at", select: "created_at" },
+  { table: "app_usage_tracking", label: "App usage", timeColumn: "created_at", select: "created_at,action", kindColumn: "action" },
+  { table: "field_activity", label: "Field activity", timeColumn: "created_at", select: "created_at,within_geofence", kindColumn: "within_geofence" },
+  { table: "attendance_records", label: "Attendance", timeColumn: "created_at", select: "created_at,status", kindColumn: "status" },
+  { table: "forum_posts", label: "Forum", timeColumn: "created_at", select: "created_at,category", kindColumn: "category" },
 ];
 
 export interface ActivityEvent {

@@ -141,11 +141,11 @@ export default function NeuralNetworkCanvas({ telemetry, running, height = 420 }
       for (let c = 0; c < cols.length; c++) {
         const meta = colMeta[c];
         for (const n of cols[c]) {
-          const glow = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r * 4);
-          glow.addColorStop(0, cssHsla("--primary", Math.min(0.55, n.a), "rgba(90,150,255,.4)"));
+          const glow = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r * 2.6);
+          glow.addColorStop(0, cssHsla("--primary", Math.min(0.4, n.a), "rgba(90,150,255,.4)"));
           glow.addColorStop(1, "transparent");
           ctx.fillStyle = glow;
-          ctx.beginPath(); ctx.arc(n.x, n.y, n.r * 4, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(n.x, n.y, n.r * 2.6, 0, Math.PI * 2); ctx.fill();
 
           ctx.fillStyle = meta.kind === "attn" ? primary : cssHsla("--foreground", Math.min(1, n.a + 0.2), fg);
           ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2); ctx.fill();
