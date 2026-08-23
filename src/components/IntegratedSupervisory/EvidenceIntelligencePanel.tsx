@@ -55,9 +55,26 @@ const SectionNote = ({ children }: { children: React.ReactNode }) => (
 
 /* ------------------------------------------------------- 1. daily evidence */
 
-function EvidenceLedgerTab({ parents }: { parents: Row[] }) {
+function EvidenceLedgerTab({
+  parents, drill, onRefresh,
+}: { parents: Row[]; drill: Drill; onRefresh?: () => void | Promise<void> }) {
   const ledger = useMemo(() => buildEvidenceLedger(parents), [parents]);
   const [showAll, setShowAll] = useState(false);
+  const watch = useEvidenceWatch(ledger, onRefresh);
+
+  const openFact = (f: EvidenceFact) =>
+    drill({
+      title: f.theme,
+      category: f.place,
+      color: f.severity === "critical" ? "#DC2626" : f.severity === "positive" ? "#128B5B" : "#D97706",
+      rows: f.rows,
+      note: `${f.occurrences} sighting${f.occurrences === 1 ? "" : "s"} across ${f.days.length} field day${f.days.length === 1 ? "" : "s"} (${f.notes.map((n) => `${n.day} ×${n.count}`).join(", ")})`,
+    });
+
+  const openDay = (day: string) => {
+    const rows = parents.filter((p) => String(p._end ?? p._submission_time ?? p.end ?? "").slice(0, 10) === day);
+    drill({ title: "Checklists submitted", category: day, color: "#1668DC", rows, note: "All submissions logged on this field day" });
+  };
 
   if (!ledger.days.length) {
     return <SectionNote>No dated checklists yet — the ledger builds itself as field days come in.</SectionNote>;
@@ -65,6 +82,7 @@ function EvidenceLedgerTab({ parents }: { parents: Row[] }) {
 
   const chart = ledger.days.map((d) => ({
     day: d.day.slice(5),
+    fullDay: d.day,
     "New evidence": d.newFacts,
     "Corroborations": d.repeatFacts,
     Cumulative: d.cumulative,
@@ -74,6 +92,58 @@ function EvidenceLedgerTab({ parents }: { parents: Row[] }) {
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-2">
+        <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => exportEvidenceLedgerCSV(ledger)}>
+          <FileSpreadsheet className="mr-1 h-3.5 w-3.5" /> Ledger CSV
+        </Button>
+        <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => exportEvidenceLedgerPDF(ledger)}>
+          <FileText className="mr-1 h-3.5 w-3.5" /> Ledger PDF
+        </Button>
+        <span className="mx-1 h-4 w-px bg-border" />
+        <div className="flex items-center gap-1.5">
+          <Switch id="ev-watch" checked={watch.enabled} onCheckedChange={watch.setEnabled} />
+          <label htmlFor="ev-watch" className="flex items-center gap-1 text-[11px] font-medium">
+            {watch.enabled ? <BellRing className="h-3.5 w-3.5 text-emerald-600" /> : <BellOff className="h-3.5 w-3.5 text-muted-foreground" />}
+            Daily refresh &amp; new-evidence alerts
+          </label>
+        </div>
+        {watch.enabled && !watch.notificationsGranted && (
+          <Button size="sm" variant="ghost" className="h-7 text-[11px]" onClick={() => void watch.requestNotifications()}>
+            Enable device notifications
+          </Button>
+        )}
+        {onRefresh && (
+          <Button size="sm" variant="ghost" className="h-7 text-[11px]" onClick={() => void watch.refreshNow()} disabled={watch.refreshing}>
+            <RefreshCw className={`mr-1 h-3.5 w-3.5 ${watch.refreshing ? "animate-spin" : ""}`} /> Refresh now
+          </Button>
+        )}
+        <span className="ml-auto text-[10px] text-muted-foreground">
+          {watch.lastRefresh ? `Last checked ${new Date(watch.lastRefresh).toLocaleString()}` : "Not checked yet"}
+        </span>
+      </div>
+
+      {watch.unseen.length > 0 && (
+        <div className="rounded-lg border border-rose-300 bg-rose-50/60 p-3 dark:bg-rose-950/20">
+          <div className="mb-1 flex flex-wrap items-center gap-2">
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-rose-700 dark:text-rose-400">
+              <Sparkles className="h-3.5 w-3.5" /> {watch.unseen.length} finding{watch.unseen.length === 1 ? "" : "s"} you have not reviewed
+            </p>
+            <Button size="sm" variant="outline" className="ml-auto h-6 text-[10px]" onClick={watch.acknowledge}>
+              Mark all reviewed
+            </Button>
+          </div>
+          <ul className="space-y-1 text-[11px]">
+            {watch.unseen.slice(0, 5).map((f) => (
+              <li key={f.id}>
+                <button type="button" className="text-left underline-offset-2 hover:underline" onClick={() => openFact(f)}>
+                  <span className="font-semibold">{f.theme}</span> — {f.place} · first seen {f.firstSeen}
+                </button>
+              </li>
+            ))}
+            {watch.unseen.length > 5 && <li className="text-muted-foreground">+{watch.unseen.length - 5} more</li>}
+          </ul>
+        </div>
+      )}
       <div className="grid gap-3 sm:grid-cols-4">
         {[
           { l: "Field days logged", v: ledger.days.length, tone: "bg-[hsl(214,80%,40%)]" },
@@ -90,7 +160,11 @@ function EvidenceLedgerTab({ parents }: { parents: Row[] }) {
 
       <div className="h-[260px]">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={chart} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+          <AreaChart
+            data={chart}
+            margin={{ top: 8, right: 12, left: 0, bottom: 4 }}
+            onClick={(e: any) => { const d = e?.activePayload?.[0]?.payload?.fullDay; if (d) openDay(d); }}
+          >
             <defs>
               <linearGradient id="evNew" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#DC2626" stopOpacity={0.85} />
@@ -124,7 +198,9 @@ function EvidenceLedgerTab({ parents }: { parents: Row[] }) {
           <ul className="space-y-1 text-[11px]">
             {ledger.emerging.slice(0, 6).map((f) => (
               <li key={f.id}>
-                <span className="font-semibold">{f.theme}</span> — {f.place}
+                <button type="button" className="text-left underline-offset-2 hover:underline" onClick={() => openFact(f)}>
+                  <span className="font-semibold">{f.theme}</span> — {f.place}
+                </button>
               </li>
             ))}
             {ledger.emerging.length > 6 && (
@@ -143,22 +219,24 @@ function EvidenceLedgerTab({ parents }: { parents: Row[] }) {
               <th className="px-2 py-2 text-right font-semibold">Sightings</th>
               <th className="px-2 py-2 text-right font-semibold">Days</th>
               <th className="px-2 py-2 text-left font-semibold">First → last</th>
+              <th className="px-2 py-2 text-left font-semibold">Corroboration stack</th>
               <th className="px-2 py-2 text-left font-semibold">Standing</th>
             </tr>
           </thead>
           <tbody>
             {shown.length === 0 && (
-              <tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">
+              <tr><td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">
                 Nothing is corroborated yet — every finding has been seen on a single day only.
               </td></tr>
             )}
             {shown.map((f) => (
-              <tr key={f.id} className="border-t hover:bg-muted/30">
+              <tr key={f.id} className="cursor-pointer border-t hover:bg-primary/5" onClick={() => openFact(f)} title="Open the records behind this finding">
                 <td className="px-2 py-1.5 font-medium">{f.theme}</td>
                 <td className="px-2 py-1.5 text-muted-foreground">{f.place}</td>
                 <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{f.occurrences}</td>
                 <td className="px-2 py-1.5 text-right tabular-nums">{f.days.length}</td>
                 <td className="px-2 py-1.5 whitespace-nowrap text-muted-foreground">{f.firstSeen} → {f.lastSeen}</td>
+                <td className="px-2 py-1.5 text-[10px] text-muted-foreground">{f.notes.map((n) => `${n.day.slice(5)} ×${n.count}`).join(" · ")}</td>
                 <td className="px-2 py-1.5">
                   <Badge
                     variant="outline"
