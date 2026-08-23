@@ -15,6 +15,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Download, Minus, Plus, Search, Truck, UserCog, Users, Warehouse } from "lucide-react";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { medicineLabel, type LogisticsDataset } from "@/lib/isc/medicineAccountability";
+import {
+  EXPIRY_TONE, expiryInfo, reconcileEdoVsFlhf, reconcileFlhfVsCdd, RECON_TONE,
+  type ExpiryRisk, type ReconSummary,
+} from "@/lib/isc/custodianReconciliation";
 import { exportCsv } from "./exportKoboData";
 
 type MedMap = Record<string, number>;
@@ -37,13 +41,37 @@ interface Row {
   txns: number;
   firstDate: string;
   lastDate: string;
+  /** Batch / lot numbers seen for this custodian. */
+  batches: string[];
+  /** Batch → expiry date map, for the expiry risk column. */
+  batchExpiry: Record<string, string>;
+  /** Earliest expiry across the custodian's batches (drives risk highlighting). */
+  earliestExpiry: string;
+  /** Units held on batches that are expired or expiring within 90 days. */
+  unitsAtRisk: number;
 }
 
 const nf = (n: number) => Math.round(n).toLocaleString();
 const dash = (s: string) => (s && s !== "—" ? s : "—");
 
 function blank(key: string, person: string, role: string, state: string, lga: string, ward: string, context: string): Row {
-  return { key, person, role, state, lga, ward, context, communities: [], meds: {}, total: 0, damaged: 0, netUsable: 0, txns: 0, firstDate: "", lastDate: "" };
+  return {
+    key, person, role, state, lga, ward, context, communities: [], meds: {}, total: 0, damaged: 0,
+    netUsable: 0, txns: 0, firstDate: "", lastDate: "",
+    batches: [], batchExpiry: {}, earliestExpiry: "", unitsAtRisk: 0,
+  };
+}
+
+/** Record a batch / lot number, its expiry and any at-risk units on the row. */
+function trackBatch(row: Row, batch: string | undefined, expiry: string | undefined, qty: number) {
+  const b = dash(batch ?? "");
+  if (b !== "—" && !row.batches.includes(b)) row.batches.push(b);
+  if (expiry) {
+    if (b !== "—" && !row.batchExpiry[b]) row.batchExpiry[b] = expiry;
+    if (!row.earliestExpiry || expiry < row.earliestExpiry) row.earliestExpiry = expiry;
+    const risk = expiryInfo(expiry).risk;
+    if (risk === "expired" || risk === "critical") row.unitsAtRisk += qty;
+  }
 }
 
 function stamp(row: Row, date: string) {
@@ -64,6 +92,7 @@ function buildRows(ds: LogisticsDataset) {
     row.damaged += r.qtyDamaged;
     row.netUsable += r.netUsable || r.qtyReceived - r.qtyDamaged;
     row.txns += 1;
+    trackBatch(row, r.batch, r.expiry, r.qtyReceived);
     stamp(row, r.date);
     edo.set(k, row);
   }
@@ -84,6 +113,7 @@ function buildRows(ds: LogisticsDataset) {
     row.meds[i.medicine] = (row.meds[i.medicine] ?? 0) + i.qtyIssued;
     row.total += i.qtyIssued;
     row.txns += 1;
+    trackBatch(row, i.batch, i.expiry, i.qtyIssued);
     stamp(row, i.date);
     flhf.set(k, row);
   }
@@ -102,6 +132,7 @@ function buildRows(ds: LogisticsDataset) {
     row.meds[c.medicine] = (row.meds[c.medicine] ?? 0) + c.qtyIssued;
     row.total += c.qtyIssued;
     row.txns += 1;
+    trackBatch(row, c.batch, c.expiry, c.qtyIssued);
     const com = dash(c.community);
     if (com !== "—" && !row.communities.includes(com)) row.communities.push(com);
     stamp(row, c.date);
