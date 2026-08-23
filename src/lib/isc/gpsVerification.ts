@@ -12,9 +12,27 @@ import { supabase } from "@/integrations/supabase/client";
 export interface GeoName {
   display_name?: string | null;
   address?: Record<string, string> | null;
+  /** Coordinates of the feature the provider matched (used for distance evidence). */
+  lat?: number | string | null;
+  lon?: number | string | null;
 }
 
 export type VerifyStatus = "verified" | "nearby" | "mismatch" | "outside" | "unknown";
+
+/** One explainable component of the confidence verdict. */
+export interface ConfidenceFactor {
+  key: "name" | "distance" | "evidence" | "admin";
+  label: string;
+  /** 0-100 contribution strength. */
+  value: number;
+  /** Relative weight in the blended confidence score. */
+  weight: number;
+  /** Short verdict word shown next to the bar. */
+  verdict: string;
+  /** Plain-language explanation of what was measured. */
+  detail: string;
+  color: string;
+}
 
 export interface VerifyResult {
   status: VerifyStatus;
@@ -25,7 +43,13 @@ export interface VerifyResult {
   lgaOk: boolean | null;
   stateOk: boolean | null;
   reason: string;             // human sentence for the UI
+  /** Distance in metres between the captured GPS fix and the matched feature. */
+  distanceM: number | null;
+  /** Weighted 0-100 confidence blended from every factor below. */
+  confidence: number;
+  factors: ConfidenceFactor[];
 }
+
 
 const norm = (v: string) =>
   (v || "")
