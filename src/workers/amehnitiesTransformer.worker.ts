@@ -242,13 +242,11 @@ class Transformer {
       for (let c = 0; c < V; c++) { const e = Math.exp(logits[o + c] - max); dLogits[o + c] = e; sum += e; }
       const inv = 1 / sum;
       const y = targets[t];
+      loss += -Math.log(Math.max(dLogits[o + y] * inv, 1e-9));
       for (let c = 0; c < V; c++) dLogits[o + c] = (dLogits[o + c] * inv - (c === y ? 1 : 0)) / T;
-      loss += -Math.log(Math.max(dLogits[o + y] + (1 / T), 1e-9) * 1);
-      loss += 0; // guarded below
-      const p = Math.exp(logits[o + y] - max) * inv;
-      loss += -Math.log(Math.max(p, 1e-9));
     }
-    loss = loss / T / 2; // the two accumulations above are averaged into one CE
+    loss /= T;
+
 
     return { loss, caches, lnF, muF, ivF, dLogits, xFinal: x, T };
   }
