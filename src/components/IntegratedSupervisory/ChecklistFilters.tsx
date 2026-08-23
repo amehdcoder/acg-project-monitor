@@ -55,10 +55,6 @@ export function applyChecklistFilters<T extends Record<string, unknown>>(
   });
 }
 
-const uniq = (rows: Record<string, unknown>[], field: string) =>
-  [...new Set(rows.map((r) => label(field, r[field])).filter(Boolean))].sort((a, b) =>
-    a.localeCompare(b),
-  );
 
 function FilterSelect({
   id, title, value, options, onChange, disabled, locked,
