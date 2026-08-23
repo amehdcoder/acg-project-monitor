@@ -32,7 +32,10 @@ interface Index {
   lga: string[];
   state: string[];
   buckets: Map<string, number[]>;
+  /** normalised settlement name → row indices (registry name lookup). */
+  names: Map<string, number[]>;
 }
+
 
 const CELL = 0.1; // ≈ 11 km
 const cellKey = (lat: number, lng: number) =>
