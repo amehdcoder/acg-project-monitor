@@ -15,7 +15,12 @@ export interface Citation {
   eventId: string;
   timestamp: string;
   detail: string;
+  /** "web" for published internet evidence; app records leave this unset. */
+  kind?: "web";
+  url?: string;
+  publisher?: string;
 }
+
 
 export interface StoredMessage {
   id: string;
