@@ -48,6 +48,7 @@ function build(data: Blob): Index {
   const lat: number[] = [], lng: number[] = [];
   const name: string[] = [], ward: string[] = [], lga: string[] = [], state: string[] = [];
   const buckets = new Map<string, number[]>();
+  const names = new Map<string, number[]>();
 
   for (const st of Object.keys(data)) {
     const lgas = data[st] || {};
@@ -63,6 +64,11 @@ function build(data: Blob): Index {
           const k = cellKey(la, ln);
           const b = buckets.get(k);
           if (b) b.push(i); else buckets.set(k, [i]);
+          const nk = norm(n);
+          if (nk) {
+            const nb = names.get(nk);
+            if (nb) nb.push(i); else names.set(nk, [i]);
+          }
         }
       }
     }
@@ -71,9 +77,14 @@ function build(data: Blob): Index {
   return {
     lat: Float64Array.from(lat),
     lng: Float64Array.from(lng),
-    name, ward, lga, state, buckets,
+    name, ward, lga, state, buckets, names,
   };
 }
+
+/** Normalise a place name for registry lookups. */
+export const norm = (s: string) =>
+  String(s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+
 
 /** Load + index the registry once. Safe to call repeatedly / concurrently. */
 export async function loadGrid3Index(): Promise<Index | null> {
