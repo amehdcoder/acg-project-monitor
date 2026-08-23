@@ -137,6 +137,13 @@ Deno.serve(async (req) => {
       ? body.messageId : null;
     const conversationId = typeof body?.conversationId === "string" && /^[0-9a-f-]{36}$/i.test(body.conversationId)
       ? body.conversationId : null;
+    const route = body?.route && typeof body.route === "object" ? body.route : {};
+    const questionClass = String(route?.questionClass ?? "general").slice(0, 40);
+    const tier = ["fast", "balanced", "deep"].includes(String(route?.tier)) ? String(route.tier) : "balanced";
+    const routeModel = String(route?.model ?? "").slice(0, 80);
+    const reviewQueueId = typeof body?.reviewQueueId === "string" && /^[0-9a-f-]{36}$/i.test(body.reviewQueueId)
+      ? body.reviewQueueId : null;
+    const citationCount = Number(body?.citations ?? 0);
     const policyIds: string[] = Array.isArray(body?.policyIds)
       ? body.policyIds.filter((p: unknown) => typeof p === "string" && /^[0-9a-f-]{36}$/i.test(p)).slice(0, 12)
       : [];
@@ -165,16 +172,73 @@ Deno.serve(async (req) => {
     });
     if (insertError) return json({ error: insertError.message }, 400);
 
+    // Routing policy learns which model tier actually earns reward per class.
+    await admin.rpc("ai_route_reward", {
+      _class: questionClass, _tier: tier, _model: routeModel, _reward: reward,
+    });
+
     // Bandit credit assignment: every policy entry that shaped this answer
     // receives the reward, so weak rules decay and strong ones are reinforced.
     await Promise.all(policyIds.map((id) =>
       admin.rpc("ai_policy_reward", { _policy_id: id, _reward: reward })
     ));
 
+    // ---- Admin review queue ------------------------------------------------
+    // Batch answers that are either low-confidence (no citable evidence, or a
+    // strongly negative reward) or that users keep downvoting, so an admin can
+    // correct them in one pass and re-train the policy from those corrections.
+    let queued: { reason: string; severity: number; downvotes: number } | null = null;
+    if (!reviewQueueId && question.length > 5 && answer.length > 20) {
+      const { count: priorDownvotes } = await admin
+        .from("ai_chat_feedback")
+        .select("id", { count: "exact", head: true })
+        .lt("rating", 0)
+        .ilike("question", `%${question.slice(0, 60).replace(/[%_]/g, " ")}%`);
+      const downvotes = Number(priorDownvotes ?? 0);
+
+      let reason: string | null = null;
+      let severity = 1;
+      if (downvotes >= 2) { reason = "repeat_downvotes"; severity = 3; }
+      else if (rating < 0) { reason = correction ? "user_correction" : "downvoted"; severity = 2; }
+      else if (citationCount === 0 && rating <= 0) { reason = "low_confidence"; severity = 1; }
+      else if (reward <= -0.5) { reason = "low_confidence"; severity = 2; }
+
+      if (reason) {
+        const { data: dup } = await admin
+          .from("ai_review_queue")
+          .select("id,downvotes")
+          .eq("status", "pending")
+          .eq("question", question)
+          .limit(1)
+          .maybeSingle();
+        if (dup) {
+          await admin.from("ai_review_queue")
+            .update({ downvotes: Number(dup.downvotes ?? 0) + (rating < 0 ? 1 : 0), severity })
+            .eq("id", dup.id);
+        } else {
+          await admin.from("ai_review_queue").insert({
+            conversation_id: conversationId,
+            message_id: messageId,
+            question, answer, reason, severity,
+            downvotes: Math.max(downvotes, rating < 0 ? 1 : 0),
+            citations: citationCount,
+            reward,
+            question_class: questionClass,
+            tier,
+            model: routeModel,
+            policy_ids: policyIds,
+            submitted_by: guard.userId,
+          });
+        }
+        queued = { reason, severity, downvotes };
+      }
+    }
+
     // Policy improvement — only from informative feedback.
     let learned: { topic: string; rule: string } | null = null;
     const apiKey = Deno.env.get("LOVABLE_API_KEY");
-    const informative = rating !== 0 && (correction || rating < 0 || reward >= 1);
+    const informative = Boolean(reviewQueueId && correction) ||
+      (rating !== 0 && (correction || rating < 0 || reward >= 1));
     if (apiKey && informative && answer.length > 40) {
       const lesson = await distilLesson(apiKey, { question, answer, rating, correction });
       if (lesson?.worth_keeping) {
@@ -218,7 +282,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    return json({ ok: true, reward, learned });
+    // A reviewed item closes out once its correction has been distilled.
+    if (reviewQueueId) {
+      await admin.from("ai_review_queue").update({
+        status: "resolved",
+        reviewer_id: guard.userId,
+        reviewer_correction: correction,
+        resolved_at: new Date().toISOString(),
+      }).eq("id", reviewQueueId);
+    }
+
+    return json({ ok: true, reward, learned, queued, route: { tier, questionClass } });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : "Unexpected error" }, 500);
   }
