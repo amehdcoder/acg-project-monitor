@@ -473,15 +473,36 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
           </div>
         ) : (
           <TooltipProvider delayDuration={200}>
-          <div ref={scrollRef} className="max-h-[560px] overflow-auto rounded-lg border">
-            <table className="w-full min-w-[1220px] border-collapse text-[11.5px]">
+          <div ref={scrollRef} className="max-h-[600px] overflow-auto rounded-xl border border-slate-300 shadow-sm">
+            <table className="w-full min-w-[1180px] table-fixed border-collapse text-[11.5px] leading-snug">
+              <colgroup>
+                <col className="w-[38px]" />
+                <col className="w-[150px]" />
+                <col className="w-[130px]" />
+                <col className="w-[110px]" />
+                <col className="w-[110px]" />
+                <col className="w-[92px]" />
+                <col className="w-[140px]" />
+                <col className="w-[118px]" />
+                <col className="w-[150px]" />
+                <col className="w-[86px]" />
+                <col className="w-[150px]" />
+                <col className="w-[136px]" />
+                <col className="w-[132px]" />
+                <col className="w-[86px]" />
+              </colgroup>
               <thead className="sticky top-0 z-10">
-                <tr className="bg-gradient-to-r from-slate-800 to-slate-700 text-white">
+                <tr className="bg-gradient-to-r from-slate-900 via-slate-800 to-sky-900 text-white">
                   {["#", "Community (captured)", "FLHF", "Ward", "LGA", "State", "Independent Monitor / Supervisor",
                     "Captured GPS", "GRID3 registry match", "Distance", "Nearest registry settlement",
-                    "Audit provenance", "Verdict", ""].map((h) => (
-                    <th key={h} className="whitespace-nowrap px-2.5 py-2 text-left font-semibold uppercase tracking-wide text-[10px]">
-                      {h}
+                    "Audit provenance", "Verdict", ""].map((h, hi) => (
+                    <th
+                      key={h || `sp-${hi}`}
+                      className={`border-b border-slate-600/60 px-2.5 py-2.5 align-bottom text-[9.5px] font-semibold uppercase tracking-wide ${
+                        hi === 9 ? "text-right" : "text-left"
+                      }`}
+                    >
+                      <span className="block break-words hyphens-auto">{h}</span>
                     </th>
                   ))}
                 </tr>
@@ -496,67 +517,72 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
                     <tr
                       key={`${r.id}-${i}`}
                       onClick={() => openDrill(r)}
-                      className={`cursor-pointer border-t transition-colors ${i % 2 ? "bg-muted/30" : "bg-background"} hover:bg-sky-50/70`}
+                      className={`cursor-pointer border-t border-slate-200 align-top transition-colors ${i % 2 ? "bg-slate-50/70" : "bg-background"} hover:bg-sky-50`}
                     >
-                      <td className="px-2.5 py-2 text-muted-foreground">{i + 1}</td>
-                      <td className="px-2.5 py-2 font-semibold text-slate-900">
-                        <span className="inline-flex items-center gap-1">
-                          <span className="h-2 w-2 rounded-full" style={{ background: meta.dot }} />
-                          {r.community}
+                      <td className="px-2 py-2.5 text-right tabular-nums text-[10.5px] text-muted-foreground">{i + 1}</td>
+                      <td className="px-2.5 py-2.5">
+                        <span className="flex items-start gap-1.5">
+                          <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: meta.dot }} />
+                          <span className="break-words font-semibold text-slate-900">{r.community}</span>
                         </span>
-                        {r.date && <span className="ml-1 text-[10px] text-muted-foreground">· {r.date}</span>}
-                        <span className="ml-1 text-[10px] text-sky-700">
-                          · {r.sources.length} submission{r.sources.length === 1 ? "" : "s"}
+                        <span className="mt-0.5 block text-[9.5px] text-muted-foreground">
+                          {r.date || "—"} · <span className="text-sky-700">{r.sources.length} submission{r.sources.length === 1 ? "" : "s"}</span>
                         </span>
                       </td>
-                      <td className="px-2.5 py-2">{r.flhf}</td>
-                      <td className="px-2.5 py-2">{r.ward || "—"}</td>
-                      <td className="px-2.5 py-2 font-medium text-indigo-700">{r.lga || "—"}</td>
-                      <td className="px-2.5 py-2 text-teal-700">{r.state || "—"}</td>
-                      <td className="px-2.5 py-2">{r.monitor}</td>
-                      <td className="whitespace-nowrap px-2.5 py-2 font-mono text-[10.5px] text-slate-600">
-                        <MapPin className="mr-0.5 inline h-3 w-3 text-rose-500" />
-                        {r.lat.toFixed(5)}, {r.lng.toFixed(5)}
+                      <td className="break-words px-2.5 py-2.5 text-slate-700">{r.flhf}</td>
+                      <td className="break-words px-2.5 py-2.5 text-slate-700">{r.ward || "—"}</td>
+                      <td className="break-words px-2.5 py-2.5 font-medium text-indigo-700">{r.lga || "—"}</td>
+                      <td className="break-words px-2.5 py-2.5 text-teal-700">{r.state || "—"}</td>
+                      <td className="break-words px-2.5 py-2.5 text-slate-700">{r.monitor}</td>
+                      <td className="px-2.5 py-2.5 font-mono text-[10px] text-slate-600">
+                        <span className="flex items-start gap-1">
+                          <MapPin className="mt-0.5 h-3 w-3 shrink-0 text-rose-500" />
+                          <span className="break-all">{r.lat.toFixed(5)},<br />{r.lng.toFixed(5)}</span>
+                        </span>
                       </td>
-                      <td className="px-2.5 py-2">
+                      <td className="px-2.5 py-2.5">
                         {r.named ? (
                           <>
-                            <span className="font-medium">{r.named.settlement}</span>
-                            <span className="block text-[10px] text-muted-foreground">
+                            <span className="block break-words font-medium text-slate-900">{r.named.settlement}</span>
+                            <span className="mt-0.5 block break-words text-[9.5px] text-muted-foreground">
                               {r.named.ward} · {r.named.lga}
                             </span>
                           </>
                         ) : (
-                          <span className="text-[10.5px] italic text-amber-700">no registry entry</span>
+                          <span className="block break-words text-[10.5px] italic text-amber-700">
+                            no same-name entry in this Ward / LGA
+                          </span>
                         )}
                       </td>
-                      <td className="whitespace-nowrap px-2.5 py-2">
+                      <td className="px-2 py-2.5 text-right">
                         <span
-                          className={`rounded px-1.5 py-0.5 font-semibold ${
-                            (r.distanceM ?? 0) > radiusM ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"
+                          className={`inline-block rounded-md px-1.5 py-1 text-[10.5px] font-bold tabular-nums ${
+                            (r.distanceM ?? 0) > radiusM
+                              ? "bg-rose-100 text-rose-700 ring-1 ring-rose-200"
+                              : "bg-amber-100 text-amber-800 ring-1 ring-amber-200"
                           }`}
                         >
                           {km(r.distanceM)}
                         </span>
                       </td>
-                      <td className="px-2.5 py-2">
+                      <td className="px-2.5 py-2.5">
                         {r.nearest ? (
                           <>
-                            <span className="font-medium">{r.nearest.settlement}</span>
-                            <span className="block text-[10px] text-muted-foreground">
+                            <span className="block break-words font-medium text-slate-900">{r.nearest.settlement}</span>
+                            <span className="mt-0.5 block break-words text-[9.5px] text-muted-foreground">
                               {km(r.nearest.distanceM)} away · {r.nearest.ward}
                             </span>
                           </>
-                        ) : "—"}
+                        ) : <span className="text-muted-foreground">—</span>}
                       </td>
                       {/* audit provenance */}
-                      <td className="px-2.5 py-2">
+                      <td className="px-2.5 py-2.5">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <div className="max-w-[190px] cursor-help">
+                            <div className="cursor-help space-y-0.5">
                               <Badge
                                 variant="outline"
-                                className={`text-[9.5px] ${
+                                className={`text-[9px] ${
                                   r.method === "exact"
                                     ? "border-emerald-300 bg-emerald-50 text-emerald-700"
                                     : r.method === "fuzzy"
@@ -566,18 +592,30 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
                               >
                                 {r.method === "exact" ? "exact name" : r.method === "fuzzy" ? "fuzzy name" : r.method === "nearest" ? "spatial only" : "no candidate"}
                               </Badge>
-                              <span className="block truncate text-[10px] text-muted-foreground">
+                              {r.named && (
+                                <Badge
+                                  variant="outline"
+                                  className={`ml-0.5 text-[9px] ${
+                                    r.named.scope === "ward"
+                                      ? "border-sky-300 bg-sky-50 text-sky-700"
+                                      : r.named.scope === "lga"
+                                        ? "border-indigo-300 bg-indigo-50 text-indigo-700"
+                                        : "border-fuchsia-300 bg-fuchsia-50 text-fuchsia-700"
+                                  }`}
+                                >
+                                  {SCOPE_LABEL[r.named.scope]}
+                                </Badge>
+                              )}
+                              <span className="block break-all font-mono text-[9.5px] text-muted-foreground">
                                 {(r.named ?? r.nearest)
                                   ? `${(r.named ?? r.nearest)!.lat.toFixed(4)}, ${(r.named ?? r.nearest)!.lng.toFixed(4)}`
                                   : "—"}
                               </span>
-                              <span className="block text-[9.5px] text-muted-foreground">
-                                {new Date(r.lookupAt).toLocaleTimeString()}
-                              </span>
                             </div>
                           </TooltipTrigger>
-                          <TooltipContent className="max-w-[280px] text-[11px]">
+                          <TooltipContent className="max-w-[300px] text-[11px]">
                             <p className="font-semibold">{METHOD_LABEL[r.method] ?? r.method}</p>
+                            {r.named && <p className="mt-1">Scope enforced: {SCOPE_NOTE[r.named.scope]}</p>}
                             <p className="mt-1">Source: {REGISTRY_SOURCE}</p>
                             {(r.named ?? r.nearest) && (
                               <p className="mt-1">
@@ -591,17 +629,17 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
                           </TooltipContent>
                         </Tooltip>
                       </td>
-                      <td className="px-2.5 py-2">
-                        <Badge variant="outline" className={`text-[10px] ${meta.cls}`}>
-                          {r.verdict === "out_of_radius" ? <ShieldAlert className="mr-1 h-3 w-3" /> : <AlertTriangle className="mr-1 h-3 w-3" />}
-                          {meta.label}
+                      <td className="px-2.5 py-2.5">
+                        <Badge variant="outline" className={`whitespace-normal text-left text-[9.5px] leading-tight ${meta.cls}`}>
+                          {r.verdict === "out_of_radius" ? <ShieldAlert className="mr-1 h-3 w-3 shrink-0" /> : <AlertTriangle className="mr-1 h-3 w-3 shrink-0" />}
+                          <span className="break-words">{meta.label}</span>
                         </Badge>
                       </td>
-                      <td className="px-2.5 py-2">
+                      <td className="px-1.5 py-2.5 text-right">
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-7 text-[10.5px]"
+                          className="h-7 px-2 text-[10.5px]"
                           onClick={(e) => { e.stopPropagation(); openDrill(r); }}
                         >
                           Evidence
@@ -614,6 +652,7 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
               </tbody>
             </table>
           </div>
+
           <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
             <span className="text-muted-foreground">
               Showing {filtered.length ? safePage * pageSize + 1 : 0}–
