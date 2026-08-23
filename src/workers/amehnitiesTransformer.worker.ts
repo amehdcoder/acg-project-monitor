@@ -678,15 +678,19 @@ self.onmessage = (e: MessageEvent) => {
   switch (msg.type) {
     case "init":
       stream = [];
-      lossEMA = 0; lossHistory = []; tokensSeen = 0; lastFwd = null;
+      lossEMA = 0; lossHistory = []; tokensSeen = 0; lastFwd = null; metrics = [];
       build(msg.cfg || {});
       break;
     case "tokens": {
       if (msg.vocabSize && msg.vocabSize > cfg.vocab) build({ vocab: Math.min(4096, Math.ceil(msg.vocabSize * 1.5)) });
+      if (msg.replace) stream = [];
       stream.push(...(msg.tokens as number[]));
       if (stream.length > 20000) stream = stream.slice(-20000);
       break;
     }
+    case "query":
+      runQuery(String(msg.id ?? "q"), Math.max(1, Math.min(24, msg.steps ?? 6)));
+      break;
     case "run":
       running = !!msg.running;
       if (running && !timer) timer = setTimeout(tick, 0);
