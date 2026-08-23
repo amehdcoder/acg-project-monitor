@@ -635,13 +635,16 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
         )}
 
         <p className="rounded-md border border-dashed bg-muted/40 px-3 py-2 text-[10.5px] leading-relaxed text-muted-foreground">
-          <strong>How to read this register.</strong> Distances are great-circle (Haversine) separations between the
-          supervisor's device fix and the GRID3 Nigeria settlement registry coordinate. A capture is conforming when a
-          registry settlement of the same name lies within {radiusM / 1000} km of the fix and the registry agrees on
-          the Ward and LGA. Changing the accuracy radius re-flags the register immediately using the same registry
-          lookups. “Not in GRID3 registry” usually signals a locally-used community alias; “Name does not match point”
-          signals the monitor stood in a different settlement than the one recorded.
+          <strong>How to read this register.</strong> Every community name is looked up <strong>only inside the Ward and
+          LGA declared on the checklist</strong> — a settlement of the same name in another State is never used as the
+          comparison point. If the declared Ward holds no such name, the search widens one step at a time (Ward → LGA →
+          State) and the scope that produced the match is shown in the Provenance column. Distances are great-circle
+          (Haversine) separations between the supervisor's device fix and the GRID3 registry coordinate. A capture is
+          conforming when a same-name registry settlement lies within {radiusM / 1000} km of the fix and the registry
+          agrees on the Ward and LGA. “Not in GRID3 registry” usually signals a locally-used community alias; “Name does
+          not match point” signals the monitor stood in a different settlement than the one recorded.
         </p>
+
       </CardContent>
     </Card>
     <Grid3MismatchDetailDialog spec={drill} onClose={() => setDrill(null)} />
