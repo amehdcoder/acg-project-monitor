@@ -14,7 +14,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
   Bot, User, SendHorizontal, Loader2, Trash2, Radio, History, Plus,
-  Database, Clock, Hash, MessageSquare, Sparkles,
+  Database, Clock, Hash, MessageSquare, Sparkles, ThumbsUp, ThumbsDown,
+  RefreshCw, GraduationCap, Check, BrainCircuit,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,8 +28,9 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Telemetry } from "@/hooks/useAmehnitiesBrain";
 import {
-  type Citation, type Conversation, createConversation, deleteConversation,
-  listConversations, loadMessages, saveMessage, splitFollowups, titleFromQuestion, usedCitations,
+  type Citation, type Conversation, type PolicyApplied, countLearnedRules,
+  createConversation, deleteConversation, listConversations, loadMessages, saveMessage,
+  sendFeedback, splitFollowups, titleFromQuestion, usedCitations,
 } from "@/lib/amehnitiesAi/chatHistory";
 
 interface ChatMessage {
@@ -37,6 +39,12 @@ interface ChatMessage {
   content: string;
   citations?: Citation[];
   followups?: string[];
+  /** Learned-policy entries that shaped this answer — used for reward credit. */
+  policyIds?: string[];
+  policyApplied?: PolicyApplied[];
+  /** The question this answer responded to (needed by the learning loop). */
+  question?: string;
+  rated?: -1 | 0 | 1;
 }
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
@@ -62,6 +70,10 @@ export default function AmehnitiesChatBox({
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [openCitation, setOpenCitation] = useState<Citation | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [correcting, setCorrecting] = useState<string | null>(null);
+  const [correction, setCorrection] = useState("");
+  const [learnedRules, setLearnedRules] = useState(0);
+  const [rewarding, setRewarding] = useState<string | null>(null);
   const feedRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const convIdRef = useRef<string | undefined>(conversationId);
@@ -78,7 +90,11 @@ export default function AmehnitiesChatBox({
     try { setConversations(await listConversations()); } catch { /* history unavailable */ }
   }, []);
 
-  useEffect(() => { void refreshConversations(); }, [refreshConversations]);
+  const refreshLearned = useCallback(async () => {
+    try { setLearnedRules(await countLearnedRules()); } catch { /* policy unavailable */ }
+  }, []);
+
+  useEffect(() => { void refreshConversations(); void refreshLearned(); }, [refreshConversations, refreshLearned]);
 
   // Load whichever conversation the route points at.
   useEffect(() => {
@@ -131,6 +147,8 @@ export default function AmehnitiesChatBox({
     }
 
     let catalog: Citation[] = [];
+    let policyIds: string[] = [];
+    let policyApplied: PolicyApplied[] = [];
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-app-data`, {
@@ -180,8 +198,10 @@ export default function AmehnitiesChatBox({
           if (!data || data === "[DONE]") continue;
           try {
             const parsed = JSON.parse(data);
-            if (parsed?.amehnities?.citations) {
-              catalog = parsed.amehnities.citations as Citation[];
+            if (parsed?.amehnities) {
+              catalog = (parsed.amehnities.citations ?? []) as Citation[];
+              policyIds = (parsed.amehnities.policyIds ?? []) as string[];
+              policyApplied = (parsed.amehnities.policyApplied ?? []) as PolicyApplied[];
               continue;
             }
             const delta = parsed?.choices?.[0]?.delta?.content;
@@ -198,14 +218,16 @@ export default function AmehnitiesChatBox({
       const body = finalAnswer || "_I could not determine an answer from the available application data._";
       const cites = usedCitations(body, catalog);
       setMessages((m) => m.map((x) => (x.id === replyId
-        ? { ...x, content: body, citations: cites, followups }
+        ? { ...x, content: body, citations: cites, followups, policyIds, policyApplied, question }
         : x)));
 
       if (convIdRef.current) {
         try {
-          await saveMessage(convIdRef.current, {
+          const rowId = await saveMessage(convIdRef.current, {
             role: "assistant", content: body, citations: cites, followups,
           });
+          // Adopt the database row id so feedback can be attached to this answer.
+          setMessages((m) => m.map((x) => (x.id === replyId ? { ...x, id: rowId } : x)));
           void refreshConversations();
         } catch (e: any) {
           toast.error("Answer could not be saved to history", { description: e?.message });
@@ -235,6 +257,48 @@ export default function AmehnitiesChatBox({
       toast.error("Could not delete conversation", { description: e?.message });
     }
   }, [startNewChat]);
+
+  /**
+   * Reinforcement signal. The rating (plus any written correction) is shaped
+   * into a reward server-side, credited to the policy entries that produced the
+   * answer, and distilled into a durable rule the assistant follows next time.
+   */
+  const rate = useCallback(async (msg: ChatMessage, rating: -1 | 1, note?: string) => {
+    setRewarding(msg.id);
+    try {
+      const { reward, learned } = await sendFeedback({
+        messageId: /^[0-9a-f-]{36}$/i.test(msg.id) ? msg.id : undefined,
+        conversationId: convIdRef.current,
+        question: msg.question ?? "",
+        answer: msg.content,
+        rating,
+        correction: note,
+        citations: msg.citations?.length ?? 0,
+        followups: msg.followups?.length ?? 0,
+        policyIds: msg.policyIds ?? [],
+      });
+      setMessages((m) => m.map((x) => (x.id === msg.id ? { ...x, rated: rating } : x)));
+      setCorrecting(null);
+      setCorrection("");
+      void refreshLearned();
+      toast.success(learned ? "Learned from your feedback" : "Feedback recorded", {
+        description: learned
+          ? `New rule (${learned.topic}): ${learned.rule}`
+          : `Reward signal ${reward > 0 ? "+" : ""}${reward.toFixed(2)} applied to the assistant's policy.`,
+      });
+    } catch (e: any) {
+      toast.error("Feedback could not be sent", { description: e?.message });
+    } finally {
+      setRewarding(null);
+    }
+  }, [refreshLearned]);
+
+  /** Re-ask the same question — now conditioned on the updated policy. */
+  const regenerate = useCallback((msg: ChatMessage) => {
+    if (!msg.question || busy) return;
+    setMessages((m) => m.filter((x) => x.id !== msg.id));
+    void send(msg.question);
+  }, [busy, send]);
 
   /** Markdown renderers styled with the app's semantic tokens. */
   const MD = useMemo(() => {
@@ -309,6 +373,14 @@ export default function AmehnitiesChatBox({
         <Badge variant="outline" className="ml-auto gap-1.5 border-primary/40 text-primary">
           <Radio className="h-3 w-3" />
           Corpus: {corpusEvents.toLocaleString()} events
+        </Badge>
+        <Badge
+          variant="outline"
+          title="Behaviour rules the assistant has learned from your ratings and corrections"
+          className="gap-1.5 border-emerald-500/40 text-emerald-600 dark:text-emerald-400"
+        >
+          <GraduationCap className="h-3 w-3" />
+          Learned rules: {learnedRules}
         </Badge>
 
         <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
@@ -415,6 +487,74 @@ export default function AmehnitiesChatBox({
                               <span className="shrink-0 text-muted-foreground">{fmtTime(c.timestamp)}</span>
                             </button>
                           ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                      <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                        Was this right?
+                      </span>
+                      <Button
+                        size="sm" variant={m.rated === 1 ? "default" : "ghost"}
+                        disabled={rewarding === m.id} aria-label="Helpful answer"
+                        className="h-7 gap-1 px-2 text-[11px]"
+                        onClick={() => rate(m, 1)}
+                      >
+                        {rewarding === m.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <ThumbsUp className="h-3 w-3" />}
+                        Helpful
+                      </Button>
+                      <Button
+                        size="sm" variant={m.rated === -1 ? "destructive" : "ghost"}
+                        disabled={rewarding === m.id} aria-label="Unhelpful answer"
+                        className="h-7 gap-1 px-2 text-[11px]"
+                        onClick={() => { setCorrecting(m.id); setCorrection(""); }}
+                      >
+                        <ThumbsDown className="h-3 w-3" /> Needs work
+                      </Button>
+                      <Button
+                        size="sm" variant="ghost" disabled={busy || !m.question}
+                        className="h-7 gap-1 px-2 text-[11px]" onClick={() => regenerate(m)}
+                      >
+                        <RefreshCw className="h-3 w-3" /> Retry with what it learned
+                      </Button>
+                      {m.rated && (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400">
+                          <Check className="h-3 w-3" /> Signal applied to policy
+                        </span>
+                      )}
+                      {!!m.policyApplied?.length && (
+                        <span
+                          title={m.policyApplied.map((r) => `• [${r.topic}] ${r.content}`).join("\n")}
+                          className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2 py-0.5 text-[10px] text-muted-foreground"
+                        >
+                          <BrainCircuit className="h-3 w-3 text-primary" />
+                          {m.policyApplied.length} learned rule{m.policyApplied.length === 1 ? "" : "s"} applied
+                        </span>
+                      )}
+                    </div>
+
+                    {correcting === m.id && (
+                      <div className="space-y-2 rounded-xl border border-destructive/30 bg-destructive/5 p-2.5">
+                        <p className="text-[11px] font-medium text-foreground">
+                          What was wrong or missing? Your correction becomes a permanent rule.
+                        </p>
+                        <Textarea
+                          value={correction} rows={2}
+                          onChange={(e) => setCorrection(e.target.value)}
+                          placeholder="e.g. Always break submission counts down by state, and never mix the 24h and 7d windows."
+                          className="min-h-[52px] resize-none text-xs"
+                        />
+                        <div className="flex gap-2">
+                          <Button size="sm" className="h-7 text-[11px]" disabled={rewarding === m.id}
+                            onClick={() => rate(m, -1, correction.trim() || undefined)}>
+                            {rewarding === m.id ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+                            Teach the assistant
+                          </Button>
+                          <Button size="sm" variant="ghost" className="h-7 text-[11px]"
+                            onClick={() => { setCorrecting(null); setCorrection(""); }}>
+                            Cancel
+                          </Button>
                         </div>
                       </div>
                     )}

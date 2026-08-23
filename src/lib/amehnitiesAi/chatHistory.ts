@@ -150,3 +150,55 @@ export function usedCitations(answer: string, catalog: Citation[]): Citation[] {
     .map((ref) => catalog.find((c) => c.ref === ref))
     .filter((c): c is Citation => Boolean(c));
 }
+
+/* ------------------------------------------------------------------ *
+ * Reinforcement-learning loop
+ *
+ * Human feedback is sent to the `chat-feedback` edge function, which shapes it
+ * into a scalar reward, credits the learned-policy entries that produced the
+ * answer, and distils durable rules the assistant is conditioned on next time.
+ * ------------------------------------------------------------------ */
+
+export interface PolicyApplied { topic: string; content: string; avgReward: number }
+
+export interface FeedbackPayload {
+  messageId?: string;
+  conversationId?: string;
+  question: string;
+  answer: string;
+  rating: -1 | 0 | 1;
+  correction?: string;
+  citations: number;
+  followups: number;
+  policyIds: string[];
+  regenerated?: boolean;
+}
+
+export async function sendFeedback(
+  payload: FeedbackPayload,
+): Promise<{ reward: number; learned: { topic: string; rule: string } | null }> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-feedback`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      Authorization: `Bearer ${session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  const out = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(out?.error || `Feedback failed (${res.status})`);
+  return { reward: Number(out?.reward ?? 0), learned: out?.learned ?? null };
+}
+
+/** How many behaviour rules the assistant has learned so far. */
+export async function countLearnedRules(): Promise<number> {
+  const { count, error } = await supabase
+    .from("ai_chat_policy")
+    .select("id", { count: "exact", head: true })
+    .eq("active", true)
+    .eq("kind", "rule");
+  if (error) return 0;
+  return count ?? 0;
+}

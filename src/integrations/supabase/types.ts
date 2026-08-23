@@ -611,6 +611,63 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_chat_feedback: {
+        Row: {
+          answer: string
+          conversation_id: string | null
+          correction: string | null
+          created_at: string
+          id: string
+          message_id: string | null
+          question: string
+          rating: number
+          reward: number
+          signals: Json
+          user_id: string
+        }
+        Insert: {
+          answer?: string
+          conversation_id?: string | null
+          correction?: string | null
+          created_at?: string
+          id?: string
+          message_id?: string | null
+          question?: string
+          rating?: number
+          reward?: number
+          signals?: Json
+          user_id: string
+        }
+        Update: {
+          answer?: string
+          conversation_id?: string | null
+          correction?: string | null
+          created_at?: string
+          id?: string
+          message_id?: string | null
+          question?: string
+          rating?: number
+          reward?: number
+          signals?: Json
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_chat_feedback_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "ai_chat_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_chat_feedback_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "ai_chat_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_chat_messages: {
         Row: {
           citations: Json
@@ -651,6 +708,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ai_chat_policy: {
+        Row: {
+          active: boolean
+          answer: string | null
+          avg_reward: number
+          content: string
+          created_at: string
+          created_by: string | null
+          id: string
+          kind: string
+          question: string | null
+          reward_sum: number
+          topic: string
+          trials: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          answer?: string | null
+          avg_reward?: number
+          content: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          question?: string | null
+          reward_sum?: number
+          topic?: string
+          trials?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          answer?: string | null
+          avg_reward?: number
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          question?: string | null
+          reward_sum?: number
+          topic?: string
+          trials?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       antidepressant_stock: {
         Row: {
@@ -9626,6 +9731,10 @@ export type Database = {
       }
       accessible_form_ids: { Args: { _user_id: string }; Returns: string[] }
       accessible_project_ids: { Args: { _user_id: string }; Returns: string[] }
+      ai_policy_reward: {
+        Args: { _policy_id: string; _reward: number }
+        Returns: undefined
+      }
       approve_after_hours_request: {
         Args: { p_id: string }
         Returns: undefined
