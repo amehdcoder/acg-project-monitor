@@ -278,6 +278,8 @@ Deno.serve(async (req) => {
     }
 
     if (action === "test_connection" || action === "inspect") {
+      const forbid = await ensureAdmin();
+      if (forbid) return forbid;
       const { server_url, form_uid, api_token } = params;
       if (!server_url || !form_uid || !api_token) return j({ error: "Missing server_url/form_uid/api_token" }, 400);
       const res = await probe(server_url, form_uid, api_token);
@@ -293,6 +295,8 @@ Deno.serve(async (req) => {
     }
 
     if (action === "deploy") {
+      const forbid = await ensureAdmin();
+      if (forbid) return forbid;
       const { server_url, form_uid, api_token, force } = params;
       if (!server_url || !form_uid || !api_token) return j({ error: "Missing server_url/form_uid/api_token" }, 400);
       // Safety gate: re-inspect BEFORE writing, refuse if the form already has questions unless force=true
@@ -652,6 +656,8 @@ Deno.serve(async (req) => {
 
 
     if (action === "fetch_submissions") {
+      const forbid = await ensureAdmin();
+      if (forbid) return forbid;
       const { server_url, form_uid, api_token, page_size, page } = params;
       if (!server_url || !form_uid || !api_token) return j({ error: "Missing server_url/form_uid/api_token" }, 400);
       const limit = Math.min(Math.max(Number(page_size) || 100, 1), 500);
@@ -686,6 +692,8 @@ Deno.serve(async (req) => {
     // return it as a base64 data URL so the browser can render it without
     // exposing the Kobo API token.
     if (action === "fetch_attachment") {
+      const forbid = await ensureAdmin();
+      if (forbid) return forbid;
       const { server_url, api_token, attachment_url } = params;
       if (!server_url || !api_token || !attachment_url) {
         return j({ error: "Missing server_url/api_token/attachment_url" }, 400);

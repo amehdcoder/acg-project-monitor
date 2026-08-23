@@ -411,11 +411,18 @@ Deno.serve(async (req) => {
         if (!SHARED_FILTER_METHODS.has(method)) {
           return json({ error: `Filter "${method}" not allowed`, data: null }, 403);
         }
+        // `profiles` is the only PII-bearing table here; disallow the
+        // composable/raw filter forms that could reach beyond the
+        // project-member id list enforced above.
+        if (table === "profiles" && ["or", "not", "filter", "match"].includes(method)) {
+          return json({ error: `Filter "${method}" not allowed on profiles`, data: null }, 403);
+        }
         const args = Array.isArray(f?.args) ? f.args : [];
-        const argErr = table === "profiles" ? null : rejectUnsafeFilterArgs(args);
+        const argErr = rejectUnsafeFilterArgs(args);
         if (argErr) return json({ error: argErr, data: null }, 403);
         q = q[method](...args);
       }
+
       for (const o of order) {
         const column = String(o?.column ?? "");
         if (column.includes(".") || column.includes("(")) {
