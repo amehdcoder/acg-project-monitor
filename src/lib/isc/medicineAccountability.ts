@@ -229,6 +229,8 @@ export interface IssueTx extends BaseTx {
   level: "level_2";
   medicine: string;
   batch: string;
+  /** Batch expiry date (ISO) when the facility issue record carries one. */
+  expiry: string;
   facility: string;
   inCharge: string;
   priorBalance: number;
@@ -240,6 +242,8 @@ export interface IssueTx extends BaseTx {
 export interface CddTx extends BaseTx {
   level: "level_3";
   medicine: string;
+  batch: string;
+  expiry: string;
   facility: string;
   community: string;
   cddName: string;
