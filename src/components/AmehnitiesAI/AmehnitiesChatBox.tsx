@@ -15,7 +15,7 @@ import remarkGfm from "remark-gfm";
 import {
   Bot, User, SendHorizontal, Loader2, Trash2, Radio, History, Plus,
   Database, Clock, Hash, MessageSquare, Sparkles, ThumbsUp, ThumbsDown,
-  RefreshCw, GraduationCap, Check, BrainCircuit, Gauge, Zap, Scale, Telescope,
+  RefreshCw, GraduationCap, Check, BrainCircuit, Gauge, Zap, Scale, Telescope, Globe,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
