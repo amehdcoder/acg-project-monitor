@@ -124,6 +124,38 @@ function getAny(obj: any, names: string[]): any {
   return undefined;
 }
 
+/**
+ * Opportunistic phone-number harvest: XLSForm revisions name contact fields
+ * inconsistently (CDD_Phone, Phone_Number_of_CDD, cdd_phone_no …), so any leaf
+ * matching the role AND a phone-ish token is accepted.
+ */
+function scanPhone(objs: any[], role: RegExp): string {
+  const seen = new Set<any>();
+  const walk = (o: any): string => {
+    if (!o || typeof o !== "object" || seen.has(o)) return "";
+    seen.add(o);
+    for (const [k, v] of Object.entries(o)) {
+      if (v && typeof v === "object") continue;
+      const l = leaf(k);
+      if (/(phone|msisdn|mobile|gsm|contact_?no|telephone)/i.test(l) && role.test(l)) {
+        const s = str(v).replace(/[^\d+]/g, "");
+        if (s.length >= 7) return s;
+      }
+    }
+    for (const v of Object.values(o)) {
+      if (Array.isArray(v)) { for (const i of v) { const h = walk(i); if (h) return h; } }
+      else if (v && typeof v === "object") { const h = walk(v); if (h) return h; }
+    }
+    return "";
+  };
+  for (const o of objs) { const hit = walk(o); if (hit) return hit; }
+  return "";
+}
+
+export const CDD_PHONE_RE = /(cdd|cdi|distributor)/i;
+export const INCHARGE_PHONE_RE = /(charge|flhf|facility|hw|health_?worker)/i;
+
+
 /** Any leaf whose name looks like a barcode / QR scan capture. */
 const BARCODE_RE = /(barcode|bar_code|qr_?code|qr_?scan|scanned_?code|gtin|gs1|serial_?code)/i;
 
