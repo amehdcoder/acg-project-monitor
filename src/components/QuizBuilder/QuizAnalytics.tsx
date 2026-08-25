@@ -34,6 +34,8 @@ import { pairingConsistency } from "@/lib/quizKobo/pairingCheck";
 import { needsIdentityRepair, repairKoboIdentity } from "@/lib/quizKobo/identityRepair";
 import { exportKoboCSV, exportKoboPDF, fmtP } from "@/lib/quizKobo/exports";
 import { supabase } from "@/integrations/supabase/client";
+import { sanitizeHtml } from "@/lib/sanitizeHtml";
+
 import { toast } from "@/hooks/use-toast";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
