@@ -434,10 +434,32 @@ export default function FrontierChatConsole({
                 Attach
               </Button>
               <span className="text-[11px] text-muted-foreground">Enter to send · Shift+Enter for a new line</span>
-              <Button size="sm" className="ml-auto h-8 gap-1.5 text-xs" disabled={busy || !input.trim()} onClick={() => void ask(input)}>
-                {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-                Send
-              </Button>
+              {busy ? (
+                <Button
+                  size="sm" variant="destructive" className="ml-auto h-8 gap-1.5 text-xs"
+                  onClick={stopStreaming}
+                >
+                  <Square className="h-3.5 w-3.5" /> Stop
+                </Button>
+              ) : (
+                <>
+                  {lastQuestion && (
+                    <Button
+                      size="sm" variant="outline" className="ml-auto h-8 gap-1.5 text-xs"
+                      onClick={() => void retryLast()}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" /> Retry
+                    </Button>
+                  )}
+                  <Button
+                    size="sm" className={cn("h-8 gap-1.5 text-xs", !lastQuestion && "ml-auto")}
+                    disabled={!input.trim()} onClick={() => void ask(input)}
+                  >
+                    <Send className="h-3.5 w-3.5" /> Send
+                  </Button>
+                </>
+              )}
+
             </div>
           </div>
         </TabsContent>
