@@ -247,7 +247,9 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
         const nearest = await nearestGrid3InWard(p.lat, p.lng, {
           ward: p.ward, lga: p.lga, state: p.state,
         });
-        out.push({ ...p, named, nearest, lookupAt: new Date().toISOString() });
+        const wardRegistryCount = await grid3WardSettlementCount(p.state, p.lga, p.ward);
+        out.push({ ...p, named, nearest, wardRegistryCount, lookupAt: new Date().toISOString() });
+
         if (i % 15 === 0) {
           setProgress({ done: i + 1, total: points.length });
           await new Promise((r) => setTimeout(r, 0)); // keep the tab responsive
