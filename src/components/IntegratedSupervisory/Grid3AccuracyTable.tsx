@@ -316,9 +316,10 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
     const q = query.trim().toLowerCase();
     return mismatches
       .filter((r) => verdictFilter === "all" || r.verdict === verdictFilter)
+      .filter((r) => matchesGeoScope(r, geoScope))
       .filter((r) => !q || [r.community, r.flhf, r.ward, r.lga, r.state, r.monitor].join(" ").toLowerCase().includes(q))
       .sort(SORTERS[sortKey]);
-  }, [mismatches, verdictFilter, query, sortKey]);
+  }, [mismatches, verdictFilter, geoScope, query, sortKey]);
 
   /* ------------------------- server-style pagination + row virtualization */
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -328,7 +329,8 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
     [filtered, safePage, pageSize],
   );
 
-  useEffect(() => { setPage(0); scrollRef.current?.scrollTo({ top: 0 }); }, [query, verdictFilter, sortKey, pageSize, radiusM]);
+  useEffect(() => { setPage(0); scrollRef.current?.scrollTo({ top: 0 }); }, [query, geoScope, verdictFilter, sortKey, pageSize, radiusM]);
+
 
   const virtualizer = useVirtualizer({
     count: paged.length,
