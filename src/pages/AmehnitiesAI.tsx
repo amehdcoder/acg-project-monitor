@@ -2,7 +2,7 @@
  * Amehnities AI — a real, continuously-trained Transformer neural network
  * built from Amehnities app data and activity, visualised live.
  */
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Brain, Activity, Layers, Gauge, Play, Pause, Plus, Minus, Cpu, Radio, Sparkles, Zap,
@@ -29,6 +29,9 @@ import FrontierChatConsole from "@/components/AmehnitiesAI/FrontierChatConsole";
 
 import ReviewQueuePanel from "@/components/AmehnitiesAI/ReviewQueuePanel";
 import { useAuth } from "@/hooks/useAuth";
+import { usePageAccess } from "@/hooks/usePageAccess";
+import AiAccessManager from "@/components/AmehnitiesAI/AiAccessManager";
+import { Lock, KeyRound } from "lucide-react";
 
 const fmt = (n: number) =>
   n >= 1e9 ? `${(n / 1e9).toFixed(2)}B` : n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : `${n}`;
@@ -49,7 +52,7 @@ function Stat({ icon: Icon, label, value, sub }: { icon: any; label: string; val
 
 function AmehnitiesAIWorkspace() {
   const navigate = useNavigate();
-  const { isOwner } = useAuth();
+  const { isOwner, isAdmin } = useAuth();
   const [accessOpen, setAccessOpen] = useState(false);
 
   const {
