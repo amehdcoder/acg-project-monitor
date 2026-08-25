@@ -21,8 +21,15 @@ import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import AiAccessAuditLog from "./AiAccessAuditLog";
+import {
+  AI_CAPABILITIES, AiCapabilityKey, AiPermissions, isViewOnly, normalizeAiPermissions,
+} from "@/lib/amehnitiesAi/aiPermissions";
 import {
   KeyRound, Loader2, Search, ShieldCheck, Sparkles, UserRoundCheck, Users2, Crown,
+  History, Eye, Database, ImageDown, Brain, Cpu,
 } from "lucide-react";
 
 export const AMEHNITIES_AI_PAGE_ID = "amehnities-ai";
@@ -51,6 +58,13 @@ const initials = (a: AdminRow) => {
 const ROLE_LABEL: Record<AdminRole, string> = {
   super_admin: "Super Admin",
   systems_admin: "Systems Admin",
+};
+
+const CAP_ICON: Record<AiCapabilityKey, typeof Database> = {
+  datasets: Database,
+  media_export: ImageDown,
+  training: Cpu,
+  memory: Brain,
 };
 
 export default function AiAccessManager({
