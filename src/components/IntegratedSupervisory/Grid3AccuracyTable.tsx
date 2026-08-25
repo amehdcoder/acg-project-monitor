@@ -42,6 +42,7 @@ import {
   type NamedGrid3Match, type NearestSettlement,
 } from "@/lib/isc/grid3Nearest";
 
+import GeoFilterBar, { EMPTY_GEO_SCOPE, matchesGeoScope, type GeoScope } from "./GeoFilterBar";
 import Grid3MismatchDetailDialog, { type Grid3DrillSpec } from "./Grid3MismatchDetailDialog";
 import Grid3SupervisorSummary from "./Grid3SupervisorSummary";
 
@@ -185,6 +186,7 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [running, setRunning] = useState(false);
   const [query, setQuery] = useState("");
+  const [geoScope, setGeoScope] = useState<GeoScope>(EMPTY_GEO_SCOPE);
   const [verdictFilter, setVerdictFilter] = useState<"all" | Exclude<Verdict, "match">>("all");
   const [nonce, setNonce] = useState(0);
   const [drill, setDrill] = useState<Grid3DrillSpec | null>(null);
@@ -314,9 +316,10 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
     const q = query.trim().toLowerCase();
     return mismatches
       .filter((r) => verdictFilter === "all" || r.verdict === verdictFilter)
+      .filter((r) => matchesGeoScope(r, geoScope))
       .filter((r) => !q || [r.community, r.flhf, r.ward, r.lga, r.state, r.monitor].join(" ").toLowerCase().includes(q))
       .sort(SORTERS[sortKey]);
-  }, [mismatches, verdictFilter, query, sortKey]);
+  }, [mismatches, verdictFilter, geoScope, query, sortKey]);
 
   /* ------------------------- server-style pagination + row virtualization */
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -326,7 +329,8 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
     [filtered, safePage, pageSize],
   );
 
-  useEffect(() => { setPage(0); scrollRef.current?.scrollTo({ top: 0 }); }, [query, verdictFilter, sortKey, pageSize, radiusM]);
+  useEffect(() => { setPage(0); scrollRef.current?.scrollTo({ top: 0 }); }, [query, geoScope, verdictFilter, sortKey, pageSize, radiusM]);
+
 
   const virtualizer = useVirtualizer({
     count: paged.length,
@@ -453,17 +457,19 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
           ))}
         </div>
 
+        {/* searchable State / LGA / Ward scope + quick community lookup */}
+        <GeoFilterBar
+          records={mismatches}
+          scope={geoScope}
+          onScopeChange={setGeoScope}
+          query={query}
+          onQueryChange={setQuery}
+          queryPlaceholder="Quick community lookup — community, FLHF or monitor…"
+        />
+
         {/* toolbar */}
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative min-w-[200px] flex-1">
-            <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search community, FLHF, ward, LGA or monitor…"
-              className="h-8 pl-7 text-[12px]"
-            />
-          </div>
+
 
           <div className="flex items-center gap-1.5 rounded-md border bg-muted/40 px-2 py-1">
             <Ruler className="h-3.5 w-3.5 text-sky-600" />

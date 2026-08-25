@@ -133,7 +133,15 @@ export function buildAtRiskCommunities(
     }
 
     const matched = byCommunity.get(key(community)) ?? [];
-    const scoped = matched.filter((t) => !lga || !t.lga || key(t.lga) === key(lga));
+    // Ward-scoped join: a Level 3 issue only belongs to this community when it
+    // was recorded in the SAME Ward of the SAME LGA. Cross-ward records with an
+    // identical community name are never folded in.
+    const scoped = matched.filter(
+      (t) =>
+        (!lga || !t.lga || key(t.lga) === key(lga)) &&
+        (!ward || !t.ward || key(t.ward) === key(ward)),
+    );
+
     const issues: AtRiskIssue[] = scoped.map((t) => ({
       medicine: t.medicine,
       qty: t.qtyIssued,
