@@ -99,7 +99,7 @@ export default function MedicineAccountabilityDashboard({ checklistCache = null 
       <MedicineKoboConnectDialog
         open={openConnect}
         onOpenChange={setOpenConnect}
-        onSaved={() => refresh(false)}
+        onSynced={() => { setCache(loadMedLogCache()); }}
       />
     </div>
   );
