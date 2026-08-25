@@ -321,3 +321,20 @@ export async function nearestGrid3InWard(
     state: idx.state[best], lat: idx.lat[best], lng: idx.lng[best], distanceM: bestD,
   };
 }
+
+/**
+ * How many registry settlements exist inside the declared Ward of the declared
+ * LGA and State. Zero means the audit has NOTHING to compare the community
+ * against — the row is unverifiable rather than non-conforming.
+ */
+export async function grid3WardSettlementCount(
+  state: string,
+  lga: string,
+  ward: string,
+): Promise<number> {
+  if (!norm(ward) || !norm(lga)) return 0;
+  const idx = await loadGrid3Index();
+  if (!idx) return 0;
+  return idx.wards.get(wardKey(state, lga, ward))?.length ?? 0;
+}
+
