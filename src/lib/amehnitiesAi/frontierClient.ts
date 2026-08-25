@@ -171,6 +171,33 @@ export async function generateMedia(params: {
   return out;
 }
 
+/** Poll a queued video job until it completes, fails, or the caller aborts. */
+export async function pollMedia(
+  id: string,
+  opts: { onProgress?: (pct: number) => void; signal?: AbortSignal; timeoutMs?: number } = {},
+): Promise<{ status: string; media: GeneratedMedia; message?: string }> {
+  const deadline = Date.now() + (opts.timeoutMs ?? 10 * 60_000);
+  let last: { status: string; media: GeneratedMedia; message?: string } | null = null;
+  while (Date.now() < deadline) {
+    if (opts.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    const res = await fetch(`${FUNCTIONS}/ai-media-generate`, {
+      method: "POST",
+      headers: await authHeaders(),
+      body: JSON.stringify({ action: "status", id }),
+      signal: opts.signal,
+    });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(out?.error || `Media status failed (${res.status})`);
+    last = out;
+    if (out?.status !== "queued") return out;
+    opts.onProgress?.(Number(out?.progress ?? 0));
+    await new Promise((r) => setTimeout(r, 5000));
+  }
+  if (last) return last;
+  throw new Error("Video generation timed out.");
+}
+
+
 /** Durable media cards previously produced by this user. */
 export async function listGeneratedMedia(limit = 24): Promise<GeneratedMedia[]> {
   const { data, error } = await supabase

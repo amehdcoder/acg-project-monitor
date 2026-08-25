@@ -41,7 +41,7 @@ import { generateDocument, type DocFormat } from "@/lib/amehnitiesAi/documentGen
 import { useAiPermissions } from "@/hooks/useAiPermissions";
 import { extractPythonBlock, runAnalysis, type AnalysisResult } from "@/lib/amehnitiesAi/pyodideSandbox";
 import {
-  generateMedia, listGeneratedMedia, streamFrontierChat,
+  generateMedia, pollMedia, listGeneratedMedia, streamFrontierChat,
   type FrontierMeta, type GeneratedMedia,
 } from "@/lib/amehnitiesAi/frontierClient";
 import { BRIGHT_CHART_PALETTE } from "@/lib/charts/brightPalette";
@@ -300,6 +300,20 @@ export default function FrontierChatConsole({
       setMedia((cur) => [out.media, ...cur.filter((m) => m !== pending)]);
       if (out.message) toast.info(out.message);
       else toast.success(kind === "image" ? "Image generated" : "Video job created");
+
+      // Video is asynchronous — follow the job through to the finished asset.
+      if (kind === "video" && out.status === "queued" && out.media?.id) {
+        const jobId = out.media.id;
+        const final = await pollMedia(jobId, {
+          onProgress: (pct) =>
+            setMedia((cur) => cur.map((m) => (m.id === jobId
+              ? { ...m, metadata: { ...(m.metadata ?? {}), progress: pct } }
+              : m))),
+        });
+        setMedia((cur) => cur.map((m) => (m.id === jobId ? final.media : m)));
+        if (final.status === "completed") toast.success("Video ready");
+        else toast.error("Video generation failed", { description: final.message });
+      }
     } catch (e: any) {
       setMedia((cur) => cur.filter((m) => m !== pending));
       toast.error("Generation failed", { description: e?.message });
