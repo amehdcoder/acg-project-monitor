@@ -291,6 +291,25 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
 
   const mismatches = useMemo(() => rows.filter((r) => r.verdict !== "match"), [rows]);
 
+  /** Declared Wards the GRID3 registry knows nothing about (unverifiable captures). */
+  const wardGaps = useMemo(() => {
+    const m = new Map<string, { ward: string; lga: string; state: string; communities: Set<string> }>();
+    rows.filter((r) => r.verdict === "no_ward_registry").forEach((r) => {
+      const k = `${r.state}|${r.lga}|${r.ward}`.toLowerCase();
+      const e = m.get(k) ?? {
+        ward: r.ward || "— (Ward not recorded)",
+        lga: r.lga || "— (LGA not recorded)",
+        state: r.state || "— (State not recorded)",
+        communities: new Set<string>(),
+      };
+      e.communities.add(r.community);
+      m.set(k, e);
+    });
+    return [...m.values()].sort((a, b) => b.communities.size - a.communities.size);
+  }, [rows]);
+
+
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return mismatches
