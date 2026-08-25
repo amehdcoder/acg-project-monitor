@@ -203,13 +203,21 @@ export default function IntegratedSupervisoryView() {
     { enabled: perms.canView && (!!activeConnection || feeds.length > 0) },
   );
 
-  // Automatic background sync: always on (configurable interval, default 5 min),
-  // plus an immediate catch-up when the tab regains focus or the device reconnects.
+  // Background sync safety net. Realtime is the primary path, so when the
+  // socket is live we only poll slowly (configurable, default 5 min); if the
+  // socket is down we fall back to a fast 20 s poll so the dashboard still
+  // feels near-instant. Focus / reconnect always triggers an immediate catch-up.
   useEffect(() => {
     if (!perms.canView || (!activeConnection && !feeds.length)) return;
     const cfg = loadKoboConfig(activeId);
-    const min = Math.max(1, cfg?.pollMinutes ?? 5);
-    const timer = setInterval(() => { if (navigator.onLine !== false) void refresh(true); }, min * 60 * 1000);
+    const slowMs = Math.max(1, cfg?.pollMinutes ?? 5) * 60 * 1000;
+    const intervalMs = connected ? slowMs : 20_000;
+    const tick = () => {
+      if (navigator.onLine === false) return;
+      if (document.visibilityState === "hidden") return; // don't burn quota in background tabs
+      void refresh(true);
+    };
+    const timer = setInterval(tick, intervalMs);
     const catchUp = () => { if (document.visibilityState === "visible" && navigator.onLine !== false) void refresh(true); };
     document.addEventListener("visibilitychange", catchUp);
     window.addEventListener("online", catchUp);
@@ -218,7 +226,7 @@ export default function IntegratedSupervisoryView() {
       document.removeEventListener("visibilitychange", catchUp);
       window.removeEventListener("online", catchUp);
     };
-  }, [refresh, activeId, perms.canView, activeConnection, feeds.length]);
+  }, [refresh, activeId, perms.canView, activeConnection, feeds.length, connected]);
 
   // Initial auto-sync on mount so the dashboard is fresh without pressing Sync.
   useEffect(() => {
