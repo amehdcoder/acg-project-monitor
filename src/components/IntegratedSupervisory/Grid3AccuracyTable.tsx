@@ -38,9 +38,10 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  findGrid3Named, nearestGrid3InWard, warmGrid3Index, norm,
+  findGrid3Named, nearestGrid3InWard, grid3WardSettlementCount, warmGrid3Index, norm,
   type NamedGrid3Match, type NearestSettlement,
 } from "@/lib/isc/grid3Nearest";
+
 import Grid3MismatchDetailDialog, { type Grid3DrillSpec } from "./Grid3MismatchDetailDialog";
 import Grid3SupervisorSummary from "./Grid3SupervisorSummary";
 
@@ -66,7 +67,9 @@ function parsePoint(v: unknown): { lat: number; lng: number } | null {
   return { lat: p[0], lng: p[1] };
 }
 
-type Verdict = "out_of_radius" | "name_mismatch" | "not_in_registry" | "admin_mismatch" | "match";
+type Verdict =
+  | "out_of_radius" | "name_mismatch" | "not_in_registry" | "admin_mismatch"
+  | "no_ward_registry" | "match";
 
 const VERDICT_META: Record<Exclude<Verdict, "match">, { label: string; note: string; cls: string; dot: string }> = {
   out_of_radius: {
@@ -93,7 +96,14 @@ const VERDICT_META: Record<Exclude<Verdict, "match">, { label: string; note: str
     cls: "bg-indigo-50 text-indigo-700 border-indigo-300",
     dot: "#4F46E5",
   },
+  no_ward_registry: {
+    label: "Ward absent from registry",
+    note: "The GRID3 registry holds no settlement at all for the declared Ward of this LGA and State, so the capture cannot be compared without leaving the ward — it is unverifiable, not necessarily wrong.",
+    cls: "bg-slate-100 text-slate-700 border-slate-300",
+    dot: "#64748B",
+  },
 };
+
 
 /** A resolved capture — radius-independent (lookups run once). */
 interface ResolvedRow {
@@ -109,8 +119,11 @@ interface ResolvedRow {
   lng: number;
   named: NamedGrid3Match | null;
   nearest: NearestSettlement | null;
+  /** Registry settlements available inside the declared Ward (0 ⇒ unverifiable). */
+  wardRegistryCount: number;
   /** ISO timestamp of the registry lookup (audit provenance). */
   lookupAt: string;
+
   /** All supervisor submissions that produced this capture. */
   sources: Row[];
 }
@@ -189,7 +202,8 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
 
   /* ------------------------------------------------- captures to audit */
   const points = useMemo(() => {
-    const byKey = new Map<string, Omit<ResolvedRow, "named" | "nearest" | "lookupAt">>();
+    const byKey = new Map<string, Omit<ResolvedRow, "named" | "nearest" | "lookupAt" | "wardRegistryCount">>();
+
     parents.forEach((p, i) => {
       const g = parsePoint(p.GPS ?? p._geolocation);
       if (!g) return;
@@ -233,7 +247,9 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
         const nearest = await nearestGrid3InWard(p.lat, p.lng, {
           ward: p.ward, lga: p.lga, state: p.state,
         });
-        out.push({ ...p, named, nearest, lookupAt: new Date().toISOString() });
+        const wardRegistryCount = await grid3WardSettlementCount(p.state, p.lga, p.ward);
+        out.push({ ...p, named, nearest, wardRegistryCount, lookupAt: new Date().toISOString() });
+
         if (i % 15 === 0) {
           setProgress({ done: i + 1, total: points.length });
           await new Promise((r) => setTimeout(r, 0)); // keep the tab responsive
@@ -254,13 +270,15 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
       resolved.map((r) => {
         const { named, nearest } = r;
         let verdict: Verdict = "match";
-        if (!named) verdict = "not_in_registry";
+        if (!r.wardRegistryCount) verdict = "no_ward_registry";
+        else if (!named) verdict = "not_in_registry";
         else if (named.distanceM > radiusM) verdict = "out_of_radius";
         else if (nearest && norm(nearest.settlement) !== norm(r.community) && nearest.distanceM < 1500) {
           verdict = "name_mismatch";
         } else if ((r.ward && norm(named.ward) !== norm(r.ward)) || (r.lga && norm(named.lga) !== norm(r.lga))) {
           verdict = "admin_mismatch";
         }
+
         return {
           ...r,
           verdict,
@@ -272,6 +290,25 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
   );
 
   const mismatches = useMemo(() => rows.filter((r) => r.verdict !== "match"), [rows]);
+
+  /** Declared Wards the GRID3 registry knows nothing about (unverifiable captures). */
+  const wardGaps = useMemo(() => {
+    const m = new Map<string, { ward: string; lga: string; state: string; communities: Set<string> }>();
+    rows.filter((r) => r.verdict === "no_ward_registry").forEach((r) => {
+      const k = `${r.state}|${r.lga}|${r.ward}`.toLowerCase();
+      const e = m.get(k) ?? {
+        ward: r.ward || "— (Ward not recorded)",
+        lga: r.lga || "— (LGA not recorded)",
+        state: r.state || "— (State not recorded)",
+        communities: new Set<string>(),
+      };
+      e.communities.add(r.community);
+      m.set(k, e);
+    });
+    return [...m.values()].sort((a, b) => b.communities.size - a.communities.size);
+  }, [rows]);
+
+
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -403,7 +440,7 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
         />
 
         {/* KPI strip */}
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-5">
           {(Object.keys(VERDICT_META) as Exclude<Verdict, "match">[]).map((k) => (
             <button
               key={k}
@@ -484,14 +521,45 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
           </div>
         )}
 
+        {/* wards the registry cannot cover — explicit, named empty state */}
+        {!running && wardGaps.length > 0 && (
+          <div className="rounded-lg border border-slate-300 bg-slate-50 p-3 text-[11.5px] text-slate-700">
+            <p className="flex items-center gap-1.5 font-semibold text-slate-800">
+              <AlertTriangle className="h-3.5 w-3.5 text-slate-500" />
+              No GRID3 registry settlements exist for {wardGaps.length} declared Ward{wardGaps.length === 1 ? "" : "s"}
+            </p>
+            <p className="mt-1 leading-relaxed">
+              These captures cannot be audited: the comparison is confined to the Ward declared on the checklist, and the
+              registry holds no settlement for that Ward. They are listed below as “Ward absent from registry” — treat them
+              as unverifiable, not as wrong coordinates.
+            </p>
+            <ul className="mt-2 space-y-1">
+              {wardGaps.slice(0, 8).map((g) => (
+                <li key={`${g.state}-${g.lga}-${g.ward}`} className="rounded border border-slate-200 bg-background px-2 py-1">
+                  <span className="font-semibold text-slate-900">Ward: {g.ward}</span>
+                  <span className="text-muted-foreground"> · LGA: {g.lga} · State: {g.state}</span>
+                  <span className="ml-1 text-slate-600">
+                    — {g.communities.size} communit{g.communities.size === 1 ? "y" : "ies"} affected
+                    {" "}({[...g.communities].slice(0, 3).join(", ")}{g.communities.size > 3 ? "…" : ""})
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {wardGaps.length > 8 && (
+              <p className="mt-1 text-[10.5px] text-muted-foreground">+ {wardGaps.length - 8} more Wards without registry coverage.</p>
+            )}
+          </div>
+        )}
+
         {/* table */}
         {!running && !mismatches.length ? (
           <div className="flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 p-4 text-[12px] text-emerald-800">
             <ShieldCheck className="h-4 w-4" />
             Every captured coordinate falls inside the {radiusM / 1000} km accuracy radius of its GRID3 registry
-            settlement — no exceptions to review at this threshold.
+            settlement in the same Ward — no exceptions to review at this threshold.
           </div>
         ) : (
+
           <TooltipProvider delayDuration={200}>
           <div ref={scrollRef} className="max-h-[600px] overflow-auto rounded-xl border border-slate-300 shadow-sm">
             <table className="w-full min-w-[1180px] table-fixed border-collapse text-[11.5px] leading-snug">
@@ -568,11 +636,17 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
                               {r.named.ward} · {r.named.lga}
                             </span>
                           </>
+                        ) : r.verdict === "no_ward_registry" ? (
+                          <span className="block break-words text-[10.5px] italic text-slate-600">
+                            no GRID3 settlement recorded for {r.ward || "an unnamed Ward"},{" "}
+                            {r.lga || "unnamed LGA"}, {r.state || "unnamed State"} — nothing to compare against
+                          </span>
                         ) : (
                           <span className="block break-words text-[10.5px] italic text-amber-700">
                             no same-name entry in this Ward / LGA
                           </span>
                         )}
+
                       </td>
                       <td className="px-2 py-2.5 text-right">
                         <span
