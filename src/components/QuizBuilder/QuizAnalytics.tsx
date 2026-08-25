@@ -1353,8 +1353,9 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
                     const formatted = sanitizeHtml(
                       line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>'),
                     );
-
+                    return (
                       <p
+
                         key={i}
                         className="text-sm leading-relaxed my-1"
                         dangerouslySetInnerHTML={{ __html: formatted }}
