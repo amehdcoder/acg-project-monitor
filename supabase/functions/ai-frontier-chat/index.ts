@@ -83,8 +83,15 @@ Deno.serve(async (req) => {
     // ---------------------------------------------------------- routing
     const { questionClass, heuristicTier } = classifyQuestion(question);
     let tier: Tier = heuristicTier;
+    let learnedRoute = false;
     try {
-      tier = await applyLearnedRoute(admin, questionClass, heuristicTier);
+      const { data: stats } = await admin
+        .from("ai_route_stats")
+        .select("question_class, tier, avg_reward, trials")
+        .eq("question_class", questionClass);
+      const routed = applyLearnedRoute(heuristicTier, questionClass, (stats ?? []) as never);
+      tier = routed.tier;
+      learnedRoute = routed.learned;
     } catch { /* heuristic stands */ }
 
     const pinned = String(body?.tier ?? "");
