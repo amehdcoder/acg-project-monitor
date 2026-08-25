@@ -42,6 +42,7 @@ import {
   type NamedGrid3Match, type NearestSettlement,
 } from "@/lib/isc/grid3Nearest";
 
+import GeoFilterBar, { EMPTY_GEO_SCOPE, matchesGeoScope, type GeoScope } from "./GeoFilterBar";
 import Grid3MismatchDetailDialog, { type Grid3DrillSpec } from "./Grid3MismatchDetailDialog";
 import Grid3SupervisorSummary from "./Grid3SupervisorSummary";
 
