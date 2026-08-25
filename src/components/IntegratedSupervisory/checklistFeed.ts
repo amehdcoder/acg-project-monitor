@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { buildDataDictionary, flattenAll, validateDataDictionary } from "./koboSchema";
 import { saveKoboCache, type KoboCache, type KoboConfig } from "./koboClient";
+import { filterRowsToScope } from "@/lib/isc/stateScope";
 
 export interface ChecklistFeed {
   id: string;
