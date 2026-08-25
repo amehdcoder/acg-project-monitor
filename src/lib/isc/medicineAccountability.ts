@@ -265,6 +265,9 @@ export interface IssueTx extends BaseTx {
   expiry: string;
   facility: string;
   inCharge: string;
+  /** Facility in-charge phone number when the form captured one. */
+  inChargePhone: string;
+
   priorBalance: number;
   qtyIssued: number;
   remainingLga: number;
