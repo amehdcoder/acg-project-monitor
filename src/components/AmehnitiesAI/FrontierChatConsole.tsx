@@ -401,7 +401,7 @@ export default function FrontierChatConsole({
           </div>
 
           {/* deliverables */}
-          {lastAnswer && (
+          {lastAnswer && canMediaExport && (
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Export answer</span>
               {([
