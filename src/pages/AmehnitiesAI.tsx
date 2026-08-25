@@ -293,14 +293,16 @@ function AmehnitiesAIWorkspace() {
         </div>
 
         {/* Control, sources, inference and checkpoints */}
-        <div className="mt-4 grid gap-4 lg:grid-cols-3">
-          <TrainingControlPanel
-            telemetry={telemetry}
-            budget={budget}
-            exportCheckpoint={exportCheckpoint}
-            importCheckpoint={importCheckpoint}
-            applyConfig={applyConfig}
-          />
+        <div className={`mt-4 grid gap-4 ${canTrain ? "lg:grid-cols-3" : "lg:grid-cols-2"}`}>
+          {canTrain && (
+            <TrainingControlPanel
+              telemetry={telemetry}
+              budget={budget}
+              exportCheckpoint={exportCheckpoint}
+              importCheckpoint={importCheckpoint}
+              applyConfig={applyConfig}
+            />
+          )}
           <DataSourcePanel
             allSources={allSources}
             enabledSources={enabledSources}
@@ -314,37 +316,41 @@ function AmehnitiesAIWorkspace() {
           <AskModelPanel askModel={askModel} vocab={vocab} />
         </div>
 
-        <div className="mt-4">
-          <ValidationPanel
-            evaluation={evaluation}
-            evalSeries={evalSeries}
-            evalEnabled={evalEnabled}
-            trainTokens={trainTokens}
-            valTokens={valTokens}
-            setEvalEnabled={setEvalEnabled}
-            runEvaluation={runEvaluation}
-            guardEnabled={guardEnabled}
-            setGuardEnabled={setGuardEnabled}
-            bestCheckpoints={bestCheckpoints}
-            autoSave={autoSave}
-            setAutoSave={setAutoSave}
-            bestMetric={bestMetric}
-            setBestMetric={setBestMetric}
-            autoSaving={autoSaving}
-            rollbackTo={rollbackTo}
-            downloadBestCheckpoint={downloadBestCheckpoint}
-            clearBestCheckpoints={clearBestCheckpoints}
-          />
-        </div>
+        {canTrain && (
+          <div className="mt-4">
+            <ValidationPanel
+              evaluation={evaluation}
+              evalSeries={evalSeries}
+              evalEnabled={evalEnabled}
+              trainTokens={trainTokens}
+              valTokens={valTokens}
+              setEvalEnabled={setEvalEnabled}
+              runEvaluation={runEvaluation}
+              guardEnabled={guardEnabled}
+              setGuardEnabled={setGuardEnabled}
+              bestCheckpoints={bestCheckpoints}
+              autoSave={autoSave}
+              setAutoSave={setAutoSave}
+              bestMetric={bestMetric}
+              setBestMetric={setBestMetric}
+              autoSaving={autoSaving}
+              rollbackTo={rollbackTo}
+              downloadBestCheckpoint={downloadBestCheckpoint}
+              clearBestCheckpoints={clearBestCheckpoints}
+            />
+          </div>
+        )}
 
-        <div className="mt-4">
-          <CheckpointsPanel
-            checkpoints={checkpoints}
-            downloadSavedCheckpoint={downloadSavedCheckpoint}
-            inspectCheckpoint={inspectCheckpoint}
-            importCheckpoint={importCheckpoint}
-          />
-        </div>
+        {canTrain && (
+          <div className="mt-4">
+            <CheckpointsPanel
+              checkpoints={checkpoints}
+              downloadSavedCheckpoint={downloadSavedCheckpoint}
+              inspectCheckpoint={inspectCheckpoint}
+              importCheckpoint={importCheckpoint}
+            />
+          </div>
+        )}
       </div>
 
       {isOwner && <AiAccessManager open={accessOpen} onOpenChange={setAccessOpen} />}
