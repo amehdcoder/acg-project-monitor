@@ -6,6 +6,7 @@
 // (`publish`); the API token itself never leaves this function.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { isGrantActive, norm, readState, scopeRows } from "./scope.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -53,10 +54,7 @@ async function resolveCaller(req: Request): Promise<Caller | null> {
   const isAdmin = !!profile?.is_owner || !!profile?.is_co_owner ||
     (roles ?? []).some((r: { role: string }) => r.role === "super_admin" || r.role === "systems_admin");
 
-  const now = Date.now();
-  const active = !!grant &&
-    (!grant.starts_at || new Date(grant.starts_at).getTime() <= now) &&
-    (!grant.expires_at || new Date(grant.expires_at).getTime() > now);
+  const active = isGrantActive(grant);
 
   return {
     userId,
@@ -66,7 +64,7 @@ async function resolveCaller(req: Request): Promise<Caller | null> {
   };
 }
 
-const norm = (s: unknown) => String(s ?? "").trim().toLowerCase().replace(/\s+state$/, "");
+
 
 /** Append an immutable audit line. Never throws — auditing must not break the action. */
 async function audit(row: Record<string, unknown>) {
@@ -82,16 +80,8 @@ async function actorEmail(userId: string): Promise<string | null> {
   return (data?.email as string | null) ?? null;
 }
 
-/** Best-effort State reader across the Kobo naming conventions used in the form. */
-function readState(row: Record<string, unknown>): string {
-  const isState = (leaf: string) =>
-    /^((mda|sel|q)_?)?state(_?(name|label|select|code))?$/i.test(leaf.replace(/\s+/g, "_"));
-  for (const [k, v] of Object.entries(row || {})) {
-    const leaf = k.split("/").pop() || k;
-    if (isState(leaf) && String(v ?? "").trim()) return String(v);
-  }
-  return "";
-}
+
+
 
 async function koboFetch(serverUrl: string, path: string, apiToken: string) {
   const base = serverUrl.replace(/\/+$/, "");
@@ -277,9 +267,8 @@ Deno.serve(async (req) => {
       // Server-side State scoping — a granted user can never receive rows
       // outside the State(s) their grant allows.
       const allowed = caller.isAdmin ? [] : caller.scopeStates.map(norm).filter(Boolean);
-      const scoped = allowed.length
-        ? results.filter((r) => allowed.includes(norm(readState(r))))
-        : results;
+      const scoped = scopeRows(results, caller.scopeStates, caller.isAdmin);
+
 
       return json({
         feed: { id: feed.id, name: feed.name, form_uid: feed.form_uid, server_url: feed.server_url },

@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { buildDataDictionary, flattenAll, validateDataDictionary } from "./koboSchema";
 import { saveKoboCache, type KoboCache, type KoboConfig } from "./koboClient";
+import { filterRowsToScope } from "@/lib/isc/stateScope";
 
 export interface ChecklistFeed {
   id: string;
@@ -110,7 +111,12 @@ export interface ScopedFetchResult {
 export async function fetchScopedSubmissions(feedId?: string | null): Promise<ScopedFetchResult> {
   const d = await callFeed({ action: "fetch", feed_id: feedId ?? undefined });
 
-  const results: any[] = Array.isArray(d?.results) ? d.results : [];
+  const scopeStates = (d?.scope_states ?? []) as string[];
+  const raw: any[] = Array.isArray(d?.results) ? d.results : [];
+  // Defence-in-depth: the server already filtered, but every payload —
+  // including realtime-triggered refetches and cached responses — is re-checked
+  // against the caller's granted State(s) before it reaches the dashboard.
+  const results = filterRowsToScope(raw, scopeStates);
   results.sort(
     (a, b) => new Date(b?._submission_time ?? 0).getTime() - new Date(a?._submission_time ?? 0).getTime(),
   );
@@ -118,6 +124,7 @@ export async function fetchScopedSubmissions(feedId?: string | null): Promise<Sc
   const survey = Array.isArray(d?.survey) ? d.survey : [];
   const flatResults = flattenAll(results, survey);
   const columns = buildDataDictionary(flatResults, survey);
+
 
   const cache: KoboCache = {
     fetchedAt: new Date().toISOString(),
@@ -139,7 +146,7 @@ export async function fetchScopedSubmissions(feedId?: string | null): Promise<Sc
   return {
     cache,
     feed,
-    scopeStates: (d?.scope_states ?? []) as string[],
+    scopeStates,
     total: Number(d?.total ?? results.length),
   };
 }
