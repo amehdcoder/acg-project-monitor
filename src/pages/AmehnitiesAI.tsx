@@ -102,7 +102,13 @@ function AmehnitiesAIWorkspace() {
               {running ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
               {running ? "Pause" : "Resume"}
             </Button>
+            {isOwner && (
+              <Button size="sm" variant="outline" onClick={() => setAccessOpen(true)} className="gap-1.5">
+                <KeyRound className="h-4 w-4" /> Manage access
+              </Button>
+            )}
           </div>
+
         </header>
 
         {/* KPI strip */}
