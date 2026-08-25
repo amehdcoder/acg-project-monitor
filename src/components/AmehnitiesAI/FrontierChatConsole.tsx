@@ -383,7 +383,14 @@ export default function FrontierChatConsole({
                     </div>
                   )}
 
+                  {m.stopped && (
+                    <Badge variant="outline" className="mt-1 gap-1 text-[10px] text-muted-foreground">
+                      <Square className="h-2.5 w-2.5" /> Stopped by you
+                    </Badge>
+                  )}
+
                   {m.streaming && (
+
                     <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
                       <Loader2 className="h-3 w-3 animate-spin" /> reasoning…
                     </div>
