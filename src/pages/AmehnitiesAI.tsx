@@ -25,6 +25,8 @@ import CheckpointsPanel from "@/components/AmehnitiesAI/CheckpointsPanel";
 import ValidationPanel from "@/components/AmehnitiesAI/ValidationPanel";
 import DivergenceAlert from "@/components/AmehnitiesAI/DivergenceAlert";
 import AmehnitiesChatBox from "@/components/AmehnitiesAI/AmehnitiesChatBox";
+import FrontierChatConsole from "@/components/AmehnitiesAI/FrontierChatConsole";
+
 import ReviewQueuePanel from "@/components/AmehnitiesAI/ReviewQueuePanel";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -141,6 +143,12 @@ export default function AmehnitiesAI() {
         {/* Grounded assistant over live application data */}
         <div className="mt-4">
           <AmehnitiesChatBox telemetry={telemetry} corpusEvents={totalEvents} />
+
+          {/* Enterprise console: files, analysis, documents, multimodal media */}
+          <div className="mt-4">
+            <FrontierChatConsole telemetry={telemetry} corpusEvents={totalEvents} />
+          </div>
+
 
           {/* Human-in-the-loop correction queue — admins only. */}
           {isAdmin && (

@@ -277,7 +277,7 @@ export async function dismissReviewItem(id: string) {
 
 /** Submit an admin correction — this is what re-trains the learned policy. */
 export async function resolveReviewItem(item: ReviewItem, correction: string) {
-  return sendFeedback({
+  const result = await sendFeedback({
     reviewQueueId: item.id,
     messageId: item.message_id ?? undefined,
     conversationId: item.conversation_id ?? undefined,
@@ -289,7 +289,30 @@ export async function resolveReviewItem(item: ReviewItem, correction: string) {
     followups: 0,
     policyIds: Array.isArray(item.policy_ids) ? item.policy_ids : [],
   });
+
+  // Durably store the correction in the vector memory as an authoritative
+  // system-feedback prompt, so semantically similar questions recall it.
+  try {
+    const { indexFeedbackCorrection } = await import("./frontierClient");
+    await indexFeedbackCorrection({
+      question: item.question,
+      correction,
+      sourceId: `review:${item.id}`,
+      metadata: {
+        review_queue_id: item.id,
+        question_class: item.question_class,
+        tier: item.tier,
+        model: item.model,
+        reason: item.reason,
+      },
+    });
+  } catch (e) {
+    console.warn("Correction saved, but memory indexing failed:", (e as Error)?.message);
+  }
+
+  return result;
 }
+
 
 /** Learned routing evidence, for the admin panel. */
 export async function listRouteStats() {
