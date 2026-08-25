@@ -92,6 +92,10 @@ function build(data: Blob): Index {
 export const norm = (s: string) =>
   String(s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
 
+/** Composite key for the strict "same Ward of the same LGA and State" scope. */
+export const wardKey = (state: string, lga: string, ward: string) =>
+  `${norm(state)}|${norm(lga)}|${norm(ward)}`;
+
 
 /** Load + index the registry once. Safe to call repeatedly / concurrently. */
 export async function loadGrid3Index(): Promise<Index | null> {
