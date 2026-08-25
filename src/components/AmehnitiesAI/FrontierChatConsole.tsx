@@ -87,6 +87,11 @@ export default function FrontierChatConsole({
   telemetry?: unknown;
   corpusEvents?: number;
 }) {
+  // Granular capability gating — Owners hold everything; granted admins hold
+  // exactly what the Owner toggled on their grant (default: view-only).
+  const { can: canAi } = useAiPermissions();
+  const canDatasets = canAi("datasets");
+  const canMediaExport = canAi("media_export");
   const [messages, setMessages] = useState<ConsoleMessage[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
