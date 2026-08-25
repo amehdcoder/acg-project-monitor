@@ -349,3 +349,46 @@ function AmehnitiesAIWorkspace() {
     </div>
   );
 }
+
+/**
+ * Access gate — Amehnities AI is Owner-only, plus any admin the Owner has
+ * explicitly granted (page_id "amehnities-ai" in admin_page_access). The heavy
+ * training workspace never mounts for anyone who is not entitled.
+ */
+export default function AmehnitiesAI() {
+  const navigate = useNavigate();
+  const { canAccessPage, loadingAccess } = usePageAccess();
+
+  if (loadingAccess) {
+    return (
+      <div className="grid min-h-[100dvh] place-items-center bg-background">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-primary" />
+          Checking your access…
+        </div>
+      </div>
+    );
+  }
+
+  if (!canAccessPage("amehnities-ai")) {
+    return (
+      <div className="grid min-h-[100dvh] place-items-center bg-background px-4">
+        <Card className="w-full max-w-md border-border/60 bg-card/70 p-6 text-center backdrop-blur">
+          <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl border border-primary/30 bg-primary/10">
+            <Lock className="h-5 w-5 text-primary" />
+          </div>
+          <h1 className="text-lg font-semibold tracking-tight">Amehnities AI is restricted</h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            This workspace is reserved for the Owner. Ask the Owner to grant you access from
+            Amehnities AI → Manage access.
+          </p>
+          <Button className="mt-5 gap-1.5" variant="outline" onClick={() => navigate("/")}>
+            <ArrowLeft className="h-4 w-4" /> Back to app
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
+  return <AmehnitiesAIWorkspace />;
+}
