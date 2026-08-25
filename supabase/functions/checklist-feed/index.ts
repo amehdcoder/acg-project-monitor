@@ -80,16 +80,8 @@ async function actorEmail(userId: string): Promise<string | null> {
   return (data?.email as string | null) ?? null;
 }
 
-/** Best-effort State reader across the Kobo naming conventions used in the form. */
-function readState(row: Record<string, unknown>): string {
-  const isState = (leaf: string) =>
-    /^((mda|sel|q)_?)?state(_?(name|label|select|code))?$/i.test(leaf.replace(/\s+/g, "_"));
-  for (const [k, v] of Object.entries(row || {})) {
-    const leaf = k.split("/").pop() || k;
-    if (isState(leaf) && String(v ?? "").trim()) return String(v);
-  }
-  return "";
-}
+
+
 
 async function koboFetch(serverUrl: string, path: string, apiToken: string) {
   const base = serverUrl.replace(/\/+$/, "");
