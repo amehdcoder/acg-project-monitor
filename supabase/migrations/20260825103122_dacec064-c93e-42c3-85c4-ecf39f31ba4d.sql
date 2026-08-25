@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.log_admin_page_access_change() FROM PUBLIC, anon, authenticated;

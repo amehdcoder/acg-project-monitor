@@ -420,12 +420,47 @@ export type Database = {
           },
         ]
       }
+      admin_access_audit: {
+        Row: {
+          action: string
+          actor_user_id: string | null
+          created_at: string
+          id: string
+          new_permissions: Json | null
+          old_permissions: Json | null
+          page_id: string
+          target_user_id: string
+        }
+        Insert: {
+          action: string
+          actor_user_id?: string | null
+          created_at?: string
+          id?: string
+          new_permissions?: Json | null
+          old_permissions?: Json | null
+          page_id: string
+          target_user_id: string
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string | null
+          created_at?: string
+          id?: string
+          new_permissions?: Json | null
+          old_permissions?: Json | null
+          page_id?: string
+          target_user_id?: string
+        }
+        Relationships: []
+      }
       admin_page_access: {
         Row: {
           created_at: string
           granted_by: string
           id: string
           page_id: string
+          permissions: Json
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -433,6 +468,8 @@ export type Database = {
           granted_by: string
           id?: string
           page_id: string
+          permissions?: Json
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -440,6 +477,8 @@ export type Database = {
           granted_by?: string
           id?: string
           page_id?: string
+          permissions?: Json
+          updated_at?: string
           user_id?: string
         }
         Relationships: []

@@ -26,12 +26,13 @@ import ValidationPanel from "@/components/AmehnitiesAI/ValidationPanel";
 import DivergenceAlert from "@/components/AmehnitiesAI/DivergenceAlert";
 import AmehnitiesChatBox from "@/components/AmehnitiesAI/AmehnitiesChatBox";
 import FrontierChatConsole from "@/components/AmehnitiesAI/FrontierChatConsole";
+import { useAiPermissions } from "@/hooks/useAiPermissions";
 
 import ReviewQueuePanel from "@/components/AmehnitiesAI/ReviewQueuePanel";
 import { useAuth } from "@/hooks/useAuth";
 import { usePageAccess } from "@/hooks/usePageAccess";
 import AiAccessManager from "@/components/AmehnitiesAI/AiAccessManager";
-import { Lock, KeyRound } from "lucide-react";
+import { Lock, KeyRound, Eye } from "lucide-react";
 
 const fmt = (n: number) =>
   n >= 1e9 ? `${(n / 1e9).toFixed(2)}B` : n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : `${n}`;
@@ -54,6 +55,10 @@ function AmehnitiesAIWorkspace() {
   const navigate = useNavigate();
   const { isOwner, isAdmin } = useAuth();
   const [accessOpen, setAccessOpen] = useState(false);
+  // Granular capabilities the Owner assigned to this admin (Owner = all).
+  const { can: canAi, viewOnly } = useAiPermissions();
+  const canTrain = canAi("training");
+
 
   const {
     telemetry, running, toggle, budget, setBudget, grow, shrink,
@@ -98,10 +103,17 @@ function AmehnitiesAIWorkspace() {
               <span className={`inline-block h-1.5 w-1.5 rounded-full ${running ? "animate-pulse bg-primary" : "bg-muted-foreground"}`} />
               {running ? "Training" : "Paused"}
             </Badge>
-            <Button size="sm" variant={running ? "secondary" : "default"} onClick={toggle} className="gap-1.5">
-              {running ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-              {running ? "Pause" : "Resume"}
-            </Button>
+            {viewOnly && (
+              <Badge variant="secondary" className="gap-1.5 text-[11px]">
+                <Eye className="h-3 w-3" /> View-only access
+              </Badge>
+            )}
+            {canTrain && (
+              <Button size="sm" variant={running ? "secondary" : "default"} onClick={toggle} className="gap-1.5">
+                {running ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                {running ? "Pause" : "Resume"}
+              </Button>
+            )}
             {isOwner && (
               <Button size="sm" variant="outline" onClick={() => setAccessOpen(true)} className="gap-1.5">
                 <KeyRound className="h-4 w-4" /> Manage access
@@ -293,14 +305,16 @@ function AmehnitiesAIWorkspace() {
         </div>
 
         {/* Control, sources, inference and checkpoints */}
-        <div className="mt-4 grid gap-4 lg:grid-cols-3">
-          <TrainingControlPanel
-            telemetry={telemetry}
-            budget={budget}
-            exportCheckpoint={exportCheckpoint}
-            importCheckpoint={importCheckpoint}
-            applyConfig={applyConfig}
-          />
+        <div className={`mt-4 grid gap-4 ${canTrain ? "lg:grid-cols-3" : "lg:grid-cols-2"}`}>
+          {canTrain && (
+            <TrainingControlPanel
+              telemetry={telemetry}
+              budget={budget}
+              exportCheckpoint={exportCheckpoint}
+              importCheckpoint={importCheckpoint}
+              applyConfig={applyConfig}
+            />
+          )}
           <DataSourcePanel
             allSources={allSources}
             enabledSources={enabledSources}
@@ -314,37 +328,41 @@ function AmehnitiesAIWorkspace() {
           <AskModelPanel askModel={askModel} vocab={vocab} />
         </div>
 
-        <div className="mt-4">
-          <ValidationPanel
-            evaluation={evaluation}
-            evalSeries={evalSeries}
-            evalEnabled={evalEnabled}
-            trainTokens={trainTokens}
-            valTokens={valTokens}
-            setEvalEnabled={setEvalEnabled}
-            runEvaluation={runEvaluation}
-            guardEnabled={guardEnabled}
-            setGuardEnabled={setGuardEnabled}
-            bestCheckpoints={bestCheckpoints}
-            autoSave={autoSave}
-            setAutoSave={setAutoSave}
-            bestMetric={bestMetric}
-            setBestMetric={setBestMetric}
-            autoSaving={autoSaving}
-            rollbackTo={rollbackTo}
-            downloadBestCheckpoint={downloadBestCheckpoint}
-            clearBestCheckpoints={clearBestCheckpoints}
-          />
-        </div>
+        {canTrain && (
+          <div className="mt-4">
+            <ValidationPanel
+              evaluation={evaluation}
+              evalSeries={evalSeries}
+              evalEnabled={evalEnabled}
+              trainTokens={trainTokens}
+              valTokens={valTokens}
+              setEvalEnabled={setEvalEnabled}
+              runEvaluation={runEvaluation}
+              guardEnabled={guardEnabled}
+              setGuardEnabled={setGuardEnabled}
+              bestCheckpoints={bestCheckpoints}
+              autoSave={autoSave}
+              setAutoSave={setAutoSave}
+              bestMetric={bestMetric}
+              setBestMetric={setBestMetric}
+              autoSaving={autoSaving}
+              rollbackTo={rollbackTo}
+              downloadBestCheckpoint={downloadBestCheckpoint}
+              clearBestCheckpoints={clearBestCheckpoints}
+            />
+          </div>
+        )}
 
-        <div className="mt-4">
-          <CheckpointsPanel
-            checkpoints={checkpoints}
-            downloadSavedCheckpoint={downloadSavedCheckpoint}
-            inspectCheckpoint={inspectCheckpoint}
-            importCheckpoint={importCheckpoint}
-          />
-        </div>
+        {canTrain && (
+          <div className="mt-4">
+            <CheckpointsPanel
+              checkpoints={checkpoints}
+              downloadSavedCheckpoint={downloadSavedCheckpoint}
+              inspectCheckpoint={inspectCheckpoint}
+              importCheckpoint={importCheckpoint}
+            />
+          </div>
+        )}
       </div>
 
       {isOwner && <AiAccessManager open={accessOpen} onOpenChange={setAccessOpen} />}

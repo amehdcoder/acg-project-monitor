@@ -38,6 +38,7 @@ import { cn } from "@/lib/utils";
 
 import { parseFiles, type ParsedAttachment } from "@/lib/amehnitiesAi/fileParsers";
 import { generateDocument, type DocFormat } from "@/lib/amehnitiesAi/documentGenerator";
+import { useAiPermissions } from "@/hooks/useAiPermissions";
 import { extractPythonBlock, runAnalysis, type AnalysisResult } from "@/lib/amehnitiesAi/pyodideSandbox";
 import {
   generateMedia, listGeneratedMedia, streamFrontierChat,
@@ -87,6 +88,11 @@ export default function FrontierChatConsole({
   telemetry?: unknown;
   corpusEvents?: number;
 }) {
+  // Granular capability gating — Owners hold everything; granted admins hold
+  // exactly what the Owner toggled on their grant (default: view-only).
+  const { can: canAi } = useAiPermissions();
+  const canDatasets = canAi("datasets");
+  const canMediaExport = canAi("media_export");
   const [messages, setMessages] = useState<ConsoleMessage[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -323,8 +329,12 @@ export default function FrontierChatConsole({
       <Tabs defaultValue="chat" className="p-3 sm:p-4">
         <TabsList>
           <TabsTrigger value="chat" className="gap-1.5"><Bot className="h-3.5 w-3.5" /> Chat</TabsTrigger>
-          <TabsTrigger value="data" className="gap-1.5"><Database className="h-3.5 w-3.5" /> Data ({attachments.length})</TabsTrigger>
-          <TabsTrigger value="media" className="gap-1.5"><ImageIcon className="h-3.5 w-3.5" /> Media</TabsTrigger>
+          {canDatasets && (
+            <TabsTrigger value="data" className="gap-1.5"><Database className="h-3.5 w-3.5" /> Data ({attachments.length})</TabsTrigger>
+          )}
+          {canMediaExport && (
+            <TabsTrigger value="media" className="gap-1.5"><ImageIcon className="h-3.5 w-3.5" /> Media</TabsTrigger>
+          )}
           <TabsTrigger value="notes" className="gap-1.5"><NotebookPen className="h-3.5 w-3.5" /> Notes</TabsTrigger>
 
         </TabsList>
@@ -401,7 +411,7 @@ export default function FrontierChatConsole({
           </div>
 
           {/* deliverables */}
-          {lastAnswer && (
+          {lastAnswer && canMediaExport && (
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Export answer</span>
               {([
@@ -512,7 +522,7 @@ export default function FrontierChatConsole({
         </TabsContent>
 
         {/* ------------------------------------------------------- data */}
-        <TabsContent value="data" className="pt-4">
+        <TabsContent value="data" className="pt-4" hidden={!canDatasets}>
           <div
             onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
             onDragLeave={() => setDragging(false)}
@@ -585,7 +595,7 @@ export default function FrontierChatConsole({
         </TabsContent>
 
         {/* ------------------------------------------------------ media */}
-        <TabsContent value="media" className="pt-4">
+        <TabsContent value="media" className="pt-4" hidden={!canMediaExport}>
           <div className="flex flex-wrap gap-2">
             <Input
               value={mediaPrompt}
