@@ -543,7 +543,23 @@ export default function FrontierChatConsole({
             ))}
           </div>
         </TabsContent>
+
+        {/* ------------------------------------------------------ notes */}
+        <TabsContent value="notes" className="pt-4">
+          <NotesPanel refreshKey={notesRefresh} />
+        </TabsContent>
       </Tabs>
+
+      <SaveNoteDialog
+        open={noteOpen}
+        onOpenChange={setNoteOpen}
+        question={lastQuestion}
+        answer={lastAnswer}
+        analysis={analysis}
+        datasets={datasets}
+        onSaved={() => setNotesRefresh((n) => n + 1)}
+      />
+
     </Card>
   );
 }
