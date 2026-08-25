@@ -757,6 +757,93 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_generated_media: {
+        Row: {
+          conversation_id: string | null
+          created_at: string
+          created_by: string
+          id: string
+          kind: string
+          metadata: Json
+          model: string | null
+          prompt: string
+          status: string
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          conversation_id?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          kind?: string
+          metadata?: Json
+          model?: string | null
+          prompt: string
+          status?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          conversation_id?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          kind?: string
+          metadata?: Json
+          model?: string | null
+          prompt?: string
+          status?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: []
+      }
+      ai_memory_embeddings: {
+        Row: {
+          content: string
+          created_at: string
+          created_by: string | null
+          embedding: string | null
+          id: string
+          is_shared: boolean
+          kind: string
+          metadata: Json
+          project_id: string | null
+          source_id: string | null
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          created_by?: string | null
+          embedding?: string | null
+          id?: string
+          is_shared?: boolean
+          kind: string
+          metadata?: Json
+          project_id?: string | null
+          source_id?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          embedding?: string | null
+          id?: string
+          is_shared?: boolean
+          kind?: string
+          metadata?: Json
+          project_id?: string | null
+          source_id?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ai_review_queue: {
         Row: {
           answer: string
@@ -10273,6 +10360,22 @@ export type Database = {
           _user_agent?: string
         }
         Returns: string
+      }
+      match_ai_memory: {
+        Args: {
+          _embedding: string
+          _kinds?: string[]
+          _match_count?: number
+          _min_similarity?: number
+        }
+        Returns: {
+          content: string
+          id: string
+          kind: string
+          metadata: Json
+          similarity: number
+          title: string
+        }[]
       }
       mda_lens_allows_project: {
         Args: { _project_id: string; _user_id: string }
