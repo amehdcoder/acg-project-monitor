@@ -380,17 +380,24 @@ export default function FrontierChatConsole({
               ))}
               {pythonBlock && datasets.length > 0 && (
                 <Button
-                  size="sm" className="ml-auto h-8 gap-1.5 text-xs"
+                  size="sm" className="h-8 gap-1.5 text-xs"
                   disabled={analysisStatus !== null} onClick={() => void doAnalysis()}
                 >
                   {analysisStatus ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
                   {analysisStatus ?? "Run analysis"}
                 </Button>
               )}
+              <Button
+                size="sm" variant="secondary" className="ml-auto h-8 gap-1.5 text-xs"
+                onClick={() => setNoteOpen(true)}
+              >
+                <NotebookPen className="h-3.5 w-3.5" /> Save as note
+              </Button>
             </div>
           )}
 
           {analysis && <AnalysisOutput result={analysis} />}
+
 
           {/* composer */}
           <div
