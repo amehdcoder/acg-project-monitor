@@ -587,6 +587,80 @@ export type Database = {
           },
         ]
       }
+      ai_analysis_notes: {
+        Row: {
+          chart: Json | null
+          code: string | null
+          conversation_id: string | null
+          created_at: string
+          created_by: string
+          dataset_id: string | null
+          dataset_name: string | null
+          findings: string
+          id: string
+          project_id: string | null
+          question: string | null
+          scope_community: string | null
+          scope_lga: string | null
+          scope_state: string | null
+          scope_ward: string | null
+          stdout: string | null
+          tags: string[]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          chart?: Json | null
+          code?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          created_by?: string
+          dataset_id?: string | null
+          dataset_name?: string | null
+          findings: string
+          id?: string
+          project_id?: string | null
+          question?: string | null
+          scope_community?: string | null
+          scope_lga?: string | null
+          scope_state?: string | null
+          scope_ward?: string | null
+          stdout?: string | null
+          tags?: string[]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          chart?: Json | null
+          code?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          created_by?: string
+          dataset_id?: string | null
+          dataset_name?: string | null
+          findings?: string
+          id?: string
+          project_id?: string | null
+          question?: string | null
+          scope_community?: string | null
+          scope_lga?: string | null
+          scope_state?: string | null
+          scope_ward?: string | null
+          stdout?: string | null
+          tags?: string[]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_analysis_notes_dataset_id_fkey"
+            columns: ["dataset_id"]
+            isOneToOne: false
+            referencedRelation: "ai_datasets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_chat_conversations: {
         Row: {
           created_at: string
@@ -757,6 +831,51 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_datasets: {
+        Row: {
+          columns: Json
+          conversation_id: string | null
+          created_at: string
+          created_by: string
+          file_type: string | null
+          id: string
+          kind: string
+          name: string
+          project_id: string | null
+          row_count: number
+          summary: string | null
+          updated_at: string
+        }
+        Insert: {
+          columns?: Json
+          conversation_id?: string | null
+          created_at?: string
+          created_by?: string
+          file_type?: string | null
+          id?: string
+          kind?: string
+          name: string
+          project_id?: string | null
+          row_count?: number
+          summary?: string | null
+          updated_at?: string
+        }
+        Update: {
+          columns?: Json
+          conversation_id?: string | null
+          created_at?: string
+          created_by?: string
+          file_type?: string | null
+          id?: string
+          kind?: string
+          name?: string
+          project_id?: string | null
+          row_count?: number
+          summary?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ai_generated_media: {
         Row: {
           conversation_id: string | null
@@ -766,6 +885,7 @@ export type Database = {
           kind: string
           metadata: Json
           model: string | null
+          project_id: string | null
           prompt: string
           status: string
           updated_at: string
@@ -779,6 +899,7 @@ export type Database = {
           kind?: string
           metadata?: Json
           model?: string | null
+          project_id?: string | null
           prompt: string
           status?: string
           updated_at?: string
@@ -792,6 +913,7 @@ export type Database = {
           kind?: string
           metadata?: Json
           model?: string | null
+          project_id?: string | null
           prompt?: string
           status?: string
           updated_at?: string
@@ -10033,6 +10155,10 @@ export type Database = {
         Args: { _class: string; _model: string; _reward: number; _tier: string }
         Returns: undefined
       }
+      ai_row_visible: {
+        Args: { _created_by: string; _project_id: string }
+        Returns: boolean
+      }
       approve_after_hours_request: {
         Args: { p_id: string }
         Returns: undefined
@@ -10361,22 +10487,40 @@ export type Database = {
         }
         Returns: string
       }
-      match_ai_memory: {
-        Args: {
-          _embedding: string
-          _kinds?: string[]
-          _match_count?: number
-          _min_similarity?: number
-        }
-        Returns: {
-          content: string
-          id: string
-          kind: string
-          metadata: Json
-          similarity: number
-          title: string
-        }[]
-      }
+      match_ai_memory:
+        | {
+            Args: {
+              _embedding: string
+              _kinds?: string[]
+              _match_count?: number
+              _min_similarity?: number
+            }
+            Returns: {
+              content: string
+              id: string
+              kind: string
+              metadata: Json
+              similarity: number
+              title: string
+            }[]
+          }
+        | {
+            Args: {
+              _embedding: string
+              _kinds?: string[]
+              _match_count?: number
+              _min_similarity?: number
+              _user_id?: string
+            }
+            Returns: {
+              content: string
+              id: string
+              kind: string
+              metadata: Json
+              similarity: number
+              title: string
+            }[]
+          }
       mda_lens_allows_project: {
         Args: { _project_id: string; _user_id: string }
         Returns: boolean
