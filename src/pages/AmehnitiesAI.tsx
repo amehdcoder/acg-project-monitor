@@ -142,6 +142,12 @@ export default function AmehnitiesAI() {
         <div className="mt-4">
           <AmehnitiesChatBox telemetry={telemetry} corpusEvents={totalEvents} />
 
+          {/* Enterprise console: files, analysis, documents, multimodal media */}
+          <div className="mt-4">
+            <FrontierChatConsole telemetry={telemetry} corpusEvents={totalEvents} />
+          </div>
+
+
           {/* Human-in-the-loop correction queue — admins only. */}
           {isAdmin && (
             <div className="mt-4">
