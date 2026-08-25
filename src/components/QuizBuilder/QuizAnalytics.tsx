@@ -34,6 +34,8 @@ import { pairingConsistency } from "@/lib/quizKobo/pairingCheck";
 import { needsIdentityRepair, repairKoboIdentity } from "@/lib/quizKobo/identityRepair";
 import { exportKoboCSV, exportKoboPDF, fmtP } from "@/lib/quizKobo/exports";
 import { supabase } from "@/integrations/supabase/client";
+import { sanitizeHtml } from "@/lib/sanitizeHtml";
+
 import { toast } from "@/hooks/use-toast";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -1350,9 +1352,12 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
                   {interpretation.split("\n").map((line, i) => {
                     if (!line.trim()) return <br key={i} />;
                     // Bold markdown-style
-                    const formatted = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                    const formatted = sanitizeHtml(
+                      line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>'),
+                    );
                     return (
                       <p
+
                         key={i}
                         className="text-sm leading-relaxed my-1"
                         dangerouslySetInnerHTML={{ __html: formatted }}
