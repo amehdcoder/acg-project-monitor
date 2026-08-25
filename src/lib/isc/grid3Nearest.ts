@@ -291,3 +291,33 @@ export async function findGrid3Named(
   return null;
 }
 
+
+/**
+ * Nearest registry settlement WITHIN the declared Ward of the declared LGA and
+ * State. Used by the coordinate accuracy audit so "name mismatch" evidence is
+ * never drawn from a neighbouring ward, LGA or state.
+ */
+export async function nearestGrid3InWard(
+  lat: number,
+  lng: number,
+  scope: { ward?: string; lga?: string; state?: string },
+): Promise<NearestSettlement | null> {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (!norm(scope.ward ?? "") || !norm(scope.lga ?? "")) return null;
+  const idx = await loadGrid3Index();
+  if (!idx) return null;
+
+  const rows = idx.wards.get(wardKey(scope.state ?? "", scope.lga ?? "", scope.ward ?? ""));
+  if (!rows?.length) return null;
+
+  let best = -1, bestD = Infinity;
+  for (const i of rows) {
+    const d = haversine(lat, lng, idx.lat[i], idx.lng[i]);
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  if (best < 0) return null;
+  return {
+    settlement: idx.name[best], ward: idx.ward[best], lga: idx.lga[best],
+    state: idx.state[best], lat: idx.lat[best], lng: idx.lng[best], distanceM: bestD,
+  };
+}
