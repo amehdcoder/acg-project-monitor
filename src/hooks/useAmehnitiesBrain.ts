@@ -138,7 +138,7 @@ export function useAmehnitiesBrain() {
     workerRef.current = w;
     w.onmessage = (e: MessageEvent) => {
       const d = e.data;
-      if (d?.type === "telemetry") setTelemetry(d as Telemetry);
+      if (d?.type === "telemetry") { telemetryRef.current = d as Telemetry; setTelemetry(d as Telemetry); }
       else if (d?.type === "checkpoint") {
         const waiters = checkpointWaiters.current;
         checkpointWaiters.current = [];
@@ -215,6 +215,81 @@ export function useAmehnitiesBrain() {
   }, [running]);
 
   useEffect(() => { workerRef.current?.postMessage({ type: "budget", ms: budget }); }, [budget]);
+  useEffect(() => { runningRef.current = running; }, [running]);
+
+  /* ---- continuous learning from the internet -----------------------------
+   * Every couple of minutes a small batch of public-health / M&E literature is
+   * retrieved, tokenised into the same live training stream the app events
+   * feed, AND written into the assistant's long-term vector memory so the chat
+   * answers improve from exactly what the network just learned. */
+  useEffect(() => {
+    if (!webLearning) return;
+    let cancelled = false;
+
+    const pull = async () => {
+      if (cancelled || document.hidden || !runningRef.current) return;
+      try {
+        const { data, error } = await supabase.functions.invoke("ai-web-stream", {
+          body: { cursor: webCursor.current, count: 2 },
+        });
+        if (error || cancelled) return;
+        const passages = (data?.passages ?? []) as (WebPassage & { topic?: string })[];
+        webCursor.current = Number(data?.cursor ?? webCursor.current + 2);
+        if (!passages.length) return;
+
+        const tk = tokenizerRef.current;
+        const tokens: number[] = [];
+        const events: ActivityEvent[] = [];
+        const now = Date.now();
+        passages.forEach((p, i) => {
+          tokens.push(...encodeWebPassage(tk, p, now + i));
+          events.push({ source: WEB_SOURCE_LABEL, kind: p.publisher, at: now + i });
+        });
+        workerRef.current?.postMessage({ type: "tokens", tokens, vocabSize: tk.size });
+        setFeed((f) => [...events.reverse(), ...f].slice(0, 40));
+        setSourceCounts((c) => ({ ...c, [WEB_SOURCE_LABEL]: (c[WEB_SOURCE_LABEL] || 0) + passages.length }));
+        setWebStats((s) => ({ passages: s.passages + passages.length, lastAt: now, topic: passages[0]?.topic ?? s.topic }));
+
+        // feed what was learned into the chat knowledge base
+        await indexMemory(passages.map((p) => ({
+          kind: "web_knowledge",
+          title: p.title,
+          content: `${p.title}\n${p.snippet}`,
+          metadata: { url: p.url, publisher: p.publisher, year: p.year, topic: p.topic },
+        }))).catch(() => undefined);
+      } catch { /* the brain never breaks the page over a knowledge pull */ }
+    };
+
+    void pull();
+    const id = setInterval(() => void pull(), 120_000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [webLearning]);
+
+  /* ---- consolidation: push what the network has learned into chat memory --- */
+  useEffect(() => {
+    const consolidate = async () => {
+      const t = telemetryRef.current;
+      if (!t || document.hidden || !runningRef.current || !(t.loss > 0)) return;
+      const top = (t.top || []).slice(0, 5)
+        .map((x) => `${tokenizerRef.current.vocab[x.id] ?? `token#${x.id}`} (${(x.p * 100).toFixed(1)}%)`)
+        .join(", ");
+      await indexMemory([{
+        kind: "brain_state",
+        title: `Amehnities neural state — step ${t.step}`,
+        content:
+          `The in-app Transformer now holds ${t.params.toLocaleString()} parameters across ${t.cfg.nLayers} blocks ` +
+          `(${t.cfg.nHeads} heads, d_model ${t.cfg.dModel}, context ${t.cfg.ctx}). ` +
+          `Loss ${t.loss.toFixed(3)}, perplexity ${t.perplexity.toFixed(2)}, ` +
+          `${t.tokensSeen.toLocaleString()} activity tokens seen.` +
+          (top ? ` Most likely next app events: ${top}.` : "") +
+          (t.evaluation ? ` Held-out accuracy ${(t.evaluation.accuracy * 100).toFixed(1)}%.` : ""),
+        source_id: "amehnities-brain-state",
+        metadata: { step: t.step, params: t.params, loss: t.loss, perplexity: t.perplexity },
+      }]).catch(() => undefined);
+    };
+    const id = setInterval(() => void consolidate(), 5 * 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   // The guardrail pauses training inside the worker; mirror that in UI state so
   // the controls (and the visibility watcher) never silently resume a diverged run.
