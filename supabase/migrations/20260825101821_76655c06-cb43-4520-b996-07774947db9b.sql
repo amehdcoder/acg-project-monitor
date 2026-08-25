@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.match_ai_memory(extensions.vector, integer, double precision, text[]);

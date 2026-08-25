@@ -10487,40 +10487,23 @@ export type Database = {
         }
         Returns: string
       }
-      match_ai_memory:
-        | {
-            Args: {
-              _embedding: string
-              _kinds?: string[]
-              _match_count?: number
-              _min_similarity?: number
-            }
-            Returns: {
-              content: string
-              id: string
-              kind: string
-              metadata: Json
-              similarity: number
-              title: string
-            }[]
-          }
-        | {
-            Args: {
-              _embedding: string
-              _kinds?: string[]
-              _match_count?: number
-              _min_similarity?: number
-              _user_id?: string
-            }
-            Returns: {
-              content: string
-              id: string
-              kind: string
-              metadata: Json
-              similarity: number
-              title: string
-            }[]
-          }
+      match_ai_memory: {
+        Args: {
+          _embedding: string
+          _kinds?: string[]
+          _match_count?: number
+          _min_similarity?: number
+          _user_id?: string
+        }
+        Returns: {
+          content: string
+          id: string
+          kind: string
+          metadata: Json
+          similarity: number
+          title: string
+        }[]
+      }
       mda_lens_allows_project: {
         Args: { _project_id: string; _user_id: string }
         Returns: boolean
