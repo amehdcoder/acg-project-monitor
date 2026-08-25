@@ -124,6 +124,13 @@ export function useAmehnitiesBrain() {
   const bestScoreRef = useRef<number | null>(null);
   const enabledRef = useRef(enabledSources);
   enabledRef.current = enabledSources;
+  // Continuous learning from the public-health / M&E literature on the web.
+  const [webLearning, setWebLearning] = useState(true);
+  const [webStats, setWebStats] = useState({ passages: 0, lastAt: 0 as number, topic: "" });
+  const webCursor = useRef(0);
+  const runningRef = useRef(true);
+  const telemetryRef = useRef<Telemetry | null>(null);
+
 
   // ---- worker lifecycle
   useEffect(() => {
