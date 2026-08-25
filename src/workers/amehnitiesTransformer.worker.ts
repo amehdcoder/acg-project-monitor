@@ -788,6 +788,9 @@ function postTelemetry(structural = false) {
     alert: lastAlert,
     trainTokens: trainEndIndex(),
     valTokens: Math.max(0, stream.length - trainEndIndex()),
+    plasticity,
+    growth: growthLog.slice(-8),
+    maxParams: MAX_PARAMS,
   });
 }
 
