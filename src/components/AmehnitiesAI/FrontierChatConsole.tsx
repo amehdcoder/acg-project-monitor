@@ -96,6 +96,10 @@ export default function FrontierChatConsole({
   const [mediaPrompt, setMediaPrompt] = useState("");
   const [mediaBusy, setMediaBusy] = useState<"image" | "video" | null>(null);
   const [media, setMedia] = useState<GeneratedMedia[]>([]);
+  const [lastQuestion, setLastQuestion] = useState("");
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [notesRefresh, setNotesRefresh] = useState(0);
+
 
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
