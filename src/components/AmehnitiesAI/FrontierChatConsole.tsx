@@ -20,8 +20,10 @@ import {
 import {
   Bot, Brain, Download, FileSpreadsheet, FileText, FileType2, Image as ImageIcon,
   Loader2, Paperclip, Play, Presentation, Send, Sparkles, Table2, Trash2, Upload,
-  Video, X, Database, Cpu, AlertTriangle,
+  Video, X, Database, Cpu, AlertTriangle, Square, RotateCcw, NotebookPen, Search,
+  MapPin,
 } from "lucide-react";
+
 import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
