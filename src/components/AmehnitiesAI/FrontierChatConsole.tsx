@@ -41,7 +41,7 @@ import { generateDocument, type DocFormat } from "@/lib/amehnitiesAi/documentGen
 import { useAiPermissions } from "@/hooks/useAiPermissions";
 import { extractPythonBlock, runAnalysis, type AnalysisResult } from "@/lib/amehnitiesAi/pyodideSandbox";
 import {
-  generateMedia, listGeneratedMedia, streamFrontierChat,
+  generateMedia, pollMedia, listGeneratedMedia, streamFrontierChat,
   type FrontierMeta, type GeneratedMedia,
 } from "@/lib/amehnitiesAi/frontierClient";
 import { BRIGHT_CHART_PALETTE } from "@/lib/charts/brightPalette";
