@@ -282,8 +282,14 @@ export interface CddTx extends BaseTx {
   facility: string;
   community: string;
   cddName: string;
+  /** CDD phone number when the form captured one. */
+  cddPhone: string;
+  /** Facility in-charge name + phone (contact chain for follow-up). */
+  inCharge: string;
+  inChargePhone: string;
   qtyIssued: number;
   hasPhoto: boolean;
+
 }
 
 /**
