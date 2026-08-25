@@ -38,7 +38,7 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  findGrid3Named, nearestGrid3Settlement, warmGrid3Index, norm,
+  findGrid3Named, nearestGrid3InWard, warmGrid3Index, norm,
   type NamedGrid3Match, type NearestSettlement,
 } from "@/lib/isc/grid3Nearest";
 import Grid3MismatchDetailDialog, { type Grid3DrillSpec } from "./Grid3MismatchDetailDialog";
