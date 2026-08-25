@@ -16,9 +16,10 @@ import {
   type CheckpointFile, type CheckpointIssue,
 } from "@/lib/amehnitiesAi/checkpoint";
 import {
-  ACTIVITY_SOURCES, Tokenizer, encodeEvent, encodeEvents, loadActivityCorpus,
-  syntheticCorpus, type ActivityEvent,
+  ACTIVITY_SOURCES, Tokenizer, encodeEvent, encodeEvents, encodeWebPassage, loadActivityCorpus,
+  syntheticCorpus, WEB_SOURCE_LABEL, type ActivityEvent, type WebPassage,
 } from "@/lib/amehnitiesAi/activityStream";
+import { indexMemory } from "@/lib/amehnitiesAi/frontierClient";
 
 export interface MetricSample {
   at: number; step: number; loss: number; gradNorm: number;
