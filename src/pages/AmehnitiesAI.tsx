@@ -54,6 +54,10 @@ function AmehnitiesAIWorkspace() {
   const navigate = useNavigate();
   const { isOwner, isAdmin } = useAuth();
   const [accessOpen, setAccessOpen] = useState(false);
+  // Granular capabilities the Owner assigned to this admin (Owner = all).
+  const { can: canAi, viewOnly } = useAiPermissions();
+  const canTrain = canAi("training");
+
 
   const {
     telemetry, running, toggle, budget, setBudget, grow, shrink,
