@@ -25,6 +25,8 @@ import CheckpointsPanel from "@/components/AmehnitiesAI/CheckpointsPanel";
 import ValidationPanel from "@/components/AmehnitiesAI/ValidationPanel";
 import DivergenceAlert from "@/components/AmehnitiesAI/DivergenceAlert";
 import AmehnitiesChatBox from "@/components/AmehnitiesAI/AmehnitiesChatBox";
+import FrontierChatConsole from "@/components/AmehnitiesAI/FrontierChatConsole";
+
 import ReviewQueuePanel from "@/components/AmehnitiesAI/ReviewQueuePanel";
 import { useAuth } from "@/hooks/useAuth";
 
