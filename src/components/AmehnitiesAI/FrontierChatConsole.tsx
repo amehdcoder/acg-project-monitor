@@ -732,3 +732,249 @@ function AnalysisOutput({ result }: { result: AnalysisResult }) {
     </Card>
   );
 }
+
+/* ------------------------------------------------------------------ *
+ * Structured, searchable analysis notes
+ * ------------------------------------------------------------------ */
+
+function SaveNoteDialog({
+  open, onOpenChange, question, answer, analysis, datasets, onSaved,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  question: string;
+  answer: string;
+  analysis: AnalysisResult | null;
+  datasets: ParsedAttachment[];
+  onSaved: () => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [findings, setFindings] = useState("");
+  const [tags, setTags] = useState("");
+  const [datasetName, setDatasetName] = useState<string>("");
+  const [projectId, setProjectId] = useState<string>("");
+  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [scope, setScope] = useState({ state: "", lga: "", ward: "", community: "" });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setTitle((t) => t || (question ? question.slice(0, 90) : "Analysis note"));
+    setFindings((f) => f || (analysis?.stdout?.trim() ? `${answer}\n\nComputed output:\n${analysis.stdout.trim()}` : answer));
+    setDatasetName((d) => d || datasets[0]?.name || "");
+    void listMyProjects().then(setProjects).catch(() => {});
+  }, [open, question, answer, analysis, datasets]);
+
+  const save = async () => {
+    if (!title.trim() || !findings.trim()) {
+      toast.error("A title and the findings are required");
+      return;
+    }
+    setSaving(true);
+    try {
+      // Register the dataset so the note points at a durable, RLS-scoped row.
+      let datasetId: string | null = null;
+      const source = datasets.find((d) => d.name === datasetName);
+      if (source) {
+        const reg = await registerDataset({
+          name: source.name,
+          fileType: source.type,
+          kind: source.kind,
+          rowCount: source.rows?.length ?? 0,
+          columns: source.columns ?? [],
+          summary: source.summary,
+          projectId: projectId || null,
+        });
+        datasetId = reg?.id ?? null;
+      }
+
+      await saveAnalysisNote({
+        title: title.trim(),
+        question,
+        findings: findings.trim(),
+        code: analysis ? extractPythonBlock(answer) : null,
+        stdout: analysis?.stdout ?? null,
+        chart: analysis?.chart ?? null,
+        tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
+        datasetId,
+        datasetName: datasetName || null,
+        projectId: projectId || null,
+        scope: {
+          state: scope.state || null,
+          lga: scope.lga || null,
+          ward: scope.ward || null,
+          community: scope.community || null,
+        },
+      });
+      toast.success("Note saved", { description: "Searchable and recalled by the assistant later." });
+      onOpenChange(false);
+      onSaved();
+    } catch (e: any) {
+      toast.error("Could not save the note", { description: e?.message });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <NotebookPen className="h-4 w-4 text-primary" /> Save as analysis note
+          </DialogTitle>
+          <DialogDescription>
+            Stored against the dataset and community scope, searchable later, and only visible to you
+            and your project team.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <div>
+            <Label className="text-xs">Title</Label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What this finding is about" />
+          </div>
+
+          <div>
+            <Label className="text-xs">Findings</Label>
+            <Textarea value={findings} onChange={(e) => setFindings(e.target.value)} className="min-h-[9rem]" />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <Label className="text-xs">Dataset</Label>
+              <select
+                value={datasetName}
+                onChange={(e) => setDatasetName(e.target.value)}
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">No dataset</option>
+                {datasets.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <Label className="text-xs">Team / project</Label>
+              <select
+                value={projectId}
+                onChange={(e) => setProjectId(e.target.value)}
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">Private to me</option>
+                {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <Label className="flex items-center gap-1 text-xs"><MapPin className="h-3 w-3" /> Community scope</Label>
+            <div className="mt-1 grid gap-2 sm:grid-cols-4">
+              {(["state", "lga", "ward", "community"] as const).map((k) => (
+                <Input
+                  key={k}
+                  value={scope[k]}
+                  onChange={(e) => setScope((s) => ({ ...s, [k]: e.target.value }))}
+                  placeholder={k === "lga" ? "LGA" : k[0].toUpperCase() + k.slice(1)}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <Label className="text-xs">Tags (comma separated)</Label>
+            <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="coverage, medicine, supervision" />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={() => void save()} disabled={saving} className="gap-1.5">
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <NotebookPen className="h-4 w-4" />}
+            Save note
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function NotesPanel({ refreshKey }: { refreshKey: number }) {
+  const [term, setTerm] = useState("");
+  const [notes, setNotes] = useState<AnalysisNote[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async (query?: string) => {
+    setLoading(true);
+    try {
+      setNotes(await searchAnalysisNotes({ query }));
+    } catch (e: any) {
+      toast.error("Could not load notes", { description: e?.message });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load, refreshKey]);
+
+  const remove = async (id: string) => {
+    try {
+      await deleteAnalysisNote(id);
+      setNotes((cur) => cur.filter((n) => n.id !== id));
+    } catch (e: any) {
+      toast.error("Delete failed", { description: e?.message });
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-2">
+        <Input
+          value={term}
+          onChange={(e) => setTerm(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") void load(term); }}
+          placeholder="Search saved findings, questions, communities…"
+        />
+        <Button variant="outline" className="gap-1.5" onClick={() => void load(term)} disabled={loading}>
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+          Search
+        </Button>
+      </div>
+
+      {notes.length === 0 && !loading && (
+        <p className="text-sm text-muted-foreground">
+          No notes yet. Run an analysis and use “Save as note” to build a searchable evidence log.
+        </p>
+      )}
+
+      {notes.map((n) => {
+        const scope = [n.scope_state, n.scope_lga, n.scope_ward, n.scope_community].filter(Boolean).join(" · ");
+        return (
+          <Card key={n.id} className="border-border/60 p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <NotebookPen className="h-4 w-4 text-primary" />
+              <span className="text-sm font-semibold">{n.title}</span>
+              {n.dataset_name && <Badge variant="outline" className="text-[10px]">{n.dataset_name}</Badge>}
+              {scope && (
+                <Badge variant="secondary" className="gap-1 text-[10px]">
+                  <MapPin className="h-2.5 w-2.5" /> {scope}
+                </Badge>
+              )}
+              <span className="text-[11px] text-muted-foreground">
+                {new Date(n.created_at).toLocaleDateString()}
+              </span>
+              <Button size="sm" variant="ghost" className="ml-auto h-7 w-7 p-0" onClick={() => void remove(n.id)}>
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            {n.question && <p className="mt-1 text-xs italic text-muted-foreground">{n.question}</p>}
+            <p className="mt-1 whitespace-pre-wrap text-xs text-foreground/90 line-clamp-6">{n.findings}</p>
+            {n.tags?.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {n.tags.map((t) => <Badge key={t} variant="outline" className="text-[10px]">{t}</Badge>)}
+              </div>
+            )}
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
