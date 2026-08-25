@@ -19,10 +19,14 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
 import {
-  BarChart3, Check, Clock, Database, Loader2, Search, ShieldCheck, Sparkles, UserPlus, Users, X,
+  BarChart3, Check, Clock, Database, Globe2, History, Loader2, Search, ShieldCheck, Sparkles, UserPlus, Users, X,
 } from "lucide-react";
+import { getAllStates } from "@/lib/nigeriaAdminData";
+import { listFeedAudit, setUserScopeStates, type FeedAuditEntry } from "./checklistFeed";
 
 export const CHECKLIST_PAGE_ID = "integrated-supervisory";
 export const CHECKLIST_RAW_PAGE_ID = "integrated-supervisory-raw";
@@ -59,6 +63,114 @@ interface GrantRow {
   user_id: string;
   page_id: string;
   expires_at: string | null;
+  scope_states?: string[] | null;
+}
+
+/**
+ * Per-user State scope editor. An empty selection means "all States"; any
+ * selection is enforced server-side by the `checklist-feed` function, so a
+ * grantee can never receive rows outside it.
+ */
+function ScopeEditor({
+  grant, label, disabled, onSaved,
+}: {
+  grant: GrantRow;
+  label: string;
+  disabled: boolean;
+  onSaved: (states: string[]) => void;
+}) {
+  const allStates = useMemo(() => getAllStates(), []);
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [selected, setSelected] = useState<string[]>(grant.scope_states ?? []);
+
+  useEffect(() => { setSelected(grant.scope_states ?? []); }, [grant.scope_states]);
+
+  const shown = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    return t ? allStates.filter((s) => s.toLowerCase().includes(t)) : allStates;
+  }, [allStates, q]);
+
+  const save = async (next: string[]) => {
+    setSaving(true);
+    try {
+      await setUserScopeStates(grant.user_id, next, grant.page_id);
+      onSaved(next);
+      toast({
+        title: "Scope updated",
+        description: next.length ? `Limited to ${next.join(", ")}.` : "Access to all States.",
+      });
+    } catch (e: any) {
+      setSelected(grant.scope_states ?? []);
+      toast({ title: "Could not update scope", description: e?.message ?? "Unknown error", variant: "destructive" });
+    } finally { setSaving(false); }
+  };
+
+  const summary = selected.length === 0
+    ? "All States"
+    : selected.length <= 2 ? selected.join(", ") : `${selected.length} States`;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          title={`${label} scope: ${selected.length ? selected.join(", ") : "all States"}`}
+          className="flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-2.5 py-1.5 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/10 disabled:opacity-60"
+        >
+          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Globe2 className="h-3.5 w-3.5" />}
+          {summary}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-[260px] p-0">
+        <div className="border-b p-2">
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search States…"
+            className="h-8 text-xs"
+          />
+          <p className="mt-1 text-[10px] text-muted-foreground">
+            No selection = every State. Filtering is enforced on the server.
+          </p>
+        </div>
+        <ScrollArea className="h-[210px]">
+          <div className="p-1">
+            {shown.map((s) => {
+              const on = selected.includes(s);
+              return (
+                <label key={s} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-muted">
+                  <Checkbox
+                    checked={on}
+                    onCheckedChange={(v) => {
+                      const next = v ? [...selected, s] : selected.filter((x) => x !== s);
+                      setSelected(next);
+                      void save(next);
+                    }}
+                  />
+                  {s}
+                </label>
+              );
+            })}
+          </div>
+        </ScrollArea>
+        {selected.length > 0 && (
+          <div className="border-t p-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-full text-[11px]"
+              onClick={() => { setSelected([]); void save([]); }}
+            >
+              Clear — allow all States
+            </Button>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 const displayName = (u: UserRow) =>
@@ -83,6 +195,20 @@ export default function ChecklistAccessManager({
   const [search, setSearch] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
   const [onlyWithAccess, setOnlyWithAccess] = useState(false);
+  const [showAudit, setShowAudit] = useState(false);
+  const [auditRows, setAuditRows] = useState<FeedAuditEntry[] | null>(null);
+  const [auditBusy, setAuditBusy] = useState(false);
+
+  const openAudit = useCallback(async () => {
+    setShowAudit((v) => !v);
+    if (auditRows) return;
+    setAuditBusy(true);
+    try {
+      setAuditRows(await listFeedAudit(200));
+    } catch (e: any) {
+      toast({ title: "Could not load audit trail", description: e?.message ?? "Unknown error", variant: "destructive" });
+    } finally { setAuditBusy(false); }
+  }, [auditRows]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -94,7 +220,7 @@ export default function ChecklistAccessManager({
         .order("first_name", { nullsFirst: false }),
       supabase
         .from("user_page_access")
-        .select("id, user_id, page_id, expires_at")
+        .select("id, user_id, page_id, expires_at, scope_states")
         .in("page_id", [CHECKLIST_PAGE_ID, CHECKLIST_RAW_PAGE_ID]),
     ]);
     setUsers((ud ?? []) as UserRow[]);
@@ -140,7 +266,7 @@ export default function ChecklistAccessManager({
             granted_by: user.id,
             expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
           })
-          .select("id, user_id, page_id, expires_at")
+          .select("id, user_id, page_id, expires_at, scope_states")
           .single();
         if (error) throw error;
         setGrants((g) => [...g.filter((x) => `${x.user_id}:${x.page_id}` !== key), data as GrantRow]);
@@ -292,18 +418,69 @@ export default function ChecklistAccessManager({
                       </button>
                     );
                   })}
+                  {(() => {
+                    const g = grantMap.get(`${u.user_id}:${CHECKLIST_PAGE_ID}`);
+                    if (!g) return null;
+                    return (
+                      <ScopeEditor
+                        grant={g}
+                        label="Checklist Dashboard"
+                        disabled={!canManage}
+                        onSaved={(states) =>
+                          setGrants((prev) => prev.map((x) => (x.id === g.id ? { ...x, scope_states: states } : x)))
+                        }
+                      />
+                    );
+                  })()}
                 </div>
               </div>
             ))}
           </div>
         </ScrollArea>
 
+        {showAudit && (
+          <div className="max-h-[30vh] overflow-auto border-t bg-muted/20 px-6 py-3">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Feed &amp; scope audit trail
+            </p>
+            {auditBusy && (
+              <div className="flex items-center gap-2 py-4 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading audit trail…
+              </div>
+            )}
+            {!auditBusy && !auditRows?.length && (
+              <p className="py-3 text-xs text-muted-foreground">No feed or scope changes recorded yet.</p>
+            )}
+            <div className="space-y-1.5">
+              {(auditRows ?? []).map((a) => (
+                <div key={a.id} className="rounded-md border bg-background px-3 py-2 text-[11px]">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline" className="text-[10px] font-semibold">{a.action.replace(/_/g, " ")}</Badge>
+                    <span className="font-medium">{a.actor_email ?? "System"}</span>
+                    <span className="text-muted-foreground">{new Date(a.created_at).toLocaleString()}</span>
+                  </div>
+                  <p className="mt-1 text-muted-foreground break-words">
+                    {a.action === "scope_change"
+                      ? `${a.target_email ?? "user"} · ${(a.previous_scope_states ?? []).join(", ") || "All States"} → ${(a.new_scope_states ?? []).join(", ") || "All States"}`
+                      : `${a.feed_name ?? "Feed"}${a.form_uid ? ` · ${a.form_uid}` : ""}`}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center justify-between gap-3 border-t bg-muted/30 px-6 py-3">
           <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <Sparkles className="h-3.5 w-3.5 text-primary" />
             Grants apply instantly — users see the change without signing out.
           </p>
-          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>Done</Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" className="text-xs" onClick={openAudit}>
+              <History className="mr-1 h-3.5 w-3.5" /> {showAudit ? "Hide" : "Audit"} trail
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>Done</Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
