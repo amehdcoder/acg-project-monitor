@@ -422,6 +422,69 @@ let lastAlert: {
   metrics: Record<string, number>; suggestions: string[];
 } | null = null;
 
+/* ------------------------------------------------------- neural plasticity */
+/**
+ * Autonomous capacity growth ("neurogenesis"). Like a brain that thickens the
+ * circuits it keeps using, the network scales itself up whenever it has plenty
+ * of fresh experience but has stopped improving on it — the plateau signal.
+ * Growth always warm-starts from the existing weights, so nothing learned is
+ * lost, and it is hard-capped so the browser stays responsive.
+ */
+type GrowthEvent = { at: number; reason: string; from: number; to: number; cfg: Cfg };
+let plasticity = true;
+let growthLog: GrowthEvent[] = [];
+let lastGrowthAt = 0;
+let lastGrowthStep = 0;
+let plateauRef = 0;
+const MAX_PARAMS = 6_000_000;
+
+/** Apply one growth increment, warm-starting from the current weights. */
+function scaleUp(reason: string) {
+  if (!model) return;
+  const from = model.paramCount;
+  const nLayers = Math.min(10, cfg.nLayers + (cfg.dModel >= 128 ? 1 : 0));
+  const dModel = cfg.dModel < 192 ? Math.min(192, Math.round(cfg.dModel * 1.5 / 16) * 16) : cfg.dModel;
+  let nHeads = Math.min(12, dModel >= 128 ? cfg.nHeads + 2 : cfg.nHeads);
+  if (dModel % nHeads !== 0) nHeads = cfg.nHeads;
+  const dFF = dModel * 4;
+  build({ dModel, nHeads, nLayers, dFF });
+  if (!model) return;
+  lastGrowthAt = Date.now();
+  lastGrowthStep = model.step;
+  plateauRef = lossEMA;
+  growthLog.push({ at: lastGrowthAt, reason, from, to: model.paramCount, cfg: { ...cfg } });
+  if (growthLog.length > 20) growthLog = growthLog.slice(-20);
+  (self as unknown as Worker).postMessage({ type: "growth", event: growthLog[growthLog.length - 1] });
+  postTelemetry(true);
+}
+
+/** Estimated parameter count of the next growth increment. */
+function projectedParams(): number {
+  const dModel = cfg.dModel < 192 ? Math.min(192, Math.round(cfg.dModel * 1.5 / 16) * 16) : cfg.dModel;
+  const nLayers = Math.min(10, cfg.nLayers + (cfg.dModel >= 128 ? 1 : 0));
+  const perLayer = 4 * dModel * dModel + 2 * dModel * dModel * 4 + 8 * dModel;
+  return cfg.vocab * dModel * 2 + cfg.ctx * dModel + nLayers * perLayer;
+}
+
+/** Decide, every tick, whether the network should grow itself. */
+function maybeGrow() {
+  if (!plasticity || !model || !running || lastAlert) return;
+  const now = Date.now();
+  if (now - lastGrowthAt < 25_000) return;
+  if (model.step - lastGrowthStep < 400) return;
+  if (stream.length < cfg.ctx * 60) return;                 // not enough experience yet
+  if (model.paramCount >= MAX_PARAMS || projectedParams() >= MAX_PARAMS) return;
+  if (!(lossEMA > 0)) return;
+  if (!plateauRef) { plateauRef = lossEMA; return; }
+  const improvement = (plateauRef - lossEMA) / Math.max(plateauRef, 1e-6);
+  if (improvement > 0.02) { plateauRef = lossEMA; return; } // still learning fast — keep the shape
+  scaleUp(
+    improvement <= 0
+      ? "Loss stopped improving with fresh data still arriving — added capacity"
+      : `Plateau (${(improvement * 100).toFixed(1)}% gain over the window) — added capacity`,
+  );
+}
+
 /** Index at which the held-out validation slice begins. */
 function trainEndIndex() {
   const T = cfg.ctx;
