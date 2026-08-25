@@ -267,9 +267,8 @@ Deno.serve(async (req) => {
       // Server-side State scoping — a granted user can never receive rows
       // outside the State(s) their grant allows.
       const allowed = caller.isAdmin ? [] : caller.scopeStates.map(norm).filter(Boolean);
-      const scoped = allowed.length
-        ? results.filter((r) => allowed.includes(norm(readState(r))))
-        : results;
+      const scoped = scopeRows(results, caller.scopeStates, caller.isAdmin);
+
 
       return json({
         feed: { id: feed.id, name: feed.name, form_uid: feed.form_uid, server_url: feed.server_url },
