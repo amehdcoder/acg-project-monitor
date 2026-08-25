@@ -23,7 +23,10 @@ export const RESTRICTED_PAGES = [
   { id: "data-quality", label: "Data Quality" },
   { id: "microplanning", label: "Geo Microplanning" },
   { id: "quizzes", label: "Quizzes" },
+  // Owner-only by default; the Owner grants it to individual admins.
+  { id: "amehnities-ai", label: "Amehnities AI" },
 ] as const;
+
 
 export const RESTRICTED_PAGE_IDS = RESTRICTED_PAGES.map(p => p.id);
 type RestrictedPageId = (typeof RESTRICTED_PAGE_IDS)[number];

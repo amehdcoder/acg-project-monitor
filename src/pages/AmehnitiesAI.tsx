@@ -2,7 +2,7 @@
  * Amehnities AI — a real, continuously-trained Transformer neural network
  * built from Amehnities app data and activity, visualised live.
  */
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Brain, Activity, Layers, Gauge, Play, Pause, Plus, Minus, Cpu, Radio, Sparkles, Zap,
@@ -29,6 +29,9 @@ import FrontierChatConsole from "@/components/AmehnitiesAI/FrontierChatConsole";
 
 import ReviewQueuePanel from "@/components/AmehnitiesAI/ReviewQueuePanel";
 import { useAuth } from "@/hooks/useAuth";
+import { usePageAccess } from "@/hooks/usePageAccess";
+import AiAccessManager from "@/components/AmehnitiesAI/AiAccessManager";
+import { Lock, KeyRound } from "lucide-react";
 
 const fmt = (n: number) =>
   n >= 1e9 ? `${(n / 1e9).toFixed(2)}B` : n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : `${n}`;
@@ -47,9 +50,11 @@ function Stat({ icon: Icon, label, value, sub }: { icon: any; label: string; val
   );
 }
 
-export default function AmehnitiesAI() {
+function AmehnitiesAIWorkspace() {
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
+  const { isOwner, isAdmin } = useAuth();
+  const [accessOpen, setAccessOpen] = useState(false);
+
   const {
     telemetry, running, toggle, budget, setBudget, grow, shrink,
     feed, sourceCounts, corpusReady, synthetic, predictions, vocab,
@@ -97,7 +102,13 @@ export default function AmehnitiesAI() {
               {running ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
               {running ? "Pause" : "Resume"}
             </Button>
+            {isOwner && (
+              <Button size="sm" variant="outline" onClick={() => setAccessOpen(true)} className="gap-1.5">
+                <KeyRound className="h-4 w-4" /> Manage access
+              </Button>
+            )}
           </div>
+
         </header>
 
         {/* KPI strip */}
@@ -335,6 +346,51 @@ export default function AmehnitiesAI() {
           />
         </div>
       </div>
+
+      {isOwner && <AiAccessManager open={accessOpen} onOpenChange={setAccessOpen} />}
     </div>
   );
+}
+
+/**
+ * Access gate — Amehnities AI is Owner-only, plus any admin the Owner has
+ * explicitly granted (page_id "amehnities-ai" in admin_page_access). The heavy
+ * training workspace never mounts for anyone who is not entitled.
+ */
+export default function AmehnitiesAI() {
+  const navigate = useNavigate();
+  const { canAccessPage, loadingAccess } = usePageAccess();
+
+  if (loadingAccess) {
+    return (
+      <div className="grid min-h-[100dvh] place-items-center bg-background">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-primary" />
+          Checking your access…
+        </div>
+      </div>
+    );
+  }
+
+  if (!canAccessPage("amehnities-ai")) {
+    return (
+      <div className="grid min-h-[100dvh] place-items-center bg-background px-4">
+        <Card className="w-full max-w-md border-border/60 bg-card/70 p-6 text-center backdrop-blur">
+          <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl border border-primary/30 bg-primary/10">
+            <Lock className="h-5 w-5 text-primary" />
+          </div>
+          <h1 className="text-lg font-semibold tracking-tight">Amehnities AI is restricted</h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            This workspace is reserved for the Owner. Ask the Owner to grant you access from
+            Amehnities AI → Manage access.
+          </p>
+          <Button className="mt-5 gap-1.5" variant="outline" onClick={() => navigate("/")}>
+            <ArrowLeft className="h-4 w-4" /> Back to app
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
+  return <AmehnitiesAIWorkspace />;
 }
