@@ -586,11 +586,17 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
                               {r.named.ward} · {r.named.lga}
                             </span>
                           </>
+                        ) : r.verdict === "no_ward_registry" ? (
+                          <span className="block break-words text-[10.5px] italic text-slate-600">
+                            no GRID3 settlement recorded for {r.ward || "an unnamed Ward"},{" "}
+                            {r.lga || "unnamed LGA"}, {r.state || "unnamed State"} — nothing to compare against
+                          </span>
                         ) : (
                           <span className="block break-words text-[10.5px] italic text-amber-700">
                             no same-name entry in this Ward / LGA
                           </span>
                         )}
+
                       </td>
                       <td className="px-2 py-2.5 text-right">
                         <span
