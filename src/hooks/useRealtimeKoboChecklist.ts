@@ -72,8 +72,6 @@ export function useRealtimeKoboChecklist(
     channel
       // Any change to the sync ledger: new submission, edit, or deletion.
       .on("postgres_changes" as any, { event: "*", schema: "public", table: "kobo_sync_events" }, trigger)
-      // Admin republished / retargeted the shared feed — grantees repull at once.
-      .on("postgres_changes" as any, { event: "*", schema: "public", table: "checklist_dashboard_feeds" }, trigger)
       .subscribe((status) => {
         const up = status === "SUBSCRIBED";
         setConnected(up);
