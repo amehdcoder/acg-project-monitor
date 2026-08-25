@@ -202,7 +202,8 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
 
   /* ------------------------------------------------- captures to audit */
   const points = useMemo(() => {
-    const byKey = new Map<string, Omit<ResolvedRow, "named" | "nearest" | "lookupAt">>();
+    const byKey = new Map<string, Omit<ResolvedRow, "named" | "nearest" | "lookupAt" | "wardRegistryCount">>();
+
     parents.forEach((p, i) => {
       const g = parsePoint(p.GPS ?? p._geolocation);
       if (!g) return;
