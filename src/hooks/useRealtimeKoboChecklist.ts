@@ -3,8 +3,17 @@
  *
  * The Kobo webhook writes a row into `kobo_sync_events` for every inbound
  * submission (the same signal the Geo-enabled Microplanning dashboard uses).
- * Subscribing to those inserts lets the checklist dashboard refresh itself the
+ * Subscribing to those changes lets the checklist dashboard refresh itself the
  * instant a submission lands, without polling.
+ *
+ * Latency design (sub-second):
+ *  - LEADING edge fire: the first event refreshes immediately (no waiting).
+ *  - Short trailing coalesce window so a burst of submissions collapses into a
+ *    single extra refresh instead of hammering the feed.
+ *  - In-flight lock with a "dirty" flag: events that arrive during a refresh
+ *    queue exactly one follow-up run.
+ *  - Catch-up refresh whenever the socket (re)subscribes after a drop, so no
+ *    event is silently missed while the tab was asleep or offline.
  */
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,13 +21,13 @@ import { supabase } from "@/integrations/supabase/client";
 interface Options {
   /** Disable the subscription (e.g. user lacks permission). */
   enabled?: boolean;
-  /** Debounce window so a burst of submissions triggers a single refresh. */
+  /** Trailing coalesce window so a burst of submissions triggers one refresh. */
   debounceMs?: number;
 }
 
 export function useRealtimeKoboChecklist(
   onChange: () => void | Promise<void>,
-  { enabled = true, debounceMs = 1500 }: Options = {},
+  { enabled = true, debounceMs = 400 }: Options = {},
 ) {
   const [lastEventAt, setLastEventAt] = useState<Date | null>(null);
   const [connected, setConnected] = useState(false);
@@ -28,21 +37,55 @@ export function useRealtimeKoboChecklist(
   useEffect(() => {
     if (!enabled) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    let running = false;
+    let dirty = false;
+    let subscribedOnce = false;
+    let cancelled = false;
 
+    const run = async () => {
+      if (cancelled) return;
+      if (running) { dirty = true; return; }
+      running = true;
+      try { await cbRef.current?.(); }
+      catch { /* refresh errors surface in the view */ }
+      finally {
+        running = false;
+        if (dirty && !cancelled) { dirty = false; void run(); }
+      }
+    };
+
+    /** Leading-edge trigger + trailing coalesce. */
     const trigger = () => {
       setLastEventAt(new Date());
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => { void cbRef.current?.(); }, debounceMs);
+      if (timer) {
+        // A refresh already fired in this window — mark one follow-up.
+        dirty = true;
+        return;
+      }
+      void run();
+      timer = setTimeout(() => { timer = null; }, debounceMs);
     };
 
     // Unique name per mount — avoids "cannot add postgres_changes callbacks
     // after subscribe()" on StrictMode double-mounts / HMR.
     const channel = supabase.channel(`isc-kobo-${Math.random().toString(36).slice(2, 10)}`);
     channel
-      .on("postgres_changes" as any, { event: "INSERT", schema: "public", table: "kobo_sync_events" }, trigger)
-      .subscribe((status) => setConnected(status === "SUBSCRIBED"));
+      // Any change to the sync ledger: new submission, edit, or deletion.
+      .on("postgres_changes" as any, { event: "*", schema: "public", table: "kobo_sync_events" }, trigger)
+      // Admin republished / retargeted the shared feed — grantees repull at once.
+      .on("postgres_changes" as any, { event: "*", schema: "public", table: "checklist_dashboard_feeds" }, trigger)
+      .subscribe((status) => {
+        const up = status === "SUBSCRIBED";
+        setConnected(up);
+        if (up) {
+          // Catch up on anything missed while the socket was down.
+          if (subscribedOnce) void run();
+          subscribedOnce = true;
+        }
+      });
 
     return () => {
+      cancelled = true;
       if (timer) clearTimeout(timer);
       supabase.removeChannel(channel);
     };
