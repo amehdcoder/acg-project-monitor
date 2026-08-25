@@ -38,32 +38,47 @@ export function useRealtimeKoboChecklist(
     if (!enabled) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let running = false;
-    let dirty = false;
+    let pending = 0;              // events observed since the last refresh started
+    let latestEvent: Date | null = null;
     let subscribedOnce = false;
     let cancelled = false;
 
+    /** One React state update per coalesce window, not one per event. */
+    const flushEventState = () => {
+      if (cancelled || !latestEvent) return;
+      const at = latestEvent;
+      latestEvent = null;
+      setLastEventAt(at);
+    };
+
     const run = async () => {
-      if (cancelled) return;
-      if (running) { dirty = true; return; }
+      if (cancelled || running) return;
       running = true;
+      pending = 0;
       try { await cbRef.current?.(); }
       catch { /* refresh errors surface in the view */ }
       finally {
         running = false;
-        if (dirty && !cancelled) { dirty = false; void run(); }
+        // Anything that landed mid-refresh merges into a single follow-up run
+        // scheduled at the end of the current window (never a tight loop).
+        if (pending > 0 && !cancelled && !timer) {
+          timer = setTimeout(() => { timer = null; flushEventState(); void run(); }, debounceMs);
+        }
       }
     };
 
-    /** Leading-edge trigger + trailing coalesce. */
+    /** Leading-edge trigger + trailing coalesce of the whole burst. */
     const trigger = () => {
-      setLastEventAt(new Date());
-      if (timer) {
-        // A refresh already fired in this window — mark one follow-up.
-        dirty = true;
-        return;
-      }
+      pending += 1;
+      latestEvent = new Date();
+      if (timer || running) return; // burst merges into the pending/queued run
+      flushEventState();
       void run();
-      timer = setTimeout(() => { timer = null; }, debounceMs);
+      timer = setTimeout(() => {
+        timer = null;
+        flushEventState();
+        if (pending > 0) void run(); // one merged refresh for the whole burst
+      }, debounceMs);
     };
 
     // Unique name per mount — avoids "cannot add postgres_changes callbacks
@@ -88,6 +103,7 @@ export function useRealtimeKoboChecklist(
       supabase.removeChannel(channel);
     };
   }, [enabled, debounceMs]);
+
 
   return { lastEventAt, connected };
 }
