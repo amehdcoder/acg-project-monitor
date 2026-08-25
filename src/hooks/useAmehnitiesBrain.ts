@@ -513,6 +513,10 @@ export function useAmehnitiesBrain() {
   );
 
   const grow = useCallback(() => workerRef.current?.postMessage({ type: "grow" }), []);
+  const setPlasticity = useCallback(
+    (enabled: boolean) => workerRef.current?.postMessage({ type: "plasticity", enabled }),
+    [],
+  );
   const shrink = useCallback(() => workerRef.current?.postMessage({ type: "shrink" }), []);
   const toggle = useCallback(() => setRunning((r) => !r), []);
 
@@ -539,5 +543,9 @@ export function useAmehnitiesBrain() {
     setGuardEnabled, dismissAlert,
     bestCheckpoints, autoSave, setAutoSave, bestMetric, setBestMetric: changeBestMetric,
     autoSaving, rollbackTo, downloadBestCheckpoint, clearBestCheckpoints,
+    plasticity: telemetry?.plasticity ?? true, setPlasticity,
+    growth: telemetry?.growth ?? [],
+    maxParams: telemetry?.maxParams ?? 0,
+    webLearning, setWebLearning, webStats,
   };
 }
