@@ -77,9 +77,12 @@ export default function AiAccessManager({
   const { user, isOwner } = useAuth();
   const [admins, setAdmins] = useState<AdminRow[]>([]);
   const [granted, setGranted] = useState<Set<string>>(new Set());
+  const [perms, setPerms] = useState<Record<string, AiPermissions>>({});
   const [loading, setLoading] = useState(false);
   const [pending, setPending] = useState<string | null>(null);
+  const [capPending, setCapPending] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -100,6 +103,7 @@ export default function AiAccessManager({
       if (ids.length === 0) {
         setAdmins([]);
         setGranted(new Set());
+        setPerms({});
         return;
       }
 
@@ -110,7 +114,7 @@ export default function AiAccessManager({
           .in("user_id", ids),
         supabase
           .from("admin_page_access")
-          .select("user_id")
+          .select("user_id, permissions")
           .eq("page_id", AMEHNITIES_AI_PAGE_ID),
       ]);
 
@@ -132,6 +136,11 @@ export default function AiAccessManager({
 
       setAdmins(rows);
       setGranted(new Set((grantRows ?? []).map((g: any) => g.user_id as string)));
+      const pmap: Record<string, AiPermissions> = {};
+      (grantRows ?? []).forEach((g: any) => {
+        pmap[g.user_id] = normalizeAiPermissions(g.permissions);
+      });
+      setPerms(pmap);
     } catch (e: any) {
       toast.error("Could not load admins", { description: e?.message });
     } finally {
@@ -152,10 +161,15 @@ export default function AiAccessManager({
           user_id: row.user_id,
           page_id: AMEHNITIES_AI_PAGE_ID,
           granted_by: user!.id,
+          permissions: {},
         });
         if (error) throw error;
         setGranted((cur) => new Set(cur).add(row.user_id));
-        toast.success(`${displayName(row)} can now open Amehnities AI`);
+        setPerms((cur) => ({ ...cur, [row.user_id]: normalizeAiPermissions({}) }));
+        setExpanded(row.user_id);
+        toast.success(`${displayName(row)} can now open Amehnities AI`, {
+          description: "Granted as view-only — switch on capabilities below.",
+        });
       } else {
         const { error } = await supabase
           .from("admin_page_access")
@@ -168,12 +182,37 @@ export default function AiAccessManager({
           n.delete(row.user_id);
           return n;
         });
+        setPerms((cur) => {
+          const n = { ...cur };
+          delete n[row.user_id];
+          return n;
+        });
+        if (expanded === row.user_id) setExpanded(null);
         toast.success(`Access revoked for ${displayName(row)}`);
       }
     } catch (e: any) {
       toast.error("Could not update access", { description: e?.message });
     } finally {
       setPending(null);
+    }
+  };
+
+  const toggleCapability = async (row: AdminRow, key: AiCapabilityKey, next: boolean) => {
+    const current = perms[row.user_id] ?? normalizeAiPermissions({});
+    const updated: AiPermissions = { ...current, [key]: next };
+    setCapPending(`${row.user_id}:${key}`);
+    try {
+      const { error } = await supabase
+        .from("admin_page_access")
+        .update({ permissions: updated as any })
+        .eq("user_id", row.user_id)
+        .eq("page_id", AMEHNITIES_AI_PAGE_ID);
+      if (error) throw error;
+      setPerms((cur) => ({ ...cur, [row.user_id]: updated }));
+    } catch (e: any) {
+      toast.error("Could not update permission", { description: e?.message });
+    } finally {
+      setCapPending(null);
     }
   };
 
@@ -184,6 +223,12 @@ export default function AiAccessManager({
       `${displayName(a)} ${a.email ?? ""} ${a.designation ?? ""}`.toLowerCase().includes(q),
     );
   }, [admins, search]);
+
+  const nameIndex = useMemo(() => {
+    const m = new Map<string, { name: string; isOwner?: boolean }>();
+    admins.forEach((a) => m.set(a.user_id, { name: displayName(a), isOwner: !!a.is_owner }));
+    return m;
+  }, [admins]);
 
   const grantedCount = useMemo(
     () => admins.filter((a) => !a.is_owner && granted.has(a.user_id)).length,
