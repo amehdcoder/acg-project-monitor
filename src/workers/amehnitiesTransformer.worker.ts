@@ -951,10 +951,13 @@ self.onmessage = (e: MessageEvent) => {
       budgetMs = Math.max(2, Math.min(40, msg.ms || 12));
       break;
     case "grow": {
-      const nLayers = Math.min(12, cfg.nLayers + (cfg.dModel >= 128 ? 1 : 0));
-      const dModel = cfg.dModel < 128 ? cfg.dModel * 2 : cfg.dModel;
-      const nHeads = Math.min(12, dModel >= 128 ? cfg.nHeads + 2 : cfg.nHeads);
-      build({ dModel, nHeads: dModel % nHeads === 0 ? nHeads : cfg.nHeads, nLayers, dFF: dModel * 4 });
+      scaleUp("Manual capacity increase");
+      break;
+    }
+    case "plasticity": {
+      plasticity = !!msg.enabled;
+      plateauRef = lossEMA;
+      postTelemetry(true);
       break;
     }
     case "config": {
