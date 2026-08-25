@@ -34,7 +34,10 @@ interface Index {
   buckets: Map<string, number[]>;
   /** normalised settlement name → row indices (registry name lookup). */
   names: Map<string, number[]>;
+  /** normalised "state|lga|ward" → row indices (administrative scoping). */
+  wards: Map<string, number[]>;
 }
+
 
 
 const CELL = 0.1; // ≈ 11 km
