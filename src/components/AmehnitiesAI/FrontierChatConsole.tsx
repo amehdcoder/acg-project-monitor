@@ -44,6 +44,15 @@ import {
   type FrontierMeta, type GeneratedMedia,
 } from "@/lib/amehnitiesAi/frontierClient";
 import { BRIGHT_CHART_PALETTE } from "@/lib/charts/brightPalette";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
+  listMyProjects, registerDataset, saveAnalysisNote, searchAnalysisNotes,
+  deleteAnalysisNote, type AnalysisNote,
+} from "@/lib/amehnitiesAi/analysisNotes";
+
 
 interface ConsoleMessage {
   id: string;
