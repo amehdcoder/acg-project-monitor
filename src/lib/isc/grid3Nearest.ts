@@ -203,18 +203,19 @@ function fuzzyKeys(idx: Index, key: string): string[] {
  * administrative unit the monitor declared, and sits closest to the captured
  * GPS point.
  *
- * Scoping is strict by default: a community named "Obasanjo" declared in a Yobe
- * ward is only ever compared with registry settlements of that name inside the
- * SAME Ward and LGA — never with a same-name settlement in Bayelsa. When the
- * declared ward yields no candidate we relax one step at a time (Ward → LGA →
- * State) and report which scope produced the match, so the audit can show it.
- * With `strict: true` (default) the search never leaves the declared State.
+ * With `wardOnly: true` (used by the coordinate accuracy audit) the comparison
+ * NEVER leaves the declared Ward of the declared LGA and State — a community is
+ * only ever measured against registry settlements of that same ward. Records
+ * without a full Ward + LGA chain return no match instead of silently widening.
+ *
+ * Otherwise scoping is strict by default and relaxes one step at a time
+ * (Ward → LGA → State), reporting which scope produced the match.
  */
 export async function findGrid3Named(
   community: string,
   lat: number,
   lng: number,
-  scope: { ward?: string; lga?: string; state?: string; strict?: boolean } = {},
+  scope: { ward?: string; lga?: string; state?: string; strict?: boolean; wardOnly?: boolean } = {},
 ): Promise<NamedGrid3Match | null> {
   const key = norm(community);
   if (!key) return null;
@@ -226,26 +227,30 @@ export async function findGrid3Named(
   const stateK = norm(scope.state ?? "");
   const strict = scope.strict !== false;
 
+  const inWard = (i: number) =>
+    norm(idx.ward[i]) === wardK &&
+    norm(idx.lga[i]) === lgaK &&
+    (!stateK || norm(idx.state[i]) === stateK);
+
   const levels: { name: NamedGrid3Match["scope"]; ok: (i: number) => boolean }[] = [];
-  if (wardK && lgaK) {
-    levels.push({
-      name: "ward",
-      ok: (i) =>
-        norm(idx.ward[i]) === wardK &&
-        norm(idx.lga[i]) === lgaK &&
-        (!stateK || norm(idx.state[i]) === stateK),
-    });
+
+  if (scope.wardOnly) {
+    // Same Ward / same LGA / same State only — no widening at all.
+    if (!wardK || !lgaK) return null;
+    levels.push({ name: "ward", ok: inWard });
+  } else {
+    if (wardK && lgaK) levels.push({ name: "ward", ok: inWard });
+    if (lgaK) {
+      levels.push({
+        name: "lga",
+        ok: (i) => norm(idx.lga[i]) === lgaK && (!stateK || norm(idx.state[i]) === stateK),
+      });
+    }
+    if (stateK) levels.push({ name: "state", ok: (i) => norm(idx.state[i]) === stateK });
+    // Only fall through to a nationwide search when the caller opts out of strict
+    // scoping, or when the record carries no administrative labels at all.
+    if (!strict || levels.length === 0) levels.push({ name: "unscoped", ok: () => true });
   }
-  if (lgaK) {
-    levels.push({
-      name: "lga",
-      ok: (i) => norm(idx.lga[i]) === lgaK && (!stateK || norm(idx.state[i]) === stateK),
-    });
-  }
-  if (stateK) levels.push({ name: "state", ok: (i) => norm(idx.state[i]) === stateK });
-  // Only fall through to a nationwide search when the caller opts out of strict
-  // scoping, or when the record carries no administrative labels at all.
-  if (!strict || levels.length === 0) levels.push({ name: "unscoped", ok: () => true });
 
   const closest = (
     cands: number[],
