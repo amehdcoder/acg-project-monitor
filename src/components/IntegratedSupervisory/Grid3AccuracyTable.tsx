@@ -521,14 +521,45 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
           </div>
         )}
 
+        {/* wards the registry cannot cover — explicit, named empty state */}
+        {!running && wardGaps.length > 0 && (
+          <div className="rounded-lg border border-slate-300 bg-slate-50 p-3 text-[11.5px] text-slate-700">
+            <p className="flex items-center gap-1.5 font-semibold text-slate-800">
+              <AlertTriangle className="h-3.5 w-3.5 text-slate-500" />
+              No GRID3 registry settlements exist for {wardGaps.length} declared Ward{wardGaps.length === 1 ? "" : "s"}
+            </p>
+            <p className="mt-1 leading-relaxed">
+              These captures cannot be audited: the comparison is confined to the Ward declared on the checklist, and the
+              registry holds no settlement for that Ward. They are listed below as “Ward absent from registry” — treat them
+              as unverifiable, not as wrong coordinates.
+            </p>
+            <ul className="mt-2 space-y-1">
+              {wardGaps.slice(0, 8).map((g) => (
+                <li key={`${g.state}-${g.lga}-${g.ward}`} className="rounded border border-slate-200 bg-background px-2 py-1">
+                  <span className="font-semibold text-slate-900">Ward: {g.ward}</span>
+                  <span className="text-muted-foreground"> · LGA: {g.lga} · State: {g.state}</span>
+                  <span className="ml-1 text-slate-600">
+                    — {g.communities.size} communit{g.communities.size === 1 ? "y" : "ies"} affected
+                    {" "}({[...g.communities].slice(0, 3).join(", ")}{g.communities.size > 3 ? "…" : ""})
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {wardGaps.length > 8 && (
+              <p className="mt-1 text-[10.5px] text-muted-foreground">+ {wardGaps.length - 8} more Wards without registry coverage.</p>
+            )}
+          </div>
+        )}
+
         {/* table */}
         {!running && !mismatches.length ? (
           <div className="flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 p-4 text-[12px] text-emerald-800">
             <ShieldCheck className="h-4 w-4" />
             Every captured coordinate falls inside the {radiusM / 1000} km accuracy radius of its GRID3 registry
-            settlement — no exceptions to review at this threshold.
+            settlement in the same Ward — no exceptions to review at this threshold.
           </div>
         ) : (
+
           <TooltipProvider delayDuration={200}>
           <div ref={scrollRef} className="max-h-[600px] overflow-auto rounded-xl border border-slate-300 shadow-sm">
             <table className="w-full min-w-[1180px] table-fixed border-collapse text-[11.5px] leading-snug">
