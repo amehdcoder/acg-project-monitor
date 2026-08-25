@@ -522,7 +522,7 @@ export default function FrontierChatConsole({
         </TabsContent>
 
         {/* ------------------------------------------------------- data */}
-        <TabsContent value="data" className="pt-4">
+        <TabsContent value="data" className="pt-4" hidden={!canDatasets}>
           <div
             onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
             onDragLeave={() => setDragging(false)}
