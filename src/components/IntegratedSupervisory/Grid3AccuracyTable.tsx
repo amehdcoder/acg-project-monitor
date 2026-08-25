@@ -421,7 +421,7 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
         />
 
         {/* KPI strip */}
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-5">
           {(Object.keys(VERDICT_META) as Exclude<Verdict, "match">[]).map((k) => (
             <button
               key={k}
