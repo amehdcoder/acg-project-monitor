@@ -9,13 +9,16 @@
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertOctagon, Download, FileSpreadsheet, PhoneCall, PhoneOff, PackageX, Search, Users } from "lucide-react";
+import { AlertOctagon, Download, FileSpreadsheet, PhoneCall, PhoneOff, PackageX, Users } from "lucide-react";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { medicineLabel, type LogisticsDataset } from "@/lib/isc/medicineAccountability";
+import { type LogisticsDataset } from "@/lib/isc/medicineAccountability";
 import { buildAtRiskCommunities, summariseAtRisk, type RiskFilter } from "@/lib/isc/atRiskCommunities";
+import {
+  AT_RISK_COLUMNS as COLS, atRiskHaystack, buildAtRiskExportRows, flattenAtRisk,
+} from "@/lib/isc/atRiskExport";
+import GeoFilterBar, { EMPTY_GEO_SCOPE, matchesGeoScope, type GeoScope } from "./GeoFilterBar";
 import { exportCsv, exportXlsx } from "./exportKoboData";
 import type { KoboCache } from "./koboClient";
 
@@ -25,31 +28,12 @@ const MODE_LABEL: Record<RiskFilter, string> = {
   insufficient: "Medicines reported insufficient (any MDA status)",
 };
 
-const COLS = [
-  { key: "community", label: "Community / settlement" },
-  { key: "ward", label: "Ward" },
-  { key: "lga", label: "LGA" },
-  { key: "state", label: "State" },
-  { key: "flhf", label: "FLHF" },
-  { key: "statusLabel", label: "Status of MDA" },
-  { key: "sufficiencyLabel", label: "Medicine sufficiency" },
-  { key: "insufficientMedicines", label: "Medicine(s) reported insufficient" },
-  { key: "medicinesIssued", label: "Medicine(s) issued to community" },
-  { key: "totalIssued", label: "Total units issued" },
-  { key: "cddList", label: "CDD(s)" },
-  { key: "cddPhoneList", label: "CDD phone number(s)" },
-  { key: "inCharge", label: "FLHF in-charge" },
-  { key: "inChargePhone", label: "In-charge phone" },
-  { key: "monitor", label: "Reported by" },
-  { key: "visitDate", label: "Last visit" },
-  { key: "reports", label: "Checklist reports" },
-];
-
 export default function AtRiskCommunitiesTable({
   checklistCache, logistics,
 }: { checklistCache: KoboCache | null; logistics: LogisticsDataset | null }) {
   const [mode, setMode] = useState<RiskFilter>("both");
   const [q, setQ] = useState("");
+  const [scope, setScope] = useState<GeoScope>(EMPTY_GEO_SCOPE);
   const dq = useDebouncedValue(q, 300);
 
   const rows = useMemo(
@@ -58,39 +42,18 @@ export default function AtRiskCommunitiesTable({
   );
   const stats = useMemo(() => summariseAtRisk(rows), [rows]);
 
-  const flat = useMemo(
-    () =>
-      rows.map((r) => ({
-        ...r,
-        medicinesIssued: r.issues.length
-          ? Array.from(
-              r.issues.reduce((m, i) => {
-                m.set(i.medicine, (m.get(i.medicine) ?? 0) + i.qty);
-                return m;
-              }, new Map<string, number>()),
-            )
-              .map(([m, qty]) => `${medicineLabel(m)} — ${Math.round(qty).toLocaleString()}`)
-              .join("; ")
-          : "None recorded",
-        cddList: r.cdds.join("; ") || "—",
-        cddPhoneList: r.cddPhones.join("; ") || "Not captured",
-        inChargePhone: r.inChargePhone || "Not captured",
-      })),
-    [rows],
-  );
+  const flat = useMemo(() => flattenAtRisk(rows), [rows]);
 
   const filtered = useMemo(() => {
     const n = dq.trim().toLowerCase();
-    if (!n) return flat;
-    return flat.filter((r) => COLS.map((c) => String((r as any)[c.key] ?? "")).join(" ").toLowerCase().includes(n));
-  }, [flat, dq]);
+    return flat
+      .filter((r) => matchesGeoScope(r, scope))
+      .filter((r) => !n || atRiskHaystack(r).includes(n));
+  }, [flat, dq, scope]);
 
   const stamp = new Date().toISOString().slice(0, 10);
-  const exportRows = filtered.map((r) => {
-    const o: Record<string, unknown> = {};
-    COLS.forEach((c) => { o[c.key] = (r as any)[c.key] ?? ""; });
-    return o;
-  });
+  const exportRows = useMemo(() => buildAtRiskExportRows(filtered), [filtered]);
+
 
   return (
     <Card className="overflow-hidden border-rose-300">
