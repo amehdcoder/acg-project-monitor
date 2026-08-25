@@ -47,9 +47,11 @@ function Stat({ icon: Icon, label, value, sub }: { icon: any; label: string; val
   );
 }
 
-export default function AmehnitiesAI() {
+function AmehnitiesAIWorkspace() {
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
+  const { isOwner } = useAuth();
+  const [accessOpen, setAccessOpen] = useState(false);
+
   const {
     telemetry, running, toggle, budget, setBudget, grow, shrink,
     feed, sourceCounts, corpusReady, synthetic, predictions, vocab,
