@@ -103,10 +103,17 @@ function AmehnitiesAIWorkspace() {
               <span className={`inline-block h-1.5 w-1.5 rounded-full ${running ? "animate-pulse bg-primary" : "bg-muted-foreground"}`} />
               {running ? "Training" : "Paused"}
             </Badge>
-            <Button size="sm" variant={running ? "secondary" : "default"} onClick={toggle} className="gap-1.5">
-              {running ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-              {running ? "Pause" : "Resume"}
-            </Button>
+            {viewOnly && (
+              <Badge variant="secondary" className="gap-1.5 text-[11px]">
+                <Eye className="h-3 w-3" /> View-only access
+              </Badge>
+            )}
+            {canTrain && (
+              <Button size="sm" variant={running ? "secondary" : "default"} onClick={toggle} className="gap-1.5">
+                {running ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                {running ? "Pause" : "Resume"}
+              </Button>
+            )}
             {isOwner && (
               <Button size="sm" variant="outline" onClick={() => setAccessOpen(true)} className="gap-1.5">
                 <KeyRound className="h-4 w-4" /> Manage access
