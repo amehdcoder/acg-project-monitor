@@ -20,8 +20,10 @@ import {
 import {
   Bot, Brain, Download, FileSpreadsheet, FileText, FileType2, Image as ImageIcon,
   Loader2, Paperclip, Play, Presentation, Send, Sparkles, Table2, Trash2, Upload,
-  Video, X, Database, Cpu, AlertTriangle,
+  Video, X, Database, Cpu, AlertTriangle, Square, RotateCcw, NotebookPen, Search,
+  MapPin,
 } from "lucide-react";
+
 import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
@@ -42,6 +44,15 @@ import {
   type FrontierMeta, type GeneratedMedia,
 } from "@/lib/amehnitiesAi/frontierClient";
 import { BRIGHT_CHART_PALETTE } from "@/lib/charts/brightPalette";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
+  listMyProjects, registerDataset, saveAnalysisNote, searchAnalysisNotes,
+  deleteAnalysisNote, type AnalysisNote,
+} from "@/lib/amehnitiesAi/analysisNotes";
+
 
 interface ConsoleMessage {
   id: string;
@@ -50,6 +61,9 @@ interface ConsoleMessage {
   meta?: FrontierMeta | null;
   attachments?: { name: string; kind: string }[];
   streaming?: boolean;
+  /** True when the user cancelled the stream mid-flight. */
+  stopped?: boolean;
+
 }
 
 const uid = () => `m_${Math.random().toString(36).slice(2, 10)}`;
@@ -85,6 +99,10 @@ export default function FrontierChatConsole({
   const [mediaPrompt, setMediaPrompt] = useState("");
   const [mediaBusy, setMediaBusy] = useState<"image" | "video" | null>(null);
   const [media, setMedia] = useState<GeneratedMedia[]>([]);
+  const [lastQuestion, setLastQuestion] = useState("");
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [notesRefresh, setNotesRefresh] = useState(0);
+
 
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -149,22 +167,31 @@ export default function FrontierChatConsole({
     }
   }, [telemetry, corpusEvents]);
 
-  const ask = useCallback(async (question: string) => {
+  const ask = useCallback(async (question: string, opts?: { replaceLastTurn?: boolean }) => {
     const q = question.trim();
     if (!q || busy) return;
 
-    const userMsg: ConsoleMessage = {
-      id: uid(),
-      role: "user",
-      content: q,
-      attachments: attachments.map((a) => ({ name: a.name, kind: a.kind })),
-    };
     const assistantId = uid();
-    setMessages((cur) => [
-      ...cur,
-      userMsg,
-      { id: assistantId, role: "assistant", content: "", streaming: true },
-    ]);
+    setMessages((cur) => {
+      // On retry, drop the previous user/assistant pair so the thread stays clean.
+      let base = cur;
+      if (opts?.replaceLastTurn) {
+        base = [...cur];
+        if (base.at(-1)?.role === "assistant") base.pop();
+        if (base.at(-1)?.role === "user") base.pop();
+      }
+      return [
+        ...base,
+        {
+          id: uid(),
+          role: "user" as const,
+          content: q,
+          attachments: attachments.map((a) => ({ name: a.name, kind: a.kind })),
+        },
+        { id: assistantId, role: "assistant" as const, content: "", streaming: true },
+      ];
+    });
+    setLastQuestion(q);
     setInput("");
     setBusy(true);
     setAnalysis(null);
@@ -186,22 +213,37 @@ export default function FrontierChatConsole({
           setMessages((cur) => cur.map((m) => (m.id === assistantId ? { ...m, content: full } : m))),
       });
     } catch (e: any) {
-      if (e?.name !== "AbortError") {
-        toast.error("Assistant failed", { description: e?.message });
-        setMessages((cur) =>
-          cur.map((m) =>
-            m.id === assistantId
-              ? { ...m, content: m.content || `⚠️ ${e?.message ?? "Request failed."}` }
-              : m,
-          ),
-        );
-      }
+      const aborted = e?.name === "AbortError" || controller.signal.aborted;
+      setMessages((cur) =>
+        cur.map((m) =>
+          m.id === assistantId
+            ? aborted
+              // Keep whatever streamed so far and mark the turn as stopped.
+              ? { ...m, stopped: true, content: m.content ? `${m.content}\n\n_Stopped._` : "_Stopped._" }
+              : { ...m, content: m.content || `⚠️ ${e?.message ?? "Request failed."}` }
+            : m,
+        ),
+      );
+      if (!aborted) toast.error("Assistant failed", { description: e?.message });
     } finally {
       setMessages((cur) => cur.map((m) => (m.id === assistantId ? { ...m, streaming: false } : m)));
       setBusy(false);
       abortRef.current = null;
     }
   }, [attachments, busy, messages, telemetrySummary]);
+
+  /** Cancels the in-flight stream immediately; the partial answer is kept. */
+  const stopStreaming = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+  }, []);
+
+  /** Re-sends the last question, replacing the previous (stopped or failed) turn. */
+  const retryLast = useCallback(async () => {
+    if (!lastQuestion || busy) return;
+    await ask(lastQuestion, { replaceLastTurn: true });
+  }, [ask, busy, lastQuestion]);
+
 
   /* ------------------------------------------------------------ analysis */
   const doAnalysis = useCallback(async () => {
@@ -283,6 +325,8 @@ export default function FrontierChatConsole({
           <TabsTrigger value="chat" className="gap-1.5"><Bot className="h-3.5 w-3.5" /> Chat</TabsTrigger>
           <TabsTrigger value="data" className="gap-1.5"><Database className="h-3.5 w-3.5" /> Data ({attachments.length})</TabsTrigger>
           <TabsTrigger value="media" className="gap-1.5"><ImageIcon className="h-3.5 w-3.5" /> Media</TabsTrigger>
+          <TabsTrigger value="notes" className="gap-1.5"><NotebookPen className="h-3.5 w-3.5" /> Notes</TabsTrigger>
+
         </TabsList>
 
         {/* ------------------------------------------------------- chat */}
@@ -339,7 +383,14 @@ export default function FrontierChatConsole({
                     </div>
                   )}
 
+                  {m.stopped && (
+                    <Badge variant="outline" className="mt-1 gap-1 text-[10px] text-muted-foreground">
+                      <Square className="h-2.5 w-2.5" /> Stopped by you
+                    </Badge>
+                  )}
+
                   {m.streaming && (
+
                     <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
                       <Loader2 className="h-3 w-3 animate-spin" /> reasoning…
                     </div>
@@ -369,17 +420,24 @@ export default function FrontierChatConsole({
               ))}
               {pythonBlock && datasets.length > 0 && (
                 <Button
-                  size="sm" className="ml-auto h-8 gap-1.5 text-xs"
+                  size="sm" className="h-8 gap-1.5 text-xs"
                   disabled={analysisStatus !== null} onClick={() => void doAnalysis()}
                 >
                   {analysisStatus ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
                   {analysisStatus ?? "Run analysis"}
                 </Button>
               )}
+              <Button
+                size="sm" variant="secondary" className="ml-auto h-8 gap-1.5 text-xs"
+                onClick={() => setNoteOpen(true)}
+              >
+                <NotebookPen className="h-3.5 w-3.5" /> Save as note
+              </Button>
             </div>
           )}
 
           {analysis && <AnalysisOutput result={analysis} />}
+
 
           {/* composer */}
           <div
@@ -423,10 +481,32 @@ export default function FrontierChatConsole({
                 Attach
               </Button>
               <span className="text-[11px] text-muted-foreground">Enter to send · Shift+Enter for a new line</span>
-              <Button size="sm" className="ml-auto h-8 gap-1.5 text-xs" disabled={busy || !input.trim()} onClick={() => void ask(input)}>
-                {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-                Send
-              </Button>
+              {busy ? (
+                <Button
+                  size="sm" variant="destructive" className="ml-auto h-8 gap-1.5 text-xs"
+                  onClick={stopStreaming}
+                >
+                  <Square className="h-3.5 w-3.5" /> Stop
+                </Button>
+              ) : (
+                <>
+                  {lastQuestion && (
+                    <Button
+                      size="sm" variant="outline" className="ml-auto h-8 gap-1.5 text-xs"
+                      onClick={() => void retryLast()}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" /> Retry
+                    </Button>
+                  )}
+                  <Button
+                    size="sm" className={cn("h-8 gap-1.5 text-xs", !lastQuestion && "ml-auto")}
+                    disabled={!input.trim()} onClick={() => void ask(input)}
+                  >
+                    <Send className="h-3.5 w-3.5" /> Send
+                  </Button>
+                </>
+              )}
+
             </div>
           </div>
         </TabsContent>
@@ -532,7 +612,23 @@ export default function FrontierChatConsole({
             ))}
           </div>
         </TabsContent>
+
+        {/* ------------------------------------------------------ notes */}
+        <TabsContent value="notes" className="pt-4">
+          <NotesPanel refreshKey={notesRefresh} />
+        </TabsContent>
       </Tabs>
+
+      <SaveNoteDialog
+        open={noteOpen}
+        onOpenChange={setNoteOpen}
+        question={lastQuestion}
+        answer={lastAnswer}
+        analysis={analysis}
+        datasets={datasets}
+        onSaved={() => setNotesRefresh((n) => n + 1)}
+      />
+
     </Card>
   );
 }
@@ -641,5 +737,251 @@ function AnalysisOutput({ result }: { result: AnalysisResult }) {
         </div>
       )}
     </Card>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Structured, searchable analysis notes
+ * ------------------------------------------------------------------ */
+
+function SaveNoteDialog({
+  open, onOpenChange, question, answer, analysis, datasets, onSaved,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  question: string;
+  answer: string;
+  analysis: AnalysisResult | null;
+  datasets: ParsedAttachment[];
+  onSaved: () => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [findings, setFindings] = useState("");
+  const [tags, setTags] = useState("");
+  const [datasetName, setDatasetName] = useState<string>("");
+  const [projectId, setProjectId] = useState<string>("");
+  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [scope, setScope] = useState({ state: "", lga: "", ward: "", community: "" });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setTitle((t) => t || (question ? question.slice(0, 90) : "Analysis note"));
+    setFindings((f) => f || (analysis?.stdout?.trim() ? `${answer}\n\nComputed output:\n${analysis.stdout.trim()}` : answer));
+    setDatasetName((d) => d || datasets[0]?.name || "");
+    void listMyProjects().then(setProjects).catch(() => {});
+  }, [open, question, answer, analysis, datasets]);
+
+  const save = async () => {
+    if (!title.trim() || !findings.trim()) {
+      toast.error("A title and the findings are required");
+      return;
+    }
+    setSaving(true);
+    try {
+      // Register the dataset so the note points at a durable, RLS-scoped row.
+      let datasetId: string | null = null;
+      const source = datasets.find((d) => d.name === datasetName);
+      if (source) {
+        const reg = await registerDataset({
+          name: source.name,
+          fileType: source.type,
+          kind: source.kind,
+          rowCount: source.rows?.length ?? 0,
+          columns: source.columns ?? [],
+          summary: source.summary,
+          projectId: projectId || null,
+        });
+        datasetId = reg?.id ?? null;
+      }
+
+      await saveAnalysisNote({
+        title: title.trim(),
+        question,
+        findings: findings.trim(),
+        code: analysis ? extractPythonBlock(answer) : null,
+        stdout: analysis?.stdout ?? null,
+        chart: analysis?.chart ?? null,
+        tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
+        datasetId,
+        datasetName: datasetName || null,
+        projectId: projectId || null,
+        scope: {
+          state: scope.state || null,
+          lga: scope.lga || null,
+          ward: scope.ward || null,
+          community: scope.community || null,
+        },
+      });
+      toast.success("Note saved", { description: "Searchable and recalled by the assistant later." });
+      onOpenChange(false);
+      onSaved();
+    } catch (e: any) {
+      toast.error("Could not save the note", { description: e?.message });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <NotebookPen className="h-4 w-4 text-primary" /> Save as analysis note
+          </DialogTitle>
+          <DialogDescription>
+            Stored against the dataset and community scope, searchable later, and only visible to you
+            and your project team.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <div>
+            <Label className="text-xs">Title</Label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What this finding is about" />
+          </div>
+
+          <div>
+            <Label className="text-xs">Findings</Label>
+            <Textarea value={findings} onChange={(e) => setFindings(e.target.value)} className="min-h-[9rem]" />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <Label className="text-xs">Dataset</Label>
+              <select
+                value={datasetName}
+                onChange={(e) => setDatasetName(e.target.value)}
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">No dataset</option>
+                {datasets.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <Label className="text-xs">Team / project</Label>
+              <select
+                value={projectId}
+                onChange={(e) => setProjectId(e.target.value)}
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">Private to me</option>
+                {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <Label className="flex items-center gap-1 text-xs"><MapPin className="h-3 w-3" /> Community scope</Label>
+            <div className="mt-1 grid gap-2 sm:grid-cols-4">
+              {(["state", "lga", "ward", "community"] as const).map((k) => (
+                <Input
+                  key={k}
+                  value={scope[k]}
+                  onChange={(e) => setScope((s) => ({ ...s, [k]: e.target.value }))}
+                  placeholder={k === "lga" ? "LGA" : k[0].toUpperCase() + k.slice(1)}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <Label className="text-xs">Tags (comma separated)</Label>
+            <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="coverage, medicine, supervision" />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={() => void save()} disabled={saving} className="gap-1.5">
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <NotebookPen className="h-4 w-4" />}
+            Save note
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function NotesPanel({ refreshKey }: { refreshKey: number }) {
+  const [term, setTerm] = useState("");
+  const [notes, setNotes] = useState<AnalysisNote[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async (query?: string) => {
+    setLoading(true);
+    try {
+      setNotes(await searchAnalysisNotes({ query }));
+    } catch (e: any) {
+      toast.error("Could not load notes", { description: e?.message });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load, refreshKey]);
+
+  const remove = async (id: string) => {
+    try {
+      await deleteAnalysisNote(id);
+      setNotes((cur) => cur.filter((n) => n.id !== id));
+    } catch (e: any) {
+      toast.error("Delete failed", { description: e?.message });
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-2">
+        <Input
+          value={term}
+          onChange={(e) => setTerm(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") void load(term); }}
+          placeholder="Search saved findings, questions, communities…"
+        />
+        <Button variant="outline" className="gap-1.5" onClick={() => void load(term)} disabled={loading}>
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+          Search
+        </Button>
+      </div>
+
+      {notes.length === 0 && !loading && (
+        <p className="text-sm text-muted-foreground">
+          No notes yet. Run an analysis and use “Save as note” to build a searchable evidence log.
+        </p>
+      )}
+
+      {notes.map((n) => {
+        const scope = [n.scope_state, n.scope_lga, n.scope_ward, n.scope_community].filter(Boolean).join(" · ");
+        return (
+          <Card key={n.id} className="border-border/60 p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <NotebookPen className="h-4 w-4 text-primary" />
+              <span className="text-sm font-semibold">{n.title}</span>
+              {n.dataset_name && <Badge variant="outline" className="text-[10px]">{n.dataset_name}</Badge>}
+              {scope && (
+                <Badge variant="secondary" className="gap-1 text-[10px]">
+                  <MapPin className="h-2.5 w-2.5" /> {scope}
+                </Badge>
+              )}
+              <span className="text-[11px] text-muted-foreground">
+                {new Date(n.created_at).toLocaleDateString()}
+              </span>
+              <Button size="sm" variant="ghost" className="ml-auto h-7 w-7 p-0" onClick={() => void remove(n.id)}>
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            {n.question && <p className="mt-1 text-xs italic text-muted-foreground">{n.question}</p>}
+            <p className="mt-1 whitespace-pre-wrap text-xs text-foreground/90 line-clamp-6">{n.findings}</p>
+            {n.tags?.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {n.tags.map((t) => <Badge key={t} variant="outline" className="text-[10px]">{t}</Badge>)}
+              </div>
+            )}
+          </Card>
+        );
+      })}
+    </div>
   );
 }

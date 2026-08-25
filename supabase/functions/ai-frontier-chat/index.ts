@@ -115,7 +115,10 @@ Deno.serve(async (req) => {
         _match_count: 8,
         _min_similarity: 0.18,
         _kinds: null,
+        // The service role bypasses RLS, so scope recall to the caller explicitly.
+        _user_id: userId,
       });
+
       const rows = (matches ?? []) as { title: string | null; kind: string; content: string; similarity: number }[];
       if (rows.length) {
         memoryBlock = "RECALLED MEMORY (long-term vector store):\n" + rows.map((r, i) => {

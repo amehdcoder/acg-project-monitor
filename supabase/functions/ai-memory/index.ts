@@ -123,7 +123,10 @@ Deno.serve(async (req) => {
         _match_count: Math.min(Number(body?.limit ?? 8) || 8, 25),
         _min_similarity: Number(body?.minSimilarity ?? 0.15),
         _kinds: Array.isArray(body?.kinds) && body.kinds.length ? body.kinds : null,
+        // The service role bypasses RLS, so scope recall to the caller explicitly.
+        _user_id: userId,
       });
+
       if (error) return json({ error: error.message }, 400);
       return json({ matches: data ?? [] });
     }
