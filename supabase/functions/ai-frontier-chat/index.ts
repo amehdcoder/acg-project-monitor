@@ -170,7 +170,7 @@ Deno.serve(async (req) => {
     // Prepend a metadata frame, then relay the model stream untouched.
     const meta = `data: ${JSON.stringify({
       type: "meta",
-      route: { tier: frontier ? "frontier" : tier, label: routeLabel, model, questionClass },
+      route: { tier: frontier ? "frontier" : tier, label: routeLabel, model, questionClass, learned: learnedRoute },
       memory: memoryCitations,
       files: attachments.map((a, i) => ({ marker: `F${i + 1}`, name: a.name ?? "file", type: a.type ?? "" })),
     })}\n\n`;
