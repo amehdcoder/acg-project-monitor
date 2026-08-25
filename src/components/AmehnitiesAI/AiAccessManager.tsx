@@ -274,86 +274,165 @@ export default function AiAccessManager({
           </DialogHeader>
         </div>
 
-        <div className="px-6 pt-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search admins by name, email or designation…"
-              className="pl-9"
-            />
+        <Tabs defaultValue="admins" className="w-full">
+          <div className="px-6 pt-4">
+            <TabsList className="grid w-full max-w-xs grid-cols-2">
+              <TabsTrigger value="admins" className="gap-1.5 text-xs">
+                <Users2 className="h-3.5 w-3.5" /> Admins
+              </TabsTrigger>
+              <TabsTrigger value="audit" className="gap-1.5 text-xs">
+                <History className="h-3.5 w-3.5" /> Audit log
+              </TabsTrigger>
+            </TabsList>
           </div>
-        </div>
 
-        <ScrollArea className="max-h-[46vh] px-6 py-4">
-          {loading ? (
-            <div className="space-y-2">
-              {[0, 1, 2].map((i) => (
-                <Skeleton key={i} className="h-16 w-full rounded-xl" />
-              ))}
+          <TabsContent value="admins" className="mt-0">
+            <div className="px-6 pt-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search admins by name, email or designation…"
+                  className="pl-9"
+                />
+              </div>
             </div>
-          ) : filtered.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border/70 p-8 text-center">
-              <Sparkles className="mx-auto mb-2 h-5 w-5 text-muted-foreground" />
-              <p className="text-sm font-medium">No matching admins</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Only Super Admins and Systems Admins can be granted Amehnities AI.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {filtered.map((a) => {
-                const has = a.is_owner || granted.has(a.user_id);
-                const busy = pending === a.user_id;
-                return (
-                  <div
-                    key={a.user_id}
-                    className={`flex items-center gap-3 rounded-xl border p-3 transition-colors ${
-                      has ? "border-primary/40 bg-primary/[0.06]" : "border-border/60 bg-card/50"
-                    }`}
-                  >
-                    <Avatar className="h-10 w-10 border border-border/60">
-                      {a.avatar_url && <AvatarImage src={a.avatar_url} alt={displayName(a)} />}
-                      <AvatarFallback className="text-xs font-semibold">{initials(a)}</AvatarFallback>
-                    </Avatar>
 
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="truncate text-sm font-semibold">{displayName(a)}</span>
-                        {a.is_owner && (
-                          <Badge className="gap-1 bg-primary/15 text-[10px] text-primary hover:bg-primary/15">
-                            <Crown className="h-2.5 w-2.5" /> Owner
-                          </Badge>
-                        )}
-                        <Badge variant="outline" className="text-[10px]">{ROLE_LABEL[a.role]}</Badge>
-                      </div>
-                      <p className="truncate text-xs text-muted-foreground">{a.email ?? "—"}</p>
-                    </div>
+            <ScrollArea className="max-h-[46vh] px-6 py-4">
+              {loading ? (
+                <div className="space-y-2">
+                  {[0, 1, 2].map((i) => (
+                    <Skeleton key={i} className="h-16 w-full rounded-xl" />
+                  ))}
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border/70 p-8 text-center">
+                  <Sparkles className="mx-auto mb-2 h-5 w-5 text-muted-foreground" />
+                  <p className="text-sm font-medium">No matching admins</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Only Super Admins and Systems Admins can be granted Amehnities AI.
+                  </p>
+                </div>
+              ) : (
+                <TooltipProvider delayDuration={200}>
+                  <div className="space-y-2">
+                    {filtered.map((a) => {
+                      const has = a.is_owner || granted.has(a.user_id);
+                      const busy = pending === a.user_id;
+                      const p = perms[a.user_id];
+                      const viewOnly = !a.is_owner && has && isViewOnly(p);
+                      const isOpen = expanded === a.user_id;
+                      return (
+                        <div
+                          key={a.user_id}
+                          className={`rounded-xl border transition-colors ${
+                            has ? "border-primary/40 bg-primary/[0.06]" : "border-border/60 bg-card/50"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 p-3">
+                            <Avatar className="h-10 w-10 border border-border/60">
+                              {a.avatar_url && <AvatarImage src={a.avatar_url} alt={displayName(a)} />}
+                              <AvatarFallback className="text-xs font-semibold">{initials(a)}</AvatarFallback>
+                            </Avatar>
 
-                    <div className="flex shrink-0 items-center gap-2">
-                      {has && (
-                        <span className="hidden items-center gap-1 text-[11px] font-medium text-primary sm:flex">
-                          <ShieldCheck className="h-3.5 w-3.5" /> Access
-                        </span>
-                      )}
-                      {busy ? (
-                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                      ) : (
-                        <Switch
-                          checked={has}
-                          disabled={!!a.is_owner}
-                          onCheckedChange={(v) => void toggleAccess(a, v)}
-                          aria-label={`Toggle Amehnities AI access for ${displayName(a)}`}
-                        />
-                      )}
-                    </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="truncate text-sm font-semibold">{displayName(a)}</span>
+                                {a.is_owner && (
+                                  <Badge className="gap-1 bg-primary/15 text-[10px] text-primary hover:bg-primary/15">
+                                    <Crown className="h-2.5 w-2.5" /> Owner
+                                  </Badge>
+                                )}
+                                <Badge variant="outline" className="text-[10px]">{ROLE_LABEL[a.role]}</Badge>
+                                {a.is_owner ? (
+                                  <Badge variant="outline" className="border-primary/40 text-[10px] text-primary">
+                                    Full control
+                                  </Badge>
+                                ) : viewOnly ? (
+                                  <Badge variant="outline" className="gap-1 text-[10px] text-muted-foreground">
+                                    <Eye className="h-2.5 w-2.5" /> View-only
+                                  </Badge>
+                                ) : null}
+                              </div>
+                              <p className="truncate text-xs text-muted-foreground">{a.email ?? "—"}</p>
+                            </div>
+
+                            <div className="flex shrink-0 items-center gap-2">
+                              {has && !a.is_owner && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 gap-1.5 px-2 text-[11px]"
+                                  onClick={() => setExpanded(isOpen ? null : a.user_id)}
+                                >
+                                  <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+                                  {isOpen ? "Hide" : "Permissions"}
+                                </Button>
+                              )}
+                              {busy ? (
+                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                              ) : (
+                                <Switch
+                                  checked={has}
+                                  disabled={!!a.is_owner}
+                                  onCheckedChange={(v) => void toggleAccess(a, v)}
+                                  aria-label={`Toggle Amehnities AI access for ${displayName(a)}`}
+                                />
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Granular permission levels */}
+                          {has && !a.is_owner && isOpen && (
+                            <div className="grid gap-1.5 border-t border-border/50 px-3 py-3 sm:grid-cols-2">
+                              {AI_CAPABILITIES.map((cap) => {
+                                const Icon = CAP_ICON[cap.key];
+                                const capBusy = capPending === `${a.user_id}:${cap.key}`;
+                                return (
+                                  <Tooltip key={cap.key}>
+                                    <TooltipTrigger asChild>
+                                      <div className="flex items-center gap-2 rounded-lg border border-border/50 bg-background/60 px-2.5 py-2">
+                                        <Icon className="h-3.5 w-3.5 shrink-0 text-primary" />
+                                        <span className="min-w-0 flex-1 truncate text-[11px] font-medium">
+                                          {cap.label}
+                                        </span>
+                                        {capBusy ? (
+                                          <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                                        ) : (
+                                          <Switch
+                                            className="scale-90"
+                                            checked={p?.[cap.key] === true}
+                                            onCheckedChange={(v) => void toggleCapability(a, cap.key, v)}
+                                            aria-label={`${cap.label} for ${displayName(a)}`}
+                                          />
+                                        )}
+                                      </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" className="max-w-[16rem] text-xs">
+                                      {cap.description}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                );
+                              })}
+                              <p className="col-span-full text-[10px] text-muted-foreground">
+                                All capabilities off = view-only. Every change is timestamped in the audit log.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </ScrollArea>
+                </TooltipProvider>
+              )}
+            </ScrollArea>
+          </TabsContent>
+
+          <TabsContent value="audit" className="mt-0">
+            <AiAccessAuditLog pageId={AMEHNITIES_AI_PAGE_ID} names={nameIndex} />
+          </TabsContent>
+        </Tabs>
 
         <div className="flex items-center justify-between gap-3 border-t border-border/60 px-6 py-3">
           <p className="text-[11px] text-muted-foreground">
