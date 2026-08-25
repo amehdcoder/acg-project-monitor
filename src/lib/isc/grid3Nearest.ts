@@ -52,12 +52,14 @@ function build(data: Blob): Index {
   const name: string[] = [], ward: string[] = [], lga: string[] = [], state: string[] = [];
   const buckets = new Map<string, number[]>();
   const names = new Map<string, number[]>();
+  const wardIdx = new Map<string, number[]>();
 
   for (const st of Object.keys(data)) {
     const lgas = data[st] || {};
     for (const lg of Object.keys(lgas)) {
       const wards = lgas[lg] || {};
       for (const wd of Object.keys(wards)) {
+        const wKey = wardKey(st, lg, wd);
         for (const entry of wards[wd] || []) {
           const [n, la, ln] = entry;
           if (la == null || ln == null || !Number.isFinite(la) || !Number.isFinite(ln)) continue;
@@ -72,6 +74,8 @@ function build(data: Blob): Index {
             const nb = names.get(nk);
             if (nb) nb.push(i); else names.set(nk, [i]);
           }
+          const wb = wardIdx.get(wKey);
+          if (wb) wb.push(i); else wardIdx.set(wKey, [i]);
         }
       }
     }
@@ -80,7 +84,7 @@ function build(data: Blob): Index {
   return {
     lat: Float64Array.from(lat),
     lng: Float64Array.from(lng),
-    name, ward, lga, state, buckets, names,
+    name, ward, lga, state, buckets, names, wards: wardIdx,
   };
 }
 
