@@ -151,3 +151,47 @@ export function syntheticCorpus(tk: Tokenizer, n = 600): ActivityEvent[] {
   }
   return out;
 }
+
+/* ------------------------------------------------------------------ web */
+
+/** Label used for knowledge streamed in from the public-health literature. */
+export const WEB_SOURCE_LABEL = "Web knowledge";
+
+const STOPWORDS = new Set(
+  "the a an and or of for to in on with by from is are was were be been this that these those we our their its as at into over under between about after before during than then which who whom whose what when where how why not no all any some each other more most such can may might will would should could study studies results conclusion background methods objective".split(" "),
+);
+
+/** Salient content terms from a passage, most informative first. */
+export function passageTerms(text: string, max = 8): string[] {
+  const counts = new Map<string, number>();
+  for (const raw of String(text ?? "").toLowerCase().split(/[^a-z0-9-]+/)) {
+    const w = raw.trim();
+    if (w.length < 4 || STOPWORDS.has(w) || /^\d+$/.test(w)) continue;
+    counts.set(w, (counts.get(w) ?? 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, max).map(([w]) => w);
+}
+
+export interface WebPassage {
+  title: string;
+  publisher: string;
+  snippet: string;
+  url?: string;
+  year?: string;
+}
+
+/**
+ * Encode one retrieved literature passage as a token sentence so the live
+ * network learns from the internet exactly the way it learns from app events.
+ */
+export function encodeWebPassage(tk: Tokenizer, p: WebPassage, at = Date.now()): number[] {
+  const d = new Date(at);
+  const out = [
+    tk.id(`src:${WEB_SOURCE_LABEL}`),
+    tk.id(`pub:${slug(p.publisher)}`),
+    tk.id(`hour:${d.getHours()}`),
+  ];
+  for (const term of passageTerms(`${p.title} ${p.snippet}`)) out.push(tk.id(`term:${term}`));
+  out.push(tk.id("gap:knowledge"));
+  return out;
+}
