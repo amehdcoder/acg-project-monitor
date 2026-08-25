@@ -38,6 +38,7 @@ import { cn } from "@/lib/utils";
 
 import { parseFiles, type ParsedAttachment } from "@/lib/amehnitiesAi/fileParsers";
 import { generateDocument, type DocFormat } from "@/lib/amehnitiesAi/documentGenerator";
+import { useAiPermissions } from "@/hooks/useAiPermissions";
 import { extractPythonBlock, runAnalysis, type AnalysisResult } from "@/lib/amehnitiesAi/pyodideSandbox";
 import {
   generateMedia, listGeneratedMedia, streamFrontierChat,
