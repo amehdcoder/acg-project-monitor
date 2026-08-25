@@ -36,6 +36,10 @@ import { useMdaLens } from "@/hooks/useMdaLens";
 import { campaignInLensScope, readKoboCampaign, readKoboGeo, rowInLensScope } from "@/lib/mdaLens/config";
 import MdaLensExportButton from "@/components/UserManagement/MdaLensExportButton";
 import LensScopeBanner, { lensScopeSummary } from "@/components/MdaLens/LensScopeBanner";
+import {
+  fetchScopedSubmissions, feedCacheKey, listChecklistFeeds, publishChecklistFeed, type ChecklistFeed,
+} from "./checklistFeed";
+
 
 export default function IntegratedSupervisoryView() {
   const perms = useChecklistPermissions();
