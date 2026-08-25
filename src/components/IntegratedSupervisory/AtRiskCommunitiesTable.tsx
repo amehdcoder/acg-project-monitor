@@ -92,28 +92,38 @@ export default function AtRiskCommunitiesTable({
         </div>
 
         {/* toolbar */}
-        <div className="flex flex-wrap items-center gap-2">
-          <Select value={mode} onValueChange={(v) => setMode(v as RiskFilter)}>
-            <SelectTrigger className="h-8 w-[330px] text-[12px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {(Object.keys(MODE_LABEL) as RiskFilter[]).map((m) => (
-                <SelectItem key={m} value={m} className="text-[12px]">{MODE_LABEL[m]}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <div className="relative min-w-[200px] flex-1">
-            <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search community, CDD, FLHF or LGA…" className="h-8 pl-7 text-[12px]" />
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={mode} onValueChange={(v) => setMode(v as RiskFilter)}>
+              <SelectTrigger className="h-8 w-[330px] text-[12px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {(Object.keys(MODE_LABEL) as RiskFilter[]).map((m) => (
+                  <SelectItem key={m} value={m} className="text-[12px]">{MODE_LABEL[m]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Badge variant="outline" className="ml-auto text-[10px]">
+              {filtered.length.toLocaleString()} of {flat.length.toLocaleString()} communities
+            </Badge>
+            <Button size="sm" variant="outline" className="h-8 text-[11px]" disabled={!exportRows.length}
+              onClick={() => exportXlsx(exportRows, COLS, null, `At_risk_communities_${stamp}.xlsx`)}>
+              <FileSpreadsheet className="mr-1 h-3.5 w-3.5" /> Excel
+            </Button>
+            <Button size="sm" variant="outline" className="h-8 text-[11px]" disabled={!exportRows.length}
+              onClick={() => exportCsv(exportRows, COLS, null, `At_risk_communities_${stamp}.csv`)}>
+              <Download className="mr-1 h-3.5 w-3.5" /> CSV
+            </Button>
           </div>
-          <Button size="sm" variant="outline" className="h-8 text-[11px]" disabled={!exportRows.length}
-            onClick={() => exportXlsx(exportRows, COLS, null, `At_risk_communities_${stamp}.xlsx`)}>
-            <FileSpreadsheet className="mr-1 h-3.5 w-3.5" /> Excel
-          </Button>
-          <Button size="sm" variant="outline" className="h-8 text-[11px]" disabled={!exportRows.length}
-            onClick={() => exportCsv(exportRows, COLS, null, `At_risk_communities_${stamp}.csv`)}>
-            <Download className="mr-1 h-3.5 w-3.5" /> CSV
-          </Button>
+          <GeoFilterBar
+            records={flat}
+            scope={scope}
+            onScopeChange={setScope}
+            query={q}
+            onQueryChange={setQ}
+            queryPlaceholder="Quick lookup — community, CDD, FLHF or phone…"
+          />
         </div>
+
 
         {!filtered.length ? (
           <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-4 text-[12px] text-emerald-800">
