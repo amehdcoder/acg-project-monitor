@@ -61,6 +61,9 @@ interface ConsoleMessage {
   meta?: FrontierMeta | null;
   attachments?: { name: string; kind: string }[];
   streaming?: boolean;
+  /** True when the user cancelled the stream mid-flight. */
+  stopped?: boolean;
+
 }
 
 const uid = () => `m_${Math.random().toString(36).slice(2, 10)}`;
