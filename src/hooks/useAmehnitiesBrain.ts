@@ -65,6 +65,10 @@ export interface Telemetry {
   alert: DivergenceAlert | null;
   trainTokens: number;
   valTokens: number;
+  /** Autonomous capacity growth ("neurogenesis"). */
+  plasticity?: boolean;
+  growth?: { at: number; reason: string; from: number; to: number; cfg: Telemetry["cfg"] }[];
+  maxParams?: number;
 }
 
 export interface QueryResult {
