@@ -453,17 +453,19 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
           ))}
         </div>
 
+        {/* searchable State / LGA / Ward scope + quick community lookup */}
+        <GeoFilterBar
+          records={mismatches}
+          scope={geoScope}
+          onScopeChange={setGeoScope}
+          query={query}
+          onQueryChange={setQuery}
+          queryPlaceholder="Quick community lookup — community, FLHF or monitor…"
+        />
+
         {/* toolbar */}
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative min-w-[200px] flex-1">
-            <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search community, FLHF, ward, LGA or monitor…"
-              className="h-8 pl-7 text-[12px]"
-            />
-          </div>
+
 
           <div className="flex items-center gap-1.5 rounded-md border bg-muted/40 px-2 py-1">
             <Ruler className="h-3.5 w-3.5 text-sky-600" />
