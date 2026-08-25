@@ -989,6 +989,7 @@ self.onmessage = (e: MessageEvent) => {
     case "shrink": {
       const dModel = Math.max(32, cfg.dModel / 2);
       build({ dModel, nHeads: Math.max(2, Math.min(cfg.nHeads, dModel / 16)), nLayers: Math.max(2, cfg.nLayers - 1), dFF: dModel * 4 });
+      lastGrowthAt = Date.now(); lastGrowthStep = model?.step ?? 0; plateauRef = lossEMA;
       break;
     }
   }
