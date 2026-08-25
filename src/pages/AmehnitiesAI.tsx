@@ -346,6 +346,8 @@ function AmehnitiesAIWorkspace() {
           />
         </div>
       </div>
+
+      {isOwner && <AiAccessManager open={accessOpen} onOpenChange={setAccessOpen} />}
     </div>
   );
 }
