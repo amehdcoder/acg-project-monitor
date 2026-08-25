@@ -595,7 +595,7 @@ export default function FrontierChatConsole({
         </TabsContent>
 
         {/* ------------------------------------------------------ media */}
-        <TabsContent value="media" className="pt-4">
+        <TabsContent value="media" className="pt-4" hidden={!canMediaExport}>
           <div className="flex flex-wrap gap-2">
             <Input
               value={mediaPrompt}
