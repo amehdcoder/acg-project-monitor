@@ -114,12 +114,25 @@ export default function IntegratedSupervisoryView() {
     setCache(loadKoboCache(id));
   };
 
+  /* Cheap payload fingerprint: a merged burst that resolves to the same data
+     must not push a new cache object (that would re-render every chart). */
+  const cacheSigRef = useRef<string>("");
+  const cacheSignature = (c: KoboCache | null) =>
+    !c ? "" : `${c.count}|${c.formUid ?? ""}|${(c.results?.[0] as any)?._submission_time ?? ""}|${(c.results?.[0] as any)?._id ?? ""}|${(c.results?.[c.results.length - 1] as any)?._id ?? ""}`;
+  const applyCache = useCallback((c: KoboCache) => {
+    const sig = cacheSignature(c);
+    if (sig && sig === cacheSigRef.current) return false;
+    cacheSigRef.current = sig;
+    setCache(c);
+    return true;
+  }, []);
+
   /** Pull live submissions through the server feed — filtered server-side to scope. */
   const refreshShared = useCallback(async (silent = false) => {
     setSyncing(true);
     try {
       const { cache: c, feed, scopeStates } = await fetchScopedSubmissions(feeds[0]?.id ?? null);
-      setCache(c);
+      applyCache(c);
       setFeedScopeStates(scopeStates);
       setUsingSharedFeed(true);
       setSyncError(null);
@@ -135,7 +148,7 @@ export default function IntegratedSupervisoryView() {
         toast({ title: "Refresh failed", description: e?.message ?? "Unable to load live data.", variant: "destructive" });
       }
     } finally { setSyncing(false); }
-  }, [feeds]);
+  }, [feeds, applyCache]);
 
   const refresh = useCallback(async (silent = false) => {
     const id = getActiveConnectionId();
@@ -149,7 +162,7 @@ export default function IntegratedSupervisoryView() {
     setSyncing(true);
     try {
       const c = await fetchSubmissions(cfg, id);
-      setCache(c);
+      applyCache(c);
       setUsingSharedFeed(false);
       setSyncError(null);
       // Keep the shared feed in step so grantees always see the live connection.
@@ -166,7 +179,7 @@ export default function IntegratedSupervisoryView() {
       setSyncError({ message: e?.message || "Unable to reach KoboToolbox.", hint: e?.hint });
       if (!silent) toast({ title: "Refresh failed", description: e?.hint || e?.message || "Unable to reach KoboToolbox.", variant: "destructive" });
     } finally { setSyncing(false); }
-  }, [perms.canManageIntegrations, feeds, refreshShared]);
+  }, [perms.canManageIntegrations, feeds, refreshShared, applyCache]);
 
   /* Load the shared feed registry once the user is known, then hydrate any
      cached scoped payload so grantees paint instantly, offline included. */
