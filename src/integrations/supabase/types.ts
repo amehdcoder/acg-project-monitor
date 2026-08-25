@@ -3413,6 +3413,42 @@ export type Database = {
           },
         ]
       }
+      checklist_dashboard_feeds: {
+        Row: {
+          api_token: string
+          created_at: string
+          created_by: string | null
+          form_uid: string
+          id: string
+          is_active: boolean
+          name: string
+          server_url: string
+          updated_at: string
+        }
+        Insert: {
+          api_token: string
+          created_at?: string
+          created_by?: string | null
+          form_uid: string
+          id?: string
+          is_active?: boolean
+          name: string
+          server_url?: string
+          updated_at?: string
+        }
+        Update: {
+          api_token?: string
+          created_at?: string
+          created_by?: string | null
+          form_uid?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          server_url?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       client_error_logs: {
         Row: {
           component: string
@@ -9272,6 +9308,7 @@ export type Database = {
           granted_by: string
           id: string
           page_id: string
+          scope_states: string[]
           starts_at: string | null
           user_id: string
         }
@@ -9281,6 +9318,7 @@ export type Database = {
           granted_by: string
           id?: string
           page_id: string
+          scope_states?: string[]
           starts_at?: string | null
           user_id: string
         }
@@ -9290,6 +9328,7 @@ export type Database = {
           granted_by?: string
           id?: string
           page_id?: string
+          scope_states?: string[]
           starts_at?: string | null
           user_id?: string
         }
