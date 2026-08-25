@@ -38,7 +38,7 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  findGrid3Named, nearestGrid3Settlement, warmGrid3Index, norm,
+  findGrid3Named, nearestGrid3InWard, warmGrid3Index, norm,
   type NamedGrid3Match, type NearestSettlement,
 } from "@/lib/isc/grid3Nearest";
 import Grid3MismatchDetailDialog, { type Grid3DrillSpec } from "./Grid3MismatchDetailDialog";
@@ -141,11 +141,12 @@ const SCOPE_LABEL: Record<string, string> = {
 };
 
 const SCOPE_NOTE: Record<string, string> = {
-  ward: "matched inside the declared Ward and LGA",
-  lga: "no same-name settlement in the declared Ward — widened to the declared LGA",
-  state: "no same-name settlement in the declared LGA — widened to the declared State",
-  unscoped: "record carried no administrative labels, so the whole registry was searched",
+  ward: "matched inside the declared Ward of the declared LGA and State — no widening",
+  lga: "widened to the declared LGA",
+  state: "widened to the declared State",
+  unscoped: "no administrative labels on the record",
 };
+
 
 
 type SortKey = "distance" | "community" | "lga" | "monitor" | "date";
@@ -226,9 +227,12 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
         if (cancelled) return;
         const p = points[i];
         const named = await findGrid3Named(p.community, p.lat, p.lng, {
-          ward: p.ward, lga: p.lga, state: p.state, strict: true,
+          ward: p.ward, lga: p.lga, state: p.state, strict: true, wardOnly: true,
         });
-        const nearest = await nearestGrid3Settlement(p.lat, p.lng, 25000);
+        // Spatial evidence is likewise confined to the declared Ward/LGA/State.
+        const nearest = await nearestGrid3InWard(p.lat, p.lng, {
+          ward: p.ward, lga: p.lga, state: p.state,
+        });
         out.push({ ...p, named, nearest, lookupAt: new Date().toISOString() });
         if (i % 15 === 0) {
           setProgress({ done: i + 1, total: points.length });
@@ -690,14 +694,14 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
         )}
 
         <p className="rounded-md border border-dashed bg-muted/40 px-3 py-2 text-[10.5px] leading-relaxed text-muted-foreground">
-          <strong>How to read this register.</strong> Every community name is looked up <strong>only inside the Ward and
-          LGA declared on the checklist</strong> — a settlement of the same name in another State is never used as the
-          comparison point. If the declared Ward holds no such name, the search widens one step at a time (Ward → LGA →
-          State) and the scope that produced the match is shown in the Provenance column. Distances are great-circle
-          (Haversine) separations between the supervisor's device fix and the GRID3 registry coordinate. A capture is
-          conforming when a same-name registry settlement lies within {radiusM / 1000} km of the fix and the registry
-          agrees on the Ward and LGA. “Not in GRID3 registry” usually signals a locally-used community alias; “Name does
-          not match point” signals the monitor stood in a different settlement than the one recorded.
+          <strong>How to read this register.</strong> Every community is compared <strong>only with GRID3 settlements
+          inside the same Ward, of the same LGA and State declared on the checklist</strong> — the search never widens
+          to a neighbouring ward, LGA or state, so a same-name settlement elsewhere is never used as the comparison
+          point. Distances are great-circle (Haversine) separations between the supervisor's device fix and the GRID3
+          registry coordinate. A capture is conforming when a same-name registry settlement in that ward lies within
+          {" "}{radiusM / 1000} km of the fix. “Not in GRID3 registry” means no settlement of that name exists in the
+          declared ward (a local alias, or an incomplete Ward/LGA on the record); “Name does not match point” means the
+          nearest registry settlement in that same ward carries a different name than the one recorded.
         </p>
 
       </CardContent>

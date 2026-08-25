@@ -34,7 +34,10 @@ interface Index {
   buckets: Map<string, number[]>;
   /** normalised settlement name → row indices (registry name lookup). */
   names: Map<string, number[]>;
+  /** normalised "state|lga|ward" → row indices (administrative scoping). */
+  wards: Map<string, number[]>;
 }
+
 
 
 const CELL = 0.1; // ≈ 11 km
@@ -49,12 +52,14 @@ function build(data: Blob): Index {
   const name: string[] = [], ward: string[] = [], lga: string[] = [], state: string[] = [];
   const buckets = new Map<string, number[]>();
   const names = new Map<string, number[]>();
+  const wardIdx = new Map<string, number[]>();
 
   for (const st of Object.keys(data)) {
     const lgas = data[st] || {};
     for (const lg of Object.keys(lgas)) {
       const wards = lgas[lg] || {};
       for (const wd of Object.keys(wards)) {
+        const wKey = wardKey(st, lg, wd);
         for (const entry of wards[wd] || []) {
           const [n, la, ln] = entry;
           if (la == null || ln == null || !Number.isFinite(la) || !Number.isFinite(ln)) continue;
@@ -69,6 +74,8 @@ function build(data: Blob): Index {
             const nb = names.get(nk);
             if (nb) nb.push(i); else names.set(nk, [i]);
           }
+          const wb = wardIdx.get(wKey);
+          if (wb) wb.push(i); else wardIdx.set(wKey, [i]);
         }
       }
     }
@@ -77,13 +84,17 @@ function build(data: Blob): Index {
   return {
     lat: Float64Array.from(lat),
     lng: Float64Array.from(lng),
-    name, ward, lga, state, buckets, names,
+    name, ward, lga, state, buckets, names, wards: wardIdx,
   };
 }
 
 /** Normalise a place name for registry lookups. */
 export const norm = (s: string) =>
   String(s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+
+/** Composite key for the strict "same Ward of the same LGA and State" scope. */
+export const wardKey = (state: string, lga: string, ward: string) =>
+  `${norm(state)}|${norm(lga)}|${norm(ward)}`;
 
 
 /** Load + index the registry once. Safe to call repeatedly / concurrently. */
@@ -192,18 +203,19 @@ function fuzzyKeys(idx: Index, key: string): string[] {
  * administrative unit the monitor declared, and sits closest to the captured
  * GPS point.
  *
- * Scoping is strict by default: a community named "Obasanjo" declared in a Yobe
- * ward is only ever compared with registry settlements of that name inside the
- * SAME Ward and LGA — never with a same-name settlement in Bayelsa. When the
- * declared ward yields no candidate we relax one step at a time (Ward → LGA →
- * State) and report which scope produced the match, so the audit can show it.
- * With `strict: true` (default) the search never leaves the declared State.
+ * With `wardOnly: true` (used by the coordinate accuracy audit) the comparison
+ * NEVER leaves the declared Ward of the declared LGA and State — a community is
+ * only ever measured against registry settlements of that same ward. Records
+ * without a full Ward + LGA chain return no match instead of silently widening.
+ *
+ * Otherwise scoping is strict by default and relaxes one step at a time
+ * (Ward → LGA → State), reporting which scope produced the match.
  */
 export async function findGrid3Named(
   community: string,
   lat: number,
   lng: number,
-  scope: { ward?: string; lga?: string; state?: string; strict?: boolean } = {},
+  scope: { ward?: string; lga?: string; state?: string; strict?: boolean; wardOnly?: boolean } = {},
 ): Promise<NamedGrid3Match | null> {
   const key = norm(community);
   if (!key) return null;
@@ -215,26 +227,30 @@ export async function findGrid3Named(
   const stateK = norm(scope.state ?? "");
   const strict = scope.strict !== false;
 
+  const inWard = (i: number) =>
+    norm(idx.ward[i]) === wardK &&
+    norm(idx.lga[i]) === lgaK &&
+    (!stateK || norm(idx.state[i]) === stateK);
+
   const levels: { name: NamedGrid3Match["scope"]; ok: (i: number) => boolean }[] = [];
-  if (wardK && lgaK) {
-    levels.push({
-      name: "ward",
-      ok: (i) =>
-        norm(idx.ward[i]) === wardK &&
-        norm(idx.lga[i]) === lgaK &&
-        (!stateK || norm(idx.state[i]) === stateK),
-    });
+
+  if (scope.wardOnly) {
+    // Same Ward / same LGA / same State only — no widening at all.
+    if (!wardK || !lgaK) return null;
+    levels.push({ name: "ward", ok: inWard });
+  } else {
+    if (wardK && lgaK) levels.push({ name: "ward", ok: inWard });
+    if (lgaK) {
+      levels.push({
+        name: "lga",
+        ok: (i) => norm(idx.lga[i]) === lgaK && (!stateK || norm(idx.state[i]) === stateK),
+      });
+    }
+    if (stateK) levels.push({ name: "state", ok: (i) => norm(idx.state[i]) === stateK });
+    // Only fall through to a nationwide search when the caller opts out of strict
+    // scoping, or when the record carries no administrative labels at all.
+    if (!strict || levels.length === 0) levels.push({ name: "unscoped", ok: () => true });
   }
-  if (lgaK) {
-    levels.push({
-      name: "lga",
-      ok: (i) => norm(idx.lga[i]) === lgaK && (!stateK || norm(idx.state[i]) === stateK),
-    });
-  }
-  if (stateK) levels.push({ name: "state", ok: (i) => norm(idx.state[i]) === stateK });
-  // Only fall through to a nationwide search when the caller opts out of strict
-  // scoping, or when the record carries no administrative labels at all.
-  if (!strict || levels.length === 0) levels.push({ name: "unscoped", ok: () => true });
 
   const closest = (
     cands: number[],
@@ -275,3 +291,33 @@ export async function findGrid3Named(
   return null;
 }
 
+
+/**
+ * Nearest registry settlement WITHIN the declared Ward of the declared LGA and
+ * State. Used by the coordinate accuracy audit so "name mismatch" evidence is
+ * never drawn from a neighbouring ward, LGA or state.
+ */
+export async function nearestGrid3InWard(
+  lat: number,
+  lng: number,
+  scope: { ward?: string; lga?: string; state?: string },
+): Promise<NearestSettlement | null> {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (!norm(scope.ward ?? "") || !norm(scope.lga ?? "")) return null;
+  const idx = await loadGrid3Index();
+  if (!idx) return null;
+
+  const rows = idx.wards.get(wardKey(scope.state ?? "", scope.lga ?? "", scope.ward ?? ""));
+  if (!rows?.length) return null;
+
+  let best = -1, bestD = Infinity;
+  for (const i of rows) {
+    const d = haversine(lat, lng, idx.lat[i], idx.lng[i]);
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  if (best < 0) return null;
+  return {
+    settlement: idx.name[best], ward: idx.ward[best], lga: idx.lga[best],
+    state: idx.state[best], lat: idx.lat[best], lng: idx.lng[best], distanceM: bestD,
+  };
+}
