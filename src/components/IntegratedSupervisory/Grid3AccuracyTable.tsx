@@ -270,13 +270,15 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
       resolved.map((r) => {
         const { named, nearest } = r;
         let verdict: Verdict = "match";
-        if (!named) verdict = "not_in_registry";
+        if (!r.wardRegistryCount) verdict = "no_ward_registry";
+        else if (!named) verdict = "not_in_registry";
         else if (named.distanceM > radiusM) verdict = "out_of_radius";
         else if (nearest && norm(nearest.settlement) !== norm(r.community) && nearest.distanceM < 1500) {
           verdict = "name_mismatch";
         } else if ((r.ward && norm(named.ward) !== norm(r.ward)) || (r.lga && norm(named.lga) !== norm(r.lga))) {
           verdict = "admin_mismatch";
         }
+
         return {
           ...r,
           verdict,
