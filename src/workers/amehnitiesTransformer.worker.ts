@@ -673,6 +673,8 @@ function tick() {
     lastEvalAt = Date.now();
     evaluateValidation();
   }
+  // Grow the network itself when experience outpaces capacity.
+  if (steps > 0) maybeGrow();
   if (now - lastTelemetry > 250) { postTelemetry(); lastTelemetry = now; }
   // yield generously so the UI thread and the rest of the app stay smooth
   timer = setTimeout(tick, steps > 0 ? 24 : 400);
