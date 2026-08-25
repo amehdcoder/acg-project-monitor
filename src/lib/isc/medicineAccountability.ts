@@ -449,6 +449,8 @@ export function parseLogistics(raws: any[]): LogisticsDataset {
         expiry: str(getAny(item, ["l2_expiry_date", "Expiry_Date_001", "Expiry_Date_Issued", "Expiry_Date"])),
         facility: str(get(raw, "Health_Facility_Name")) || "—",
         inCharge: str(get(raw, "Health_Facility_In_Charge_Name")) || "—",
+        inChargePhone: scanPhone([item, raw], INCHARGE_PHONE_RE),
+
         priorBalance: num(get(item, "current_balanace")),
         qtyIssued: num(get(item, "qiflhf")),
         remainingLga: num(get(item, "l2_lga_rem_stock")),
