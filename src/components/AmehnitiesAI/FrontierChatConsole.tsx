@@ -160,22 +160,31 @@ export default function FrontierChatConsole({
     }
   }, [telemetry, corpusEvents]);
 
-  const ask = useCallback(async (question: string) => {
+  const ask = useCallback(async (question: string, opts?: { replaceLastTurn?: boolean }) => {
     const q = question.trim();
     if (!q || busy) return;
 
-    const userMsg: ConsoleMessage = {
-      id: uid(),
-      role: "user",
-      content: q,
-      attachments: attachments.map((a) => ({ name: a.name, kind: a.kind })),
-    };
     const assistantId = uid();
-    setMessages((cur) => [
-      ...cur,
-      userMsg,
-      { id: assistantId, role: "assistant", content: "", streaming: true },
-    ]);
+    setMessages((cur) => {
+      // On retry, drop the previous user/assistant pair so the thread stays clean.
+      let base = cur;
+      if (opts?.replaceLastTurn) {
+        base = [...cur];
+        if (base.at(-1)?.role === "assistant") base.pop();
+        if (base.at(-1)?.role === "user") base.pop();
+      }
+      return [
+        ...base,
+        {
+          id: uid(),
+          role: "user" as const,
+          content: q,
+          attachments: attachments.map((a) => ({ name: a.name, kind: a.kind })),
+        },
+        { id: assistantId, role: "assistant" as const, content: "", streaming: true },
+      ];
+    });
+    setLastQuestion(q);
     setInput("");
     setBusy(true);
     setAnalysis(null);
@@ -197,22 +206,37 @@ export default function FrontierChatConsole({
           setMessages((cur) => cur.map((m) => (m.id === assistantId ? { ...m, content: full } : m))),
       });
     } catch (e: any) {
-      if (e?.name !== "AbortError") {
-        toast.error("Assistant failed", { description: e?.message });
-        setMessages((cur) =>
-          cur.map((m) =>
-            m.id === assistantId
-              ? { ...m, content: m.content || `⚠️ ${e?.message ?? "Request failed."}` }
-              : m,
-          ),
-        );
-      }
+      const aborted = e?.name === "AbortError" || controller.signal.aborted;
+      setMessages((cur) =>
+        cur.map((m) =>
+          m.id === assistantId
+            ? aborted
+              // Keep whatever streamed so far and mark the turn as stopped.
+              ? { ...m, stopped: true, content: m.content ? `${m.content}\n\n_Stopped._` : "_Stopped._" }
+              : { ...m, content: m.content || `⚠️ ${e?.message ?? "Request failed."}` }
+            : m,
+        ),
+      );
+      if (!aborted) toast.error("Assistant failed", { description: e?.message });
     } finally {
       setMessages((cur) => cur.map((m) => (m.id === assistantId ? { ...m, streaming: false } : m)));
       setBusy(false);
       abortRef.current = null;
     }
   }, [attachments, busy, messages, telemetrySummary]);
+
+  /** Cancels the in-flight stream immediately; the partial answer is kept. */
+  const stopStreaming = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+  }, []);
+
+  /** Re-sends the last question, replacing the previous (stopped or failed) turn. */
+  const retryLast = useCallback(async () => {
+    if (!lastQuestion || busy) return;
+    await ask(lastQuestion, { replaceLastTurn: true });
+  }, [ask, busy, lastQuestion]);
+
 
   /* ------------------------------------------------------------ analysis */
   const doAnalysis = useCallback(async () => {
