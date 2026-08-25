@@ -226,9 +226,12 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
         if (cancelled) return;
         const p = points[i];
         const named = await findGrid3Named(p.community, p.lat, p.lng, {
-          ward: p.ward, lga: p.lga, state: p.state, strict: true,
+          ward: p.ward, lga: p.lga, state: p.state, strict: true, wardOnly: true,
         });
-        const nearest = await nearestGrid3Settlement(p.lat, p.lng, 25000);
+        // Spatial evidence is likewise confined to the declared Ward/LGA/State.
+        const nearest = await nearestGrid3InWard(p.lat, p.lng, {
+          ward: p.ward, lga: p.lga, state: p.state,
+        });
         out.push({ ...p, named, nearest, lookupAt: new Date().toISOString() });
         if (i % 15 === 0) {
           setProgress({ done: i + 1, total: points.length });
