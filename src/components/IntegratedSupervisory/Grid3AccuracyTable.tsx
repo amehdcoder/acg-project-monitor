@@ -186,6 +186,7 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [running, setRunning] = useState(false);
   const [query, setQuery] = useState("");
+  const [geoScope, setGeoScope] = useState<GeoScope>(EMPTY_GEO_SCOPE);
   const [verdictFilter, setVerdictFilter] = useState<"all" | Exclude<Verdict, "match">>("all");
   const [nonce, setNonce] = useState(0);
   const [drill, setDrill] = useState<Grid3DrillSpec | null>(null);
