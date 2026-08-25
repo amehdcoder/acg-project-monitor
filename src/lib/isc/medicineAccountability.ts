@@ -476,6 +476,11 @@ export function parseLogistics(raws: any[]): LogisticsDataset {
           facility,
           community: communityName,
           cddName,
+          cddPhone: scanPhone([item, community], CDD_PHONE_RE) || scanPhone([community], /./),
+          inCharge: str(getAny(community, ["Health_Facility_In_Charge_Name_001"]))
+            || str(get(raw, "Health_Facility_In_Charge_Name")) || "—",
+          inChargePhone: scanPhone([raw], INCHARGE_PHONE_RE),
+
           qtyIssued: num(get(item, "Quantity_Issued_to_CDD")),
           hasPhoto: hasMedia(get(item, "CDD_Receipt_Photo_Confirmation")),
           barcode: findCode(item, community, raw),
