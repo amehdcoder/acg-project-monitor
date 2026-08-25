@@ -146,7 +146,7 @@ export async function fetchScopedSubmissions(feedId?: string | null): Promise<Sc
   return {
     cache,
     feed,
-    scopeStates: (d?.scope_states ?? []) as string[],
+    scopeStates,
     total: Number(d?.total ?? results.length),
   };
 }
