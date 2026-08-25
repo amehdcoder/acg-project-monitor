@@ -67,7 +67,9 @@ function parsePoint(v: unknown): { lat: number; lng: number } | null {
   return { lat: p[0], lng: p[1] };
 }
 
-type Verdict = "out_of_radius" | "name_mismatch" | "not_in_registry" | "admin_mismatch" | "match";
+type Verdict =
+  | "out_of_radius" | "name_mismatch" | "not_in_registry" | "admin_mismatch"
+  | "no_ward_registry" | "match";
 
 const VERDICT_META: Record<Exclude<Verdict, "match">, { label: string; note: string; cls: string; dot: string }> = {
   out_of_radius: {
@@ -94,7 +96,14 @@ const VERDICT_META: Record<Exclude<Verdict, "match">, { label: string; note: str
     cls: "bg-indigo-50 text-indigo-700 border-indigo-300",
     dot: "#4F46E5",
   },
+  no_ward_registry: {
+    label: "Ward absent from registry",
+    note: "The GRID3 registry holds no settlement at all for the declared Ward of this LGA and State, so the capture cannot be compared without leaving the ward — it is unverifiable, not necessarily wrong.",
+    cls: "bg-slate-100 text-slate-700 border-slate-300",
+    dot: "#64748B",
+  },
 };
+
 
 /** A resolved capture — radius-independent (lookups run once). */
 interface ResolvedRow {
