@@ -54,10 +54,7 @@ async function resolveCaller(req: Request): Promise<Caller | null> {
   const isAdmin = !!profile?.is_owner || !!profile?.is_co_owner ||
     (roles ?? []).some((r: { role: string }) => r.role === "super_admin" || r.role === "systems_admin");
 
-  const now = Date.now();
-  const active = !!grant &&
-    (!grant.starts_at || new Date(grant.starts_at).getTime() <= now) &&
-    (!grant.expires_at || new Date(grant.expires_at).getTime() > now);
+  const active = isGrantActive(grant);
 
   return {
     userId,
@@ -67,7 +64,7 @@ async function resolveCaller(req: Request): Promise<Caller | null> {
   };
 }
 
-const norm = (s: unknown) => String(s ?? "").trim().toLowerCase().replace(/\s+state$/, "");
+
 
 /** Append an immutable audit line. Never throws — auditing must not break the action. */
 async function audit(row: Record<string, unknown>) {
