@@ -329,8 +329,12 @@ export default function FrontierChatConsole({
       <Tabs defaultValue="chat" className="p-3 sm:p-4">
         <TabsList>
           <TabsTrigger value="chat" className="gap-1.5"><Bot className="h-3.5 w-3.5" /> Chat</TabsTrigger>
-          <TabsTrigger value="data" className="gap-1.5"><Database className="h-3.5 w-3.5" /> Data ({attachments.length})</TabsTrigger>
-          <TabsTrigger value="media" className="gap-1.5"><ImageIcon className="h-3.5 w-3.5" /> Media</TabsTrigger>
+          {canDatasets && (
+            <TabsTrigger value="data" className="gap-1.5"><Database className="h-3.5 w-3.5" /> Data ({attachments.length})</TabsTrigger>
+          )}
+          {canMediaExport && (
+            <TabsTrigger value="media" className="gap-1.5"><ImageIcon className="h-3.5 w-3.5" /> Media</TabsTrigger>
+          )}
           <TabsTrigger value="notes" className="gap-1.5"><NotebookPen className="h-3.5 w-3.5" /> Notes</TabsTrigger>
 
         </TabsList>
