@@ -119,8 +119,11 @@ interface ResolvedRow {
   lng: number;
   named: NamedGrid3Match | null;
   nearest: NearestSettlement | null;
+  /** Registry settlements available inside the declared Ward (0 ⇒ unverifiable). */
+  wardRegistryCount: number;
   /** ISO timestamp of the registry lookup (audit provenance). */
   lookupAt: string;
+
   /** All supervisor submissions that produced this capture. */
   sources: Row[];
 }
