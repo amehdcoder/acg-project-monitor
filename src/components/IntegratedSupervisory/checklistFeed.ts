@@ -70,6 +70,35 @@ export async function unpublishChecklistFeed(id: string): Promise<void> {
   await callFeed({ action: "unpublish", id });
 }
 
+/** Admin: set the State scope for a user's Checklist Dashboard grant (audited). */
+export async function setUserScopeStates(
+  userId: string,
+  scopeStates: string[],
+  pageId = "integrated-supervisory",
+): Promise<{ id: string; scope_states: string[] | null }> {
+  const d = await callFeed({ action: "set_scope", user_id: userId, page_id: pageId, scope_states: scopeStates });
+  return d.grant;
+}
+
+export interface FeedAuditEntry {
+  id: string;
+  actor_email: string | null;
+  action: string;
+  feed_name: string | null;
+  form_uid: string | null;
+  target_email: string | null;
+  page_id: string | null;
+  previous_scope_states: string[] | null;
+  new_scope_states: string[] | null;
+  created_at: string;
+}
+
+/** Admin: read the publish / unpublish / scope-change audit trail. */
+export async function listFeedAudit(limit = 200): Promise<FeedAuditEntry[]> {
+  const d = await callFeed({ action: "audit", limit });
+  return (d?.entries ?? []) as FeedAuditEntry[];
+}
+
 export interface ScopedFetchResult {
   cache: KoboCache;
   feed: ChecklistFeed;

@@ -68,6 +68,20 @@ async function resolveCaller(req: Request): Promise<Caller | null> {
 
 const norm = (s: unknown) => String(s ?? "").trim().toLowerCase().replace(/\s+state$/, "");
 
+/** Append an immutable audit line. Never throws — auditing must not break the action. */
+async function audit(row: Record<string, unknown>) {
+  try {
+    await admin.from("checklist_feed_audit").insert(row);
+  } catch (e) {
+    console.warn("checklist_feed_audit insert failed", e);
+  }
+}
+
+async function actorEmail(userId: string): Promise<string | null> {
+  const { data } = await admin.from("profiles").select("email").eq("user_id", userId).maybeSingle();
+  return (data?.email as string | null) ?? null;
+}
+
 /** Best-effort State reader across the Kobo naming conventions used in the form. */
 function readState(row: Record<string, unknown>): string {
   const isState = (leaf: string) =>
@@ -135,6 +149,16 @@ Deno.serve(async (req) => {
         .select("id, name, form_uid, server_url, is_active")
         .single();
       if (error) return json({ error: error.message }, 400);
+
+      await audit({
+        actor_id: caller.userId,
+        actor_email: await actorEmail(caller.userId),
+        action: "publish",
+        feed_id: data.id,
+        feed_name: data.name,
+        form_uid: data.form_uid,
+        details: { server_url: serverUrl },
+      });
       return json({ feed: data });
     }
 
@@ -143,9 +167,71 @@ Deno.serve(async (req) => {
       if (!caller.isAdmin) return json({ error: "Forbidden" }, 403);
       const id = String(body?.id ?? "");
       if (!id) return json({ error: "id is required" }, 400);
+      const { data: existing } = await admin
+        .from("checklist_dashboard_feeds").select("id, name, form_uid").eq("id", id).maybeSingle();
       const { error } = await admin.from("checklist_dashboard_feeds").delete().eq("id", id);
       if (error) return json({ error: error.message }, 400);
+
+      await audit({
+        actor_id: caller.userId,
+        actor_email: await actorEmail(caller.userId),
+        action: "unpublish",
+        feed_id: id,
+        feed_name: existing?.name ?? null,
+        form_uid: existing?.form_uid ?? null,
+      });
       return json({ ok: true });
+    }
+
+    /* ------------------------------------------------------- set_scope --- */
+    if (action === "set_scope") {
+      if (!caller.isAdmin) return json({ error: "Forbidden" }, 403);
+      const targetUserId = String(body?.user_id ?? "");
+      const pageId = String(body?.page_id ?? "integrated-supervisory");
+      if (!targetUserId) return json({ error: "user_id is required" }, 400);
+      const states = Array.isArray(body?.scope_states)
+        ? (body.scope_states as unknown[]).map((s) => String(s).trim()).filter(Boolean)
+        : [];
+
+      const { data: grant } = await admin
+        .from("user_page_access")
+        .select("id, scope_states")
+        .eq("user_id", targetUserId)
+        .eq("page_id", pageId)
+        .maybeSingle();
+      if (!grant) return json({ error: "This user does not have a grant for that page yet." }, 404);
+
+      const { data: updated, error } = await admin
+        .from("user_page_access")
+        .update({ scope_states: states })
+        .eq("id", grant.id)
+        .select("id, user_id, page_id, scope_states, expires_at")
+        .single();
+      if (error) return json({ error: error.message }, 400);
+
+      await audit({
+        actor_id: caller.userId,
+        actor_email: await actorEmail(caller.userId),
+        action: "scope_change",
+        target_user_id: targetUserId,
+        target_email: await actorEmail(targetUserId),
+        page_id: pageId,
+        previous_scope_states: (grant.scope_states as string[] | null) ?? [],
+        new_scope_states: states,
+      });
+      return json({ grant: updated });
+    }
+
+    /* ----------------------------------------------------------- audit --- */
+    if (action === "audit") {
+      if (!caller.isAdmin) return json({ error: "Forbidden" }, 403);
+      const { data, error } = await admin
+        .from("checklist_feed_audit")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(Math.min(500, Number(body?.limit ?? 200)));
+      if (error) return json({ error: error.message }, 400);
+      return json({ entries: data ?? [] });
     }
 
     /* ----------------------------------------------------------- fetch --- */

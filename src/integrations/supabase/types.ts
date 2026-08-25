@@ -3449,6 +3449,57 @@ export type Database = {
         }
         Relationships: []
       }
+      checklist_feed_audit: {
+        Row: {
+          action: string
+          actor_email: string | null
+          actor_id: string | null
+          created_at: string
+          details: Json
+          feed_id: string | null
+          feed_name: string | null
+          form_uid: string | null
+          id: string
+          new_scope_states: string[] | null
+          page_id: string | null
+          previous_scope_states: string[] | null
+          target_email: string | null
+          target_user_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_email?: string | null
+          actor_id?: string | null
+          created_at?: string
+          details?: Json
+          feed_id?: string | null
+          feed_name?: string | null
+          form_uid?: string | null
+          id?: string
+          new_scope_states?: string[] | null
+          page_id?: string | null
+          previous_scope_states?: string[] | null
+          target_email?: string | null
+          target_user_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_email?: string | null
+          actor_id?: string | null
+          created_at?: string
+          details?: Json
+          feed_id?: string | null
+          feed_name?: string | null
+          form_uid?: string | null
+          id?: string
+          new_scope_states?: string[] | null
+          page_id?: string | null
+          previous_scope_states?: string[] | null
+          target_email?: string | null
+          target_user_id?: string | null
+        }
+        Relationships: []
+      }
       client_error_logs: {
         Row: {
           component: string

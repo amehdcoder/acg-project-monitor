@@ -5,7 +5,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  ClipboardList, Database, GitCompareArrows, LayoutDashboard, Loader2, Lock, Plus, Radio, Server, Settings2, ShieldCheck, Trash2,
+  ClipboardList, Database, GitCompareArrows, Globe2, LayoutDashboard, Loader2, Lock, Plus, Radio, Server, Settings2, ShieldCheck, Trash2,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
@@ -52,6 +52,15 @@ export default function IntegratedSupervisoryView() {
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<{ message: string; hint?: string } | null>(null);
   const [openAccess, setOpenAccess] = useState(false);
+
+  /* ── Shared, State-scoped server feed (for granted non-admin users) ── */
+  const [feeds, setFeeds] = useState<ChecklistFeed[]>([]);
+  const [feedScopeStates, setFeedScopeStates] = useState<string[]>([]);
+  const [feedLoaded, setFeedLoaded] = useState(false);
+  const [usingSharedFeed, setUsingSharedFeed] = useState(false);
+
+  /** A user with no local Kobo credentials must read through the shared feed. */
+  const needsSharedFeed = connections.length === 0;
 
   const { lens, lensEnabled, canOpenSupervisoryTab } = useMdaLens();
 
@@ -105,10 +114,35 @@ export default function IntegratedSupervisoryView() {
     setCache(loadKoboCache(id));
   };
 
+  /** Pull live submissions through the server feed — filtered server-side to scope. */
+  const refreshShared = useCallback(async (silent = false) => {
+    setSyncing(true);
+    try {
+      const { cache: c, feed, scopeStates } = await fetchScopedSubmissions(feeds[0]?.id ?? null);
+      setCache(c);
+      setFeedScopeStates(scopeStates);
+      setUsingSharedFeed(true);
+      setSyncError(null);
+      if (!silent) {
+        toast({
+          title: "Live data refreshed",
+          description: `${c.count} submissions from ${feed.name}${scopeStates.length ? ` · ${scopeStates.join(", ")}` : ""}.`,
+        });
+      }
+    } catch (e: any) {
+      setSyncError({ message: e?.message || "Unable to load the shared Checklist feed." });
+      if (!silent) {
+        toast({ title: "Refresh failed", description: e?.message ?? "Unable to load live data.", variant: "destructive" });
+      }
+    } finally { setSyncing(false); }
+  }, [feeds]);
+
   const refresh = useCallback(async (silent = false) => {
     const id = getActiveConnectionId();
     const cfg = loadKoboConfig(id);
     if (!cfg?.formUid || !cfg?.apiToken) {
+      // Grantees have no local Kobo credentials — read the shared, scoped feed.
+      if (feeds.length) return refreshShared(silent);
       if (!silent && perms.canManageIntegrations) { setEditingId(id ?? "new"); setOpenSync(true); }
       return;
     }
@@ -116,23 +150,63 @@ export default function IntegratedSupervisoryView() {
     try {
       const c = await fetchSubmissions(cfg, id);
       setCache(c);
+      setUsingSharedFeed(false);
       setSyncError(null);
+      // Keep the shared feed in step so grantees always see the live connection.
+      if (perms.canManageIntegrations) {
+        void publishChecklistFeed(
+          listConnections().find((x) => x.id === id)?.name || "Integrated Supervisory Checklist",
+          cfg,
+        )
+          .then((f) => setFeeds((prev) => (prev.some((p) => p.id === f.id) ? prev : [...prev, f])))
+          .catch(() => { /* publishing is best-effort */ });
+      }
       if (!silent) toast({ title: "Data refreshed", description: `${c.count} submissions from KoboToolbox.` });
     } catch (e: any) {
       setSyncError({ message: e?.message || "Unable to reach KoboToolbox.", hint: e?.hint });
       if (!silent) toast({ title: "Refresh failed", description: e?.hint || e?.message || "Unable to reach KoboToolbox.", variant: "destructive" });
     } finally { setSyncing(false); }
-  }, [perms.canManageIntegrations]);
+  }, [perms.canManageIntegrations, feeds, refreshShared]);
+
+  /* Load the shared feed registry once the user is known, then hydrate any
+     cached scoped payload so grantees paint instantly, offline included. */
+  useEffect(() => {
+    if (!perms.canView || perms.loading) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const reg = await listChecklistFeeds();
+        if (cancelled) return;
+        setFeeds(reg.feeds);
+        setFeedScopeStates(reg.scopeStates);
+        if (reg.feeds[0] && needsSharedFeed) {
+          const cached = loadKoboCache(feedCacheKey(reg.feeds[0].id));
+          if (cached) { setCache(cached); setUsingSharedFeed(true); }
+        }
+      } catch { /* registry is optional for admins with local configs */ }
+      finally { if (!cancelled) setFeedLoaded(true); }
+    })();
+    return () => { cancelled = true; };
+  }, [perms.canView, perms.loading, needsSharedFeed]);
+
+  /* First live pull through the shared feed for grantees. */
+  useEffect(() => {
+    if (!feedLoaded || !needsSharedFeed || !feeds.length) return;
+    void refreshShared(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feedLoaded, needsSharedFeed, feeds.length]);
 
   // Real-time: refresh the moment KoboToolbox posts a new submission.
-  const { lastEventAt, connected } = useRealtimeKoboChecklist(() => refresh(true), {
-    enabled: perms.canView && !!activeConnection,
-  });
+  // Grantees re-pull through the scoped feed, so realtime can never widen scope.
+  const { lastEventAt, connected } = useRealtimeKoboChecklist(
+    () => (usingSharedFeed || (needsSharedFeed && feeds.length) ? refreshShared(true) : refresh(true)),
+    { enabled: perms.canView && (!!activeConnection || feeds.length > 0) },
+  );
 
   // Automatic background sync: always on (configurable interval, default 5 min),
   // plus an immediate catch-up when the tab regains focus or the device reconnects.
   useEffect(() => {
-    if (!perms.canView || !activeConnection) return;
+    if (!perms.canView || (!activeConnection && !feeds.length)) return;
     const cfg = loadKoboConfig(activeId);
     const min = Math.max(1, cfg?.pollMinutes ?? 5);
     const timer = setInterval(() => { if (navigator.onLine !== false) void refresh(true); }, min * 60 * 1000);
@@ -144,7 +218,7 @@ export default function IntegratedSupervisoryView() {
       document.removeEventListener("visibilitychange", catchUp);
       window.removeEventListener("online", catchUp);
     };
-  }, [refresh, activeId, perms.canView, activeConnection]);
+  }, [refresh, activeId, perms.canView, activeConnection, feeds.length]);
 
   // Initial auto-sync on mount so the dashboard is fresh without pressing Sync.
   useEffect(() => {
@@ -175,9 +249,26 @@ export default function IntegratedSupervisoryView() {
       <Card className="border-primary/30 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent">
         <CardContent className="p-4 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl font-bold flex items-center gap-2">
+            <h1 className="text-xl font-bold flex items-center gap-2 flex-wrap">
               <ClipboardList className="h-5 w-5 text-primary" />
-              {activeConnection?.name || "Integrated Supervisory Checklist"}
+              {activeConnection?.name || feeds[0]?.name || "Integrated Supervisory Checklist"}
+              <Badge
+                variant="outline"
+                className="gap-1 border-primary/40 bg-primary/10 text-[10px] font-semibold text-primary"
+                title={
+                  feedScopeStates.length
+                    ? `Live data is filtered on the server to ${feedScopeStates.join(", ")}.`
+                    : "You can see submissions from every State."
+                }
+              >
+                <Globe2 className="h-3 w-3" />
+                Scope: {feedScopeStates.length ? feedScopeStates.join(" · ") : "All States"}
+              </Badge>
+              {usingSharedFeed && (
+                <Badge variant="outline" className="gap-1 border-emerald-500/40 bg-emerald-500/10 text-[10px] font-semibold text-emerald-700">
+                  <Radio className="h-3 w-3" /> Shared live feed
+                </Badge>
+              )}
             </h1>
             <p className="text-xs text-muted-foreground">
               KoboToolbox-linked · offline-cached · flattened respondent analytics · {perms.roleLabel}.
@@ -264,6 +355,37 @@ export default function IntegratedSupervisoryView() {
       </Card>
 
       <LensScopeBanner lens={lens} />
+
+      {/* Scope-aware empty state — distinguishes "no feed yet" from "no data in your States". */}
+      {feedLoaded && !syncing && !feeds.length && !activeConnection && (
+        <Card className="border-amber-500/40 bg-amber-500/5">
+          <CardContent className="p-4 text-sm">
+            <p className="font-semibold text-amber-700">No live data feed has been published yet</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              An administrator needs to connect KoboToolbox and sync once. The dashboard will then stream
+              live submissions to everyone who has been granted access.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {feedLoaded && !syncing && (feeds.length > 0 || !!activeConnection) && (scopedCache?.count ?? 0) === 0 && (
+        <Card className="border-primary/30 bg-muted/30">
+          <CardContent className="p-4 text-sm">
+            <p className="font-semibold flex items-center gap-2">
+              <Globe2 className="h-4 w-4 text-primary" />
+              {feedScopeStates.length
+                ? `No submissions yet for ${feedScopeStates.join(", ")}`
+                : "No submissions available yet"}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {feedScopeStates.length
+                ? "Your access is scoped to the State(s) above, and no field submissions have landed there yet. This view updates automatically the moment one does."
+                : "The connected form has no submissions yet, or none matched the current filters."}
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs defaultValue={defaultTab} className="w-full">
         <TabsList className="flex-wrap h-auto">
