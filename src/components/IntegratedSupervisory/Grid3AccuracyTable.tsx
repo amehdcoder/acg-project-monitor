@@ -141,11 +141,12 @@ const SCOPE_LABEL: Record<string, string> = {
 };
 
 const SCOPE_NOTE: Record<string, string> = {
-  ward: "matched inside the declared Ward and LGA",
-  lga: "no same-name settlement in the declared Ward — widened to the declared LGA",
-  state: "no same-name settlement in the declared LGA — widened to the declared State",
-  unscoped: "record carried no administrative labels, so the whole registry was searched",
+  ward: "matched inside the declared Ward of the declared LGA and State — no widening",
+  lga: "widened to the declared LGA",
+  state: "widened to the declared State",
+  unscoped: "no administrative labels on the record",
 };
+
 
 
 type SortKey = "distance" | "community" | "lga" | "monitor" | "date";
