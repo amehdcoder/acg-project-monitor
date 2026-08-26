@@ -108,6 +108,27 @@ export default function NeuralNetworkCanvas({ telemetry, running, height = 420 }
       const norms = tel?.weightNorms ?? [];
       const maxE = Math.max(1e-3, ...energy);
 
+      // ---- measured backpropagation signal (∂L/∂W per stage)
+      const flow = tel?.gradFlow ?? null;
+      const gradPerColumn: number[] = new Array(columns).fill(0);
+      if (flow) {
+        gradPerColumn[0] = flow.embed;
+        for (let l = 0; l < nLayers; l++) {
+          gradPerColumn[1 + l * 2] = flow.blocks[l]?.attn ?? 0;
+          gradPerColumn[2 + l * 2] = flow.blocks[l]?.ffn ?? 0;
+        }
+        gradPerColumn[columns - 1] = flow.head;
+      }
+      const maxG = Math.max(1e-6, ...gradPerColumn);
+      const gradAt = (c: number) => Math.min(1, (gradPerColumn[c] ?? 0) / maxG);
+
+      // Forward pass then backward pass, in alternating sweeps, so the picture
+      // shows the real training loop: activations flow →, gradients flow ←.
+      const CYCLE = 3.0;
+      const phaseT = running ? t % CYCLE : 0;
+      const backward = running && phaseT >= CYCLE / 2;
+      const sweep = running ? ((phaseT % (CYCLE / 2)) / (CYCLE / 2)) : 0;
+
       type Node = { x: number; y: number; r: number; a: number };
       const cols: Node[][] = [];
       const colMeta: { label: string; kind: "embed" | "attn" | "ffn" | "head"; fresh: number }[] = [];
@@ -144,6 +165,7 @@ export default function NeuralNetworkCanvas({ telemetry, running, height = 420 }
         makeCol(2 + l * 2, 8, nf, "ffn", `ffn ${l + 1}`);
       }
       makeCol(columns - 1, 6, 0.7, "head", "head");
+
 
       // ---- connections
       ctx.lineWidth = 1;
