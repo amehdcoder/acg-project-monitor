@@ -6,11 +6,14 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Brain, Activity, Layers, Gauge, Play, Pause, Plus, Minus, Cpu, Radio, Sparkles, Zap,
+  Sprout, Globe,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
+
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAmehnitiesBrain } from "@/hooks/useAmehnitiesBrain";
