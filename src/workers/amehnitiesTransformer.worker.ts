@@ -826,6 +826,12 @@ function postTelemetry(structural = false) {
     streamSize: stream.length,
     ctx,
     gradNorm: gradNormEMA,
+    gradFlow: lastGradFlow,
+    updateNorm: updateNormEMA,
+    clipScale,
+    optimSteps,
+    lr: cfg.lr,
+
     tokensPerSec,
     stepsPerSec,
     entropy: meanEntropy,
