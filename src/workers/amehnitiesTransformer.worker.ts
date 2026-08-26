@@ -681,12 +681,19 @@ function tick() {
     }
     if (!used) break;
     if (used > 1) { const inv = 1 / used; for (const p of model.params) for (let i = 0; i < p.size; i++) p.g[i] *= inv; }
+    // Sample the raw ∂L/∂W per stage right before the optimiser consumes it,
+    // throttled to the telemetry cadence so it costs nothing between frames.
+    if (performance.now() - lastTelemetry > 250) lastGradFlow = model.gradFlow();
     const gn = model.adam();
     const loss = batchLoss / used;
     checkDivergence(gn, loss);
     if (!running) { postTelemetry(true); return; }
+    updateNormEMA = updateNormEMA === 0 ? model.lastUpdate : updateNormEMA * 0.9 + model.lastUpdate * 0.1;
+    clipScale = model.lastClip;
+    optimSteps++;
     gradNormEMA = gradNormEMA === 0 ? gn : gradNormEMA * 0.9 + gn * 0.1;
     lossEMA = lossEMA === 0 ? loss : lossEMA * 0.95 + loss * 0.05;
+
     tokensSeen += cfg.ctx * used;
     winTokens += cfg.ctx * used;
     winSteps++;
