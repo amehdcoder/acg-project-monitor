@@ -53,6 +53,16 @@ export interface Telemetry {
   streamSize: number;
   ctx: number;
   gradNorm: number;
+  /** Backpropagation: measured ∂L/∂W per stage of the network. */
+  gradFlow?: { embed: number; blocks: { attn: number; ffn: number }[]; head: number } | null;
+  /** L2 norm of the last Adam weight update (gradient-descent step size). */
+  updateNorm?: number;
+  /** Gradient-clipping scale applied on the last step (1 = unclipped). */
+  clipScale?: number;
+  /** Number of optimiser (gradient-descent) updates applied. */
+  optimSteps?: number;
+  lr?: number;
+
   tokensPerSec: number;
   stepsPerSec: number;
   entropy: number;
