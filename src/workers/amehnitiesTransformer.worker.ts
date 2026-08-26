@@ -322,6 +322,32 @@ class Transformer {
     }
   }
 
+  /**
+   * Per-stage L2 norm of the gradients currently held on the parameters —
+   * i.e. the actual ∂L/∂W produced by the last backward pass. This is what the
+   * visualisation animates, so the backward wave is real measured signal.
+   */
+  gradFlow() {
+    const n2 = (ts: Tensor[]) => {
+      let s = 0;
+      for (const t of ts) for (let i = 0; i < t.size; i++) s += t.g[i] * t.g[i];
+      return Math.sqrt(s);
+    };
+    return {
+      embed: n2([this.emb, this.pos]),
+      blocks: this.layers.map((L) => ({
+        attn: n2([L.Wq, L.Wk, L.Wv, L.Wo]),
+        ffn: n2([L.W1, L.W2]),
+      })),
+      head: n2([this.head, this.headB, this.gF, this.bF]),
+    };
+  }
+
+  /** L2 norm of the last Adam parameter update (how far the weights moved). */
+  lastUpdate = 0;
+  /** Gradient-clipping scale applied on the last step (1 = no clipping). */
+  lastClip = 1;
+
   adam() {
     this.step++;
     const { lr } = this.cfg;
@@ -332,17 +358,23 @@ class Transformer {
     for (const p of this.params) for (let i = 0; i < p.size; i++) sq += p.g[i] * p.g[i];
     const norm = Math.sqrt(sq);
     const clip = norm > 1 ? 1 / norm : 1;
+    let upd = 0;
     for (const p of this.params) {
       for (let i = 0; i < p.size; i++) {
         const g = p.g[i] * clip;
         p.m[i] = b1 * p.m[i] + (1 - b1) * g;
         p.s[i] = b2 * p.s[i] + (1 - b2) * g * g;
-        p.v[i] -= lr * (p.m[i] / c1) / (Math.sqrt(p.s[i] / c2) + eps);
+        const delta = lr * (p.m[i] / c1) / (Math.sqrt(p.s[i] / c2) + eps);
+        p.v[i] -= delta;
+        upd += delta * delta;
       }
     }
+    this.lastUpdate = Math.sqrt(upd);
+    this.lastClip = clip;
     return norm;
   }
 }
+
 
 function layerNorm(x: Float32Array, g: Float32Array, b: Float32Array, T: number, D: number, out: Float32Array, mu: Float32Array, iv: Float32Array) {
   for (let t = 0; t < T; t++) {
@@ -395,6 +427,17 @@ export interface MetricSample {
 }
 let metrics: MetricSample[] = [];
 let gradNormEMA = 0;
+/** Backpropagation telemetry: per-stage ∂L/∂W, optimiser step size, clipping. */
+export interface GradFlow {
+  embed: number;
+  blocks: { attn: number; ffn: number }[];
+  head: number;
+}
+let lastGradFlow: GradFlow | null = null;
+let updateNormEMA = 0;
+let clipScale = 1;
+let optimSteps = 0;
+
 let tokensPerSec = 0;
 let stepsPerSec = 0;
 let winTokens = 0, winSteps = 0, winStart = 0;
@@ -649,12 +692,19 @@ function tick() {
     }
     if (!used) break;
     if (used > 1) { const inv = 1 / used; for (const p of model.params) for (let i = 0; i < p.size; i++) p.g[i] *= inv; }
+    // Sample the raw ∂L/∂W per stage right before the optimiser consumes it,
+    // throttled to the telemetry cadence so it costs nothing between frames.
+    if (performance.now() - lastTelemetry > 250) lastGradFlow = model.gradFlow();
     const gn = model.adam();
     const loss = batchLoss / used;
     checkDivergence(gn, loss);
     if (!running) { postTelemetry(true); return; }
+    updateNormEMA = updateNormEMA === 0 ? model.lastUpdate : updateNormEMA * 0.9 + model.lastUpdate * 0.1;
+    clipScale = model.lastClip;
+    optimSteps++;
     gradNormEMA = gradNormEMA === 0 ? gn : gradNormEMA * 0.9 + gn * 0.1;
     lossEMA = lossEMA === 0 ? loss : lossEMA * 0.95 + loss * 0.05;
+
     tokensSeen += cfg.ctx * used;
     winTokens += cfg.ctx * used;
     winSteps++;
@@ -776,6 +826,12 @@ function postTelemetry(structural = false) {
     streamSize: stream.length,
     ctx,
     gradNorm: gradNormEMA,
+    gradFlow: lastGradFlow,
+    updateNorm: updateNormEMA,
+    clipScale,
+    optimSteps,
+    lr: cfg.lr,
+
     tokensPerSec,
     stepsPerSec,
     entropy: meanEntropy,
