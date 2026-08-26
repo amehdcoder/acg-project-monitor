@@ -6,11 +6,14 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Brain, Activity, Layers, Gauge, Play, Pause, Plus, Minus, Cpu, Radio, Sparkles, Zap,
+  Sprout, Globe,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
+
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAmehnitiesBrain } from "@/hooks/useAmehnitiesBrain";
@@ -70,7 +73,10 @@ function AmehnitiesAIWorkspace() {
     runEvaluation, setEvalEnabled, alert, guardEnabled, setGuardEnabled, dismissAlert,
     bestCheckpoints, autoSave, setAutoSave, bestMetric, setBestMetric,
     autoSaving, rollbackTo, downloadBestCheckpoint, clearBestCheckpoints,
+    plasticity, setPlasticity, growth, maxParams,
+    webLearning, setWebLearning, webStats,
   } = useAmehnitiesBrain();
+
 
   const cfg = telemetry?.cfg;
   const totalEvents = useMemo(() => Object.values(sourceCounts).reduce((a, b) => a + b, 0), [sourceCounts]);
@@ -162,6 +168,65 @@ function AmehnitiesAIWorkspace() {
             Training runs in a Web Worker with a hard per-tick time budget and pauses when this page is hidden — the rest of Amehnities stays fully responsive while the model grows.
           </p>
         </Card>
+
+        {/* Autonomous plasticity & continuous web learning */}
+        <Card className="mt-4 border-border/60 bg-card/70 p-4 backdrop-blur">
+          <div className="grid gap-4 lg:grid-cols-3">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 px-3 py-2.5">
+                <div className="flex items-start gap-2">
+                  <Sprout className="mt-0.5 h-4 w-4 text-primary" />
+                  <div>
+                    <p className="text-sm font-medium">Autonomous growth</p>
+                    <p className="text-xs text-muted-foreground">
+                      Grows blocks, heads and width on loss plateaus{maxParams ? ` · cap ${fmt(maxParams)} params` : ""}
+                    </p>
+                  </div>
+                </div>
+                <Switch checked={plasticity} onCheckedChange={setPlasticity} disabled={!canTrain} />
+              </div>
+
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 px-3 py-2.5">
+                <div className="flex items-start gap-2">
+                  <Globe className="mt-0.5 h-4 w-4 text-primary" />
+                  <div>
+                    <p className="text-sm font-medium">Web learning</p>
+                    <p className="text-xs text-muted-foreground">
+                      {webStats.passages
+                        ? `${fmt(webStats.passages)} passages absorbed${webStats.topic ? ` · ${webStats.topic.slice(0, 42)}…` : ""}`
+                        : "Public-health & M&E literature streaming"}
+                    </p>
+                  </div>
+                </div>
+                <Switch checked={webLearning} onCheckedChange={setWebLearning} disabled={!canTrain} />
+              </div>
+            </div>
+
+            <div className="lg:col-span-2">
+              <h3 className="mb-2 text-sm font-semibold">Neurogenesis history</h3>
+              <div className="max-h-40 space-y-1.5 overflow-y-auto pr-1">
+                {[...growth].reverse().map((g, i) => (
+                  <div key={`${g.at}-${i}`} className="flex items-center justify-between rounded-md border border-border/50 bg-muted/30 px-2.5 py-1.5 text-xs">
+                    <span className="truncate">
+                      <span className="font-mono text-foreground">{fmt(g.from)} → {fmt(g.to)}</span>
+                      <span className="ml-2 text-muted-foreground">{g.reason}</span>
+                    </span>
+                    <span className="ml-2 shrink-0 font-mono text-[10px] text-muted-foreground">
+                      {g.cfg ? `${g.cfg.nLayers}L · d${g.cfg.dModel} · ${g.cfg.nHeads}H` : ""}
+                    </span>
+                  </div>
+                ))}
+                {!growth.length && (
+                  <p className="text-sm text-muted-foreground">
+                    No growth yet — the network expands itself once learning plateaus on fresh experience.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </Card>
+
+
 
         {/* Grounded assistant over live application data */}
         <div className="mt-4">
