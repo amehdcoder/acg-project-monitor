@@ -427,6 +427,17 @@ export interface MetricSample {
 }
 let metrics: MetricSample[] = [];
 let gradNormEMA = 0;
+/** Backpropagation telemetry: per-stage ∂L/∂W, optimiser step size, clipping. */
+export interface GradFlow {
+  embed: number;
+  blocks: { attn: number; ffn: number }[];
+  head: number;
+}
+let lastGradFlow: GradFlow | null = null;
+let updateNormEMA = 0;
+let clipScale = 1;
+let optimSteps = 0;
+
 let tokensPerSec = 0;
 let stepsPerSec = 0;
 let winTokens = 0, winSteps = 0, winStart = 0;
