@@ -70,7 +70,10 @@ function AmehnitiesAIWorkspace() {
     runEvaluation, setEvalEnabled, alert, guardEnabled, setGuardEnabled, dismissAlert,
     bestCheckpoints, autoSave, setAutoSave, bestMetric, setBestMetric,
     autoSaving, rollbackTo, downloadBestCheckpoint, clearBestCheckpoints,
+    plasticity, setPlasticity, growth, maxParams,
+    webLearning, setWebLearning, webStats,
   } = useAmehnitiesBrain();
+
 
   const cfg = telemetry?.cfg;
   const totalEvents = useMemo(() => Object.values(sourceCounts).reduce((a, b) => a + b, 0), [sourceCounts]);
