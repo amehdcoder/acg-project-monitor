@@ -2,7 +2,7 @@
  * Amehnities AI — in-browser Transformer language model over app activity.
  *
  * A complete decoder-only Transformer (pre-LayerNorm, multi-head causal
- * self-attention, GELU feed-forward, learned token + positional embeddings,
+ * self-attention, Swish feed-forward, learned token + positional embeddings,
  * Adam optimiser) implemented in plain typed arrays and trained INSIDE a Web
  * Worker so the UI thread never blocks. The model consumes the live token
  * stream produced from Amehnities app data/activity and learns to predict the
@@ -97,11 +97,16 @@ function matmulBackward(
   }
 }
 
-const GELU_C = Math.sqrt(2 / Math.PI);
-const gelu = (x: number) => 0.5 * x * (1 + Math.tanh(GELU_C * (x + 0.044715 * x * x * x)));
-const geluGrad = (x: number) => {
-  const t = Math.tanh(GELU_C * (x + 0.044715 * x * x * x));
-  return 0.5 * (1 + t) + 0.5 * x * (1 - t * t) * GELU_C * (1 + 3 * 0.044715 * x * x);
+// Swish / SiLU activation: x · σ(x). Chosen over GELU for this continuously
+// trained model: it is smooth and non-monotonic with no dead regions, its
+// gradients never vanish to exactly zero, and it empirically trains more
+// stably over very long horizons (it is the activation used by modern
+// frontier LLMs). Backprop stays a clean element-wise multiply.
+const sigmoid = (x: number) => 1 / (1 + Math.exp(-x));
+const swish = (x: number) => x * sigmoid(x);
+const swishGrad = (x: number) => {
+  const s = sigmoid(x);
+  return s + x * s * (1 - s);
 };
 
 /* ------------------------------------------------------------------ model */
@@ -223,7 +228,7 @@ class Transformer {
       const pre = new Float32Array(T * dFF);
       matmul(ln2, L.W1.v, T, D, dFF, pre, L.bf1.v);
       const act = new Float32Array(T * dFF);
-      for (let i = 0; i < T * dFF; i++) act[i] = gelu(pre[i]);
+      for (let i = 0; i < T * dFF; i++) act[i] = swish(pre[i]);
       const ff = new Float32Array(T * D);
       matmul(act, L.W2.v, T, dFF, D, ff, L.bf2.v);
       const x2 = new Float32Array(T * D);
@@ -272,7 +277,7 @@ class Transformer {
       // FFN branch
       const dff = new Float32Array(T * dFF);
       matmulBackward(C.act, L.W2.v, dx, T, dFF, D, dff, L.W2.g, L.bf2.g);
-      for (let i = 0; i < T * dFF; i++) dff[i] *= geluGrad(C.pre[i]);
+      for (let i = 0; i < T * dFF; i++) dff[i] *= swishGrad(C.pre[i]);
       const dLn2 = new Float32Array(T * D);
       matmulBackward(C.ln2, L.W1.v, dff, T, D, dFF, dLn2, L.W1.g, L.bf1.g);
       const dx1 = layerNormBackward(dLn2, C.x1, L.g2.v, L.g2.g, L.b2.g, C.mu2, C.iv2, T, D);
