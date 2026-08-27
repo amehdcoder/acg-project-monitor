@@ -2,7 +2,7 @@
  * Amehnities AI — in-browser Transformer language model over app activity.
  *
  * A complete decoder-only Transformer (pre-LayerNorm, multi-head causal
- * self-attention, GELU feed-forward, learned token + positional embeddings,
+ * self-attention, Swish feed-forward, learned token + positional embeddings,
  * Adam optimiser) implemented in plain typed arrays and trained INSIDE a Web
  * Worker so the UI thread never blocks. The model consumes the live token
  * stream produced from Amehnities app data/activity and learns to predict the
@@ -228,7 +228,7 @@ class Transformer {
       const pre = new Float32Array(T * dFF);
       matmul(ln2, L.W1.v, T, D, dFF, pre, L.bf1.v);
       const act = new Float32Array(T * dFF);
-      for (let i = 0; i < T * dFF; i++) act[i] = gelu(pre[i]);
+      for (let i = 0; i < T * dFF; i++) act[i] = swish(pre[i]);
       const ff = new Float32Array(T * D);
       matmul(act, L.W2.v, T, dFF, D, ff, L.bf2.v);
       const x2 = new Float32Array(T * D);
@@ -277,7 +277,7 @@ class Transformer {
       // FFN branch
       const dff = new Float32Array(T * dFF);
       matmulBackward(C.act, L.W2.v, dx, T, dFF, D, dff, L.W2.g, L.bf2.g);
-      for (let i = 0; i < T * dFF; i++) dff[i] *= geluGrad(C.pre[i]);
+      for (let i = 0; i < T * dFF; i++) dff[i] *= swishGrad(C.pre[i]);
       const dLn2 = new Float32Array(T * D);
       matmulBackward(C.ln2, L.W1.v, dff, T, D, dFF, dLn2, L.W1.g, L.bf1.g);
       const dx1 = layerNormBackward(dLn2, C.x1, L.g2.v, L.g2.g, L.b2.g, C.mu2, C.iv2, T, D);
