@@ -181,21 +181,50 @@ export default function NeuralNetworkCanvas({ telemetry, running, height = 420 }
         ctx.stroke();
       }
 
-      // ---- travelling activations (bounded: one pulse per column pair)
+      // ---- travelling signal pulses (one per column pair)
+      // Forward phase: activations sweep left → right in the primary colour.
+      // Backward phase: gradients sweep right → left in a contrasting colour,
+      // with pulse brightness scaled by the measured ∂L/∂W of that stage, so
+      // the layers actually learning glow the hardest during backprop.
       if (running) {
+        const gradHue = "hsl(18 95% 58%)"; // warm orange = gradient descent
         for (let c = 0; c < cols.length - 1; c++) {
           const a = cols[c], b = cols[c + 1];
           if (!a.length || !b.length) continue;
           const phase = (t * 0.55 + c * 0.12) % 1;
-          const p = a[(c * 3) % a.length], q = b[(c * 5) % b.length];
+          // during backprop the pulse travels from the deeper column back
+          const p = backward ? b[(c * 5) % b.length] : a[(c * 3) % a.length];
+          const q = backward ? a[(c * 3) % a.length] : b[(c * 5) % b.length];
           const mt = phase;
           const x = (1 - mt) ** 3 * p.x + 3 * (1 - mt) ** 2 * mt * (p.x + colW * 0.45) + 3 * (1 - mt) * mt ** 2 * (q.x - colW * 0.45) + mt ** 3 * q.x;
           const y = (1 - mt) ** 3 * p.y + 3 * (1 - mt) ** 2 * mt * p.y + 3 * (1 - mt) * mt ** 2 * q.y + mt ** 3 * q.y;
-          const g = ctx.createRadialGradient(x, y, 0, x, y, 12);
-          g.addColorStop(0, primary);
+          const intensity = backward ? 0.25 + 0.75 * Math.max(gradAt(c), gradAt(c + 1)) : 1;
+          const size = backward ? 8 + 8 * intensity : 12;
+          ctx.globalAlpha = intensity;
+          const g = ctx.createRadialGradient(x, y, 0, x, y, size);
+          g.addColorStop(0, backward ? gradHue : primary);
           g.addColorStop(1, "transparent");
           ctx.fillStyle = g;
-          ctx.beginPath(); ctx.arc(x, y, 12, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(x, y, size, 0, Math.PI * 2); ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+
+        // gradient-magnitude underlay on edges during backprop: edges feeding
+        // high-gradient stages brighten so the "learning heat" is structural
+        if (backward) {
+          for (let c = 0; c < cols.length - 1; c++) {
+            const gi = gradAt(c);
+            if (gi < 0.05) continue;
+            const a = cols[c], b = cols[c + 1];
+            if (!a.length || !b.length) continue;
+            ctx.strokeStyle = `hsl(18 95% 58% / ${(0.05 + gi * 0.3).toFixed(3)})`;
+            ctx.beginPath();
+            for (const p of a) for (const q of b) {
+              ctx.moveTo(p.x, p.y);
+              ctx.bezierCurveTo(p.x + colW * 0.45, p.y, q.x - colW * 0.45, q.y, q.x, q.y);
+            }
+            ctx.stroke();
+          }
         }
       }
 
@@ -241,10 +270,30 @@ export default function NeuralNetworkCanvas({ telemetry, running, height = 420 }
       ctx.font = "10px ui-sans-serif, system-ui, sans-serif";
       ctx.fillStyle = muted;
       ctx.fillText(`${nLayers} blocks · ${nHeads} heads · d${tel?.cfg.dModel ?? 0} · ctx ${tel?.cfg.ctx ?? 0}`, 12, 32);
+
+      // ---- optimisation HUD: real gradient-descent telemetry
+      const upd = tel?.updateNorm ?? 0;
+      const clip = tel?.clipScale ?? 1;
+      const lr = tel?.lr ?? 0;
+      const gTot = gradPerColumn.reduce((s, v) => s + v, 0);
+      ctx.font = "10px ui-monospace, SFMono-Regular, monospace";
+      ctx.fillStyle = muted;
+      ctx.fillText(
+        `∇L ${gTot.toFixed(2)} · lr ${lr.toExponential(1)} · Δw ${upd.toFixed(3)}${clip < 0.999 ? ` · clip ×${clip.toFixed(2)}` : ""}`,
+        12, 46,
+      );
+      // phase indicator: FORWARD (activations) / BACKPROP (gradients)
+      ctx.textAlign = "right";
+      ctx.font = "600 10px ui-sans-serif, system-ui, sans-serif";
+      if (running) {
+        ctx.fillStyle = backward ? "hsl(18 95% 58%)" : primary;
+        ctx.fillText(backward ? "← BACKPROP · gradient descent" : "FORWARD → activations", W - 12, 32);
+      } else {
+        ctx.fillStyle = muted;
+        ctx.fillText("PAUSED", W - 12, 32);
+      }
       if (growthPulse >= 0) {
         ctx.fillStyle = primary;
-        ctx.font = "600 10px ui-sans-serif, system-ui, sans-serif";
-        ctx.textAlign = "right";
         ctx.fillText("NEUROGENESIS — capacity added", W - 12, 18);
       }
     };
