@@ -109,6 +109,22 @@ const swishGrad = (x: number) => {
   return s + x * s * (1 - s);
 };
 
+// GELU (tanh approximation) — offered as a switchable alternative so the
+// learning behaviour of the two activations can be compared live.
+const GELU_A = Math.sqrt(2 / Math.PI);
+const gelu = (x: number) => 0.5 * x * (1 + Math.tanh(GELU_A * (x + 0.044715 * x * x * x)));
+const geluGrad = (x: number) => {
+  const inner = GELU_A * (x + 0.044715 * x * x * x);
+  const t = Math.tanh(inner);
+  const dInner = GELU_A * (1 + 3 * 0.044715 * x * x);
+  return 0.5 * (1 + t) + 0.5 * x * (1 - t * t) * dInner;
+};
+
+export type ActivationKind = "swish" | "gelu";
+let activation: ActivationKind = "swish";
+const actFn = (x: number) => (activation === "gelu" ? gelu(x) : swish(x));
+const actGrad = (x: number) => (activation === "gelu" ? geluGrad(x) : swishGrad(x));
+
 /* ------------------------------------------------------------------ model */
 
 type Layer = {
@@ -228,7 +244,7 @@ class Transformer {
       const pre = new Float32Array(T * dFF);
       matmul(ln2, L.W1.v, T, D, dFF, pre, L.bf1.v);
       const act = new Float32Array(T * dFF);
-      for (let i = 0; i < T * dFF; i++) act[i] = swish(pre[i]);
+      for (let i = 0; i < T * dFF; i++) act[i] = actFn(pre[i]);
       const ff = new Float32Array(T * D);
       matmul(act, L.W2.v, T, dFF, D, ff, L.bf2.v);
       const x2 = new Float32Array(T * D);
@@ -277,7 +293,7 @@ class Transformer {
       // FFN branch
       const dff = new Float32Array(T * dFF);
       matmulBackward(C.act, L.W2.v, dx, T, dFF, D, dff, L.W2.g, L.bf2.g);
-      for (let i = 0; i < T * dFF; i++) dff[i] *= swishGrad(C.pre[i]);
+      for (let i = 0; i < T * dFF; i++) dff[i] *= actGrad(C.pre[i]);
       const dLn2 = new Float32Array(T * D);
       matmulBackward(C.ln2, L.W1.v, dff, T, D, dFF, dLn2, L.W1.g, L.bf1.g);
       const dx1 = layerNormBackward(dLn2, C.x1, L.g2.v, L.g2.g, L.b2.g, C.mu2, C.iv2, T, D);
@@ -850,6 +866,7 @@ function postTelemetry(structural = false) {
     trainTokens: trainEndIndex(),
     valTokens: Math.max(0, stream.length - trainEndIndex()),
     plasticity,
+    activation,
     growth: growthLog.slice(-8),
     maxParams: MAX_PARAMS,
   });
@@ -1013,6 +1030,11 @@ self.onmessage = (e: MessageEvent) => {
       break;
     case "grow": {
       scaleUp("Manual capacity increase");
+      break;
+    }
+    case "activation": {
+      activation = msg.kind === "gelu" ? "gelu" : "swish";
+      postTelemetry(true);
       break;
     }
     case "plasticity": {
