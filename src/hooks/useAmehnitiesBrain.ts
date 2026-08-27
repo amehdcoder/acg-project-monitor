@@ -77,6 +77,8 @@ export interface Telemetry {
   valTokens: number;
   /** Autonomous capacity growth ("neurogenesis"). */
   plasticity?: boolean;
+  /** FFN activation currently used by the network. */
+  activation?: "swish" | "gelu";
   growth?: { at: number; reason: string; from: number; to: number; cfg: Telemetry["cfg"] }[];
   maxParams?: number;
 }
@@ -527,6 +529,10 @@ export function useAmehnitiesBrain() {
     (enabled: boolean) => workerRef.current?.postMessage({ type: "plasticity", enabled }),
     [],
   );
+  const setActivation = useCallback(
+    (kind: "swish" | "gelu") => workerRef.current?.postMessage({ type: "activation", kind }),
+    [],
+  );
   const shrink = useCallback(() => workerRef.current?.postMessage({ type: "shrink" }), []);
   const toggle = useCallback(() => setRunning((r) => !r), []);
 
@@ -554,6 +560,7 @@ export function useAmehnitiesBrain() {
     bestCheckpoints, autoSave, setAutoSave, bestMetric, setBestMetric: changeBestMetric,
     autoSaving, rollbackTo, downloadBestCheckpoint, clearBestCheckpoints,
     plasticity: telemetry?.plasticity ?? true, setPlasticity,
+    activation: telemetry?.activation ?? "swish", setActivation,
     growth: telemetry?.growth ?? [],
     maxParams: telemetry?.maxParams ?? 0,
     webLearning, setWebLearning, webStats,
