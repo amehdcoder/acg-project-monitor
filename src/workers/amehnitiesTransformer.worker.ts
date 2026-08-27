@@ -97,11 +97,16 @@ function matmulBackward(
   }
 }
 
-const GELU_C = Math.sqrt(2 / Math.PI);
-const gelu = (x: number) => 0.5 * x * (1 + Math.tanh(GELU_C * (x + 0.044715 * x * x * x)));
-const geluGrad = (x: number) => {
-  const t = Math.tanh(GELU_C * (x + 0.044715 * x * x * x));
-  return 0.5 * (1 + t) + 0.5 * x * (1 - t * t) * GELU_C * (1 + 3 * 0.044715 * x * x);
+// Swish / SiLU activation: x · σ(x). Chosen over GELU for this continuously
+// trained model: it is smooth and non-monotonic with no dead regions, its
+// gradients never vanish to exactly zero, and it empirically trains more
+// stably over very long horizons (it is the activation used by modern
+// frontier LLMs). Backprop stays a clean element-wise multiply.
+const sigmoid = (x: number) => 1 / (1 + Math.exp(-x));
+const swish = (x: number) => x * sigmoid(x);
+const swishGrad = (x: number) => {
+  const s = sigmoid(x);
+  return s + x * s * (1 - s);
 };
 
 /* ------------------------------------------------------------------ model */
