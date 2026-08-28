@@ -310,144 +310,61 @@ Deno.serve(async (req) => {
       });
     }
 
-    const apiKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!apiKey) {
-      return new Response(JSON.stringify({ error: "AI is not configured on this workspace." }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
     const lastQuestion = String(messages[messages.length - 1]?.content ?? "").slice(0, 2000);
 
-    // Web grounding: on by default, skipped for pure record look-ups, and
-    // overridable per request with `useWeb`.
+    // Internet evidence the assistant has learned to consult: open literature
+    // (Europe PMC) and reference sources. No third-party language model is
+    // called anywhere in this endpoint.
     const webRequested = body?.useWeb === undefined ? null : Boolean(body.useWeb);
     const wantWeb = webRequested === null ? shouldSearchWeb(lastQuestion) : webRequested;
 
-    const [ctx, policy, routeStats, webSources] = await Promise.all([
+    const [ctx, policy, webSources] = await Promise.all([
       buildContext(token),
       retrievePolicy(lastQuestion),
-      loadRouteStats(),
       wantWeb ? retrieveWebKnowledge(lastQuestion).catch(() => []) : Promise.resolve([]),
     ]);
-    const learned = policyBlock(policy.rules, policy.exemplars);
-    const webBlock = webKnowledgeBlock(webSources);
 
-
-    // ---- Automatic model routing -------------------------------------------
-    const { questionClass, heuristicTier } = classifyQuestion(lastQuestion);
-    const forced = ["fast", "balanced", "deep"].includes(String(body?.forceTier))
-      ? (body.forceTier as Tier) : null;
-    const routed = forced
-      ? { tier: forced, learned: false, evidence: [] as { tier: Tier; avgReward: number; trials: number }[] }
-      : applyLearnedRoute(heuristicTier, questionClass, routeStats);
-    const tier: Tier = routed.tier;
-    const model = TIER_MODEL[tier];
-
-    const trimmed = messages.slice(-16).map((m: { role: string; content: string }) => ({
-      role: m.role === "assistant" ? "assistant" : "user",
-      content: String(m.content ?? "").slice(0, 6000),
-    }));
-
-    const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Lovable-API-Key": apiKey,
-        "X-Lovable-AIG-SDK": "fetch",
-      },
-      body: JSON.stringify({
-        model,
-        stream: true,
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "system", content: PUBLIC_HEALTH_EXPERTISE },
-          { role: "system", content: tierDirective(tier) },
-          ...(learned ? [{ role: "system", content: learned }] : []),
-          ...(webBlock ? [{ role: "system", content: webBlock }] : []),
-
-          { role: "system", content: `LIVE APPLICATION CONTEXT\n\n${contextBlock(ctx, modelStats)}` },
-          ...trimmed,
-        ],
-      }),
-    });
-
-    if (!upstream.ok || !upstream.body) {
-      const detail = await upstream.text().catch(() => "");
-      let message = "The assistant is unavailable right now.";
-      if (upstream.status === 429) message = "Too many requests to Amehnities AI — please wait a moment and try again.";
-      else if (upstream.status === 402) message = "The workspace is out of AI credits. Add credits in Lovable to keep using the assistant.";
-      else if (upstream.status === 403) message = "AI access is blocked by workspace policy.";
-      return new Response(JSON.stringify({ error: message, detail: detail.slice(0, 500) }), {
-        status: upstream.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Emit the citation catalog + the policy entries used (for reward credit
-    // assignment when the user rates the answer), then relay the model stream.
-    const encoder = new TextEncoder();
-    const catalogFrame = `data: ${JSON.stringify({
-      amehnities: {
-        citations: [
-          ...ctx.citations,
-          // Web evidence joins the same clickable catalog, marked as external.
-          ...webSources.map((w) => ({
-            ref: w.ref,
-            table: "web",
-            kind: "web" as const,
-            label: w.title,
-            eventId: w.url,
-            url: w.url,
-            publisher: w.publisher,
-            timestamp: w.year ? `${w.year}-01-01T00:00:00.000Z` : new Date().toISOString(),
-            detail: w.snippet.slice(0, 400),
-          })),
-        ],
-        webSourceCount: webSources.length,
-
-        generatedAt: ctx.generatedAt,
-        policyIds: policy.ids,
-        policyApplied: policy.rules.map((r) => ({ topic: r.topic, content: r.content, avgReward: Number(r.avg_reward) })),
-        precedents: policy.exemplars.length,
-        route: {
-          tier,
-          model,
-          label: TIER_LABEL[tier],
-          questionClass,
-          heuristicTier,
-          learned: routed.learned,
-          evidence: routed.evidence,
-        },
-      },
-    })}\n\n`;
-
-    const stream = new ReadableStream({
-      async start(controller) {
-        controller.enqueue(encoder.encode(catalogFrame));
-        const reader = upstream.body!.getReader();
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            controller.enqueue(value);
-          }
-        } catch {
-          /* client or upstream disconnected */
-        } finally {
-          controller.close();
-        }
-      },
-    });
-
-    return new Response(stream, {
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      },
-    });
+    // Evidence bundle. The answer itself is composed in the browser by the
+    // Amehnities model from this evidence — the endpoint only retrieves.
+    return new Response(JSON.stringify({
+      generatedAt: ctx.generatedAt,
+      windowNote: ctx.windowNote,
+      streams: ctx.streams.map((s) => ({
+        label: s.label,
+        table: s.table,
+        total: s.total,
+        kinds: s.kinds,
+        last24h: s.last24h,
+        last7d: s.last7d,
+        newest: s.newest,
+        oldest: s.oldest,
+        error: s.error ?? null,
+        refs: s.citations.map((c) => c.ref),
+      })),
+      citations: [
+        ...ctx.citations,
+        ...webSources.map((w) => ({
+          ref: w.ref,
+          table: "web",
+          kind: "web" as const,
+          label: w.title,
+          eventId: w.url,
+          url: w.url,
+          publisher: w.publisher,
+          timestamp: w.year ? `${w.year}-01-01T00:00:00.000Z` : new Date().toISOString(),
+          detail: w.snippet.slice(0, 400),
+        })),
+      ],
+      web: webSources.map((w) => ({
+        ref: w.ref, title: w.title, publisher: w.publisher, year: w.year ?? null,
+        url: w.url, snippet: w.snippet.slice(0, 700),
+      })),
+      rules: policy.rules.map((r) => ({ topic: r.topic, content: r.content, avgReward: Number(r.avg_reward) })),
+      exemplars: policy.exemplars.map((e) => ({ question: e.question, answer: e.answer })),
+      policyIds: policy.ids,
+      modelStats: modelStats ?? null,
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unexpected error" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
