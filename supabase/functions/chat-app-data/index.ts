@@ -12,7 +12,6 @@
  */
 import { guardRequest } from "../_shared/authGuard.ts";
 import { retrieveWebKnowledge, shouldSearchWeb } from "../_shared/webKnowledge.ts";
-import { retrieveWebKnowledge, shouldSearchWeb, webKnowledgeBlock } from "../_shared/webKnowledge.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 
