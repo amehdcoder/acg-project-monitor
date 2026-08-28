@@ -1,15 +1,16 @@
 /**
- * chat-app-data — the Amehnities Data Assistant.
+ * chat-app-data — evidence retrieval for the Amehnities Data Assistant.
  *
- * Pulls a bounded, real-time slice of application activity straight from the
- * database, hands it to Lovable AI together with the live Transformer metrics
- * the browser reports, and streams the grounded answer back to the client.
+ * This endpoint calls NO third-party language model. It returns a bounded,
+ * real-time slice of application activity, the assistant's own learned policy
+ * (rules and precedents distilled from human feedback) and open internet
+ * evidence. The answer itself is composed in the browser by the Amehnities
+ * model from what it has learned.
  *
- * Every sampled row is registered in a citation catalog ([E1], [E2] …) that
- * carries the real event id and timestamp, so the assistant can attribute each
- * factual claim to a clickable source. The catalog is emitted as the first SSE
- * frame before the model tokens start streaming.
+ * Every sampled row is registered in a citation catalog ([E1], [E2] …, plus
+ * [W#] for published web evidence) carrying the real event id and timestamp.
  */
+
 import { guardRequest } from "../_shared/authGuard.ts";
 import { retrieveWebKnowledge, shouldSearchWeb } from "../_shared/webKnowledge.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
