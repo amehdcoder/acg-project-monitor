@@ -11,9 +11,7 @@
  * frame before the model tokens start streaming.
  */
 import { guardRequest } from "../_shared/authGuard.ts";
-import {
-  applyLearnedRoute, classifyQuestion, TIER_LABEL, TIER_MODEL, tierDirective, type Tier,
-} from "../_shared/modelRouter.ts";
+import { retrieveWebKnowledge, shouldSearchWeb } from "../_shared/webKnowledge.ts";
 import { retrieveWebKnowledge, shouldSearchWeb, webKnowledgeBlock } from "../_shared/webKnowledge.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -29,32 +27,7 @@ const corsHeaders = {
  * a public-health professional working on Nigerian NTD mass drug administration,
  * eye health and primary-health-care programmes, using WHO/NTD doctrine.
  */
-const PUBLIC_HEALTH_EXPERTISE = `DOMAIN EXPERTISE — you are a senior public-health specialist (epidemiology, neglected tropical diseases, and health-systems supervision) embedded in Nigerian programme delivery. Apply this expertise to every answer:
 
-Programmes: preventive chemotherapy NTDs (onchocerciasis, lymphatic filariasis, schistosomiasis, soil-transmitted helminths, trachoma), inclusive eye health, immunisation and primary health care. Delivery is by community-directed mass drug administration (MDA) through CDDs, supervised by FLHF in-charges, LGA EDOs / Logistic Officers and State Logistics/Programme Officers, across the State → LGA → Ward → FLHF → Community hierarchy.
-
-Indicators you use correctly and by name:
-- Programme (administrative) coverage = treated ÷ targeted population; epidemiological coverage = treated ÷ total population. Never conflate them — say which one a figure is.
-- WHO effective-coverage thresholds: ≥65% epidemiological coverage for onchocerciasis/LF, ≥75% for schistosomiasis and STH among school-age children; validated (survey) coverage should be within ~10 percentage points of reported coverage, otherwise flag reporting bias.
-- Survey coverage is reported with a 95% confidence interval and design effect; a point estimate without an interval is incomplete.
-- Medicine accountability: doses received, issued, administered, returned and wasted must reconcile at every custodial level; unexplained variance is a stock-out, a recording error or a diversion risk — in that order of likelihood, and say which the data supports.
-- Data-quality logic: zero-submission units, duplicate submissions, GPS outside the expected ward, implausible tablet-per-person ratios and out-of-range ages are all quality signals, not results.
-
-Judgement rules: distinguish association from causation; name the denominator behind every rate; prefer rates and per-population figures over raw counts when comparing units; call out small denominators (<30) as unstable; treat missing data as a finding, not a zero. Close analytical answers with the programmatic action a supervisor should take (who does what, at which level), framed in WHO-standard terminology.
-
-Safety: this is programme analytics, not clinical advice. Never give individual patient treatment instructions; refer dosing questions to the national NTD treatment guidelines.`;
-
-const SYSTEM_PROMPT = `You are the official Amehnities Data Assistant. You answer from two grounded sources and nothing else: (1) the supplied application activity context and live metrics, and (2) the PUBLISHED EVIDENCE FROM THE INTERNET block when it is present. Never invent data. Figures about this deployment come only from the application context; standards, definitions, methodology and global comparisons come from the published evidence. If neither can answer, state that clearly.
-
-CITATIONS (mandatory): every factual claim drawn from the activity context must end with one or more citation markers taken from the SOURCE EVENTS catalog, written exactly as [E12] or [E3][E7]. Every claim drawn from published literature or guidance must cite its web marker, written exactly as [W1] or [W2][W4]. Never invent a marker that is not in a catalog. Claims about the live Transformer metrics use [MODEL] instead. Sentences that are purely interpretation may go uncited.
-
-REASONING DISCIPLINE: think through the question silently before answering — identify which streams answer it, do the arithmetic from the supplied counts only, and re-check every number you print against the context. If two figures disagree, say so rather than picking one. Never extrapolate beyond the sampled window; state the window when it matters. When the published evidence gives a threshold or standard, compare this programme's figures against it explicitly. If the data cannot answer the question, say exactly what is missing and what would answer it.
-
-Formatting: reply in clean Markdown. Use tables for comparisons and breakdowns, bullet points for lists, and bold for key figures. Always quote the exact counts you were given. Keep answers under 350 words unless the user asks for more detail.
-
-FOLLOW-UPS (mandatory): finish your reply with a final line, on its own, in exactly this form:
-FOLLOWUPS: question one | question two | question three
-Each follow-up must be a specific, answerable question about something you actually observed in the supplied data or evidence (name the stream, status, figure, or standard). No generic questions. Nothing may come after that line.`;
 
 
 /** Bounded pulls — never a heavy scan, even on very large projects. */
@@ -172,33 +145,6 @@ async function buildContext(token: string) {
   };
 }
 
-function contextBlock(ctx: Awaited<ReturnType<typeof buildContext>>, model: Record<string, unknown> | undefined) {
-  const lines: string[] = [];
-  lines.push(`Context generated at ${ctx.generatedAt}. ${ctx.windowNote}`);
-  lines.push("");
-  lines.push("APPLICATION ACTIVITY STREAMS");
-  for (const s of ctx.streams) {
-    if (s.error) { lines.push(`- ${s.label}: unavailable to this user (${s.error}).`); continue; }
-    const kinds = Object.entries(s.kinds).sort((a, b) => b[1] - a[1]).slice(0, 8)
-      .map(([k, v]) => `${k}=${v}`).join(", ") || "none";
-    const refs = s.citations.map((c) => `[${c.ref}]`).join("") || "—";
-    lines.push(`- ${s.label}: ${s.total} records sampled | last 24h: ${s.last24h} | last 7d: ${s.last7d} | newest: ${s.newest ?? "n/a"} | oldest: ${s.oldest ?? "n/a"} | breakdown: ${kinds} | sample sources: ${refs}`);
-  }
-  const totalEvents = ctx.streams.reduce((a, s) => a + s.total, 0);
-  lines.push("");
-  lines.push(`TOTAL SAMPLED EVENTS: ${totalEvents}`);
-  lines.push("");
-  lines.push("SOURCE EVENTS CATALOG (cite these markers)");
-  for (const c of ctx.citations) {
-    lines.push(`[${c.ref}] ${c.label} · table=${c.table} · event_id=${c.eventId} · at=${c.timestamp} · ${c.detail}`);
-  }
-  if (model && Object.keys(model).length) {
-    lines.push("");
-    lines.push("LIVE TRANSFORMER METRICS (browser-trained model) — cite as [MODEL]");
-    for (const [k, v] of Object.entries(model)) lines.push(`- ${k}: ${typeof v === "number" ? v : String(v)}`);
-  }
-  return lines.join("\n");
-}
 
 /**
  * Retrieval of the learned policy (RLHF-style, weights untouched).
@@ -264,35 +210,7 @@ async function retrievePolicy(question: string) {
 }
 
 /** Learned routing evidence — reward per (question class, model tier). */
-async function loadRouteStats() {
-  const url = Deno.env.get("SUPABASE_URL");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!url || !serviceKey) return [];
-  const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
-  const { data } = await admin
-    .from("ai_route_stats")
-    .select("question_class,tier,avg_reward,trials")
-    .limit(200);
-  return (data ?? []) as { question_class: string; tier: Tier; avg_reward: number; trials: number }[];
-}
 
-function policyBlock(rules: PolicyRow[], exemplars: PolicyRow[]) {
-  if (!rules.length && !exemplars.length) return "";
-  const lines: string[] = [];
-  if (rules.length) {
-    lines.push("LEARNED OPERATING RULES (distilled from verified human feedback on your previous answers — follow them):");
-    rules.forEach((r, i) => lines.push(`${i + 1}. [${r.topic}] ${r.content}`));
-  }
-  if (exemplars.length) {
-    lines.push("");
-    lines.push("HIGH-RATED PRECEDENTS (match this depth, structure and citation discipline — never reuse their figures):");
-    exemplars.forEach((e, i) => {
-      lines.push(`Precedent ${i + 1} — Q: ${String(e.question).slice(0, 300)}`);
-      lines.push(`A (excerpt): ${String(e.answer).slice(0, 900)}`);
-    });
-  }
-  return lines.join("\n");
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
