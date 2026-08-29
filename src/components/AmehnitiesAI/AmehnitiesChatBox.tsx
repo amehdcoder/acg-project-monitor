@@ -32,6 +32,8 @@ import {
   createConversation, deleteConversation, listConversations, loadMessages, saveMessage,
   sendFeedback, splitFollowups, titleFromQuestion, usedCitations,
 } from "@/lib/amehnitiesAi/chatHistory";
+import { composeAnswer, type EvidenceBundle } from "@/lib/amehnitiesAi/selfReliantAnswer";
+
 
 interface ChatMessage {
   id: string;
