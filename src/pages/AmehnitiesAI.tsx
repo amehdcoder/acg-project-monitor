@@ -20,6 +20,7 @@ import { useAmehnitiesBrain } from "@/hooks/useAmehnitiesBrain";
 import NeuralNetworkCanvas from "@/components/AmehnitiesAI/NeuralNetworkCanvas";
 import AttentionMaps from "@/components/AmehnitiesAI/AttentionMaps";
 import LossSparkline from "@/components/AmehnitiesAI/LossSparkline";
+import LiveLearningChart from "@/components/AmehnitiesAI/LiveLearningChart";
 import TrainingControlPanel from "@/components/AmehnitiesAI/TrainingControlPanel";
 import TrainingMetricsDashboard from "@/components/AmehnitiesAI/TrainingMetricsDashboard";
 import DataSourcePanel from "@/components/AmehnitiesAI/DataSourcePanel";
@@ -28,7 +29,6 @@ import CheckpointsPanel from "@/components/AmehnitiesAI/CheckpointsPanel";
 import ValidationPanel from "@/components/AmehnitiesAI/ValidationPanel";
 import DivergenceAlert from "@/components/AmehnitiesAI/DivergenceAlert";
 import AmehnitiesChatBox from "@/components/AmehnitiesAI/AmehnitiesChatBox";
-import FrontierChatConsole from "@/components/AmehnitiesAI/FrontierChatConsole";
 import { useAiPermissions } from "@/hooks/useAiPermissions";
 
 import ReviewQueuePanel from "@/components/AmehnitiesAI/ReviewQueuePanel";
@@ -75,6 +75,7 @@ function AmehnitiesAIWorkspace() {
     autoSaving, rollbackTo, downloadBestCheckpoint, clearBestCheckpoints,
     plasticity, setPlasticity, growth, maxParams,
     webLearning, setWebLearning, webStats,
+    activation, setActivation,
   } = useAmehnitiesBrain();
 
 
@@ -228,15 +229,47 @@ function AmehnitiesAIWorkspace() {
 
 
 
+        {/* Activation function & live learning curve */}
+        <div className="mt-4 grid gap-4 lg:grid-cols-3">
+          <Card className="border-border/60 bg-card/70 p-4 backdrop-blur">
+            <div className="flex items-start gap-2">
+              <Zap className="mt-0.5 h-4 w-4 text-primary" />
+              <div>
+                <p className="text-sm font-medium">Activation function</p>
+                <p className="text-xs text-muted-foreground">
+                  Swish (SiLU) keeps gradients alive over very long continuous runs; GELU converges
+                  slightly sharper on short bursts. Switching applies to the feed-forward block immediately.
+                </p>
+              </div>
+            </div>
+            <Tabs
+              value={activation}
+              onValueChange={(v) => setActivation(v as "swish" | "gelu")}
+              className="mt-3"
+            >
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="swish" disabled={!canTrain}>Swish</TabsTrigger>
+                <TabsTrigger value="gelu" disabled={!canTrain}>GELU</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <div className="mt-3 grid grid-cols-2 gap-2 font-mono text-[11px] text-muted-foreground">
+              <div className="rounded-md border border-border/50 bg-muted/30 px-2 py-1.5">
+                loss {(telemetry?.loss ?? 0).toFixed(4)}
+              </div>
+              <div className="rounded-md border border-border/50 bg-muted/30 px-2 py-1.5">
+                ∇L {(telemetry?.gradNorm ?? 0).toFixed(3)}
+              </div>
+            </div>
+          </Card>
+
+          <div className="lg:col-span-2">
+            <LiveLearningChart metrics={telemetry?.metrics ?? []} running={running} />
+          </div>
+        </div>
+
         {/* Grounded assistant over live application data */}
         <div className="mt-4">
           <AmehnitiesChatBox telemetry={telemetry} corpusEvents={totalEvents} />
-
-          {/* Enterprise console: files, analysis, documents, multimodal media */}
-          <div className="mt-4">
-            <FrontierChatConsole telemetry={telemetry} corpusEvents={totalEvents} />
-          </div>
-
 
           {/* Human-in-the-loop correction queue — admins only. */}
           {isAdmin && (

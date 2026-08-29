@@ -35,8 +35,8 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const apiKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!apiKey) return json({ error: "AI is not configured (missing key)." }, 500);
+    // Embeddings are computed locally — no external model or key is required.
+    const apiKey = "";
 
     const authHeader = req.headers.get("Authorization") ?? "";
     if (!authHeader.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
