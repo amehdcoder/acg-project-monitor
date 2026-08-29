@@ -1,13 +1,14 @@
 /**
  * Shared embedding helper for the Amehnities AI long-term memory.
  *
- * All vectors are produced at 1536 dimensions so they line up with the
- * `ai_memory_embeddings.embedding` column and its cosine index.
+ * Embeddings are computed locally and deterministically — no external model or
+ * AI gateway is involved anywhere in Amehnities AI. The representation is a
+ * hashed character n-gram + word bag ("hashing trick") projected into a fixed
+ * 1536-dimensional space and L2-normalised, so cosine similarity in
+ * `ai_memory_embeddings.embedding` behaves exactly as before.
  */
-export const EMBED_MODEL = "google/gemini-embedding-2";
+export const EMBED_MODEL = "amehnities-local-hash-v1";
 export const EMBED_DIM = 1536;
-
-const GATEWAY = "https://ai.gateway.lovable.dev/v1";
 
 export class GatewayError extends Error {
   status: number;
@@ -17,36 +18,62 @@ export class GatewayError extends Error {
   }
 }
 
-/** Embed one or more texts. Returns one vector per input, in order. */
-export async function embedTexts(texts: string[], apiKey: string): Promise<number[][]> {
-  if (texts.length === 0) return [];
-  const res = await fetch(`${GATEWAY}/embeddings`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Lovable-API-Key": apiKey,
-      "X-Lovable-AIG-SDK": "fetch",
-    },
-    body: JSON.stringify({
-      model: EMBED_MODEL,
-      input: texts.map((t) => t.slice(0, 8000)),
-      dimensions: EMBED_DIM,
-      encoding_format: "float",
-    }),
-  });
+/** FNV-1a — fast, stable, well-distributed for feature hashing. */
+function hash(str: string, seed = 0x811c9dc5): number {
+  let h = seed >>> 0;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h >>> 0;
+}
 
-  if (!res.ok) {
-    const body = await res.text();
-    console.error(`Embedding request failed [${res.status}]: ${body}`);
-    throw new GatewayError(res.status, body);
+const STOP = new Set([
+  "the", "and", "for", "that", "with", "this", "from", "are", "was", "were", "has",
+  "have", "had", "not", "but", "you", "our", "its", "their", "they", "which", "into",
+]);
+
+function add(vec: Float64Array, term: string, weight: number) {
+  const h = hash(term);
+  const idx = h % EMBED_DIM;
+  // Signed hashing keeps collisions unbiased.
+  vec[idx] += (h & 1 ? weight : -weight);
+}
+
+/** Embed a single text into a unit-norm 1536-d vector. */
+export function embedText(text: string): number[] {
+  const vec = new Float64Array(EMBED_DIM);
+  const clean = String(text ?? "").toLowerCase().slice(0, 8000);
+  const words = clean.replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
+
+  for (const w of words) {
+    if (w.length < 2 || STOP.has(w)) continue;
+    add(vec, `w:${w}`, 1);
+    // character 4-grams give robustness to spelling variants and morphology
+    for (let i = 0; i + 4 <= w.length; i++) add(vec, `c:${w.slice(i, i + 4)}`, 0.45);
+  }
+  // word bigrams capture short-range phrasing ("medicine accountability")
+  for (let i = 0; i + 1 < words.length; i++) {
+    if (STOP.has(words[i]) && STOP.has(words[i + 1])) continue;
+    add(vec, `b:${words[i]}_${words[i + 1]}`, 0.7);
   }
 
-  const json = await res.json();
-  const rows = (json?.data ?? []) as { embedding: number[]; index?: number }[];
-  return rows
-    .slice()
-    .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
-    .map((r) => r.embedding);
+  let norm = 0;
+  for (let i = 0; i < EMBED_DIM; i++) norm += vec[i] * vec[i];
+  norm = Math.sqrt(norm) || 1;
+  const out = new Array<number>(EMBED_DIM);
+  for (let i = 0; i < EMBED_DIM; i++) out[i] = vec[i] / norm;
+  return out;
+}
+
+/**
+ * Embed one or more texts. Returns one vector per input, in order.
+ * The `apiKey` argument is accepted for call-site compatibility and ignored —
+ * nothing leaves the backend.
+ */
+export async function embedTexts(texts: string[], _apiKey?: string): Promise<number[][]> {
+  if (texts.length === 0) return [];
+  return texts.map((t) => embedText(t));
 }
 
 /** Postgres `vector` literal for a float array. */
