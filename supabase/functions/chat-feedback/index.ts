@@ -64,58 +64,81 @@ function shapeReward(input: {
   };
 }
 
-const DISTILL_PROMPT = `You improve an analytics assistant that answers questions strictly from a Nigerian public-health application's live activity data.
+/**
+ * Local lesson distillation — no external language model.
+ *
+ * The lesson is extracted deterministically from the reviewer's own words (a
+ * correction is already an imperative statement of what the assistant should
+ * have done) or, absent a correction, from the grounding signals of the answer
+ * itself. This keeps the learning loop entirely self-reliant.
+ */
+const TOPIC_MAP: [RegExp, string][] = [
+  [/coverage|treated|target population/i, "coverage reporting"],
+  [/medicine|drug|stock|logistic|reconcil|accountab/i, "medicine accountability"],
+  [/supervis|checklist|monitor/i, "supervision evidence"],
+  [/gps|coordinate|registry|grid3|ward|lga|state/i, "geographic scoping"],
+  [/quiz|pre.?test|post.?test|score/i, "assessment scoring"],
+  [/citation|source|reference|evidence/i, "evidence citation"],
+  [/denominator|sample|percent|rate|statistic/i, "statistical rigour"],
+];
 
-You are given one question, the answer that was produced, the user's rating and (optionally) their correction. Extract ONE durable, generalisable lesson that would make FUTURE answers better.
+function topicFor(text: string): string {
+  for (const [re, topic] of TOPIC_MAP) if (re.test(text)) return topic;
+  const word = text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/)
+    .filter((w) => w.length > 4).slice(0, 2).join(" ");
+  return (word || "general").slice(0, 60);
+}
 
-Return ONLY a JSON object, no prose, no code fences:
-{"topic":"<2-4 word subject, lowercase>","rule":"<one imperative sentence, max 200 chars, generalisable — never about this one question's specific numbers>","worth_keeping":true|false}
+/** Turn free text into one imperative, generalisable sentence. */
+function toRule(correction: string): string {
+  const first = correction.split(/(?<=[.!?])\s+/)[0]?.trim() || correction.trim();
+  const stripped = first
+    .replace(/^(you should|you must|please|it should|the answer should|next time,?)\s+/i, "")
+    .replace(/\b(this|that) (answer|question|one)\b/gi, "such answers")
+    .replace(/\b\d[\d,.]*%?\b/g, "the reported figure")
+    .trim();
+  const sentence = stripped.charAt(0).toUpperCase() + stripped.slice(1);
+  return (sentence.endsWith(".") ? sentence : `${sentence}.`).slice(0, 240);
+}
 
-Set worth_keeping to false when the feedback carries no transferable lesson (e.g. a bare thumbs-up on a trivial answer, or a complaint about something outside the assistant's control).`;
-
-async function distilLesson(apiKey: string, payload: {
+function distilLesson(payload: {
   question: string; answer: string; rating: number; correction?: string | null;
-}): Promise<{ topic: string; rule: string; worth_keeping: boolean } | null> {
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Lovable-API-Key": apiKey,
-      "X-Lovable-AIG-SDK": "fetch",
-    },
-    body: JSON.stringify({
-      model: "google/gemini-3.7-flash",
-      messages: [
-        { role: "system", content: DISTILL_PROMPT },
-        {
-          role: "user",
-          content: [
-            `QUESTION: ${payload.question.slice(0, 1500)}`,
-            `ANSWER: ${payload.answer.slice(0, 4000)}`,
-            `RATING: ${payload.rating > 0 ? "positive" : payload.rating < 0 ? "negative" : "neutral"}`,
-            payload.correction ? `USER CORRECTION: ${payload.correction.slice(0, 1500)}` : "",
-          ].filter(Boolean).join("\n\n"),
-        },
-      ],
-    }),
-  });
-  if (!res.ok) return null;
-  const data = await res.json().catch(() => null);
-  const raw = data?.choices?.[0]?.message?.content;
-  if (typeof raw !== "string") return null;
-  const match = raw.match(/\{[\s\S]*\}/);
-  if (!match) return null;
-  try {
-    const parsed = JSON.parse(match[0]);
-    if (typeof parsed?.rule !== "string" || !parsed.rule.trim()) return null;
+  citations: number; followups: number;
+}): { topic: string; rule: string; worth_keeping: boolean } | null {
+  const correction = (payload.correction ?? "").trim();
+  if (correction.length >= 12) {
     return {
-      topic: String(parsed.topic ?? "general").slice(0, 60).toLowerCase(),
-      rule: parsed.rule.trim().slice(0, 240),
-      worth_keeping: parsed.worth_keeping !== false,
+      topic: topicFor(`${correction} ${payload.question}`),
+      rule: toRule(correction),
+      worth_keeping: true,
     };
-  } catch {
-    return null;
   }
+
+  // No written correction: learn only from clear, diagnosable grounding failures.
+  if (payload.rating < 0) {
+    if (payload.citations === 0) {
+      return {
+        topic: topicFor(payload.question),
+        rule: "Cite a specific application record [E#] or published source [W#] for every factual claim; never answer from unsourced generalities.",
+        worth_keeping: true,
+      };
+    }
+    if (payload.answer.length < 400) {
+      return {
+        topic: topicFor(payload.question),
+        rule: "Answer with the full evidence reading: the numbers, their denominators, the detected signals and the programmatic action to take.",
+        worth_keeping: true,
+      };
+    }
+    if (payload.followups === 0) {
+      return {
+        topic: topicFor(payload.question),
+        rule: "Close every answer with concrete follow-up questions grounded in the streams that were actually read.",
+        worth_keeping: true,
+      };
+    }
+  }
+  return null;
 }
 
 Deno.serve(async (req) => {
@@ -236,11 +259,14 @@ Deno.serve(async (req) => {
 
     // Policy improvement — only from informative feedback.
     let learned: { topic: string; rule: string } | null = null;
-    const apiKey = Deno.env.get("LOVABLE_API_KEY");
     const informative = Boolean(reviewQueueId && correction) ||
       (rating !== 0 && (correction || rating < 0 || reward >= 1));
-    if (apiKey && informative && answer.length > 40) {
-      const lesson = await distilLesson(apiKey, { question, answer, rating, correction });
+    if (informative && answer.length > 40) {
+      const lesson = distilLesson({
+        question, answer, rating, correction,
+        citations: citationCount,
+        followups: followupCount,
+      });
       if (lesson?.worth_keeping) {
         const { data: existing } = await admin
           .from("ai_chat_policy")
