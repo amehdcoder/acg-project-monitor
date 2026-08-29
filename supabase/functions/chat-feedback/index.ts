@@ -167,6 +167,8 @@ Deno.serve(async (req) => {
     const reviewQueueId = typeof body?.reviewQueueId === "string" && /^[0-9a-f-]{36}$/i.test(body.reviewQueueId)
       ? body.reviewQueueId : null;
     const citationCount = Number(body?.citations ?? 0);
+    const followupCount = Number(body?.followups ?? 0);
+
     const policyIds: string[] = Array.isArray(body?.policyIds)
       ? body.policyIds.filter((p: unknown) => typeof p === "string" && /^[0-9a-f-]{36}$/i.test(p)).slice(0, 12)
       : [];
