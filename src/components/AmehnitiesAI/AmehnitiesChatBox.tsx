@@ -151,7 +151,7 @@ export default function AmehnitiesChatBox({
 
     let catalog: Citation[] = [];
     let policyIds: string[] = [];
-    let policyApplied: PolicyApplied[] = [];
+    const policyApplied: PolicyApplied[] = [];
     let route: RouteInfo | undefined;
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -164,72 +164,53 @@ export default function AmehnitiesChatBox({
         },
         body: JSON.stringify({
           messages: history.map((m) => ({ role: m.role, content: m.content })),
-          modelStats: telemetry
-            ? {
-                parameters: telemetry.params,
-                trainingStep: telemetry.step,
-                loss: Number(telemetry.loss.toFixed(4)),
-                perplexity: Number(telemetry.perplexity.toFixed(3)),
-                tokensSeen: telemetry.tokensSeen,
-                tokensPerSecond: Math.round(telemetry.tokensPerSec || 0),
-                architecture: `${telemetry.cfg.nLayers} blocks · d=${telemetry.cfg.dModel} · ${telemetry.cfg.nHeads} heads · ctx ${telemetry.cfg.ctx}`,
-                corpusEventsInBrowser: corpusEvents,
-              }
-            : undefined,
         }),
       });
 
-      if (!res.ok || !res.body) {
-        const payload = await res.json().catch(() => ({}));
-        throw new Error(payload?.error || `Assistant unavailable (${res.status})`);
+      const evidence = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(evidence?.error || `Evidence retrieval failed (${res.status})`);
+
+      catalog = (evidence.citations ?? []) as Citation[];
+      policyIds = (evidence.policyIds ?? []) as string[];
+
+      // Compose the answer here, from retrieved evidence and learned policy only.
+      const composed = composeAnswer(question, evidence as EvidenceBundle, telemetry
+        ? {
+            params: telemetry.params,
+            step: telemetry.step,
+            loss: telemetry.loss,
+            perplexity: telemetry.perplexity,
+            tokensSeen: telemetry.tokensSeen,
+          }
+        : null);
+
+      route = {
+        tier: "balanced",
+        model: `amehnities-local-${(telemetry?.params ?? 0).toLocaleString()}p`,
+        label: "Amehnities model",
+        questionClass: "self-reliant",
+        heuristicTier: "local",
+        learned: policyIds.length > 0,
+      };
+
+      // Reveal the composed answer progressively so it reads like live thinking.
+      const body = composed.markdown;
+      const CHUNK = Math.max(12, Math.ceil(body.length / 90));
+      for (let i = 0; i < body.length; i += CHUNK) {
+        const shown = body.slice(0, i + CHUNK);
+        setMessages((m) => m.map((x) => (x.id === replyId ? { ...x, content: shown } : x)));
+        await new Promise((r) => setTimeout(r, 12));
       }
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let answer = "";
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed.startsWith("data:")) continue;
-          const data = trimmed.slice(5).trim();
-          if (!data || data === "[DONE]") continue;
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed?.amehnities) {
-              catalog = (parsed.amehnities.citations ?? []) as Citation[];
-              policyIds = (parsed.amehnities.policyIds ?? []) as string[];
-              policyApplied = (parsed.amehnities.policyApplied ?? []) as PolicyApplied[];
-              route = parsed.amehnities.route as RouteInfo | undefined;
-              continue;
-            }
-            const delta = parsed?.choices?.[0]?.delta?.content;
-            if (typeof delta === "string" && delta) {
-              answer += delta;
-              const shown = splitFollowups(answer).answer;
-              setMessages((m) => m.map((x) => (x.id === replyId ? { ...x, content: shown } : x)));
-            }
-          } catch { /* partial frame — wait for more bytes */ }
-        }
-      }
-
-      const { answer: finalAnswer, followups } = splitFollowups(answer);
-      const body = finalAnswer || "_I could not determine an answer from the available application data._";
       const cites = usedCitations(body, catalog);
       setMessages((m) => m.map((x) => (x.id === replyId
-        ? { ...x, content: body, citations: cites, followups, policyIds, policyApplied, question, route }
+        ? { ...x, content: body, citations: cites, followups: composed.followups, policyIds, policyApplied, question, route }
         : x)));
 
       if (convIdRef.current) {
         try {
           const rowId = await saveMessage(convIdRef.current, {
-            role: "assistant", content: body, citations: cites, followups,
+            role: "assistant", content: body, citations: cites, followups: composed.followups,
           });
           // Adopt the database row id so feedback can be attached to this answer.
           setMessages((m) => m.map((x) => (x.id === replyId ? { ...x, id: rowId } : x)));
@@ -244,7 +225,8 @@ export default function AmehnitiesChatBox({
     } finally {
       setBusy(false);
     }
-  }, [busy, messages, telemetry, corpusEvents, navigate, refreshConversations]);
+  }, [busy, messages, telemetry, navigate, refreshConversations]);
+
 
   const startNewChat = useCallback(() => {
     setMessages([]);
