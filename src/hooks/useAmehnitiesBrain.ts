@@ -636,6 +636,16 @@ export function useAmehnitiesBrain() {
     [createVersion],
   );
 
+  /** Automatic rollback points every 2,000 optimiser steps of real training. */
+  useEffect(() => {
+    const step = telemetry?.step ?? 0;
+    if (!persistence.supported || !step) return;
+    if (lastVersionStepRef.current < 0) { lastVersionStepRef.current = step; return; }
+    if (step - lastVersionStepRef.current < 2000) return;
+    lastVersionStepRef.current = step;
+    void createVersion({ trigger: "auto", label: `Auto · step ${step.toLocaleString()}` }).catch(() => undefined);
+  }, [telemetry?.step, persistence.supported, createVersion]);
+
 
   /**
    * Auto-save the best-performing checkpoints.
