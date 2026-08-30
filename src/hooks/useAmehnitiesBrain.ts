@@ -678,5 +678,7 @@ export function useAmehnitiesBrain() {
     growth: telemetry?.growth ?? [],
     maxParams: telemetry?.maxParams ?? 0,
     webLearning, setWebLearning, webStats,
+    persistence, persistNow, forgetSavedBrain,
+
   };
 }
