@@ -22,6 +22,9 @@ import AttentionMaps from "@/components/AmehnitiesAI/AttentionMaps";
 import LossSparkline from "@/components/AmehnitiesAI/LossSparkline";
 import LiveLearningChart from "@/components/AmehnitiesAI/LiveLearningChart";
 import TrainingControlPanel from "@/components/AmehnitiesAI/TrainingControlPanel";
+import DatasetImportPanel from "@/components/AmehnitiesAI/DatasetImportPanel";
+import ModelVersionsPanel from "@/components/AmehnitiesAI/ModelVersionsPanel";
+
 import TrainingMetricsDashboard from "@/components/AmehnitiesAI/TrainingMetricsDashboard";
 import DataSourcePanel from "@/components/AmehnitiesAI/DataSourcePanel";
 import AskModelPanel from "@/components/AmehnitiesAI/AskModelPanel";
@@ -77,6 +80,9 @@ function AmehnitiesAIWorkspace() {
     webLearning, setWebLearning, webStats,
     activation, setActivation,
     persistence, persistNow, forgetSavedBrain,
+    versions, createVersion, rollbackToVersion, removeVersion, clearAllVersions, downloadVersion,
+    trainOnDataset, datasetTraining, datasetRuns,
+
 
   } = useAmehnitiesBrain();
 
@@ -431,6 +437,26 @@ function AmehnitiesAIWorkspace() {
           />
           <AskModelPanel askModel={askModel} vocab={vocab} />
         </div>
+
+        {canTrain && (
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <DatasetImportPanel
+              trainOnDataset={trainOnDataset}
+              datasetTraining={datasetTraining}
+              datasetRuns={datasetRuns}
+            />
+            <ModelVersionsPanel
+              versions={versions}
+              createVersion={createVersion}
+              rollbackToVersion={rollbackToVersion}
+              removeVersion={removeVersion}
+              downloadVersion={downloadVersion}
+              clearAllVersions={clearAllVersions}
+            />
+          </div>
+        )}
+
+
 
         {canTrain && (
           <div className="mt-4">

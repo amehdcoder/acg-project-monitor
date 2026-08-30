@@ -21,8 +21,13 @@ import {
 } from "@/lib/amehnitiesAi/activityStream";
 import { indexMemory } from "@/lib/amehnitiesAi/frontierClient";
 import {
-  clearBrain, loadBrain, saveBrain, type PersistenceStatus,
+  clearBrain, clearVersions, deleteVersion, getVersion, listVersions, loadBrain, saveBrain, saveVersion,
+  type ModelVersionMeta, type PersistenceStatus, type VersionTrigger,
 } from "@/lib/amehnitiesAi/brainPersistence";
+import {
+  describeDataset, encodeDataset, type ParsedDataset,
+} from "@/lib/amehnitiesAi/trainingDataset";
+
 
 
 export interface MetricSample {
@@ -115,7 +120,16 @@ export interface CheckpointRecord {
 /** How an auto-saved checkpoint is judged to be "the best so far". */
 export type BestMetric = "loss" | "confidence";
 
+/** One completed supervised training run over an imported dataset. */
+export interface DatasetRun {
+  id: string; at: number; name: string; examples: number; epochs: number;
+  tokens: number; format: string; startStep: number; endStep: number; loss: number;
+}
+
+export type { ModelVersionMeta } from "@/lib/amehnitiesAi/brainPersistence";
+
 const SOURCE_LABELS = ACTIVITY_SOURCES.map((s) => s.label);
+
 
 export function useAmehnitiesBrain() {
   const workerRef = useRef<Worker | null>(null);
@@ -156,6 +170,14 @@ export function useAmehnitiesBrain() {
   const lastSavedStepRef = useRef(-1);
   const savingRef = useRef(false);
   const lastMemoryPushRef = useRef(0);
+
+  // ---- versioning + dataset import
+  const [versions, setVersions] = useState<ModelVersionMeta[]>([]);
+  const [datasetTraining, setDatasetTraining] = useState(false);
+  const [datasetRuns, setDatasetRuns] = useState<DatasetRun[]>([]);
+  const lastVersionStepRef = useRef(-1);
+  const persistNowRef = useRef<((opts?: { force?: boolean }) => Promise<void>) | null>(null);
+
 
 
 
@@ -472,6 +494,9 @@ export function useAmehnitiesBrain() {
     };
   }, [persistNow, persistence.supported]);
 
+  useEffect(() => { persistNowRef.current = persistNow; }, [persistNow]);
+
+
   /** Forget the automatically saved model (next boot trains from scratch). */
   const forgetSavedBrain = useCallback(async () => {
     await clearBrain();
@@ -479,6 +504,147 @@ export function useAmehnitiesBrain() {
     setPersistence((p) => ({ ...p, savedAt: null, step: 0, params: 0, bytes: 0, restored: false, error: null }));
   }, []);
 
+  /* ---- model versioning --------------------------------------------------
+   * Immutable, dated snapshots kept on the device. Any of them can be rolled
+   * back into the live worker in one click if a training run degrades results.
+   */
+  const refreshVersions = useCallback(async () => {
+    setVersions(await listVersions());
+  }, []);
+
+  useEffect(() => { void refreshVersions(); }, [refreshVersions]);
+
+  const createVersion = useCallback(
+    async (opts?: { label?: string; trigger?: VersionTrigger; notes?: string }) => {
+      const t = telemetryRef.current;
+      const payload = await captureCheckpoint(true);
+      const file = buildCheckpointFile(payload, tokenizerRef.current.vocab);
+      if (payload.shapes) file.shapes = payload.shapes;
+      const meta = await saveVersion(file, {
+        label: opts?.label,
+        trigger: opts?.trigger ?? "manual",
+        notes: opts?.notes,
+        perplexity: t?.perplexity ?? 0,
+        valLoss: t?.evaluation?.loss ?? null,
+        accuracy: t?.evaluation?.accuracy ?? null,
+      });
+      lastVersionStepRef.current = meta.step;
+      await refreshVersions();
+      return meta;
+    },
+    [captureCheckpoint, refreshVersions],
+  );
+
+  /** Restore a stored version into the live model (a safety point is kept first). */
+  const rollbackToVersion = useCallback(async (id: string) => {
+    const rec = await getVersion(id);
+    if (!rec) throw new Error("That version is no longer stored on this device");
+    // Never lose the current state — snapshot it before overwriting.
+    try { await createVersion({ trigger: "pre-rollback", label: "Before rollback" }); } catch { /* best effort */ }
+    tokenizerRef.current.restore(rec.file.vocabulary ?? []);
+    workerRef.current?.postMessage({ type: "load", ckpt: toWorkerCheckpoint(rec.file) });
+    const saved = await saveBrain(rec.file);
+    lastSavedStepRef.current = saved.step;
+    setPersistence((p) => ({
+      ...p, savedAt: saved.savedAt, step: saved.step, params: saved.params, bytes: saved.bytes, error: null,
+    }));
+    await refreshVersions();
+    return rec;
+  }, [createVersion, refreshVersions]);
+
+  const removeVersion = useCallback(async (id: string) => {
+    await deleteVersion(id);
+    await refreshVersions();
+  }, [refreshVersions]);
+
+  const clearAllVersions = useCallback(async () => {
+    await clearVersions();
+    await refreshVersions();
+  }, [refreshVersions]);
+
+  const downloadVersion = useCallback(async (id: string) => {
+    const rec = await getVersion(id);
+    if (!rec) throw new Error("That version is no longer stored on this device");
+    return downloadCheckpoint(rec.file);
+  }, []);
+
+  /* ---- supervised dataset import ----------------------------------------
+   * Imported examples are packed with role-boundary tokens and streamed into
+   * the live training loop, then the improved model is persisted immediately
+   * and a version is cut so the run can always be reverted.
+   */
+  const trainOnDataset = useCallback(
+    async (parsed: ParsedDataset, opts?: { epochs?: number }) => {
+      const w = workerRef.current;
+      if (!w) throw new Error("Model is not running");
+      if (!parsed.examples.length) throw new Error("No usable examples were found in that dataset");
+      const epochs = Math.max(1, Math.min(20, opts?.epochs ?? 3));
+      const startStep = telemetryRef.current?.step ?? 0;
+      setDatasetTraining(true);
+      try {
+        const tk = tokenizerRef.current;
+        const tokens = encodeDataset(tk, parsed.examples, parsed.name, epochs);
+        w.postMessage({ type: "tokens", tokens, vocabSize: tk.size });
+        w.postMessage({ type: "run", running: true });
+        setRunning(true);
+
+        // Let the live loop actually consume the new material before we
+        // snapshot, so the persisted model reflects the imported examples.
+        const target = Math.min(600, 60 + parsed.examples.length * epochs);
+        const deadline = Date.now() + 45_000;
+        while (Date.now() < deadline) {
+          await new Promise((r) => setTimeout(r, 400));
+          if ((telemetryRef.current?.step ?? 0) - startStep >= target) break;
+        }
+
+        await persistNowRef.current?.({ force: true });
+        const version = await createVersion({
+          trigger: "dataset",
+          label: `Dataset · ${parsed.name}`,
+          notes: describeDataset(parsed),
+        });
+
+        const run: DatasetRun = {
+          id: version.id,
+          at: Date.now(),
+          name: parsed.name,
+          examples: parsed.examples.length,
+          epochs,
+          tokens: tokens.length,
+          format: parsed.format,
+          startStep,
+          endStep: telemetryRef.current?.step ?? startStep,
+          loss: telemetryRef.current?.loss ?? 0,
+        };
+        setDatasetRuns((r) => [run, ...r].slice(0, 20));
+
+        // What was learned is fed straight into the chat knowledge base.
+        void indexMemory(
+          parsed.examples.slice(0, 60).map((ex, i) => ({
+            kind: "training_example",
+            title: (ex.prompt || ex.completion).slice(0, 90) || `${parsed.name} #${i + 1}`,
+            content: ex.prompt ? `Q: ${ex.prompt}\nA: ${ex.completion}` : ex.completion,
+            metadata: { dataset: parsed.name, format: parsed.format, epochs },
+          })),
+        ).catch(() => undefined);
+
+        return run;
+      } finally {
+        setDatasetTraining(false);
+      }
+    },
+    [createVersion],
+  );
+
+  /** Automatic rollback points every 2,000 optimiser steps of real training. */
+  useEffect(() => {
+    const step = telemetry?.step ?? 0;
+    if (!persistence.supported || !step) return;
+    if (lastVersionStepRef.current < 0) { lastVersionStepRef.current = step; return; }
+    if (step - lastVersionStepRef.current < 2000) return;
+    lastVersionStepRef.current = step;
+    void createVersion({ trigger: "auto", label: `Auto · step ${step.toLocaleString()}` }).catch(() => undefined);
+  }, [telemetry?.step, persistence.supported, createVersion]);
 
 
   /**
@@ -679,6 +845,10 @@ export function useAmehnitiesBrain() {
     maxParams: telemetry?.maxParams ?? 0,
     webLearning, setWebLearning, webStats,
     persistence, persistNow, forgetSavedBrain,
+    versions, createVersion, rollbackToVersion, removeVersion, clearAllVersions,
+    downloadVersion, refreshVersions,
+    trainOnDataset, datasetTraining, datasetRuns,
+
 
   };
 }
