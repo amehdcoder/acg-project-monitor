@@ -33,6 +33,8 @@ import {
   sendFeedback, splitFollowups, titleFromQuestion, usedCitations,
 } from "@/lib/amehnitiesAi/chatHistory";
 import { composeAnswer, type EvidenceBundle } from "@/lib/amehnitiesAi/selfReliantAnswer";
+import { searchMemory } from "@/lib/amehnitiesAi/frontierClient";
+
 
 
 interface ChatMessage {
