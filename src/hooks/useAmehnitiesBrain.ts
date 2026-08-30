@@ -120,7 +120,16 @@ export interface CheckpointRecord {
 /** How an auto-saved checkpoint is judged to be "the best so far". */
 export type BestMetric = "loss" | "confidence";
 
+/** One completed supervised training run over an imported dataset. */
+export interface DatasetRun {
+  id: string; at: number; name: string; examples: number; epochs: number;
+  tokens: number; format: string; startStep: number; endStep: number; loss: number;
+}
+
+export type { ModelVersionMeta } from "@/lib/amehnitiesAi/brainPersistence";
+
 const SOURCE_LABELS = ACTIVITY_SOURCES.map((s) => s.label);
+
 
 export function useAmehnitiesBrain() {
   const workerRef = useRef<Worker | null>(null);
