@@ -436,6 +436,26 @@ function AmehnitiesAIWorkspace() {
         </div>
 
         {canTrain && (
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <DatasetImportPanel
+              trainOnDataset={trainOnDataset}
+              datasetTraining={datasetTraining}
+              datasetRuns={datasetRuns}
+            />
+            <ModelVersionsPanel
+              versions={versions}
+              createVersion={createVersion}
+              rollbackToVersion={rollbackToVersion}
+              removeVersion={removeVersion}
+              downloadVersion={downloadVersion}
+              clearAllVersions={clearAllVersions}
+            />
+          </div>
+        )}
+
+
+
+        {canTrain && (
           <div className="mt-4">
             <ValidationPanel
               evaluation={evaluation}
