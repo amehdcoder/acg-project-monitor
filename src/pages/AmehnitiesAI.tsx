@@ -22,6 +22,9 @@ import AttentionMaps from "@/components/AmehnitiesAI/AttentionMaps";
 import LossSparkline from "@/components/AmehnitiesAI/LossSparkline";
 import LiveLearningChart from "@/components/AmehnitiesAI/LiveLearningChart";
 import TrainingControlPanel from "@/components/AmehnitiesAI/TrainingControlPanel";
+import DatasetImportPanel from "@/components/AmehnitiesAI/DatasetImportPanel";
+import ModelVersionsPanel from "@/components/AmehnitiesAI/ModelVersionsPanel";
+
 import TrainingMetricsDashboard from "@/components/AmehnitiesAI/TrainingMetricsDashboard";
 import DataSourcePanel from "@/components/AmehnitiesAI/DataSourcePanel";
 import AskModelPanel from "@/components/AmehnitiesAI/AskModelPanel";
