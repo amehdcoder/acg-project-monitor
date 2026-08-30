@@ -13,13 +13,34 @@
  */
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { chunkText, embedTexts, GatewayError, toVectorLiteral } from "../_shared/embeddings.ts";
+import { chunkText, EMBED_MODEL, embedTexts, GatewayError, toVectorLiteral } from "../_shared/embeddings.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
 
 const MAX_ENTRIES = 40;
+
+/**
+ * Vectors produced by any earlier embedder are not comparable with the current
+ * local deterministic 1536-d model, so they are purged the first time this
+ * function runs after a model change. Rows written by the current model carry
+ * `metadata.embed_model`; anything else is stale and is deleted once.
+ */
+let purgedStale = false;
+async function purgeStaleVectors(admin: ReturnType<typeof createClient>) {
+  if (purgedStale) return;
+  purgedStale = true;
+  const { error } = await admin
+    .from("ai_memory_embeddings")
+    .delete()
+    .not("metadata->>embed_model", "eq", EMBED_MODEL);
+  if (error) {
+    purgedStale = false;
+    console.error("stale vector purge failed:", error.message);
+  }
+}
+
 
 interface MemoryEntry {
   kind?: string;
