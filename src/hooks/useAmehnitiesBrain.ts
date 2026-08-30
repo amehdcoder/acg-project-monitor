@@ -494,6 +494,9 @@ export function useAmehnitiesBrain() {
     };
   }, [persistNow, persistence.supported]);
 
+  useEffect(() => { persistNowRef.current = persistNow; }, [persistNow]);
+
+
   /** Forget the automatically saved model (next boot trains from scratch). */
   const forgetSavedBrain = useCallback(async () => {
     await clearBrain();
