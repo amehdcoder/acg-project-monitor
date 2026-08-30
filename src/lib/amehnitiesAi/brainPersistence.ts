@@ -106,3 +106,102 @@ export async function clearBrain(): Promise<void> {
     await withStore("readwrite", (s) => s.delete(KEY) as IDBRequest<undefined>);
   } catch { /* nothing to clear */ }
 }
+
+
+/* ------------------------------------------------------------------ *
+ * Model versioning
+ *
+ * Every meaningful training milestone (an autosave crossing the version
+ * cadence, a dataset training run, a manual "Save version") writes an
+ * immutable, dated snapshot here. If a training run degrades results, any
+ * version can be rolled back into the live worker in one click.
+ * ------------------------------------------------------------------ */
+
+export type VersionTrigger = "manual" | "auto" | "dataset" | "pre-rollback";
+
+export interface ModelVersion {
+  id: string;
+  label: string;
+  createdAt: string;
+  trigger: VersionTrigger;
+  step: number;
+  params: number;
+  loss: number;
+  perplexity: number;
+  valLoss?: number | null;
+  accuracy?: number | null;
+  bytes: number;
+  notes?: string;
+  file: CheckpointFile;
+}
+
+export type ModelVersionMeta = Omit<ModelVersion, "file">;
+
+const stripFile = (v: ModelVersion): ModelVersionMeta => {
+  const { file: _f, ...meta } = v;
+  return meta;
+};
+
+/** Store a new immutable version and prune the oldest beyond MAX_VERSIONS. */
+export async function saveVersion(
+  file: CheckpointFile,
+  meta: {
+    label?: string; trigger?: VersionTrigger; notes?: string;
+    perplexity?: number; valLoss?: number | null; accuracy?: number | null;
+  } = {},
+): Promise<ModelVersionMeta> {
+  const createdAt = new Date().toISOString();
+  const rec: ModelVersion = {
+    id: `v-${createdAt}-${Math.random().toString(36).slice(2, 7)}`,
+    label: meta.label?.trim() || `Step ${file.training.step.toLocaleString()}`,
+    createdAt,
+    trigger: meta.trigger ?? "manual",
+    step: file.training.step,
+    params: file.training.paramCount,
+    loss: file.training.loss,
+    perplexity: meta.perplexity ?? 0,
+    valLoss: meta.valLoss ?? null,
+    accuracy: meta.accuracy ?? null,
+    bytes: JSON.stringify(file).length,
+    notes: meta.notes,
+    file,
+  };
+  await withStore("readwrite", (s) => s.put(rec) as IDBRequest<IDBValidKey>, VERSIONS);
+  const all = await listVersions();
+  for (const old of all.slice(MAX_VERSIONS)) await deleteVersion(old.id);
+  return stripFile(rec);
+}
+
+/** Newest-first version history (metadata only — weights stay on disk). */
+export async function listVersions(): Promise<ModelVersionMeta[]> {
+  try {
+    const all = await withStore<ModelVersion[]>("readonly", (s) => s.getAll() as IDBRequest<ModelVersion[]>, VERSIONS);
+    return (all ?? [])
+      .filter((v) => v?.file?.weights?.base64)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map(stripFile);
+  } catch {
+    return [];
+  }
+}
+
+export async function getVersion(id: string): Promise<ModelVersion | null> {
+  try {
+    const rec = await withStore<ModelVersion | undefined>("readonly", (s) => s.get(id), VERSIONS);
+    return rec?.file?.weights?.base64 ? rec : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteVersion(id: string): Promise<void> {
+  try {
+    await withStore("readwrite", (s) => s.delete(id) as IDBRequest<undefined>, VERSIONS);
+  } catch { /* already gone */ }
+}
+
+export async function clearVersions(): Promise<void> {
+  try {
+    await withStore("readwrite", (s) => s.clear() as IDBRequest<undefined>, VERSIONS);
+  } catch { /* nothing to clear */ }
+}
