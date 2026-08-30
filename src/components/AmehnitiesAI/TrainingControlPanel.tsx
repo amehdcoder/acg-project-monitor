@@ -154,6 +154,41 @@ export default function TrainingControlPanel({
           : "Applying pauses the loop, updates the optimiser, then resumes — no step is left half-finished. “Restart fresh” re-initialises all weights and counters."}
       </p>
 
+      {persistence && (
+        <div className="mt-4 rounded-lg border border-border/60 bg-muted/30 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 text-xs font-semibold">
+              <Save className="h-3.5 w-3.5 text-primary" />
+              Autosave
+            </div>
+            <Badge variant="outline" className={persistence.saving ? "border-primary/50 text-primary" : "border-emerald-500/50 text-emerald-600 dark:text-emerald-400"}>
+              {persistence.saving ? "saving…" : persistence.savedAt ? "live" : "waiting"}
+            </Badge>
+          </div>
+          <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+            {persistence.error
+              ? persistence.error
+              : persistence.savedAt
+                ? `Saved at step ${persistence.step.toLocaleString()} · ${persistence.params.toLocaleString()} params · ${(persistence.bytes / 1048576).toFixed(2)} MB · ${new Date(persistence.savedAt).toLocaleTimeString()}${persistence.restored ? " · restored from the last session" : ""}`
+                : "The model saves itself to this device every 30 seconds and whenever you leave the page, then resumes exactly where it stopped."}
+          </p>
+          <div className="mt-2 flex gap-2">
+            <Button size="sm" variant="secondary" className="h-7 gap-1.5 text-[11px]"
+              disabled={!persistNow || persistence.saving}
+              onClick={() => void persistNow?.({ force: true })}>
+              <Save className="h-3 w-3" /> Save now
+            </Button>
+            <Button size="sm" variant="ghost" className="h-7 gap-1.5 text-[11px]"
+              disabled={!forgetSavedBrain}
+              onClick={() => { void forgetSavedBrain?.().then(() => toast.success("Saved model cleared")); }}>
+              <Trash2 className="h-3 w-3" /> Forget saved model
+            </Button>
+          </div>
+        </div>
+      )}
+
+
+
       <div className="mt-4 border-t border-border/60 pt-4">
         <div className="mb-2 flex items-center justify-between gap-2">
           <h4 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Checkpoints</h4>
