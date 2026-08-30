@@ -32,7 +32,7 @@ function Row({ label, value, hint, children }: { label: string; value: string; h
 }
 
 export default function TrainingControlPanel({
-  telemetry, budget, exportCheckpoint, importCheckpoint, applyConfig,
+  telemetry, budget, exportCheckpoint, importCheckpoint, applyConfig, persistence, persistNow, forgetSavedBrain,
 }: {
   telemetry: Telemetry | null;
   budget: number;
@@ -42,7 +42,14 @@ export default function TrainingControlPanel({
     patch: { lr?: number; batch?: number; ctx?: number; budgetMs?: number },
     opts?: { fresh?: boolean },
   ) => Promise<void>;
+  persistence?: {
+    supported: boolean; savedAt: string | null; step: number; params: number;
+    bytes: number; restored: boolean; saving: boolean; error: string | null;
+  };
+  persistNow?: (opts?: { force?: boolean }) => Promise<void>;
+  forgetSavedBrain?: () => Promise<void>;
 }) {
+
   const cfg = telemetry?.cfg;
   const [lrIdx, setLrIdx] = useState(() => nearestIndex(LR_STOPS, 3e-3));
   const [batch, setBatch] = useState(1);
