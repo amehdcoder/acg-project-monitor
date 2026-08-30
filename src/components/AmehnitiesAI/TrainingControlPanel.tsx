@@ -3,7 +3,7 @@
  * for the Amehnities AI Transformer.
  */
 import { useEffect, useRef, useState } from "react";
-import { Download, Upload, RotateCcw, SlidersHorizontal, Check, Loader2, ShieldCheck } from "lucide-react";
+import { Download, Upload, RotateCcw, SlidersHorizontal, Check, Loader2, ShieldCheck, Save, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
