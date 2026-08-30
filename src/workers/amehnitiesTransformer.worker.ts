@@ -617,6 +617,55 @@ function evaluateValidation(maxWindows = 6): EvalSample | null {
   return sample;
 }
 
+/**
+ * Score the model on an *explicit* token sequence that is never added to the
+ * training stream — the holdout benchmark used by the promotion gate. Forward
+ * passes only, so running it can never leak the benchmark into the weights.
+ */
+function scoreTokens(tokens: number[], maxWindows = 12): EvalSample | null {
+  if (!model || tokens.length < cfg.ctx + 2) return null;
+  const T = cfg.ctx, V = cfg.vocab;
+  const avail = tokens.length - 1;
+  const n = Math.max(1, Math.min(maxWindows, Math.floor(avail / T)));
+  const span = Math.max(0, avail - T);
+  let loss = 0, correct = 0, top5 = 0, conf = 0, positions = 0;
+
+  for (let w = 0; w < n; w++) {
+    const start = n === 1 ? Math.floor(span / 2) : Math.round((w * span) / (n - 1));
+    const x = new Int32Array(T), y = new Int32Array(T);
+    for (let i = 0; i < T; i++) { x[i] = tokens[start + i] % V; y[i] = tokens[start + i + 1] % V; }
+    const fwd = model.forward(x, y);
+    loss += fwd.loss;
+    for (let t = 0; t < T; t++) {
+      const o = t * V, target = y[t];
+      let best = -1, bestP = -Infinity, rank = 0;
+      const pTarget = fwd.dLogits[o + target] * T + 1;
+      for (let c = 0; c < V; c++) {
+        const p = fwd.dLogits[o + c] * T + (c === target ? 1 : 0);
+        if (p > bestP) { bestP = p; best = c; }
+        if (p > pTarget) rank++;
+      }
+      if (best === target) correct++;
+      if (rank < 5) top5++;
+      conf += Math.max(0, Math.min(1, pTarget));
+      positions++;
+    }
+  }
+
+  return {
+    at: Date.now(),
+    step: model.step,
+    loss: loss / n,
+    perplexity: Math.exp(Math.min(loss / n, 20)),
+    accuracy: positions ? correct / positions : 0,
+    top5: positions ? top5 / positions : 0,
+    confidence: positions ? conf / positions : 0,
+    windows: n,
+  };
+}
+
+
+
 /** Pause training and tell the UI exactly what went wrong and how to recover. */
 function raiseAlert(reason: string, title: string, detail: string, suggestions: string[], extra: Record<string, number> = {}) {
   running = false;
@@ -1000,7 +1049,16 @@ self.onmessage = (e: MessageEvent) => {
       if (stream.length > 20000) stream = stream.slice(-20000);
       break;
     }
+    case "benchmark": {
+      const sample = scoreTokens(
+        Array.isArray(msg.tokens) ? (msg.tokens as number[]) : [],
+        Math.max(1, Math.min(32, msg.windows ?? 12)),
+      );
+      (self as unknown as Worker).postMessage({ type: "benchmark", id: String(msg.id ?? "b"), sample });
+      break;
+    }
     case "query":
+
       runQuery(String(msg.id ?? "q"), Math.max(1, Math.min(24, msg.steps ?? 6)));
       break;
     case "run":
