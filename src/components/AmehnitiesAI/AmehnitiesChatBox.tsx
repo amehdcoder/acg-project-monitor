@@ -177,6 +177,10 @@ export default function AmehnitiesChatBox({
       catalog = (evidence.citations ?? []) as Citation[];
       policyIds = (evidence.policyIds ?? []) as string[];
 
+      // Recall what training has written into long-term memory, so answers use
+      // the trained model's own knowledge alongside the live evidence.
+      const memories = await searchMemory(question, 6).catch(() => []);
+
       // Compose the answer here, from retrieved evidence and learned policy only.
       const composed = composeAnswer(question, evidence as EvidenceBundle, telemetry
         ? {
@@ -186,7 +190,8 @@ export default function AmehnitiesChatBox({
             perplexity: telemetry.perplexity,
             tokensSeen: telemetry.tokensSeen,
           }
-        : null);
+        : null, memories);
+
 
       route = {
         tier: "balanced",
