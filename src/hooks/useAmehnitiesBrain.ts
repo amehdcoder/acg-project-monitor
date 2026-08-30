@@ -20,6 +20,10 @@ import {
   syntheticCorpus, WEB_SOURCE_LABEL, type ActivityEvent, type WebPassage,
 } from "@/lib/amehnitiesAi/activityStream";
 import { indexMemory } from "@/lib/amehnitiesAi/frontierClient";
+import {
+  clearBrain, loadBrain, saveBrain, type PersistenceStatus,
+} from "@/lib/amehnitiesAi/brainPersistence";
+
 
 export interface MetricSample {
   at: number; step: number; loss: number; gradNorm: number;
@@ -143,6 +147,18 @@ export function useAmehnitiesBrain() {
   const runningRef = useRef(true);
   const telemetryRef = useRef<Telemetry | null>(null);
 
+  // ---- automatic, continuous persistence of everything the model learns
+  const [persistence, setPersistence] = useState<PersistenceStatus>({
+    supported: typeof indexedDB !== "undefined",
+    savedAt: null, step: 0, params: 0, bytes: 0, restored: false, saving: false, error: null,
+  });
+  const restoredRef = useRef(false);
+  const lastSavedStepRef = useRef(-1);
+  const savingRef = useRef(false);
+  const lastMemoryPushRef = useRef(0);
+
+
+
 
   // ---- worker lifecycle
   useEffect(() => {
@@ -162,8 +178,31 @@ export function useAmehnitiesBrain() {
     };
     w.postMessage({ type: "init", cfg: { dModel: 64, nHeads: 4, nLayers: 4, dFF: 256, ctx: 32, vocab: 256, lr: 3e-3, batch: 1 } });
     w.postMessage({ type: "run", running: true });
+
+    // Warm-start from the automatically persisted model, so everything learned
+    // in previous sessions (weights, optimiser state, vocabulary, counters)
+    // continues instead of restarting from scratch.
+    void (async () => {
+      const rec = await loadBrain();
+      if (!rec || workerRef.current !== w) { restoredRef.current = true; return; }
+      try {
+        tokenizerRef.current.restore(rec.file.vocabulary ?? []);
+        w.postMessage({ type: "load", ckpt: toWorkerCheckpoint(rec.file) });
+        lastSavedStepRef.current = rec.step;
+        setPersistence((p) => ({
+          ...p, savedAt: rec.savedAt, step: rec.step, params: rec.params, bytes: rec.bytes,
+          restored: true, error: null,
+        }));
+      } catch (e: any) {
+        setPersistence((p) => ({ ...p, error: e?.message ?? "Saved model could not be restored" }));
+      } finally {
+        restoredRef.current = true;
+      }
+    })();
+
     return () => { w.postMessage({ type: "run", running: false }); w.terminate(); workerRef.current = null; };
   }, []);
+
 
   // ---- corpus (reloaded whenever the enabled source mix changes)
   useEffect(() => {
@@ -367,6 +406,81 @@ export function useAmehnitiesBrain() {
     return rec;
   }, [captureCheckpoint]);
 
+  /* ---- realtime autosave -------------------------------------------------
+   * Every 30 seconds (and whenever the tab is hidden or closed) the live model
+   * — weights, Adam moments, vocabulary, step/token counters and the current
+   * architecture, including any neurogenesis growth — is written to IndexedDB.
+   * The same snapshot is summarised into the assistant's long-term memory so
+   * the chat answers always reflect the most recently trained model. */
+  const persistNow = useCallback(async (opts?: { force?: boolean }) => {
+    const t = telemetryRef.current;
+    if (!t || savingRef.current || !restoredRef.current) return;
+    if (!opts?.force && t.step <= lastSavedStepRef.current) return;
+    savingRef.current = true;
+    setPersistence((p) => ({ ...p, saving: true }));
+    try {
+      const payload = await captureCheckpoint(true);
+      const file = buildCheckpointFile(payload, tokenizerRef.current.vocab);
+      if (payload.shapes) file.shapes = payload.shapes;
+      const rec = await saveBrain(file);
+      lastSavedStepRef.current = rec.step;
+      setPersistence((p) => ({
+        ...p, savedAt: rec.savedAt, step: rec.step, params: rec.params, bytes: rec.bytes,
+        saving: false, error: null,
+      }));
+
+      // Feed what was just learned into the chat knowledge base.
+      const now = Date.now();
+      if (now - lastMemoryPushRef.current > 120_000) {
+        lastMemoryPushRef.current = now;
+        const top = (t.top || []).slice(0, 5)
+          .map((x) => `${tokenizerRef.current.vocab[x.id] ?? `token#${x.id}`} (${(x.p * 100).toFixed(1)}%)`)
+          .join(", ");
+        void indexMemory([{
+          kind: "brain_state",
+          title: `Amehnities trained model — step ${rec.step}`,
+          content:
+            `Saved model snapshot at step ${rec.step.toLocaleString()}: ${rec.params.toLocaleString()} parameters, ` +
+            `${t.cfg.nLayers} blocks, ${t.cfg.nHeads} heads, d_model ${t.cfg.dModel}, context ${t.cfg.ctx}, ` +
+            `activation ${t.activation ?? "swish"}. Training loss ${t.loss.toFixed(4)}, perplexity ${t.perplexity.toFixed(2)}, ` +
+            `${t.tokensSeen.toLocaleString()} activity tokens learned from ${t.streamSize.toLocaleString()} stream tokens.` +
+            (top ? ` Most likely next app events: ${top}.` : "") +
+            (t.evaluation ? ` Held-out accuracy ${(t.evaluation.accuracy * 100).toFixed(1)}%, validation loss ${t.evaluation.loss.toFixed(3)}.` : ""),
+          source_id: "amehnities-brain-state",
+          metadata: { step: rec.step, params: rec.params, loss: t.loss, perplexity: t.perplexity, saved_at: rec.savedAt },
+        }]).catch(() => undefined);
+      }
+    } catch (e: any) {
+      setPersistence((p) => ({ ...p, saving: false, error: e?.message ?? "Autosave failed" }));
+    } finally {
+      savingRef.current = false;
+    }
+  }, [captureCheckpoint]);
+
+  useEffect(() => {
+    if (!persistence.supported) return;
+    const id = setInterval(() => { void persistNow(); }, 30_000);
+    const flush = () => { void persistNow(); };
+    const onVis = () => { if (document.hidden) flush(); };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("pagehide", flush);
+      flush();
+    };
+  }, [persistNow, persistence.supported]);
+
+  /** Forget the automatically saved model (next boot trains from scratch). */
+  const forgetSavedBrain = useCallback(async () => {
+    await clearBrain();
+    lastSavedStepRef.current = -1;
+    setPersistence((p) => ({ ...p, savedAt: null, step: 0, params: 0, bytes: 0, restored: false, error: null }));
+  }, []);
+
+
+
   /**
    * Auto-save the best-performing checkpoints.
    *
@@ -564,5 +678,7 @@ export function useAmehnitiesBrain() {
     growth: telemetry?.growth ?? [],
     maxParams: telemetry?.maxParams ?? 0,
     webLearning, setWebLearning, webStats,
+    persistence, persistNow, forgetSavedBrain,
+
   };
 }

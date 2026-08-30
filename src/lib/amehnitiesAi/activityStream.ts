@@ -56,8 +56,16 @@ export class Tokenizer {
     this.vocab.push(term);
     return id;
   }
+  /** Re-seed the vocabulary from a persisted checkpoint so token ids stay stable. */
+  restore(vocab: string[]) {
+    if (!Array.isArray(vocab) || !vocab.length) return;
+    this.map.clear();
+    this.vocab = vocab.slice(0, this.limit);
+    this.vocab.forEach((term, i) => this.map.set(term, i));
+  }
   get size() { return Math.max(this.vocab.length, 1); }
 }
+
 
 function gapBucket(ms: number): string {
   if (ms < 5_000) return "gap:burst";

@@ -76,6 +76,8 @@ function AmehnitiesAIWorkspace() {
     plasticity, setPlasticity, growth, maxParams,
     webLearning, setWebLearning, webStats,
     activation, setActivation,
+    persistence, persistNow, forgetSavedBrain,
+
   } = useAmehnitiesBrain();
 
 
@@ -411,7 +413,11 @@ function AmehnitiesAIWorkspace() {
               exportCheckpoint={exportCheckpoint}
               importCheckpoint={importCheckpoint}
               applyConfig={applyConfig}
+              persistence={persistence}
+              persistNow={persistNow}
+              forgetSavedBrain={forgetSavedBrain}
             />
+
           )}
           <DataSourcePanel
             allSources={allSources}

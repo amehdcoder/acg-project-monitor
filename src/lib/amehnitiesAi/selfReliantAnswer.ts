@@ -168,8 +168,11 @@ export function composeAnswer(
   question: string,
   ev: EvidenceBundle,
   telemetry?: { params: number; step: number; loss: number; perplexity: number; tokensSeen: number } | null,
+  /** Recalled long-term memory written by training (trained-model knowledge). */
+  memories?: { title: string | null; kind: string; content: string; similarity: number }[],
 ): ComposedAnswer {
   const ranked = rankStreams(question, ev.streams);
+
   const totalSampled = ranked.reduce((a, s) => a + s.total, 0);
   const recent = ranked.reduce((a, s) => a + s.last24h, 0);
   const week = ranked.reduce((a, s) => a + s.last7d, 0);
@@ -219,6 +222,19 @@ export function composeAnswer(
       ).join("\n")}`,
     );
   }
+
+  // ---- Trained memory recall ----------------------------------------------
+  const recalled = (memories ?? []).filter((m) => m.content?.trim()).slice(0, 4);
+  if (recalled.length) {
+    parts.push(
+      `**Recalled from training**\n${recalled.map((m) => {
+        const label = m.title?.trim() || m.kind.replace(/_/g, " ");
+        return `- **${label}** (${(m.similarity * 100).toFixed(0)}% match) — ${m.content.replace(/\s+/g, " ").slice(0, 320)}`;
+      }).join("\n")}`,
+    );
+  }
+
+
 
   // ---- Programmatic action -------------------------------------------------
   const lead = ranked[0];
