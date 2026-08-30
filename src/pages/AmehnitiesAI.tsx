@@ -413,7 +413,11 @@ function AmehnitiesAIWorkspace() {
               exportCheckpoint={exportCheckpoint}
               importCheckpoint={importCheckpoint}
               applyConfig={applyConfig}
+              persistence={persistence}
+              persistNow={persistNow}
+              forgetSavedBrain={forgetSavedBrain}
             />
+
           )}
           <DataSourcePanel
             allSources={allSources}
