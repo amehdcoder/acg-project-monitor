@@ -77,6 +77,9 @@ function AmehnitiesAIWorkspace() {
     webLearning, setWebLearning, webStats,
     activation, setActivation,
     persistence, persistNow, forgetSavedBrain,
+    versions, createVersion, rollbackToVersion, removeVersion, clearAllVersions, downloadVersion,
+    trainOnDataset, datasetTraining, datasetRuns,
+
 
   } = useAmehnitiesBrain();
 
