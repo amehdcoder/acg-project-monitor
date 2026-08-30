@@ -118,7 +118,7 @@ Deno.serve(async (req) => {
         source_id: c.entry.source_id ?? null,
         title: c.entry.title ?? null,
         content: c.text,
-        metadata: { ...(c.entry.metadata ?? {}), part: c.part, parts: c.parts },
+        metadata: { ...(c.entry.metadata ?? {}), part: c.part, parts: c.parts, embed_model: EMBED_MODEL },
         project_id: c.entry.project_id ?? null,
         created_by: userId,
         is_shared: c.entry.is_shared ?? true,
