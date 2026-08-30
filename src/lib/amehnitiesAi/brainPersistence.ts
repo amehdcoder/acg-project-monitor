@@ -48,18 +48,23 @@ function openDb(): Promise<IDBDatabase> {
     req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
+      if (!db.objectStoreNames.contains(VERSIONS)) db.createObjectStore(VERSIONS, { keyPath: "id" });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error ?? new Error("Could not open the model store"));
   });
 }
 
-async function withStore<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<T>): Promise<T> {
+async function withStore<T>(
+  mode: IDBTransactionMode,
+  fn: (s: IDBObjectStore) => IDBRequest<T>,
+  store: string = STORE,
+): Promise<T> {
   const db = await openDb();
   try {
     return await new Promise<T>((resolve, reject) => {
-      const tx = db.transaction(STORE, mode);
-      const req = fn(tx.objectStore(STORE));
+      const tx = db.transaction(store, mode);
+      const req = fn(tx.objectStore(store));
       req.onsuccess = () => resolve(req.result as T);
       req.onerror = () => reject(req.error ?? new Error("Model store request failed"));
     });
@@ -67,6 +72,7 @@ async function withStore<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) =>
     db.close();
   }
 }
+
 
 /** Persist the newest snapshot of the model (overwrites the previous one). */
 export async function saveBrain(file: CheckpointFile): Promise<PersistedBrain> {
