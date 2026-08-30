@@ -162,6 +162,14 @@ export function useAmehnitiesBrain() {
   const savingRef = useRef(false);
   const lastMemoryPushRef = useRef(0);
 
+  // ---- versioning + dataset import
+  const [versions, setVersions] = useState<ModelVersionMeta[]>([]);
+  const [datasetTraining, setDatasetTraining] = useState(false);
+  const [datasetRuns, setDatasetRuns] = useState<DatasetRun[]>([]);
+  const lastVersionStepRef = useRef(-1);
+  const persistNowRef = useRef<((opts?: { force?: boolean }) => Promise<void>) | null>(null);
+
+
 
 
 
