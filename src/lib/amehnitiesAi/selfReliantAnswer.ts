@@ -223,6 +223,19 @@ export function composeAnswer(
     );
   }
 
+  // ---- Trained memory recall ----------------------------------------------
+  const recalled = (memories ?? []).filter((m) => m.content?.trim()).slice(0, 4);
+  if (recalled.length) {
+    parts.push(
+      `**Recalled from training**\n${recalled.map((m) => {
+        const label = m.title?.trim() || m.kind.replace(/_/g, " ");
+        return `- **${label}** (${(m.similarity * 100).toFixed(0)}% match) — ${m.content.replace(/\s+/g, " ").slice(0, 320)}`;
+      }).join("\n")}`,
+    );
+  }
+
+
+
   // ---- Programmatic action -------------------------------------------------
   const lead = ranked[0];
   const action = mode === "action" || mode === "diagnostic"
