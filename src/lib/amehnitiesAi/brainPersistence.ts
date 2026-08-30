@@ -13,9 +13,13 @@
 import type { CheckpointFile } from "./checkpoint";
 
 const DB_NAME = "amehnities-brain";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE = "state";
+const VERSIONS = "versions";
 const KEY = "latest";
+/** How many rollback points are kept on the device. */
+export const MAX_VERSIONS = 15;
+
 
 export interface PersistedBrain {
   savedAt: string;
