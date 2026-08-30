@@ -20,6 +20,10 @@ import {
   syntheticCorpus, WEB_SOURCE_LABEL, type ActivityEvent, type WebPassage,
 } from "@/lib/amehnitiesAi/activityStream";
 import { indexMemory } from "@/lib/amehnitiesAi/frontierClient";
+import {
+  clearBrain, loadBrain, saveBrain, type PersistenceStatus,
+} from "@/lib/amehnitiesAi/brainPersistence";
+
 
 export interface MetricSample {
   at: number; step: number; loss: number; gradNorm: number;
