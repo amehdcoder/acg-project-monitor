@@ -21,8 +21,13 @@ import {
 } from "@/lib/amehnitiesAi/activityStream";
 import { indexMemory } from "@/lib/amehnitiesAi/frontierClient";
 import {
-  clearBrain, loadBrain, saveBrain, type PersistenceStatus,
+  clearBrain, clearVersions, deleteVersion, getVersion, listVersions, loadBrain, saveBrain, saveVersion,
+  type ModelVersionMeta, type PersistenceStatus, type VersionTrigger,
 } from "@/lib/amehnitiesAi/brainPersistence";
+import {
+  describeDataset, encodeDataset, type ParsedDataset,
+} from "@/lib/amehnitiesAi/trainingDataset";
+
 
 
 export interface MetricSample {
