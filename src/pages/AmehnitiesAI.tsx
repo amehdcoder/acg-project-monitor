@@ -76,6 +76,8 @@ function AmehnitiesAIWorkspace() {
     plasticity, setPlasticity, growth, maxParams,
     webLearning, setWebLearning, webStats,
     activation, setActivation,
+    persistence, persistNow, forgetSavedBrain,
+
   } = useAmehnitiesBrain();
 
 
