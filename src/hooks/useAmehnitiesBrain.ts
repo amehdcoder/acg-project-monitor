@@ -845,6 +845,10 @@ export function useAmehnitiesBrain() {
     maxParams: telemetry?.maxParams ?? 0,
     webLearning, setWebLearning, webStats,
     persistence, persistNow, forgetSavedBrain,
+    versions, createVersion, rollbackToVersion, removeVersion, clearAllVersions,
+    downloadVersion, refreshVersions,
+    trainOnDataset, datasetTraining, datasetRuns,
+
 
   };
 }
