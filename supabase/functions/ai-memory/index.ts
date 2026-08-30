@@ -72,9 +72,11 @@ Deno.serve(async (req) => {
     if (!userId) return json({ error: "Unauthorized" }, 401);
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
+    await purgeStaleVectors(admin);
 
     const body = await req.json().catch(() => ({}));
     const action = String(body?.action ?? "search");
+
 
     // ---------------------------------------------------------------- index
     if (action === "index" || action === "feedback") {
