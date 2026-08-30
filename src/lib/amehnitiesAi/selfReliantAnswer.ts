@@ -168,8 +168,11 @@ export function composeAnswer(
   question: string,
   ev: EvidenceBundle,
   telemetry?: { params: number; step: number; loss: number; perplexity: number; tokensSeen: number } | null,
+  /** Recalled long-term memory written by training (trained-model knowledge). */
+  memories?: { title: string | null; kind: string; content: string; similarity: number }[],
 ): ComposedAnswer {
   const ranked = rankStreams(question, ev.streams);
+
   const totalSampled = ranked.reduce((a, s) => a + s.total, 0);
   const recent = ranked.reduce((a, s) => a + s.last24h, 0);
   const week = ranked.reduce((a, s) => a + s.last7d, 0);
