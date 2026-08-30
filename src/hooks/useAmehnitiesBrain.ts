@@ -147,6 +147,18 @@ export function useAmehnitiesBrain() {
   const runningRef = useRef(true);
   const telemetryRef = useRef<Telemetry | null>(null);
 
+  // ---- automatic, continuous persistence of everything the model learns
+  const [persistence, setPersistence] = useState<PersistenceStatus>({
+    supported: typeof indexedDB !== "undefined",
+    savedAt: null, step: 0, params: 0, bytes: 0, restored: false, saving: false, error: null,
+  });
+  const restoredRef = useRef(false);
+  const lastSavedStepRef = useRef(-1);
+  const savingRef = useRef(false);
+  const lastMemoryPushRef = useRef(0);
+
+
+
 
   // ---- worker lifecycle
   useEffect(() => {
