@@ -1049,7 +1049,16 @@ self.onmessage = (e: MessageEvent) => {
       if (stream.length > 20000) stream = stream.slice(-20000);
       break;
     }
+    case "benchmark": {
+      const sample = scoreTokens(
+        Array.isArray(msg.tokens) ? (msg.tokens as number[]) : [],
+        Math.max(1, Math.min(32, msg.windows ?? 12)),
+      );
+      (self as unknown as Worker).postMessage({ type: "benchmark", id: String(msg.id ?? "b"), sample });
+      break;
+    }
     case "query":
+
       runQuery(String(msg.id ?? "q"), Math.max(1, Math.min(24, msg.steps ?? 6)));
       break;
     case "run":
