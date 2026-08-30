@@ -34,7 +34,8 @@ async function purgeStaleVectors(admin: ReturnType<typeof createClient>) {
   const { error } = await admin
     .from("ai_memory_embeddings")
     .delete()
-    .not("metadata->>embed_model", "eq", EMBED_MODEL);
+    .or(`metadata->>embed_model.is.null,metadata->>embed_model.neq.${EMBED_MODEL}`);
+
   if (error) {
     purgedStale = false;
     console.error("stale vector purge failed:", error.message);
