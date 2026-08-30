@@ -13,13 +13,35 @@
  */
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { chunkText, embedTexts, GatewayError, toVectorLiteral } from "../_shared/embeddings.ts";
+import { chunkText, EMBED_MODEL, embedTexts, GatewayError, toVectorLiteral } from "../_shared/embeddings.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
 
 const MAX_ENTRIES = 40;
+
+/**
+ * Vectors produced by any earlier embedder are not comparable with the current
+ * local deterministic 1536-d model, so they are purged the first time this
+ * function runs after a model change. Rows written by the current model carry
+ * `metadata.embed_model`; anything else is stale and is deleted once.
+ */
+let purgedStale = false;
+async function purgeStaleVectors(admin: ReturnType<typeof createClient>) {
+  if (purgedStale) return;
+  purgedStale = true;
+  const { error } = await admin
+    .from("ai_memory_embeddings")
+    .delete()
+    .or(`metadata->>embed_model.is.null,metadata->>embed_model.neq.${EMBED_MODEL}`);
+
+  if (error) {
+    purgedStale = false;
+    console.error("stale vector purge failed:", error.message);
+  }
+}
+
 
 interface MemoryEntry {
   kind?: string;
@@ -50,9 +72,11 @@ Deno.serve(async (req) => {
     if (!userId) return json({ error: "Unauthorized" }, 401);
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
+    await purgeStaleVectors(admin);
 
     const body = await req.json().catch(() => ({}));
     const action = String(body?.action ?? "search");
+
 
     // ---------------------------------------------------------------- index
     if (action === "index" || action === "feedback") {
@@ -94,7 +118,7 @@ Deno.serve(async (req) => {
         source_id: c.entry.source_id ?? null,
         title: c.entry.title ?? null,
         content: c.text,
-        metadata: { ...(c.entry.metadata ?? {}), part: c.part, parts: c.parts },
+        metadata: { ...(c.entry.metadata ?? {}), part: c.part, parts: c.parts, embed_model: EMBED_MODEL },
         project_id: c.entry.project_id ?? null,
         created_by: userId,
         is_shared: c.entry.is_shared ?? true,
