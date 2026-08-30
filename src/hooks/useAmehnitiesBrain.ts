@@ -162,8 +162,31 @@ export function useAmehnitiesBrain() {
     };
     w.postMessage({ type: "init", cfg: { dModel: 64, nHeads: 4, nLayers: 4, dFF: 256, ctx: 32, vocab: 256, lr: 3e-3, batch: 1 } });
     w.postMessage({ type: "run", running: true });
+
+    // Warm-start from the automatically persisted model, so everything learned
+    // in previous sessions (weights, optimiser state, vocabulary, counters)
+    // continues instead of restarting from scratch.
+    void (async () => {
+      const rec = await loadBrain();
+      if (!rec || workerRef.current !== w) { restoredRef.current = true; return; }
+      try {
+        tokenizerRef.current.restore(rec.file.vocabulary ?? []);
+        w.postMessage({ type: "load", ckpt: toWorkerCheckpoint(rec.file) });
+        lastSavedStepRef.current = rec.step;
+        setPersistence((p) => ({
+          ...p, savedAt: rec.savedAt, step: rec.step, params: rec.params, bytes: rec.bytes,
+          restored: true, error: null,
+        }));
+      } catch (e: any) {
+        setPersistence((p) => ({ ...p, error: e?.message ?? "Saved model could not be restored" }));
+      } finally {
+        restoredRef.current = true;
+      }
+    })();
+
     return () => { w.postMessage({ type: "run", running: false }); w.terminate(); workerRef.current = null; };
   }, []);
+
 
   // ---- corpus (reloaded whenever the enabled source mix changes)
   useEffect(() => {
