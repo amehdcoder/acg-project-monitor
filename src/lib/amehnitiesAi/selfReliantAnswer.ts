@@ -10,6 +10,7 @@
  * No external language model is called at any point — composition happens
  * locally and deterministically from retrieved evidence.
  */
+import { enforceOutputPolicy, screenPrompt } from "./safetyPolicy";
 import type { Citation } from "./chatHistory";
 
 export interface EvidenceStream {
@@ -171,6 +172,12 @@ export function composeAnswer(
   /** Recalled long-term memory written by training (trained-model knowledge). */
   memories?: { title: string | null; kind: string; content: string; similarity: number }[],
 ): ComposedAnswer {
+  // The same global policy applies here, so any caller — chat, retry, batch —
+  // gets identical refusal behaviour and formatting.
+  const screened = screenPrompt(question);
+  if (!screened.allowed) {
+    return { markdown: enforceOutputPolicy(screened.message ?? "I can't help with that request.").text, followups: [] };
+  }
   const ranked = rankStreams(question, ev.streams);
 
   const totalSampled = ranked.reduce((a, s) => a + s.total, 0);
@@ -252,5 +259,10 @@ export function composeAnswer(
     parts.push("_Answered locally by the Amehnities model from learned app and internet evidence. No external language model was used._");
   }
 
-  return { markdown: parts.join("\n\n"), followups: followupsFor(question, ranked) };
+  const enforced = enforceOutputPolicy(parts.join("\n\n"));
+  return {
+    markdown: enforced.note ? `${enforced.text}\n\n_${enforced.note}_` : enforced.text,
+    followups: followupsFor(question, ranked),
+  };
 }
+

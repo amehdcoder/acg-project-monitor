@@ -3,7 +3,7 @@
  * live fine-tuning pass that updates the persisted model in realtime.
  */
 import { useMemo, useRef, useState } from "react";
-import { Database, Upload, Play, Loader2, FileText, CheckCircle2 } from "lucide-react";
+import { Database, Upload, Play, Loader2, FileText, CheckCircle2, ShieldAlert } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -54,9 +54,9 @@ export default function DatasetImportPanel({
     if (!parsed) return;
     try {
       const res = await trainOnDataset(parsed, { epochs });
-      toast.success("Training run complete", {
-        description: `${res.examples} examples × ${res.epochs} epochs · steps ${res.startStep.toLocaleString()} → ${res.endStep.toLocaleString()} · loss ${res.loss.toFixed(4)} · saved as a new version`,
-      });
+      const detail = `${res.examples} trained · ${res.holdout} holdout · steps ${res.startStep.toLocaleString()} → ${res.endStep.toLocaleString()}${res.gate?.reason ? ` · ${res.gate.reason}` : ""}`;
+      if (res.promoted) toast.success("Training run promoted", { description: detail });
+      else toast.warning("Run reverted by the evaluation gate", { description: detail });
     } catch (e: any) {
       toast.error("Training run failed", { description: e?.message });
     }
@@ -121,19 +121,38 @@ export default function DatasetImportPanel({
       {datasetRuns.length > 0 && (
         <div className="mt-3 border-t border-border/60 pt-3">
           <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Recent runs</h4>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             {datasetRuns.slice(0, 5).map((r) => (
-              <div key={r.id} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                <CheckCircle2 className="h-3 w-3 shrink-0 text-emerald-500" />
-                <span className="truncate">
-                  {r.name} · {r.examples}×{r.epochs} · {r.tokens.toLocaleString()} tokens · loss {r.loss.toFixed(4)}
+              <div key={r.id} className="rounded-md border border-border/50 bg-muted/30 px-2 py-1.5 text-[11px]">
+                <div className="flex items-center gap-1.5">
+                  {r.promoted
+                    ? <CheckCircle2 className="h-3 w-3 shrink-0 text-emerald-500" />
+                    : <ShieldAlert className="h-3 w-3 shrink-0 text-amber-500" />}
+                  <span className="truncate font-medium">
+                    {r.name} · {r.examples}×{r.epochs} · {r.tokens.toLocaleString()} tokens
+                  </span>
+                  <Badge variant="outline"
+                    className={`ml-auto h-4 px-1.5 text-[10px] ${r.promoted
+                      ? "border-emerald-500/50 text-emerald-600 dark:text-emerald-400"
+                      : "border-amber-500/50 text-amber-600 dark:text-amber-400"}`}>
+                    {r.promoted ? "Promoted" : "Reverted"}
+                  </Badge>
+                </div>
+                <p className="mt-0.5 leading-snug text-muted-foreground">
+                  Holdout {r.holdout} · loss {r.loss.toFixed(4)}
+                  {r.droppedUnsafe > 0 && ` · ${r.droppedUnsafe} unsafe dropped`}
+                  {r.redactedExamples > 0 && ` · ${r.redactedExamples} redacted`}
                   {" · "}{new Date(r.at).toLocaleTimeString()}
-                </span>
+                </p>
+                {r.gate?.reason && (
+                  <p className="mt-0.5 leading-snug text-muted-foreground">{r.gate.reason}</p>
+                )}
               </div>
             ))}
           </div>
         </div>
       )}
+
     </Card>
   );
 }

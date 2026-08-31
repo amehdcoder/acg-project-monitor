@@ -25,8 +25,13 @@ import {
   type ModelVersionMeta, type PersistenceStatus, type VersionTrigger,
 } from "@/lib/amehnitiesAi/brainPersistence";
 import {
-  describeDataset, encodeDataset, type ParsedDataset,
+  describeDataset, encodeDataset, type ParsedDataset, type TrainingExample,
 } from "@/lib/amehnitiesAi/trainingDataset";
+import {
+  DEFAULT_GATE, describeVerdict, evaluateGate, holdoutSplit,
+  type BenchmarkSample, type GateVerdict,
+} from "@/lib/amehnitiesAi/evalHarness";
+import { sanitizeTrainingPair } from "@/lib/amehnitiesAi/safetyPolicy";
 
 
 
@@ -124,7 +129,16 @@ export type BestMetric = "loss" | "confidence";
 export interface DatasetRun {
   id: string; at: number; name: string; examples: number; epochs: number;
   tokens: number; format: string; startStep: number; endStep: number; loss: number;
+  /** Examples withheld from training and used by the promotion gate. */
+  holdout: number;
+  /** Examples dropped / masked by the global safety policy. */
+  droppedUnsafe: number;
+  redactedExamples: number;
+  /** Pre/post benchmark verdict — `promote:false` means the run was reverted. */
+  gate: GateVerdict | null;
+  promoted: boolean;
 }
+
 
 export type { ModelVersionMeta } from "@/lib/amehnitiesAi/brainPersistence";
 
@@ -177,6 +191,9 @@ export function useAmehnitiesBrain() {
   const [datasetRuns, setDatasetRuns] = useState<DatasetRun[]>([]);
   const lastVersionStepRef = useRef(-1);
   const persistNowRef = useRef<((opts?: { force?: boolean }) => Promise<void>) | null>(null);
+  /** Pending holdout-benchmark requests, keyed by request id. */
+  const benchmarkWaiters = useRef<Map<string, (s: BenchmarkSample | null) => void>>(new Map());
+
 
 
 
@@ -196,6 +213,9 @@ export function useAmehnitiesBrain() {
       } else if (d?.type === "query") {
         const resolve = queryWaiters.current.get(d.id);
         if (resolve) { queryWaiters.current.delete(d.id); resolve(d); }
+      } else if (d?.type === "benchmark") {
+        const resolve = benchmarkWaiters.current.get(d.id);
+        if (resolve) { benchmarkWaiters.current.delete(d.id); resolve(d.sample ?? null); }
       }
     };
     w.postMessage({ type: "init", cfg: { dModel: 64, nHeads: 4, nLayers: 4, dFF: 256, ctx: 32, vocab: 256, lr: 3e-3, batch: 1 } });
@@ -568,73 +588,139 @@ export function useAmehnitiesBrain() {
     return downloadCheckpoint(rec.file);
   }, []);
 
+  /* ---- holdout benchmark -------------------------------------------------
+   * Forward-pass-only scoring of an explicit token sequence that is never
+   * appended to the training stream, so the benchmark can never leak into the
+   * weights. This is what the promotion gate compares before and after a run.
+   */
+  const runBenchmark = useCallback((tokens: number[], windows = 12) => {
+    const w = workerRef.current;
+    if (!w || tokens.length < 40) return Promise.resolve<BenchmarkSample | null>(null);
+    const id = `b-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    return new Promise<BenchmarkSample | null>((resolve) => {
+      const timeout = setTimeout(() => { benchmarkWaiters.current.delete(id); resolve(null); }, 15000);
+      benchmarkWaiters.current.set(id, (s) => { clearTimeout(timeout); resolve(s); });
+      w.postMessage({ type: "benchmark", id, tokens, windows });
+    });
+  }, []);
+
   /* ---- supervised dataset import ----------------------------------------
-   * Imported examples are packed with role-boundary tokens and streamed into
-   * the live training loop, then the improved model is persisted immediately
-   * and a version is cut so the run can always be reverted.
+   * Every run: safety-sanitise → hold out a benchmark slice → score before →
+   * train → score after → gate. Only a run that clears the gate is promoted
+   * (persisted + versioned); a regression is rolled back to the pre-run
+   * snapshot so a bad dataset can never degrade the live model.
    */
   const trainOnDataset = useCallback(
-    async (parsed: ParsedDataset, opts?: { epochs?: number }) => {
+    async (parsed: ParsedDataset, opts?: { epochs?: number; holdoutRatio?: number }) => {
       const w = workerRef.current;
       if (!w) throw new Error("Model is not running");
       if (!parsed.examples.length) throw new Error("No usable examples were found in that dataset");
+
+      // 1. Global safety policy — identical rules to chat: refuse-worthy
+      //    material is dropped, personal identifiers are masked before a
+      //    single token is packed.
+      const safety = sanitizeTrainingPair<TrainingExample>(parsed.examples);
+      if (!safety.kept.length) {
+        throw new Error("Every example was rejected by the safety policy, so there is nothing safe to train on");
+      }
+
       const epochs = Math.max(1, Math.min(20, opts?.epochs ?? 3));
       const startStep = telemetryRef.current?.step ?? 0;
       setDatasetTraining(true);
       try {
         const tk = tokenizerRef.current;
-        const tokens = encodeDataset(tk, parsed.examples, parsed.name, epochs);
+        const split = holdoutSplit(safety.kept, opts?.holdoutRatio);
+        const trainSet = split.train.length ? split.train : safety.kept;
+
+        // 2. Encode the holdout once — the exact same tokens are scored before
+        //    and after, so the comparison is like-for-like.
+        const holdoutTokens = split.holdout.length
+          ? encodeDataset(tk, split.holdout, `${parsed.name}-holdout`, 1)
+          : [];
+
+        // 3. Pre-run safety snapshot + pre-run benchmark.
+        let preRunId: string | null = null;
+        try {
+          const pre = await createVersion({
+            trigger: "pre-rollback",
+            label: `Before dataset · ${parsed.name}`,
+            notes: "Automatic safety point taken before a dataset training run",
+          });
+          preRunId = pre.id;
+        } catch { /* best effort — the gate still reports */ }
+
+        const before = await runBenchmark(holdoutTokens);
+
+        // 4. Train on the training split only.
+        const tokens = encodeDataset(tk, trainSet, parsed.name, epochs);
         w.postMessage({ type: "tokens", tokens, vocabSize: tk.size });
         w.postMessage({ type: "run", running: true });
         setRunning(true);
 
-        // Let the live loop actually consume the new material before we
-        // snapshot, so the persisted model reflects the imported examples.
-        const target = Math.min(600, 60 + parsed.examples.length * epochs);
+        const target = Math.min(600, 60 + trainSet.length * epochs);
         const deadline = Date.now() + 45_000;
         while (Date.now() < deadline) {
           await new Promise((r) => setTimeout(r, 400));
           if ((telemetryRef.current?.step ?? 0) - startStep >= target) break;
         }
 
-        await persistNowRef.current?.({ force: true });
-        const version = await createVersion({
-          trigger: "dataset",
-          label: `Dataset · ${parsed.name}`,
-          notes: describeDataset(parsed),
-        });
+        // 5. Post-run benchmark on the untouched holdout, then the gate.
+        const after = await runBenchmark(holdoutTokens);
+        const gate = evaluateGate(before, after, DEFAULT_GATE);
+
+        let versionId = preRunId ?? `run-${Date.now()}`;
+        if (gate.promote) {
+          await persistNowRef.current?.({ force: true });
+          const version = await createVersion({
+            trigger: "dataset",
+            label: `Dataset · ${parsed.name}`,
+            notes: `${describeDataset(parsed)} · ${describeVerdict(gate)}`,
+          });
+          versionId = version.id;
+        } else if (preRunId) {
+          // Regression — revert the live model to exactly where it started.
+          try { await rollbackToVersion(preRunId); } catch { /* surfaced in the verdict */ }
+        }
 
         const run: DatasetRun = {
-          id: version.id,
+          id: versionId,
           at: Date.now(),
           name: parsed.name,
-          examples: parsed.examples.length,
+          examples: trainSet.length,
           epochs,
           tokens: tokens.length,
           format: parsed.format,
           startStep,
           endStep: telemetryRef.current?.step ?? startStep,
           loss: telemetryRef.current?.loss ?? 0,
+          holdout: split.holdout.length,
+          droppedUnsafe: safety.dropped,
+          redactedExamples: safety.redactedExamples,
+          gate,
+          promoted: gate.promote,
         };
         setDatasetRuns((r) => [run, ...r].slice(0, 20));
 
-        // What was learned is fed straight into the chat knowledge base.
-        void indexMemory(
-          parsed.examples.slice(0, 60).map((ex, i) => ({
-            kind: "training_example",
-            title: (ex.prompt || ex.completion).slice(0, 90) || `${parsed.name} #${i + 1}`,
-            content: ex.prompt ? `Q: ${ex.prompt}\nA: ${ex.completion}` : ex.completion,
-            metadata: { dataset: parsed.name, format: parsed.format, epochs },
-          })),
-        ).catch(() => undefined);
+        // 6. Only promoted knowledge is fed into the chat knowledge base.
+        if (gate.promote) {
+          void indexMemory(
+            trainSet.slice(0, 60).map((ex, i) => ({
+              kind: "training_example",
+              title: (ex.prompt || ex.completion).slice(0, 90) || `${parsed.name} #${i + 1}`,
+              content: ex.prompt ? `Q: ${ex.prompt}\nA: ${ex.completion}` : ex.completion,
+              metadata: { dataset: parsed.name, format: parsed.format, epochs },
+            })),
+          ).catch(() => undefined);
+        }
 
         return run;
       } finally {
         setDatasetTraining(false);
       }
     },
-    [createVersion],
+    [createVersion, rollbackToVersion, runBenchmark],
   );
+
 
   /** Automatic rollback points every 2,000 optimiser steps of real training. */
   useEffect(() => {
