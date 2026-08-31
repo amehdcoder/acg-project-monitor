@@ -10,6 +10,7 @@
  * No external language model is called at any point — composition happens
  * locally and deterministically from retrieved evidence.
  */
+import { enforceOutputPolicy, screenPrompt } from "./safetyPolicy";
 import type { Citation } from "./chatHistory";
 
 export interface EvidenceStream {
