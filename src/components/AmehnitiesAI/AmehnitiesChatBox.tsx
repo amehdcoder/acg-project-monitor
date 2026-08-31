@@ -224,8 +224,12 @@ export default function AmehnitiesChatBox({
         learned: policyIds.length > 0,
       };
 
+      // Every answer leaves through the same policy: PII masking, then the
+      // deterministic output format (bullets, spacing, bounded length).
+      const enforced = enforceOutputPolicy(composed.markdown);
+      const body = enforced.note ? `${enforced.text}\n\n_${enforced.note}_` : enforced.text;
+
       // Reveal the composed answer progressively so it reads like live thinking.
-      const body = composed.markdown;
       const CHUNK = Math.max(12, Math.ceil(body.length / 90));
       for (let i = 0; i < body.length; i += CHUNK) {
         const shown = body.slice(0, i + CHUNK);
