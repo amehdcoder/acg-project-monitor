@@ -3,7 +3,7 @@
  * live fine-tuning pass that updates the persisted model in realtime.
  */
 import { useMemo, useRef, useState } from "react";
-import { Database, Upload, Play, Loader2, FileText, CheckCircle2 } from "lucide-react";
+import { Database, Upload, Play, Loader2, FileText, CheckCircle2, ShieldAlert } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
