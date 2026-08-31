@@ -210,6 +210,9 @@ export function useAmehnitiesBrain() {
       } else if (d?.type === "query") {
         const resolve = queryWaiters.current.get(d.id);
         if (resolve) { queryWaiters.current.delete(d.id); resolve(d); }
+      } else if (d?.type === "benchmark") {
+        const resolve = benchmarkWaiters.current.get(d.id);
+        if (resolve) { benchmarkWaiters.current.delete(d.id); resolve(d.sample ?? null); }
       }
     };
     w.postMessage({ type: "init", cfg: { dModel: 64, nHeads: 4, nLayers: 4, dFF: 256, ctx: 32, vocab: 256, lr: 3e-3, batch: 1 } });
