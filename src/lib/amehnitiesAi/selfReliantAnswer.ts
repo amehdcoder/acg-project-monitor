@@ -252,5 +252,10 @@ export function composeAnswer(
     parts.push("_Answered locally by the Amehnities model from learned app and internet evidence. No external language model was used._");
   }
 
-  return { markdown: parts.join("\n\n"), followups: followupsFor(question, ranked) };
+  const enforced = enforceOutputPolicy(parts.join("\n\n"));
+  return {
+    markdown: enforced.note ? `${enforced.text}\n\n_${enforced.note}_` : enforced.text,
+    followups: followupsFor(question, ranked),
+  };
 }
+
