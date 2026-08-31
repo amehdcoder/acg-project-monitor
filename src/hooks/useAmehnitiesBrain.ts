@@ -25,8 +25,13 @@ import {
   type ModelVersionMeta, type PersistenceStatus, type VersionTrigger,
 } from "@/lib/amehnitiesAi/brainPersistence";
 import {
-  describeDataset, encodeDataset, type ParsedDataset,
+  describeDataset, encodeDataset, type ParsedDataset, type TrainingExample,
 } from "@/lib/amehnitiesAi/trainingDataset";
+import {
+  DEFAULT_GATE, describeVerdict, evaluateGate, holdoutSplit,
+  type BenchmarkSample, type GateVerdict,
+} from "@/lib/amehnitiesAi/evalHarness";
+import { sanitizeTrainingPair } from "@/lib/amehnitiesAi/safetyPolicy";
 
 
 
