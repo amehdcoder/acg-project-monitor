@@ -129,7 +129,16 @@ export type BestMetric = "loss" | "confidence";
 export interface DatasetRun {
   id: string; at: number; name: string; examples: number; epochs: number;
   tokens: number; format: string; startStep: number; endStep: number; loss: number;
+  /** Examples withheld from training and used by the promotion gate. */
+  holdout: number;
+  /** Examples dropped / masked by the global safety policy. */
+  droppedUnsafe: number;
+  redactedExamples: number;
+  /** Pre/post benchmark verdict — `promote:false` means the run was reverted. */
+  gate: GateVerdict | null;
+  promoted: boolean;
 }
+
 
 export type { ModelVersionMeta } from "@/lib/amehnitiesAi/brainPersistence";
 
