@@ -129,13 +129,34 @@ export default function AmehnitiesChatBox({
   useEffect(() => { if (!busy) inputRef.current?.focus(); }, [busy, conversationId]);
 
   const send = useCallback(async (text: string) => {
-    const question = text.trim();
-    if (!question || busy) return;
+    const raw = text.trim();
+    if (!raw || busy) return;
+
+    // Global SLM safety policy — one screen for every prompt: refusal rules
+    // first, then PII masking. Nothing unmasked is stored, retrieved or shown.
+    const decision = screenPrompt(raw);
+    const question = decision.sanitizedPrompt || raw;
     setInput("");
     const userMsg: ChatMessage = { id: uid(), role: "user", content: question };
     const replyId = uid();
     const history = [...messages, userMsg];
     setMessages([...history, { id: replyId, role: "assistant", content: "" }]);
+
+    if (!decision.allowed) {
+      const refusal = enforceOutputPolicy(decision.message ?? "I can't help with that request.").text;
+      setMessages((m) => m.map((x) => (x.id === replyId ? { ...x, content: refusal, question } : x)));
+      const convRefusal = convIdRef.current;
+      if (convRefusal) {
+        void saveMessage(convRefusal, { role: "user", content: question }).catch(() => undefined);
+        void saveMessage(convRefusal, { role: "assistant", content: refusal }).catch(() => undefined);
+      }
+      return;
+    }
+
+    if (decision.redactions && Object.keys(decision.redactions).length) {
+      toast.info("Personal identifiers removed", { description: describeRedactions(decision.redactions) });
+    }
+
     setBusy(true);
 
     // Ensure the conversation exists (and that its URL is shareable/reloadable).
@@ -152,6 +173,7 @@ export default function AmehnitiesChatBox({
     } catch (e: any) {
       toast.error("Chat history could not be saved", { description: e?.message });
     }
+
 
     let catalog: Citation[] = [];
     let policyIds: string[] = [];
