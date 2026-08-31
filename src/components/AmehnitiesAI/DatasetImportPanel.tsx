@@ -54,9 +54,9 @@ export default function DatasetImportPanel({
     if (!parsed) return;
     try {
       const res = await trainOnDataset(parsed, { epochs });
-      toast.success("Training run complete", {
-        description: `${res.examples} examples × ${res.epochs} epochs · steps ${res.startStep.toLocaleString()} → ${res.endStep.toLocaleString()} · loss ${res.loss.toFixed(4)} · saved as a new version`,
-      });
+      const detail = `${res.examples} trained · ${res.holdout} holdout · steps ${res.startStep.toLocaleString()} → ${res.endStep.toLocaleString()}${res.gate?.reason ? ` · ${res.gate.reason}` : ""}`;
+      if (res.promoted) toast.success("Training run promoted", { description: detail });
+      else toast.warning("Run reverted by the evaluation gate", { description: detail });
     } catch (e: any) {
       toast.error("Training run failed", { description: e?.message });
     }
