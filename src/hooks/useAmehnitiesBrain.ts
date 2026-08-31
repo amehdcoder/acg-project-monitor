@@ -191,6 +191,9 @@ export function useAmehnitiesBrain() {
   const [datasetRuns, setDatasetRuns] = useState<DatasetRun[]>([]);
   const lastVersionStepRef = useRef(-1);
   const persistNowRef = useRef<((opts?: { force?: boolean }) => Promise<void>) | null>(null);
+  /** Pending holdout-benchmark requests, keyed by request id. */
+  const benchmarkWaiters = useRef<Map<string, (s: BenchmarkSample | null) => void>>(new Map());
+
 
 
 
