@@ -249,7 +249,7 @@ export async function testConnection(cfg: KoboConfig) {
 const PAGE_SIZE = 500;
 const HARD_CAP = 50_000; // safety guard
 
-async function fetchPage(cfg: KoboConfig, page: number) {
+async function fetchPage(cfg: KoboConfig, page: number, since?: string | null) {
   const { data, error } = await supabase.functions.invoke("kobo-form-manager", {
     body: {
       action: "fetch_submissions",
@@ -258,6 +258,8 @@ async function fetchPage(cfg: KoboConfig, page: number) {
       api_token: cfg.apiToken,
       page_size: PAGE_SIZE,
       page,
+      since: since || undefined,
+      skip_asset: page > 0 || undefined,
     },
   });
   if (error) throw await parseInvokeError(error);
@@ -268,32 +270,70 @@ async function fetchPage(cfg: KoboConfig, page: number) {
   return d;
 }
 
-export async function fetchSubmissions(cfg: KoboConfig, connectionId?: string | null): Promise<KoboCache> {
-  const first = await fetchPage(cfg, 0);
+const rowKey = (r: any) => String(r?._uuid ?? r?._id ?? r?.["meta/instanceID"] ?? "");
+
+/** Newest `_submission_time` in a cache — the delta cursor. */
+export function latestSubmissionTime(cache: KoboCache | null | undefined): string | null {
+  if (!cache?.results?.length) return null;
+  let latest: string | null = null;
+  for (const r of cache.results as any[]) {
+    const t = String(r?._submission_time ?? "");
+    if (t && (!latest || t > latest)) latest = t;
+  }
+  return latest;
+}
+
+/**
+ * Pull submissions for a connection.
+ *
+ * By default this performs a DELTA sync against the cached payload: only
+ * submissions newer than the cache's newest `_submission_time` are downloaded
+ * and merged, so a realtime-triggered refresh completes in well under a second
+ * instead of re-downloading the entire form. Pass `{ full: true }` to force a
+ * complete re-download (used after a schema change or manual "Resync all").
+ */
+export async function fetchSubmissions(
+  cfg: KoboConfig,
+  connectionId?: string | null,
+  opts: { full?: boolean } = {},
+): Promise<KoboCache> {
+  const prev = opts.full ? null : loadKoboCache(connectionId);
+  const since = prev?.survey?.length ? latestSubmissionTime(prev) : null;
+
+  const first = await fetchPage(cfg, 0, since);
   const total = Number(first?.count) || (first?.results?.length ?? 0);
-  const results: any[] = [...(first?.results ?? [])];
+  const fresh: any[] = [...(first?.results ?? [])];
   let page = 1;
-  let lastLen = results.length;
-  while (
-    lastLen === PAGE_SIZE &&
-    results.length < total &&
-    results.length < HARD_CAP
-  ) {
-    const next = await fetchPage(cfg, page);
+  let lastLen = fresh.length;
+  while (lastLen === PAGE_SIZE && fresh.length < total && fresh.length < HARD_CAP) {
+    const next = await fetchPage(cfg, page, since);
     const chunk = Array.isArray(next?.results) ? next.results : [];
     if (chunk.length === 0) break;
-    results.push(...chunk);
+    fresh.push(...chunk);
     lastLen = chunk.length;
     page++;
   }
+
+  let results: any[];
+  if (since && prev) {
+    const byKey = new Map<string, any>();
+    for (const r of prev.results ?? []) byKey.set(rowKey(r), r);
+    for (const r of fresh) byKey.set(rowKey(r), r); // edits replace in place
+    results = Array.from(byKey.values());
+  } else {
+    results = fresh;
+  }
+
   // Preserve exact Kobo chronological order (newest first).
   results.sort((a, b) => {
     const ta = new Date(a?._submission_time ?? 0).getTime();
     const tb = new Date(b?._submission_time ?? 0).getTime();
     return tb - ta;
   });
-  const survey = Array.isArray(first?.survey) ? first.survey : [];
-  const fields = Array.isArray(first?.fields) ? first.fields : [];
+
+  const survey = Array.isArray(first?.survey) && first.survey.length ? first.survey : (prev?.survey ?? []);
+  const fields = Array.isArray(first?.fields) && first.fields.length ? first.fields : (prev?.fields ?? []);
+  const choices = Array.isArray(first?.choices) && first.choices.length ? first.choices : (prev?.choices ?? []);
   const flatResults = flattenAll(results, survey.length ? survey : fields);
   const columns = buildDataDictionary(flatResults, survey.length ? survey : fields);
   const validation = validateDataDictionary(columns, fields);
@@ -302,7 +342,7 @@ export async function fetchSubmissions(cfg: KoboConfig, connectionId?: string | 
   }
   const cache: KoboCache = {
     fetchedAt: new Date().toISOString(),
-    formTitle: first?.form_title ?? null,
+    formTitle: first?.form_title ?? prev?.formTitle ?? null,
     count: results.length,
     results,
     flatResults,
@@ -310,7 +350,7 @@ export async function fetchSubmissions(cfg: KoboConfig, connectionId?: string | 
     columns,
     validation,
     survey,
-    choices: Array.isArray(first?.choices) ? first.choices : [],
+    choices,
     formUid: cfg.formUid,
   };
   saveKoboCache(cache, connectionId);
