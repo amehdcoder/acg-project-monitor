@@ -263,29 +263,48 @@ Deno.serve(async (req) => {
       const feed = feeds?.[0];
       if (!feed) return json({ error: "No Checklist data feed has been published yet." }, 404);
 
-      // Asset definition (survey + choices) so labels resolve client-side.
-      let survey: unknown[] = [];
-      let choices: unknown[] = [];
-      let formTitle: string | null = feed.name ?? null;
-      try {
-        const asset = await koboFetch(feed.server_url, `/api/v2/assets/${feed.form_uid}/?format=json`, feed.api_token);
-        survey = asset?.content?.survey ?? [];
-        choices = asset?.content?.choices ?? [];
-        formTitle = asset?.name ?? formTitle;
-      } catch (_e) { /* schema is optional — submissions still render */ }
+      // Delta mode: the client already holds everything up to `since`, so we
+      // only ask Kobo for submissions newer than that — a sub-second round trip
+      // instead of re-downloading the whole form on every realtime tick.
+      const since = typeof body?.since === "string" && body.since ? String(body.since) : null;
+      const skipSchema = body?.skip_schema === true;
+
+      const asset = skipSchema
+        ? { survey: [], choices: [], title: feed.name ?? null }
+        : await loadAsset(feed);
 
       const PAGE = 1000;
       const HARD_CAP = 50_000;
+      const dataPath = (start: number) => {
+        const parts = [`format=json`, `limit=${PAGE}`, `start=${start}`, `sort=${encodeURIComponent('{"_submission_time":-1}')}`];
+        if (since) {
+          parts.push(
+            `query=${encodeURIComponent(JSON.stringify({ _submission_time: { $gt: since } }))}`,
+          );
+        }
+        return `/api/v2/assets/${feed.form_uid}/data/?${parts.join("&")}`;
+      };
+
       const results: Record<string, unknown>[] = [];
-      for (let start = 0; start < HARD_CAP; start += PAGE) {
-        const page = await koboFetch(
-          feed.server_url,
-          `/api/v2/assets/${feed.form_uid}/data/?format=json&limit=${PAGE}&start=${start}`,
-          feed.api_token,
-        );
-        const chunk = Array.isArray(page?.results) ? page.results : [];
-        results.push(...chunk);
-        if (chunk.length < PAGE) break;
+      const firstPage = await koboFetch(feed.server_url, dataPath(0), feed.api_token);
+      const firstChunk = Array.isArray(firstPage?.results) ? firstPage.results : [];
+      results.push(...firstChunk);
+      const totalAvailable = Number(firstPage?.count) || firstChunk.length;
+
+      if (firstChunk.length === PAGE && totalAvailable > PAGE) {
+        // Fetch remaining pages concurrently (bounded) instead of serially.
+        const starts: number[] = [];
+        for (let s = PAGE; s < Math.min(totalAvailable, HARD_CAP); s += PAGE) starts.push(s);
+        const CONCURRENCY = 4;
+        for (let i = 0; i < starts.length; i += CONCURRENCY) {
+          const batch = await Promise.all(
+            starts.slice(i, i + CONCURRENCY).map((s) => koboFetch(feed.server_url, dataPath(s), feed.api_token)),
+          );
+          for (const p of batch) {
+            const chunk = Array.isArray(p?.results) ? p.results : [];
+            results.push(...chunk);
+          }
+        }
       }
 
       // Server-side State scoping — a granted user can never receive rows
@@ -293,17 +312,26 @@ Deno.serve(async (req) => {
       const allowed = caller.isAdmin ? [] : caller.scopeStates.map(norm).filter(Boolean);
       const scoped = scopeRows(results, caller.scopeStates, caller.isAdmin);
 
+      let latest: string | null = since;
+      for (const r of results) {
+        const t = String((r as Record<string, unknown>)?._submission_time ?? "");
+        if (t && (!latest || t > latest)) latest = t;
+      }
 
       return json({
         feed: { id: feed.id, name: feed.name, form_uid: feed.form_uid, server_url: feed.server_url },
-        form_title: formTitle,
-        survey,
-        choices,
+        form_title: asset.title,
+        survey: asset.survey,
+        choices: asset.choices,
+        mode: since ? "delta" : "full",
+        since,
+        latest_submission_time: latest,
         count: scoped.length,
         total: results.length,
         scope_states: allowed.length ? caller.scopeStates : [],
         results: scoped,
       });
+
     }
 
     return json({ error: `Unknown action "${action}"` }, 400);
