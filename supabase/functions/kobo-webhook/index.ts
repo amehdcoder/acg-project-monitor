@@ -188,7 +188,7 @@ Deno.serve(async (req) => {
   const url = new URL(req.url);
   const projectId = url.searchParams.get("project_id");
   const submittedAt = (payload["_submission_time"] as string | undefined) ?? null;
-  const kind = detectKind(payload, url.searchParams.get("form_type"));
+  const kind = await detectKind(payload, url.searchParams.get("form_type"));
   const formUid = (payload["_xform_id_string"] as string | undefined) ?? null;
   const submitterUserId = url.searchParams.get("submitted_by") || null;
 
