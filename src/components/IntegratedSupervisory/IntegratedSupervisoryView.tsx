@@ -117,15 +117,19 @@ export default function IntegratedSupervisoryView() {
   /* Cheap payload fingerprint: a merged burst that resolves to the same data
      must not push a new cache object (that would re-render every chart). */
   const cacheSigRef = useRef<string>("");
+  /* Always-current cache, used as the delta cursor without re-creating callbacks. */
+  const cacheRef = useRef<KoboCache | null>(null);
   const cacheSignature = (c: KoboCache | null) =>
     !c ? "" : `${c.count}|${c.formUid ?? ""}|${(c.results?.[0] as any)?._submission_time ?? ""}|${(c.results?.[0] as any)?._id ?? ""}|${(c.results?.[c.results.length - 1] as any)?._id ?? ""}`;
   const applyCache = useCallback((c: KoboCache) => {
+    cacheRef.current = c;
     const sig = cacheSignature(c);
     if (sig && sig === cacheSigRef.current) return false;
     cacheSigRef.current = sig;
     setCache(c);
     return true;
   }, []);
+
 
   /** Pull live submissions through the server feed — filtered server-side to scope. */
   const sharedInFlight = useRef<Promise<void> | null>(null);
