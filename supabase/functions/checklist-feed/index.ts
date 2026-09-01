@@ -95,6 +95,30 @@ async function koboFetch(serverUrl: string, path: string, apiToken: string) {
   return await res.json();
 }
 
+/* The form definition changes rarely but costs a full Kobo round-trip, so it is
+   memoised per warm isolate. This is the single biggest cost on a delta sync. */
+interface AssetSchema { survey: unknown[]; choices: unknown[]; title: string | null }
+const assetCache = new Map<string, { at: number; asset: AssetSchema }>();
+const ASSET_TTL_MS = 10 * 60_000;
+
+async function loadAsset(feed: { form_uid: string; server_url: string; api_token: string; name?: string }): Promise<AssetSchema> {
+  const hit = assetCache.get(feed.form_uid);
+  if (hit && Date.now() - hit.at < ASSET_TTL_MS) return hit.asset;
+  try {
+    const a = await koboFetch(feed.server_url, `/api/v2/assets/${feed.form_uid}/?format=json`, feed.api_token);
+    const asset: AssetSchema = {
+      survey: a?.content?.survey ?? [],
+      choices: a?.content?.choices ?? [],
+      title: a?.name ?? feed.name ?? null,
+    };
+    assetCache.set(feed.form_uid, { at: Date.now(), asset });
+    return asset;
+  } catch (_e) {
+    return hit?.asset ?? { survey: [], choices: [], title: feed.name ?? null };
+  }
+}
+
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
