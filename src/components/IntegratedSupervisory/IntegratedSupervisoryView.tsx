@@ -128,27 +128,37 @@ export default function IntegratedSupervisoryView() {
   }, []);
 
   /** Pull live submissions through the server feed — filtered server-side to scope. */
+  const sharedInFlight = useRef<Promise<void> | null>(null);
   const refreshShared = useCallback(async (silent = false) => {
-    setSyncing(true);
-    try {
-      const { cache: c, feed, scopeStates } = await fetchScopedSubmissions(feeds[0]?.id ?? null);
-      applyCache(c);
-      setFeedScopeStates(scopeStates);
-      setUsingSharedFeed(true);
-      setSyncError(null);
-      if (!silent) {
-        toast({
-          title: "Live data refreshed",
-          description: `${c.count} submissions from ${feed.name}${scopeStates.length ? ` · ${scopeStates.join(", ")}` : ""}.`,
-        });
-      }
-    } catch (e: any) {
-      setSyncError({ message: e?.message || "Unable to load the shared Checklist feed." });
-      if (!silent) {
-        toast({ title: "Refresh failed", description: e?.message ?? "Unable to load live data.", variant: "destructive" });
-      }
-    } finally { setSyncing(false); }
+    // Concurrent triggers (realtime burst + poll + focus) share one request.
+    if (sharedInFlight.current) return sharedInFlight.current;
+    const job = (async () => {
+      setSyncing(true);
+      try {
+        // Delta sync: only submissions newer than what we already hold.
+        const prev = cacheRef.current;
+        const { cache: c, feed, scopeStates, delta } = await fetchScopedSubmissions(feeds[0]?.id ?? null, prev);
+        applyCache(c);
+        setFeedScopeStates(scopeStates);
+        setUsingSharedFeed(true);
+        setSyncError(null);
+        if (!silent) {
+          toast({
+            title: delta ? "Live data up to date" : "Live data refreshed",
+            description: `${c.count} submissions from ${feed.name}${scopeStates.length ? ` · ${scopeStates.join(", ")}` : ""}.`,
+          });
+        }
+      } catch (e: any) {
+        setSyncError({ message: e?.message || "Unable to load the shared Checklist feed." });
+        if (!silent) {
+          toast({ title: "Refresh failed", description: e?.message ?? "Unable to load live data.", variant: "destructive" });
+        }
+      } finally { setSyncing(false); sharedInFlight.current = null; }
+    })();
+    sharedInFlight.current = job;
+    return job;
   }, [feeds, applyCache]);
+
 
   const refresh = useCallback(async (silent = false) => {
     const id = getActiveConnectionId();
