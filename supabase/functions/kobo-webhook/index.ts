@@ -86,17 +86,41 @@ function extractGeo(obj: Record<string, unknown>): { lat: number | null; lng: nu
   return { lat: r.lat, lng: r.lng, geotagged: r.geotagged };
 }
 
-type FormKind = "microplan" | "coverage" | "reconciliation" | "seeclear";
+type FormKind = "microplan" | "coverage" | "reconciliation" | "seeclear" | "checklist";
 
-function detectKind(
+/* Published Integrated Supervisory Checklist form UIDs, cached briefly so the
+   webhook can recognise checklist submissions without a DB hit per request. */
+let checklistUids: { at: number; uids: Set<string> } = { at: 0, uids: new Set() };
+const CHECKLIST_TTL_MS = 60_000;
+
+async function checklistFormUids(): Promise<Set<string>> {
+  if (Date.now() - checklistUids.at < CHECKLIST_TTL_MS) return checklistUids.uids;
+  try {
+    const { data } = await supabase
+      .from("checklist_dashboard_feeds")
+      .select("form_uid")
+      .eq("is_active", true);
+    checklistUids = {
+      at: Date.now(),
+      uids: new Set((data ?? []).map((r: { form_uid?: string }) => String(r?.form_uid ?? "").toLowerCase()).filter(Boolean)),
+    };
+  } catch { checklistUids = { at: Date.now(), uids: checklistUids.uids }; }
+  return checklistUids.uids;
+}
+
+async function detectKind(
   payload: Record<string, unknown>,
   qp: string | null,
-): FormKind {
+): Promise<FormKind> {
   const hinted = (qp ?? "").toLowerCase();
-  if (hinted === "coverage" || hinted === "reconciliation" || hinted === "microplan" || hinted === "seeclear") {
+  if (["coverage", "reconciliation", "microplan", "seeclear", "checklist"].includes(hinted)) {
     return hinted as FormKind;
   }
   const xform = String(payload["_xform_id_string"] ?? "").toLowerCase();
+  // A submission from any *published* Checklist Dashboard feed only needs to
+  // wake the dashboard up — it is read live from Kobo, never mirrored here.
+  if (xform && (await checklistFormUids()).has(xform)) return "checklist";
+  if (xform.includes("checklist") || xform.includes("supervis")) return "checklist";
   if (xform.includes("seeclear") || xform.includes("see_clear")) return "seeclear";
   if ("readiness_score" in payload && "equip_score" in payload) return "seeclear";
   if (xform.includes("recon")) return "reconciliation";
@@ -105,6 +129,7 @@ function detectKind(
   if ("total_treated" in payload || "doses_administered" in payload) return "coverage";
   return "microplan";
 }
+
 
 async function emitSyncEvent(
   status: string,
