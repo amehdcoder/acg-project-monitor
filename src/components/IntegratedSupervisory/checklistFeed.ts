@@ -71,6 +71,12 @@ export async function unpublishChecklistFeed(id: string): Promise<void> {
   await callFeed({ action: "unpublish", id });
 }
 
+/** Admin: point the form's KoboToolbox REST Service at kobo-webhook (?form_type=checklist)
+ *  so submissions reach the dashboard in realtime. */
+export async function registerChecklistWebhook(feedId?: string): Promise<{ ok: boolean; endpoint: string; results: unknown[] }> {
+  return await callFeed({ action: "register_webhook", ...(feedId ? { feed_id: feedId } : {}) });
+}
+
 /** Admin: set the State scope for a user's Checklist Dashboard grant (audited). */
 export async function setUserScopeStates(
   userId: string,

@@ -83,10 +83,21 @@ async function actorEmail(userId: string): Promise<string | null> {
 
 
 
-async function koboFetch(serverUrl: string, path: string, apiToken: string) {
+async function koboFetch(
+  serverUrl: string,
+  path: string,
+  apiToken: string,
+  init?: { method?: string; body?: unknown },
+) {
   const base = serverUrl.replace(/\/+$/, "");
   const res = await fetch(`${base}${path}`, {
-    headers: { Authorization: `Token ${apiToken}`, Accept: "application/json" },
+    method: init?.method ?? "GET",
+    headers: {
+      Authorization: `Token ${apiToken}`,
+      Accept: "application/json",
+      ...(init?.body !== undefined ? { "Content-Type": "application/json" } : {}),
+    },
+    ...(init?.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
   });
   if (!res.ok) {
     const detail = await res.text();
@@ -195,6 +206,60 @@ Deno.serve(async (req) => {
         form_uid: existing?.form_uid ?? null,
       });
       return json({ ok: true });
+    }
+
+    /* ------------------------------------------------- register_webhook --- */
+    if (action === "register_webhook") {
+      // Point the form's KoboToolbox REST Service at kobo-webhook so every new
+      // submission emits a realtime `checklist_sync` event instantly.
+      if (!caller.isAdmin) return json({ error: "Forbidden" }, 403);
+
+      let fq = admin
+        .from("checklist_dashboard_feeds")
+        .select("id, name, form_uid, server_url, api_token")
+        .eq("is_active", true);
+      const feedId = String(body?.feed_id ?? "");
+      if (feedId) fq = fq.eq("id", feedId);
+      const { data: feeds, error: fErr } = await fq;
+      if (fErr) return json({ error: fErr.message }, 400);
+      if (!feeds?.length) return json({ error: "No active checklist feed found" }, 404);
+
+      const { data: secretRow } = await admin
+        .from("kobo_webhook_secrets").select("secret").eq("active", true).limit(1).maybeSingle();
+      const endpoint = `${SUPABASE_URL}/functions/v1/kobo-webhook?form_type=checklist`;
+      const hookBody: Record<string, unknown> = {
+        name: "Amehnities Checklist Realtime Sync",
+        endpoint,
+        active: true,
+        subset_fields: [],
+        email_notification: false,
+        export_type: "json",
+        ...(secretRow?.secret ? { settings: { custom_headers: { "x-kobo-secret": secretRow.secret } } } : {}),
+      };
+
+      const results: unknown[] = [];
+      for (const feed of feeds) {
+        try {
+          const existing = await koboFetch(feed.server_url, `/api/v2/assets/${feed.form_uid}/hooks/?format=json`, feed.api_token);
+          const match = (existing?.results ?? []).find((h: any) => String(h?.endpoint ?? "").includes("kobo-webhook"));
+          const hook = match?.uid
+            ? await koboFetch(feed.server_url, `/api/v2/assets/${feed.form_uid}/hooks/${match.uid}/`, feed.api_token, { method: "PATCH", body: hookBody })
+            : await koboFetch(feed.server_url, `/api/v2/assets/${feed.form_uid}/hooks/`, feed.api_token, { method: "POST", body: hookBody });
+          results.push({ feed_id: feed.id, form_uid: feed.form_uid, ok: true, hook: { uid: hook?.uid, endpoint: hook?.endpoint, active: hook?.active } });
+          await audit({
+            actor_id: caller.userId,
+            actor_email: await actorEmail(caller.userId),
+            action: "register_webhook",
+            feed_id: feed.id,
+            feed_name: feed.name,
+            form_uid: feed.form_uid,
+            details: { endpoint, hook_uid: hook?.uid ?? null, updated_existing: !!match?.uid },
+          });
+        } catch (e) {
+          results.push({ feed_id: feed.id, form_uid: feed.form_uid, ok: false, error: (e as Error).message });
+        }
+      }
+      return json({ ok: results.every((r: any) => r.ok), endpoint, results });
     }
 
     /* ------------------------------------------------------- set_scope --- */
