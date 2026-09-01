@@ -199,7 +199,17 @@ Deno.serve(async (req) => {
   const flhf = pick(payload, ["flhf_name", "admin/flhf_name"]);
 
   try {
+    if (kind === "checklist") {
+      // Checklist Dashboard reads live from Kobo; the webhook only has to
+      // publish the realtime "something changed" signal, instantly.
+      await emitSyncEvent("checklist_sync", projectId, koboUuid, null, formUid);
+      return new Response(JSON.stringify({ ok: true, kind }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (kind === "coverage") {
+
       const items = Array.isArray(payload["community_repeat"])
         ? (payload["community_repeat"] as Array<Record<string, unknown>>)
         : [{} as Record<string, unknown>];
