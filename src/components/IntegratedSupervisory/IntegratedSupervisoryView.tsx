@@ -129,6 +129,8 @@ export default function IntegratedSupervisoryView() {
     setCache(c);
     return true;
   }, []);
+  useEffect(() => { cacheRef.current = cache; }, [cache]);
+
 
 
   /** Pull live submissions through the server feed — filtered server-side to scope. */
