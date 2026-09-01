@@ -658,18 +658,23 @@ Deno.serve(async (req) => {
     if (action === "fetch_submissions") {
       const forbid = await ensureAdmin();
       if (forbid) return forbid;
-      const { server_url, form_uid, api_token, page_size, page } = params;
+      const { server_url, form_uid, api_token, page_size, page, since, skip_asset } = params;
       if (!server_url || !form_uid || !api_token) return j({ error: "Missing server_url/form_uid/api_token" }, 400);
       const limit = Math.min(Math.max(Number(page_size) || 100, 1), 500);
       const start = Math.max(Number(page) || 0, 0) * limit;
       try {
-        const data = await koboFetch(
-          server_url,
-          `/api/v2/assets/${form_uid}/data/?format=json&limit=${limit}&start=${start}`,
-          api_token,
-        );
+        // Delta pulls ask KoboToolbox only for submissions newer than `since`,
+        // which is what keeps dashboard refreshes sub-second.
+        const qs = [`format=json`, `limit=${limit}`, `start=${start}`, `sort=${encodeURIComponent('{"_submission_time":-1}')}`];
+        if (typeof since === "string" && since) {
+          qs.push(`query=${encodeURIComponent(JSON.stringify({ _submission_time: { $gt: since } }))}`);
+        }
+        const data = await koboFetch(server_url, `/api/v2/assets/${form_uid}/data/?${qs.join("&")}`, api_token);
+        // The asset definition is only needed on the first page of a full pull.
         let asset: any = null;
-        try { asset = await koboFetch(server_url, `/api/v2/assets/${form_uid}/?format=json`, api_token); } catch {}
+        if (!skip_asset && start === 0) {
+          try { asset = await koboFetch(server_url, `/api/v2/assets/${form_uid}/?format=json`, api_token); } catch {}
+        }
         return j({
           ok: true,
           count: data?.count ?? (Array.isArray(data?.results) ? data.results.length : 0),
@@ -680,6 +685,7 @@ Deno.serve(async (req) => {
           choices: Array.isArray(asset?.content?.choices) ? asset.content.choices : [],
           fetched_at: new Date().toISOString(),
         });
+
       } catch (e) {
         if (e instanceof KoboApiError) {
           return j({ error: "Kobo fetch failed", code: e.code, status: e.status, detail: e.message }, e.code === "auth_failed" ? 401 : e.code === "forbidden" ? 403 : e.code === "not_found" ? 404 : e.code === "rate_limited" ? 429 : e.code === "timeout" ? 504 : 502);
