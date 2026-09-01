@@ -105,30 +105,75 @@ export interface ScopedFetchResult {
   feed: ChecklistFeed;
   scopeStates: string[];
   total: number;
+  /** True when only newly-arrived submissions were downloaded. */
+  delta: boolean;
 }
 
-/** Fetch live, State-scoped submissions and normalise them into a KoboCache. */
-export async function fetchScopedSubmissions(feedId?: string | null): Promise<ScopedFetchResult> {
-  const d = await callFeed({ action: "fetch", feed_id: feedId ?? undefined });
+const rowKey = (r: any) => String(r?._uuid ?? r?._id ?? r?.["meta/instanceID"] ?? "");
+
+/** Newest `_submission_time` present in a cache — the delta cursor. */
+export function latestSubmissionTime(cache: KoboCache | null | undefined): string | null {
+  if (!cache?.results?.length) return null;
+  let latest: string | null = null;
+  for (const r of cache.results as any[]) {
+    const t = String(r?._submission_time ?? "");
+    if (t && (!latest || t > latest)) latest = t;
+  }
+  return latest;
+}
+
+/**
+ * Fetch live, State-scoped submissions and normalise them into a KoboCache.
+ *
+ * When `prev` is supplied the request is a DELTA sync: only submissions newer
+ * than the cache's newest `_submission_time` are pulled from KoboToolbox and
+ * merged locally, which is what makes realtime refreshes land in well under a
+ * second instead of re-downloading the entire form.
+ */
+export async function fetchScopedSubmissions(
+  feedId?: string | null,
+  prev?: KoboCache | null,
+): Promise<ScopedFetchResult> {
+  const since = latestSubmissionTime(prev);
+  const canDelta = !!since && !!prev?.survey?.length;
+
+  const d = await callFeed({
+    action: "fetch",
+    feed_id: feedId ?? undefined,
+    since: canDelta ? since : undefined,
+    skip_schema: canDelta || undefined,
+  });
 
   const scopeStates = (d?.scope_states ?? []) as string[];
   const raw: any[] = Array.isArray(d?.results) ? d.results : [];
   // Defence-in-depth: the server already filtered, but every payload —
   // including realtime-triggered refetches and cached responses — is re-checked
   // against the caller's granted State(s) before it reaches the dashboard.
-  const results = filterRowsToScope(raw, scopeStates);
+  const fresh = filterRowsToScope(raw, scopeStates);
+  const isDelta = d?.mode === "delta" && canDelta;
+
+  let results: any[];
+  if (isDelta) {
+    const byKey = new Map<string, any>();
+    for (const r of prev!.results ?? []) byKey.set(rowKey(r), r);
+    for (const r of fresh) byKey.set(rowKey(r), r); // edits overwrite in place
+    results = Array.from(byKey.values());
+  } else {
+    results = fresh;
+  }
+
   results.sort(
     (a, b) => new Date(b?._submission_time ?? 0).getTime() - new Date(a?._submission_time ?? 0).getTime(),
   );
 
-  const survey = Array.isArray(d?.survey) ? d.survey : [];
+  const survey = Array.isArray(d?.survey) && d.survey.length ? d.survey : (prev?.survey ?? []);
+  const choices = Array.isArray(d?.choices) && d.choices.length ? d.choices : (prev?.choices ?? []);
   const flatResults = flattenAll(results, survey);
   const columns = buildDataDictionary(flatResults, survey);
 
-
   const cache: KoboCache = {
     fetchedAt: new Date().toISOString(),
-    formTitle: d?.form_title ?? d?.feed?.name ?? null,
+    formTitle: d?.form_title ?? prev?.formTitle ?? d?.feed?.name ?? null,
     count: results.length,
     results,
     flatResults,
@@ -136,8 +181,8 @@ export async function fetchScopedSubmissions(feedId?: string | null): Promise<Sc
     columns,
     validation: validateDataDictionary(columns, []),
     survey,
-    choices: Array.isArray(d?.choices) ? d.choices : [],
-    formUid: d?.feed?.form_uid,
+    choices,
+    formUid: d?.feed?.form_uid ?? prev?.formUid,
   };
 
   const feed = d.feed as ChecklistFeed;
@@ -147,6 +192,8 @@ export async function fetchScopedSubmissions(feedId?: string | null): Promise<Sc
     cache,
     feed,
     scopeStates,
-    total: Number(d?.total ?? results.length),
+    total: isDelta ? results.length : Number(d?.total ?? results.length),
+    delta: isDelta,
   };
 }
+
