@@ -208,7 +208,7 @@ export default function IntegratedSupervisoryView() {
         setFeedScopeStates(reg.scopeStates);
         if (reg.feeds[0] && needsSharedFeed) {
           const cached = loadKoboCache(feedCacheKey(reg.feeds[0].id));
-          if (cached) { setCache(cached); setUsingSharedFeed(true); }
+          if (cached) { cacheRef.current = cached; setCache(cached); setUsingSharedFeed(true); }
         }
       } catch { /* registry is optional for admins with local configs */ }
       finally { if (!cancelled) setFeedLoaded(true); }
@@ -227,25 +227,25 @@ export default function IntegratedSupervisoryView() {
   // Grantees re-pull through the scoped feed, so realtime can never widen scope.
   const { lastEventAt, connected } = useRealtimeKoboChecklist(
     () => (usingSharedFeed || (needsSharedFeed && feeds.length) ? refreshShared(true) : refresh(true)),
-    { enabled: perms.canView && (!!activeConnection || feeds.length > 0) },
+    { enabled: perms.canView && (!!activeConnection || feeds.length > 0), debounceMs: 250 },
   );
 
-  // Background sync safety net. Realtime is the primary path, so when the
-  // socket is live we only poll slowly (configurable, default 5 min); if the
-  // socket is down we fall back to a fast 20 s poll so the dashboard still
-  // feels near-instant. Focus / reconnect always triggers an immediate catch-up.
+  // Background sync safety net. Realtime is the primary path; because refreshes
+  // are now *delta* pulls (only submissions newer than what we hold), polling is
+  // cheap enough to run every 45 s while the socket is live and every 12 s when
+  // it is not. Focus / reconnect always triggers an immediate catch-up.
   useEffect(() => {
     if (!perms.canView || (!activeConnection && !feeds.length)) return;
-    const cfg = loadKoboConfig(activeId);
-    const slowMs = Math.max(1, cfg?.pollMinutes ?? 5) * 60 * 1000;
-    const intervalMs = connected ? slowMs : 20_000;
+    const shared = () => usingSharedFeed || (needsSharedFeed && feeds.length > 0);
+    const pull = () => (shared() ? refreshShared(true) : refresh(true));
+    const intervalMs = connected ? 45_000 : 12_000;
     const tick = () => {
       if (navigator.onLine === false) return;
       if (document.visibilityState === "hidden") return; // don't burn quota in background tabs
-      void refresh(true);
+      void pull();
     };
     const timer = setInterval(tick, intervalMs);
-    const catchUp = () => { if (document.visibilityState === "visible" && navigator.onLine !== false) void refresh(true); };
+    const catchUp = () => { if (document.visibilityState === "visible" && navigator.onLine !== false) void pull(); };
     document.addEventListener("visibilitychange", catchUp);
     window.addEventListener("online", catchUp);
     return () => {
@@ -253,7 +253,8 @@ export default function IntegratedSupervisoryView() {
       document.removeEventListener("visibilitychange", catchUp);
       window.removeEventListener("online", catchUp);
     };
-  }, [refresh, activeId, perms.canView, activeConnection, feeds.length, connected]);
+  }, [refresh, refreshShared, activeId, perms.canView, activeConnection, feeds.length, connected, usingSharedFeed, needsSharedFeed]);
+
 
   // Initial auto-sync on mount so the dashboard is fresh without pressing Sync.
   useEffect(() => {
