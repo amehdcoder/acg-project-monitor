@@ -313,6 +313,64 @@ Deno.serve(async (req) => {
       return json({ entries: data ?? [] });
     }
 
+    /* ---------------------------------------------- fetch_attachment --- */
+    // Grantees have no Kobo API token, so photos/signatures are streamed
+    // through this function (the token never leaves the server).
+    if (action === "fetch_attachment") {
+      if (!caller.isAdmin && !caller.granted) return json({ error: "Forbidden" }, 403);
+      const attachmentUrl = String(body?.attachment_url ?? "");
+      if (!attachmentUrl) return json({ error: "attachment_url is required" }, 400);
+
+      let q = admin
+        .from("checklist_dashboard_feeds")
+        .select("id, name, form_uid, server_url, api_token")
+        .eq("is_active", true);
+      const fid = String(body?.feed_id ?? "");
+      if (fid) q = q.eq("id", fid);
+      const { data: feeds } = await q.order("created_at", { ascending: true }).limit(1);
+      const feed = feeds?.[0];
+      if (!feed) return json({ error: "No Checklist data feed has been published yet." }, 404);
+
+      // Only ever proxy to the published Kobo deployment's own hosts.
+      let target: URL;
+      try { target = new URL(attachmentUrl); } catch { return json({ error: "Invalid attachment_url" }, 400); }
+      const feedHost = new URL(feed.server_url).hostname;
+      const rootOf = (h: string) => h.split(".").slice(-2).join(".");
+      if (target.protocol !== "https:" || rootOf(target.hostname) !== rootOf(feedHost)) {
+        return json({ error: "Attachment host not allowed" }, 400);
+      }
+
+      // Non-admins may only read media attached to a submission inside their
+      // granted State(s).
+      if (!caller.isAdmin) {
+        const submissionId = String(body?.submission_id ?? "");
+        if (!submissionId) return json({ error: "submission_id is required" }, 400);
+        const rec = await koboFetch(
+          feed.server_url,
+          `/api/v2/assets/${feed.form_uid}/data/${encodeURIComponent(submissionId)}/?format=json`,
+          feed.api_token,
+        );
+        const allowedRows = scopeRows([rec], caller.scopeStates, false);
+        if (!allowedRows.length) return json({ error: "Forbidden" }, 403);
+        const owns = (rec?._attachments ?? []).some((a: Record<string, unknown>) =>
+          [a?.download_url, a?.download_medium_url, a?.download_small_url, a?.download_large_url]
+            .filter(Boolean)
+            .some((u) => String(u) === attachmentUrl)
+        );
+        if (!owns) return json({ error: "Forbidden" }, 403);
+      }
+
+      const res = await fetch(attachmentUrl, { headers: { Authorization: `Token ${feed.api_token}` } });
+      if (!res.ok) return json({ error: `Attachment fetch failed (${res.status})` }, 400);
+      const buf = new Uint8Array(await res.arrayBuffer());
+      let bin = "";
+      for (let i = 0; i < buf.length; i += 8192) {
+        bin += String.fromCharCode(...buf.subarray(i, i + 8192));
+      }
+      const mime = res.headers.get("content-type") ?? "application/octet-stream";
+      return json({ data_url: `data:${mime};base64,${btoa(bin)}` });
+    }
+
     /* ----------------------------------------------------------- fetch --- */
     if (action === "fetch") {
       if (!caller.isAdmin && !caller.granted) return json({ error: "Forbidden" }, 403);
