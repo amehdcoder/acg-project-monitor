@@ -95,7 +95,8 @@ Deno.serve(async (req) => {
             `Approved answer / rule: ${correction}`,
           source_id: body?.source_id ? String(body.source_id) : undefined,
           metadata: { reviewed_by: userId, ...(body?.metadata ?? {}) },
-          is_shared: true,
+          project_id: body?.project_id ? String(body.project_id) : undefined,
+          is_shared: Boolean(body?.project_id),
         }];
       } else {
         const raw = Array.isArray(body?.entries) ? body.entries : [];
@@ -121,7 +122,8 @@ Deno.serve(async (req) => {
         metadata: { ...(c.entry.metadata ?? {}), part: c.part, parts: c.parts, embed_model: EMBED_MODEL },
         project_id: c.entry.project_id ?? null,
         created_by: userId,
-        is_shared: c.entry.is_shared ?? true,
+        // Sharing is only meaningful when scoped to a project; otherwise keep private.
+        is_shared: c.entry.project_id ? (c.entry.is_shared ?? true) : false,
         embedding: toVectorLiteral(vectors[i] ?? []),
       }));
 
