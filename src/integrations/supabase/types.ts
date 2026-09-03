@@ -8593,6 +8593,57 @@ export type Database = {
         }
         Relationships: []
       }
+      seeclear_kobo_schema: {
+        Row: {
+          choices: Json
+          created_at: string
+          drift: Json
+          fields: Json
+          form_title: string | null
+          form_uid: string
+          id: string
+          last_error: string | null
+          last_synced_at: string | null
+          server_url: string
+          submission_count: number
+          synced_by: string | null
+          updated_at: string
+          version_id: string | null
+        }
+        Insert: {
+          choices?: Json
+          created_at?: string
+          drift?: Json
+          fields?: Json
+          form_title?: string | null
+          form_uid: string
+          id?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          server_url?: string
+          submission_count?: number
+          synced_by?: string | null
+          updated_at?: string
+          version_id?: string | null
+        }
+        Update: {
+          choices?: Json
+          created_at?: string
+          drift?: Json
+          fields?: Json
+          form_title?: string | null
+          form_uid?: string
+          id?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          server_url?: string
+          submission_count?: number
+          synced_by?: string | null
+          updated_at?: string
+          version_id?: string | null
+        }
+        Relationships: []
+      }
       seeclear_monitoring: {
         Row: {
           challenges: Json
@@ -10441,6 +10492,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      has_standard_form: {
+        Args: { _code: string; _user_id: string }
         Returns: boolean
       }
       invoke_mda_sync_job: { Args: never; Returns: undefined }
