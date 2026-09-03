@@ -121,7 +121,8 @@ Deno.serve(async (req) => {
         metadata: { ...(c.entry.metadata ?? {}), part: c.part, parts: c.parts, embed_model: EMBED_MODEL },
         project_id: c.entry.project_id ?? null,
         created_by: userId,
-        is_shared: c.entry.is_shared ?? true,
+        // Sharing is only meaningful when scoped to a project; otherwise keep private.
+        is_shared: c.entry.project_id ? (c.entry.is_shared ?? true) : false,
         embedding: toVectorLiteral(vectors[i] ?? []),
       }));
 
