@@ -95,7 +95,8 @@ Deno.serve(async (req) => {
             `Approved answer / rule: ${correction}`,
           source_id: body?.source_id ? String(body.source_id) : undefined,
           metadata: { reviewed_by: userId, ...(body?.metadata ?? {}) },
-          is_shared: true,
+          project_id: body?.project_id ? String(body.project_id) : undefined,
+          is_shared: Boolean(body?.project_id),
         }];
       } else {
         const raw = Array.isArray(body?.entries) ? body.entries : [];
