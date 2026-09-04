@@ -363,6 +363,29 @@ Deno.serve(async (req) => {
         .select("id");
       if (error) throw error;
       await emitSyncEvent("seeclear_sync", projectId, koboUuid, data?.[0]?.id ?? null);
+      // Keep the checklist + dashboard in lock-step with the deployed Kobo form:
+      // whenever the submission carries a newer form version than the stored
+      // snapshot, re-pull the schema in the background (never blocks the 200).
+      try {
+        const version = (payload["__version__"] as string | undefined) ?? null;
+        if (version && formUid) {
+          const { data: snap } = await supabase
+            .from("seeclear_kobo_schema")
+            .select("version_id")
+            .eq("form_uid", formUid)
+            .maybeSingle();
+          if (!snap || snap.version_id !== version) {
+            void fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/seeclear-schema-sync`, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ action: "sync", form_uid: formUid }),
+            }).catch(() => {});
+          }
+        }
+      } catch { /* schema refresh is best-effort */ }
       return new Response(JSON.stringify({ ok: true, kind, rows_written: 1 }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
