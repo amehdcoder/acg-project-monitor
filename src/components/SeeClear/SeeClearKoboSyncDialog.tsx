@@ -155,6 +155,50 @@ export default function SeeClearKoboSyncDialog({ open, onClose, canViewSecret = 
             </Button>
           </div>
 
+          {/* live schema registry */}
+          <div className="rounded-lg border p-3 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="flex items-center gap-2 text-sm font-semibold">
+                <RefreshCw className="h-4 w-4" /> Live Kobo form schema
+              </p>
+              <div className="flex items-center gap-2">
+                {schema?.version_id && (
+                  <Badge variant="outline" className="text-[10px]">v{schema.version_id.slice(0, 8)}</Badge>
+                )}
+                <Badge variant="outline" className="text-[10px]">{fields.length} questions</Badge>
+                <Button size="sm" variant="outline" disabled={syncing} onClick={async () => {
+                  const r = await sync();
+                  if (r.ok) toast.success(r.changes ? `Schema updated — ${r.changes} change(s)` : "Schema is up to date");
+                  else toast.error(r.error || "Schema sync failed");
+                }}>
+                  {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  <span className="ml-1">Sync now</span>
+                </Button>
+              </div>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              The checklist and dashboard follow the deployed KoboToolbox form automatically — every submission with a
+              new form version re-pulls the question list and choice lists.
+              {schema?.last_synced_at && ` Last synced ${new Date(schema.last_synced_at).toLocaleString()}.`}
+            </p>
+            {schema?.last_error && (
+              <p className="text-[11px] text-destructive">Last sync error: {schema.last_error}</p>
+            )}
+            {!schema && (
+              <p className="text-[11px] text-muted-foreground">
+                No schema snapshot yet — connect the Kobo form (UID + API token) and press <strong>Sync now</strong>.
+              </p>
+            )}
+            {driftCount > 0 && (
+              <div className="space-y-1 rounded border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-900">
+                <p className="font-semibold">Latest schema changes ({driftCount})</p>
+                {drift.added.map((f) => <p key={`a-${f.name}`}>+ Added <strong>{f.label}</strong> ({f.type})</p>)}
+                {drift.removed.map((f) => <p key={`r-${f.name}`}>− Removed <strong>{f.label}</strong> ({f.type})</p>)}
+                {drift.changed.map((f) => <p key={`c-${f.name}`}>~ {f.name}: {f.from} → {f.to}</p>)}
+              </div>
+            )}
+          </div>
+
           {/* log */}
           <div className="rounded-lg border p-3 space-y-2">
             <div className="flex items-center justify-between gap-2">
