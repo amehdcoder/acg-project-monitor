@@ -148,6 +148,9 @@ export default function SeeClearDashboard({ onClose }: Props) {
             {isAdmin && (
               <Button size="sm" variant="secondary" onClick={() => setKoboOpen(true)} className="h-9 border-0 bg-white/15 text-white hover:bg-white/25" title="KoboToolbox sync settings"><Webhook className="h-4 w-4" /><span className="ml-1.5 hidden sm:inline">Kobo Sync</span></Button>
             )}
+            {isAdmin && (
+              <Button size="sm" variant="secondary" onClick={() => setAccessOpen(true)} className="h-9 border-0 bg-white/15 text-white hover:bg-white/25" title="Grant checklist / dashboard access"><ShieldCheck className="h-4 w-4" /><span className="ml-1.5 hidden sm:inline">Access</span></Button>
+            )}
             {canSim && (
               <Button size="sm" variant="secondary" onClick={() => setSimulate(!simulate)} className={`h-9 border-0 ${simulate ? "bg-[#2dd4a8] font-semibold text-[#0c2340] hover:bg-[#22c0a0]" : "bg-white/15 text-white hover:bg-white/25"}`}><Sparkles className="h-4 w-4" /><span className="ml-1.5 hidden sm:inline">{simulate ? "Simulating" : "Simulate"}</span></Button>
             )}
