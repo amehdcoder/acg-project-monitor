@@ -18,6 +18,7 @@ import {
   CheckCircle2, Copy, Download, Eye, EyeOff, History, Link2, Loader2, RefreshCw, ShieldCheck, Webhook, XCircle,
 } from "lucide-react";
 import { downloadSeeClearXlsForm } from "@/lib/seeclear/xlsform";
+import { useSeeClearKoboSchema } from "@/hooks/useSeeClearKoboSchema";
 
 interface Props {
   open: boolean;
