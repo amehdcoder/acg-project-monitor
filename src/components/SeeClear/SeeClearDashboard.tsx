@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import {
   ArrowLeft, RefreshCw, Building2, CheckCircle2, FileText, Landmark, Users, ClipboardList,
-  TrendingUp, AlertTriangle, MapPin, Download, Loader2, FileImage, FileSpreadsheet, Sparkles, ArrowLeftRight, Gauge, Trash2, Webhook,
+  TrendingUp, AlertTriangle, MapPin, Download, Loader2, FileImage, FileSpreadsheet, Sparkles, ArrowLeftRight, Gauge, Trash2, Webhook, ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -23,6 +23,7 @@ import { pctTone, toneColor } from "@/lib/conditionalFormatting";
 import OwnerSubmissionManager from "@/components/owner/OwnerSubmissionManager";
 import { downloadSeeClearXlsForm } from "@/lib/seeclear/xlsform";
 import SeeClearKoboSyncDialog from "./SeeClearKoboSyncDialog";
+import SeeClearAccessManager from "./SeeClearAccessManager";
 
 const NAVY = "#0c2340";
 const BLUE = "#2563eb";
@@ -114,6 +115,7 @@ export default function SeeClearDashboard({ onClose }: Props) {
   const canSim = isOwner || isSuperAdmin;
   const isAdmin = isOwner || isSuperAdmin || isOwnerLevel;
   const [koboOpen, setKoboOpen] = useState(false);
+  const [accessOpen, setAccessOpen] = useState(false);
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#f4f6fb]">
@@ -166,6 +168,7 @@ export default function SeeClearDashboard({ onClose }: Props) {
           </div>
         </div>
         <SeeClearKoboSyncDialog open={koboOpen} onClose={() => setKoboOpen(false)} canViewSecret={isAdmin} />
+        <SeeClearAccessManager open={accessOpen} onClose={() => setAccessOpen(false)} />
         <h1 className="mt-3 text-2xl font-bold">Eye Health Facility Monitoring Dashboard</h1>
         <p className="text-sm text-white/70">Facility readiness, equipment, referrals & data quality analytics</p>
       </div>
