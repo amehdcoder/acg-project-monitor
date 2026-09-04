@@ -30,6 +30,9 @@ import { queueOrInsert } from "@/lib/offlineSubmissions";
 import handsLogo from "@/assets/logo-amehnities.png";
 import coatOfArms from "@/assets/nigeria-coat-of-arms.png.asset.json";
 import { downloadSeeClearXlsForm } from "@/lib/seeclear/xlsform";
+import SeeClearAccessManager from "./SeeClearAccessManager";
+import { useSeeClearKoboSchema } from "@/hooks/useSeeClearKoboSchema";
+import { ShieldCheck } from "lucide-react";
 
 const NAVY = "#0c2340";
 const STEPS = ["Facility Profile", "Checklist", "Review & Submit"];
@@ -108,7 +111,10 @@ const Section = ({
 };
 
 export default function SeeClearFormFiller({ onClose }: Props) {
-  const { user } = useAuth();
+  const { user, isOwner, isSuperAdmin, isOwnerLevel } = useAuth();
+  const isAdmin = Boolean(isOwner || isSuperAdmin || isOwnerLevel);
+  const [accessOpen, setAccessOpen] = useState(false);
+  const { schema, fields: koboFields, driftCount } = useSeeClearKoboSchema(true);
   const geo = useGeolocation();
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -284,6 +290,16 @@ export default function SeeClearFormFiller({ onClose }: Props) {
                 catch (e: any) { toast.error(e?.message || "Could not build XLSForm"); }
               }}
             />
+            {isAdmin && (
+              <button
+                type="button"
+                title="Grant checklist / dashboard access"
+                onClick={() => setAccessOpen(true)}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20"
+              >
+                <ShieldCheck className="h-5 w-5" />
+              </button>
+            )}
             <button
               type="button"
               title="Download KoboToolbox XLSForm"
@@ -296,6 +312,7 @@ export default function SeeClearFormFiller({ onClose }: Props) {
               <Download className="h-5 w-5" />
             </button>
           </div>
+          <SeeClearAccessManager open={accessOpen} onClose={() => setAccessOpen(false)} />
 
         </div>
         {/* Stepper */}
