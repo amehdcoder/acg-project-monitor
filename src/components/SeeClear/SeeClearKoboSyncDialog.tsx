@@ -45,6 +45,7 @@ const copy = async (text: string, label: string) => {
 };
 
 export default function SeeClearKoboSyncDialog({ open, onClose, canViewSecret = false }: Props) {
+  const { schema, fields, drift, driftCount, syncing, sync } = useSeeClearKoboSchema(open);
   const [secret, setSecret] = useState<string | null>(null);
   const [secretError, setSecretError] = useState<string | null>(null);
   const [showSecret, setShowSecret] = useState(false);
