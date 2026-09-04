@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import {
   ArrowLeft, RefreshCw, Building2, CheckCircle2, FileText, Landmark, Users, ClipboardList,
-  TrendingUp, AlertTriangle, MapPin, Download, Loader2, FileImage, FileSpreadsheet, Sparkles, ArrowLeftRight, Gauge, Trash2, Webhook,
+  TrendingUp, AlertTriangle, MapPin, Download, Loader2, FileImage, FileSpreadsheet, Sparkles, ArrowLeftRight, Gauge, Trash2, Webhook, ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -23,6 +23,7 @@ import { pctTone, toneColor } from "@/lib/conditionalFormatting";
 import OwnerSubmissionManager from "@/components/owner/OwnerSubmissionManager";
 import { downloadSeeClearXlsForm } from "@/lib/seeclear/xlsform";
 import SeeClearKoboSyncDialog from "./SeeClearKoboSyncDialog";
+import SeeClearAccessManager from "./SeeClearAccessManager";
 
 const NAVY = "#0c2340";
 const BLUE = "#2563eb";
@@ -114,6 +115,7 @@ export default function SeeClearDashboard({ onClose }: Props) {
   const canSim = isOwner || isSuperAdmin;
   const isAdmin = isOwner || isSuperAdmin || isOwnerLevel;
   const [koboOpen, setKoboOpen] = useState(false);
+  const [accessOpen, setAccessOpen] = useState(false);
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#f4f6fb]">
@@ -148,6 +150,9 @@ export default function SeeClearDashboard({ onClose }: Props) {
             {isAdmin && (
               <Button size="sm" variant="secondary" onClick={() => setKoboOpen(true)} className="h-9 border-0 bg-white/15 text-white hover:bg-white/25" title="KoboToolbox sync settings"><Webhook className="h-4 w-4" /><span className="ml-1.5 hidden sm:inline">Kobo Sync</span></Button>
             )}
+            {isAdmin && (
+              <Button size="sm" variant="secondary" onClick={() => setAccessOpen(true)} className="h-9 border-0 bg-white/15 text-white hover:bg-white/25" title="Grant checklist / dashboard access"><ShieldCheck className="h-4 w-4" /><span className="ml-1.5 hidden sm:inline">Access</span></Button>
+            )}
             {canSim && (
               <Button size="sm" variant="secondary" onClick={() => setSimulate(!simulate)} className={`h-9 border-0 ${simulate ? "bg-[#2dd4a8] font-semibold text-[#0c2340] hover:bg-[#22c0a0]" : "bg-white/15 text-white hover:bg-white/25"}`}><Sparkles className="h-4 w-4" /><span className="ml-1.5 hidden sm:inline">{simulate ? "Simulating" : "Simulate"}</span></Button>
             )}
@@ -163,6 +168,7 @@ export default function SeeClearDashboard({ onClose }: Props) {
           </div>
         </div>
         <SeeClearKoboSyncDialog open={koboOpen} onClose={() => setKoboOpen(false)} canViewSecret={isAdmin} />
+        <SeeClearAccessManager open={accessOpen} onClose={() => setAccessOpen(false)} />
         <h1 className="mt-3 text-2xl font-bold">Eye Health Facility Monitoring Dashboard</h1>
         <p className="text-sm text-white/70">Facility readiness, equipment, referrals & data quality analytics</p>
       </div>
