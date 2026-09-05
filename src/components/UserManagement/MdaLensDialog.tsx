@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/hooks/use-toast";
 import { invalidateMdaLensCache } from "@/hooks/useMdaLens";
+import useRealtimeTables from "@/hooks/useRealtimeTables";
 import {
   Check, Compass, Database, Globe2, Layers, Loader2, MapPin, Search, Sparkles, Trash2,
 } from "lucide-react";
@@ -86,6 +87,14 @@ export default function MdaLensDialog({ open, onOpenChange, userId, userName, us
         setCampaignOptions(found);
       });
   }, [open, load]);
+
+  // Grantee state stays live: another admin's change to this user's lens lands
+  // here instantly instead of waiting for the dialog to be reopened.
+  useRealtimeTables(
+    [{ table: "mda_lens_grants", filter: `user_id=eq.${userId}` }],
+    load,
+    { enabled: open, name: `mda-lens-grant-${userId}` },
+  );
 
   const campaignChoices = useMemo(
     () => [...new Set([...campaignOptions, ...draft.campaign_types])].sort(),
