@@ -24,6 +24,8 @@ import OwnerSubmissionManager from "@/components/owner/OwnerSubmissionManager";
 import { downloadSeeClearXlsForm } from "@/lib/seeclear/xlsform";
 import SeeClearKoboSyncDialog from "./SeeClearKoboSyncDialog";
 import SeeClearAccessManager from "./SeeClearAccessManager";
+import SeeClearRecordDialog from "./SeeClearRecordDialog";
+import useSeeClearKoboSchema from "@/hooks/useSeeClearKoboSchema";
 
 const NAVY = "#0c2340";
 const BLUE = "#2563eb";
@@ -116,6 +118,9 @@ export default function SeeClearDashboard({ onClose }: Props) {
   const isAdmin = isOwner || isSuperAdmin || isOwnerLevel;
   const [koboOpen, setKoboOpen] = useState(false);
   const [accessOpen, setAccessOpen] = useState(false);
+  const [recordId, setRecordId] = useState<string | null>(null);
+  const { fields: koboFields, choices: koboChoices, drift, driftCount, schema } = useSeeClearKoboSchema();
+  const activeRecord = useMemo(() => rows.find((r) => r.id === recordId) ?? null, [rows, recordId]);
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#f4f6fb]">
@@ -181,6 +186,33 @@ export default function SeeClearDashboard({ onClose }: Props) {
           </div>
           <p className="text-xs font-medium text-muted-foreground">Last updated: {new Date().toLocaleString()}</p>
         </div>
+
+        {/* Live Kobo schema drift */}
+        {isAdmin && driftCount > 0 && (
+          <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 shadow-sm">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <h3 className="text-sm font-semibold text-amber-900">
+                The Kobo form changed — {driftCount} question{driftCount === 1 ? "" : "s"} differ from the last sync
+              </h3>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+              {drift.added.map((d) => (
+                <span key={`a-${d.name}`} className="rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-800">+ {d.label || d.name}</span>
+              ))}
+              {drift.removed.map((d) => (
+                <span key={`r-${d.name}`} className="rounded-full bg-red-100 px-2 py-0.5 font-medium text-red-800">− {d.label || d.name}</span>
+              ))}
+              {drift.changed.map((d) => (
+                <span key={`c-${d.name}`} className="rounded-full bg-blue-100 px-2 py-0.5 font-medium text-blue-800">{d.name}: {d.from} → {d.to}</span>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-amber-800">
+              New questions already appear on each record below. Open <strong>Kobo Sync</strong> to re-sync the schema.
+              {schema?.last_synced_at ? ` Last synced ${new Date(schema.last_synced_at).toLocaleString()}.` : ""}
+            </p>
+          </div>
+        )}
 
         {/* Plain-language narrative & recommended actions */}
         <NarrativeInsightsPanel
@@ -283,6 +315,54 @@ export default function SeeClearDashboard({ onClose }: Props) {
         <AccountabilityTable users={accountability} unitLabel="Health Facility" unitLabelPlural="Health Facilities" accent={TEAL} />
 
 
+
+        {/* Facility record register — click a row for the full checklist */}
+        <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+          <div className="mb-1 flex items-center gap-2">
+            <ClipboardList className="h-4 w-4 text-[#2563eb]" />
+            <h3 className="text-sm font-semibold text-foreground">Facility Records</h3>
+            <span className="ml-auto rounded-full bg-muted px-2.5 py-0.5 text-xs font-bold text-muted-foreground">{fmt(rows.length)}</span>
+          </div>
+          <p className="mb-3 text-xs text-muted-foreground">Tap any record to see every question and answer, including new Kobo questions.</p>
+          {rows.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">No monitoring records yet.</p>
+          ) : (
+            <div className="max-h-[420px] overflow-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-card">
+                  <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                    <th className="py-2 pr-3">Facility</th>
+                    <th className="py-2 px-3">LGA / Ward</th>
+                    <th className="py-2 px-3">Visit</th>
+                    <th className="py-2 px-3 text-right">Readiness</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <tr
+                      key={r.id}
+                      onClick={() => setRecordId(r.id)}
+                      className="cursor-pointer border-b border-border/50 last:border-0 hover:bg-muted/50"
+                    >
+                      <td className="py-2 pr-3 font-medium text-foreground">{r.facility_name || "Unnamed facility"}</td>
+                      <td className="py-2 px-3 text-xs capitalize">{r.lga || "—"}<br /><span className="text-muted-foreground">{r.ward || ""}</span></td>
+                      <td className="py-2 px-3 text-xs">{r.date_of_visit || "—"}</td>
+                      <td className="py-2 px-3 text-right font-semibold">{r.readiness_score != null ? `${Number(r.readiness_score).toFixed(0)}%` : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <SeeClearRecordDialog
+          open={!!activeRecord}
+          onClose={() => setRecordId(null)}
+          record={activeRecord as any}
+          fields={koboFields}
+          choices={koboChoices}
+        />
 
         {/* Owner-only management register */}
         {canDelete && (
