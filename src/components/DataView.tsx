@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { ArrowLeft } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import useRealtimeTables from "@/hooks/useRealtimeTables";
 import { Button } from "@/components/ui/button";
 import { useDataAnalytics, type AnalyticsFilters } from "@/hooks/useDataAnalytics";
 import { buildLabelMap } from "@/lib/formLabelUtils";
@@ -102,19 +102,18 @@ const DataView = () => {
   // What the dashboards render: simulation when toggled, otherwise real data.
   const mdaSubs = mdaSimulate ? (simulatedMdaSubs as any[]) : realMdaSubs;
 
-  // Live updates: refresh analytics whenever submissions change for the open form.
-  useEffect(() => {
-    if (!selectedFormId) return;
-    const channel = supabase
-      .channel(`dataview-submissions-${selectedFormId}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "form_submissions", filter: `form_id=eq.${selectedFormId}` },
-        () => { void refresh(); },
-      )
-      .subscribe();
-    return () => { void supabase.removeChannel(channel); };
-  }, [selectedFormId, refresh]);
+  // Live updates on the shared realtime engine: instant first refresh, burst
+  // coalescing, catch-up on focus / reconnect and fallback polling.
+  useRealtimeTables(
+    selectedFormId
+      ? [
+          { table: "form_submissions", filter: `form_id=eq.${selectedFormId}` },
+          { table: "submission_versions" },
+        ]
+      : [],
+    refresh,
+    { enabled: !!selectedFormId, name: `dataview-${selectedFormId ?? "none"}` },
+  );
 
 
 
