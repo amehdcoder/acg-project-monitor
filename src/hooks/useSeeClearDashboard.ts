@@ -36,10 +36,12 @@ export interface MonitoringRow {
   status: string | null;
   updated_at: string | null;
   created_at: string;
+  source?: string | null;
+  kobo_payload?: Record<string, unknown> | null;
 }
 
 const COLUMNS =
-  "id,monitor_id,date_of_visit,state,lga,ward,community,facility_name,facility_level,ownership,is_functional,essential_supplies,complete_records,referral_compliance,referrals_made,referrals_completed,readiness_score,equipment,challenges,recommendations,critical_gap,gps_lat,gps_lng,status,updated_at,created_at";
+  "id,monitor_id,date_of_visit,state,lga,ward,community,facility_name,facility_level,ownership,is_functional,essential_supplies,complete_records,referral_compliance,referrals_made,referrals_completed,readiness_score,equipment,challenges,recommendations,critical_gap,gps_lat,gps_lng,status,updated_at,created_at,source,kobo_payload";
 
 async function fetchAll(): Promise<MonitoringRow[]> {
   const all: MonitoringRow[] = [];
