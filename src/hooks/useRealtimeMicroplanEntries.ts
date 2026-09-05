@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useCallback, useMemo } from "react";
+import useRealtimeTables, { type RealtimeTableSpec } from "@/hooks/useRealtimeTables";
 
 /**
  * Subscribe to `microplan_entries` changes for a project and invoke a
@@ -12,41 +12,44 @@ import { supabase } from "@/integrations/supabase/client";
  * KoboCollect sees them appear in their table instantly, without spilling
  * data from other users.
  *
- * Channels are torn down on unmount to avoid subscription leaks.
+ * Runs on the shared realtime engine (`useRealtimeTables`) so it inherits the
+ * leading-edge refresh, burst coalescing, focus/online catch-up and fallback
+ * polling used by the Integrated Supervisory Dashboard.
  */
 export function useRealtimeMicroplanEntries(
   projectId: string | null | undefined,
   onChange: () => void,
   userId?: string | null,
 ) {
-  useEffect(() => {
-    if (!projectId) return;
-    const filter = userId
-      ? `project_id=eq.${projectId}`
-      : `project_id=eq.${projectId}`;
-    const channel = supabase
-      .channel(`microplan_entries_${projectId}_${userId ?? "all"}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "microplan_entries", filter },
-        (payload: { new?: { submitted_by?: string | null }; old?: { submitted_by?: string | null } }) => {
-          if (userId) {
-            const sub = payload.new?.submitted_by ?? payload.old?.submitted_by ?? null;
-            if (sub && sub !== userId) return; // ignore other users' rows
-          }
-          onChange();
-        },
-      )
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "kobo_sync_events", filter: `project_id=eq.${projectId}` },
-        (payload: { new?: { status?: string } }) => {
-          if (payload?.new?.status === "microplan_sync" || payload?.new?.status === "success") onChange();
-        },
-      )
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [projectId, userId, onChange]);
+  const accept = useCallback(
+    (payload: any) => {
+      if (!userId) return true;
+      const sub = payload?.new?.submitted_by ?? payload?.old?.submitted_by ?? null;
+      return !sub || sub === userId;
+    },
+    [userId],
+  );
+
+  const specs = useMemo<RealtimeTableSpec[]>(
+    () =>
+      projectId
+        ? [
+            { table: "microplan_entries", filter: `project_id=eq.${projectId}`, accept },
+            {
+              table: "kobo_sync_events",
+              event: "INSERT",
+              filter: `project_id=eq.${projectId}`,
+              accept: (p: any) => p?.new?.status === "microplan_sync" || p?.new?.status === "success",
+            },
+          ]
+        : [],
+    [projectId, accept],
+  );
+
+  return useRealtimeTables(specs, onChange, {
+    enabled: Boolean(projectId),
+    name: `microplan-${projectId ?? "none"}`,
+  });
 }
 
 export default useRealtimeMicroplanEntries;
