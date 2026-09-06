@@ -332,7 +332,24 @@ export default function SeeClearFormFiller({ onClose }: Props) {
       {/* Body */}
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         <motion.div key={step} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} className="mx-auto max-w-2xl space-y-4">
-          {/* STEP 1 — PROFILE */}
+          {/* Live Kobo form status + drift notice */}
+          {schema && (
+            <div className="rounded-2xl border border-[#2563eb]/20 bg-white p-3 text-[11px] shadow-sm">
+              <p className="font-semibold text-[#0c2340]">
+                Linked Kobo form: {schema.form_title || schema.form_uid}
+              </p>
+              <p className="text-muted-foreground">
+                {koboFields.length} questions • version {schema.version_id?.slice(0, 8) ?? "—"}
+                {schema.last_synced_at ? ` • synced ${new Date(schema.last_synced_at).toLocaleString()}` : ""}
+              </p>
+              {isAdmin && driftCount > 0 && (
+                <p className="mt-1 rounded-md bg-amber-50 px-2 py-1 text-amber-800">
+                  The Kobo form changed — {driftCount} question{driftCount === 1 ? "" : "s"} added, removed or edited.
+                </p>
+              )}
+            </div>
+          )}
+
           {step === 0 && (
             <>
               <div className="rounded-2xl bg-white p-4 shadow-sm">
