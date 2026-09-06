@@ -161,12 +161,70 @@ Deno.serve(async (req) => {
       return j({ ok: true, schema: data?.[0] ?? null });
     }
 
+    /* ---------------------------------------------------------- discover --- */
+    // Lists the deployed forms visible to the saved Kobo account so an admin can
+    // pick the See Clear form without hunting for its UID.
+    if (action === "discover") {
+      if (!internal && !isAdmin) return j({ error: "Forbidden" }, 403);
+      const { data: cfgs } = await admin
+        .from("kobo_form_configs")
+        .select("kobo_server_url, api_token")
+        .order("updated_at", { ascending: false })
+        .limit(1);
+      const cfg = cfgs?.[0];
+      const dToken = String(body?.api_token ?? "").trim() || String(cfg?.api_token ?? "");
+      const dServer = String(body?.server_url ?? "").trim() ||
+        String(cfg?.kobo_server_url ?? "https://kf.kobotoolbox.org");
+      if (!dToken) return j({ error: "no_kobo_config", detail: "No KoboToolbox API token saved." }, 400);
+      try {
+        const list = await koboGet(dServer, `/api/v2/assets/?format=json&limit=500`, dToken);
+        const assets = (list?.results ?? [])
+          .filter((a: any) => a?.asset_type === "survey")
+          .map((a: any) => ({
+            uid: a.uid,
+            name: a.name,
+            submissions: Number(a?.deployment__submission_count ?? 0),
+            deployed: Boolean(a?.has_deployment),
+          }));
+        return j({ ok: true, server_url: dServer, assets });
+      } catch (e) {
+        return j({ error: "kobo_fetch_failed", detail: (e as Error).message }, 502);
+      }
+    }
+
+    /* -------------------------------------------------------- save_config --- */
+    // Persists a chosen See Clear form into kobo_form_configs, reusing the saved
+    // account token when no explicit token is supplied.
+    if (action === "save_config") {
+      if (!internal && !isAdmin) return j({ error: "Forbidden" }, 403);
+      const uid = String(body?.form_uid ?? "").trim();
+      if (!uid) return j({ error: "form_uid required" }, 400);
+      const { data: cfgs } = await admin
+        .from("kobo_form_configs")
+        .select("kobo_server_url, api_token")
+        .order("updated_at", { ascending: false })
+        .limit(1);
+      const tok = String(body?.api_token ?? "").trim() || String(cfgs?.[0]?.api_token ?? "");
+      const srv = String(body?.server_url ?? "").trim() ||
+        String(cfgs?.[0]?.kobo_server_url ?? "https://kf.kobotoolbox.org");
+      if (!tok) return j({ error: "no_kobo_config", detail: "No KoboToolbox API token available." }, 400);
+      const { error: cErr } = await admin.from("kobo_form_configs").upsert({
+        form_uid: uid,
+        kobo_server_url: srv,
+        api_token: tok,
+        form_title: String(body?.form_title ?? "See Clear Facility Monitoring Checklist"),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "form_uid" });
+      if (cErr) return j({ error: cErr.message }, 500);
+      return j({ ok: true, form_uid: uid });
+    }
+
     /* -------------------------------------------------------------- sync --- */
     if (action !== "sync") return j({ error: `Unknown action: ${action}` }, 400);
     if (!internal && !isAdmin) return j({ error: "Forbidden" }, 403);
 
     // Resolve the Kobo credentials: explicit params → saved kobo_form_configs →
-    // the previously stored snapshot's form.
+    // any saved Kobo account token (same workspace) → stored snapshot's form.
     let formUid = String(body?.form_uid ?? "").trim();
     let serverUrl = String(body?.server_url ?? "").trim();
     let token = String(body?.api_token ?? "").trim();
@@ -178,7 +236,18 @@ Deno.serve(async (req) => {
         .order("updated_at", { ascending: false });
       if (formUid) q = q.eq("form_uid", formUid);
       const { data: cfgs } = await q.limit(1);
-      const cfg = cfgs?.[0];
+      let cfg = cfgs?.[0];
+      if (!cfg) {
+        // Fall back to any saved Kobo account token (same Kobo account hosts the
+        // See Clear form even when it has no dedicated config row yet).
+        const { data: anyCfg } = await admin
+          .from("kobo_form_configs")
+          .select("form_uid, kobo_server_url, api_token, form_title")
+          .order("updated_at", { ascending: false })
+          .limit(1);
+        cfg = anyCfg?.[0];
+        if (cfg) cfg = { ...cfg, form_uid: formUid || cfg.form_uid };
+      }
       if (cfg) {
         formUid = formUid || String(cfg.form_uid);
         serverUrl = serverUrl || String(cfg.kobo_server_url ?? "https://kf.kobotoolbox.org");
@@ -191,6 +260,7 @@ Deno.serve(async (req) => {
         detail: "No KoboToolbox credentials found. Save the See Clear form connection first (form UID + API token).",
       }, 400);
     }
+
     serverUrl = serverUrl || "https://kf.kobotoolbox.org";
 
     const { data: existingRows } = await admin
