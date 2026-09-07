@@ -1555,9 +1555,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     (!!currentProjectId && bmzProjectIds.has(currentProjectId)) ||
     projects.some((p) => bmzProjectIds.has(p.id));
 
-  // See Clear access is granted SEPARATELY for the checklist and the dashboard
-  // via `user_standard_form_assignments` (codes: seeclear_form / seeclear_dash).
-  const canUseSeeClearForm = isOwner || assignedStandardCodes.has("seeclear_form");
+  // See Clear: the Facility Monitoring Checklist is open to every signed-in
+  // project member by default. The Monitoring Dashboard stays restricted to
+  // users explicitly granted `seeclear_dash` (or owners).
+  const canUseSeeClearForm = true;
   const canUseSeeClearDash = isOwner || assignedStandardCodes.has("seeclear_dash");
   const seeclearFolderVisible = canUseSeeClearForm || canUseSeeClearDash;
   useEffect(() => {

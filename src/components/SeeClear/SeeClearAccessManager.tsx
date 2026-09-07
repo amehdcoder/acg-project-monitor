@@ -30,16 +30,19 @@ const MODULES = [
   {
     code: SEECLEAR_FORM_CODE,
     label: "Checklist",
-    blurb: "Facility profile, readiness, equipment, evidence and sign-off.",
+    blurb: "Open to everyone — facility profile, readiness, equipment, evidence and sign-off.",
     icon: ClipboardCheck,
     tint: "#14b8a6",
+    /** Available to every signed-in member — no grant needed. */
+    alwaysOn: true,
   },
   {
     code: SEECLEAR_DASH_CODE,
     label: "Dashboard",
-    blurb: "Readiness analytics, equipment status, referrals, map and exports.",
+    blurb: "Granted only — readiness analytics, equipment status, referrals, map and exports.",
     icon: BarChart3,
     tint: "#0f766e",
+    alwaysOn: false,
   },
 ] as const;
 
@@ -147,7 +150,7 @@ export default function SeeClearAccessManager({ open, onClose }: Props) {
   }, [users, q]);
 
   const granted = useMemo(
-    () => Object.values(grants).filter((s) => s.size > 0).length,
+    () => Object.values(grants).filter((s) => s.has(SEECLEAR_DASH_CODE)).length,
     [grants],
   );
 
@@ -159,8 +162,8 @@ export default function SeeClearAccessManager({ open, onClose }: Props) {
             <ShieldCheck className="h-5 w-5 text-primary" /> See Clear access management
           </DialogTitle>
           <DialogDescription>
-            Grant project members the Facility Monitoring Checklist, the Monitoring Dashboard, or both.
-            Changes apply instantly across every device.
+            The Facility Monitoring Checklist is available to every signed-in member by default.
+            Use the switches below to grant the Monitoring Dashboard. Changes apply instantly across every device.
           </DialogDescription>
         </DialogHeader>
 
@@ -169,7 +172,7 @@ export default function SeeClearAccessManager({ open, onClose }: Props) {
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, email or designation…" className="pl-8" />
           </div>
-          <Badge variant="outline" className="text-[11px]"><Users className="mr-1 h-3 w-3" />{granted} with access</Badge>
+          <Badge variant="outline" className="text-[11px]"><Users className="mr-1 h-3 w-3" />{granted} with dashboard access</Badge>
           <Button size="sm" variant="ghost" onClick={load} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           </Button>
@@ -206,6 +209,13 @@ export default function SeeClearAccessManager({ open, onClose }: Props) {
                     </div>
                     {MODULES.map((m) => {
                       const key = `${u.user_id}:${m.code}`;
+                      if (m.alwaysOn) {
+                        return (
+                          <Badge key={m.code} variant="outline" className="text-[10px]" style={{ color: m.tint, borderColor: `${m.tint}66` }}>
+                            {m.label} • everyone
+                          </Badge>
+                        );
+                      }
                       return (
                         <label key={m.code} className="flex items-center gap-1.5 text-[11px] font-medium">
                           <Switch

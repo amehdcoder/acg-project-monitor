@@ -11,9 +11,7 @@ import { useGeolocation } from "@/hooks/useGeolocation";
 import { toast } from "sonner";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
 import {
-  FACILITY_LEVELS, OWNERSHIP_TYPES, FUNCTIONAL_STATUS,
-  GENERAL_QUESTIONS, HR_QUESTIONS, INFRA_QUESTIONS, EQUIPMENT_ITEMS,
-  EQUIP_STATUS_META, CHALLENGE_OPTIONS, RECOMMENDATION_OPTIONS, EVIDENCE_SLOTS,
+  EQUIP_STATUS_META, EVIDENCE_SLOTS,
   computeScores, scoreYesNo, scoreEquipment, readinessBand,
   type YesNoAnswers, type EquipAnswers, type EquipStatus, type YesNoQ,
 } from "@/lib/seeclear/definition";
@@ -32,6 +30,7 @@ import coatOfArms from "@/assets/nigeria-coat-of-arms.png.asset.json";
 import { downloadSeeClearXlsForm } from "@/lib/seeclear/xlsform";
 import SeeClearAccessManager from "./SeeClearAccessManager";
 import { useSeeClearKoboSchema } from "@/hooks/useSeeClearKoboSchema";
+import { buildSeeClearLive } from "@/lib/seeclear/liveSchema";
 import { ShieldCheck } from "lucide-react";
 
 const NAVY = "#0c2340";
@@ -114,7 +113,10 @@ export default function SeeClearFormFiller({ onClose }: Props) {
   const { user, isOwner, isSuperAdmin, isOwnerLevel } = useAuth();
   const isAdmin = Boolean(isOwner || isSuperAdmin || isOwnerLevel);
   const [accessOpen, setAccessOpen] = useState(false);
-  const { schema, fields: koboFields, driftCount } = useSeeClearKoboSchema(true);
+  const { schema, fields: koboFields, choices: koboChoices, driftCount } = useSeeClearKoboSchema(true);
+  // Live Kobo overlay — question wording, options and added/removed questions
+  // follow whatever is currently deployed on the linked KoboToolbox form.
+  const live = useMemo(() => buildSeeClearLive(koboFields, koboChoices), [koboFields, koboChoices]);
   const geo = useGeolocation();
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -161,9 +163,9 @@ export default function SeeClearFormFiller({ onClose }: Props) {
   useEffect(() => { if (geo.error) toast.error(geo.error); }, [geo.error]);
 
   const scores = useMemo(() => computeScores(general, hr, infra, equip), [general, hr, infra, equip]);
-  const generalScore = scoreYesNo(GENERAL_QUESTIONS, general);
-  const hrScore = scoreYesNo(HR_QUESTIONS, hr);
-  const infraScore = scoreYesNo(INFRA_QUESTIONS, infra);
+  const generalScore = scoreYesNo(live.general, general);
+  const hrScore = scoreYesNo(live.hr, hr);
+  const infraScore = scoreYesNo(live.infra, infra);
   const equipScore = scoreEquipment(equip);
   const band = readinessBand(scores.overallPct);
 
@@ -171,15 +173,15 @@ export default function SeeClearFormFiller({ onClose }: Props) {
 
   const checklistValid = useMemo(() => {
     const allYesNo = (qs: YesNoQ[], a: YesNoAnswers) => qs.every((q) => a[q.key] === "yes" || a[q.key] === "no");
-    const equipDone = EQUIPMENT_ITEMS.every((it) => !!equip[it.key]);
+    const equipDone = live.equipment.every((it) => !!equip[it.key]);
     return (
-      allYesNo(GENERAL_QUESTIONS, general) &&
+      allYesNo(live.general, general) &&
       staffOnDuty.trim() !== "" &&
-      allYesNo(HR_QUESTIONS, hr) &&
-      allYesNo(INFRA_QUESTIONS, infra) &&
+      allYesNo(live.hr, hr) &&
+      allYesNo(live.infra, infra) &&
       equipDone
     );
-  }, [general, staffOnDuty, hr, infra, equip]);
+  }, [general, staffOnDuty, hr, infra, equip, live]);
 
   const requiredEvidenceComplete = EVIDENCE_SLOTS.filter((s) => s.required).every((s) => !!evidence[s.slot]);
   const reviewValid = requiredEvidenceComplete && challenges.length > 0 && recommendations.length > 0 && remarks.trim() !== "" && !!officerSig && !!inchargeSig;
@@ -383,13 +385,13 @@ export default function SeeClearFormFiller({ onClose }: Props) {
                 <div className="space-y-3">
                   <Field label="Facility Name" required><Input value={facilityName} onChange={(e) => setFacilityName(e.target.value)} placeholder="Enter facility name" className="h-11" /></Field>
                   <Field label="Facility Level" required>
-                    <div className="grid grid-cols-3 gap-2">{FACILITY_LEVELS.map((l) => <button key={l.value} type="button" onClick={() => setLevel(l.value)} className={`rounded-lg border-2 py-2 text-sm font-semibold ${level === l.value ? "border-[#2563eb] bg-[#0c2340] text-white" : "border-border text-foreground"}`}>{l.label}</button>)}</div>
+                    <div className="grid grid-cols-3 gap-2">{live.facilityLevels.map((l) => <button key={l.value} type="button" onClick={() => setLevel(l.value)} className={`rounded-lg border-2 py-2 text-sm font-semibold ${level === l.value ? "border-[#2563eb] bg-[#0c2340] text-white" : "border-border text-foreground"}`}>{l.label}</button>)}</div>
                   </Field>
                   <Field label="Ownership" required>
-                    <div className="grid grid-cols-2 gap-2">{OWNERSHIP_TYPES.map((o) => <button key={o.value} type="button" onClick={() => setOwnership(o.value)} className={`rounded-lg border-2 py-2 text-sm font-semibold ${ownership === o.value ? "border-[#2563eb] bg-[#0c2340] text-white" : "border-border text-foreground"}`}>{o.label}</button>)}</div>
+                    <div className="grid grid-cols-2 gap-2">{live.ownershipTypes.map((o) => <button key={o.value} type="button" onClick={() => setOwnership(o.value)} className={`rounded-lg border-2 py-2 text-sm font-semibold ${ownership === o.value ? "border-[#2563eb] bg-[#0c2340] text-white" : "border-border text-foreground"}`}>{o.label}</button>)}</div>
                   </Field>
                   <Field label="Facility Functional Status" required>
-                    <div className="grid grid-cols-3 gap-2">{FUNCTIONAL_STATUS.map((f) => <button key={f.value} type="button" onClick={() => setFuncStatus(f.value)} className={`rounded-lg border-2 py-2 text-xs font-semibold ${funcStatus === f.value ? "border-[#2563eb] bg-[#0c2340] text-white" : "border-border text-foreground"}`}>{f.label}</button>)}</div>
+                    <div className="grid grid-cols-3 gap-2">{live.functionalStatus.map((f) => <button key={f.value} type="button" onClick={() => setFuncStatus(f.value)} className={`rounded-lg border-2 py-2 text-xs font-semibold ${funcStatus === f.value ? "border-[#2563eb] bg-[#0c2340] text-white" : "border-border text-foreground"}`}>{f.label}</button>)}</div>
                   </Field>
                 </div>
               </div>
@@ -446,7 +448,7 @@ export default function SeeClearFormFiller({ onClose }: Props) {
                   <span className="rounded-full bg-[#dcfce7] px-2 py-0.5 text-xs font-semibold text-[#15803d]">{generalScore.score} / {generalScore.max}</span>
                 </div>
                 <div className="space-y-2 p-3">
-                  {GENERAL_QUESTIONS.map((q) => (
+                  {live.general.map((q) => (
                     <div key={q.key} className="flex items-center justify-between gap-3">
                       <span className="text-sm text-foreground">{q.label}</span>
                       <YesNo value={general[q.key] || ""} onChange={(v) => setGeneral({ ...general, [q.key]: v })} />
@@ -459,8 +461,8 @@ export default function SeeClearFormFiller({ onClose }: Props) {
                 </div>
               </div>
 
-              <Section id="hr" title="Human Resources" qs={HR_QUESTIONS} answers={hr} setAnswers={setHr} icon={UserIcon} openSection={openSection} setOpenSection={setOpenSection} />
-              <Section id="infra" title="Infrastructure & Utilities" qs={INFRA_QUESTIONS} answers={infra} setAnswers={setInfra} icon={Building2} openSection={openSection} setOpenSection={setOpenSection} />
+              <Section id="hr" title="Human Resources" qs={live.hr} answers={hr} setAnswers={setHr} icon={UserIcon} openSection={openSection} setOpenSection={setOpenSection} />
+              <Section id="infra" title="Infrastructure & Utilities" qs={live.infra} answers={infra} setAnswers={setInfra} icon={Building2} openSection={openSection} setOpenSection={setOpenSection} />
 
               {/* Equipment */}
               <div className="rounded-xl border border-border bg-white">
@@ -475,7 +477,7 @@ export default function SeeClearFormFiller({ onClose }: Props) {
                     ))}
                   </div>
                   <div className="space-y-1.5">
-                    {EQUIPMENT_ITEMS.map((it) => (
+                    {live.equipment.map((it) => (
                       <div key={it.key} className="flex items-center justify-between gap-2">
                         <span className="text-sm text-foreground">{it.label}{it.group === "advanced" && <span className="ml-1 text-[10px] text-muted-foreground">(Sec/Tert)</span>}</span>
                         <div className="flex gap-1">
@@ -512,12 +514,12 @@ export default function SeeClearFormFiller({ onClose }: Props) {
 
               <div className="rounded-2xl bg-white p-4 shadow-sm">
                 <h3 className="mb-2 text-sm font-bold text-[#0c2340]">Challenges Identified <span className="text-red-500">*</span></h3>
-                <Chips options={CHALLENGE_OPTIONS} selected={challenges} onToggle={(v) => setChallenges(challenges.includes(v) ? challenges.filter((c) => c !== v) : [...challenges, v])} />
+                <Chips options={live.challengeOptions} selected={challenges} onToggle={(v) => setChallenges(challenges.includes(v) ? challenges.filter((c) => c !== v) : [...challenges, v])} />
               </div>
 
               <div className="rounded-2xl bg-white p-4 shadow-sm">
                 <h3 className="mb-2 text-sm font-bold text-[#0c2340]">Recommendations <span className="text-red-500">*</span></h3>
-                <Chips options={RECOMMENDATION_OPTIONS} selected={recommendations} onToggle={(v) => setRecommendations(recommendations.includes(v) ? recommendations.filter((c) => c !== v) : [...recommendations, v])} />
+                <Chips options={live.recommendationOptions} selected={recommendations} onToggle={(v) => setRecommendations(recommendations.includes(v) ? recommendations.filter((c) => c !== v) : [...recommendations, v])} />
               </div>
 
               <div className="rounded-2xl bg-white p-4 shadow-sm">
