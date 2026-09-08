@@ -1,5 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { fuzzyMatchAny, uniqueSorted } from "@/lib/fuzzyMatch";
+import type { ScopeFilterValues } from "@/components/shared/DashboardScopeFilters";
 import { DASHBOARD_QUERY_OPTIONS } from "@/lib/queryConfig";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -67,11 +69,13 @@ export const useBmzDashboard = () => {
     queryFn: () => fetchAll(),
     ...DASHBOARD_QUERY_OPTIONS,
   });
-  const rows = rowsQ.data ?? [];
+  const allRows = rowsQ.data ?? [];
+
+  const [filters, setFilters] = useState<ScopeFilterValues>({ lga: "", facility: "", supervisor: "" });
 
   const monitorIds = useMemo(
-    () => [...new Set(rows.map((r) => r.monitor_id).filter(Boolean))] as string[],
-    [rows],
+    () => [...new Set(allRows.map((r) => r.monitor_id).filter(Boolean))] as string[],
+    [allRows],
   );
 
   const profilesQ = useQuery({
@@ -93,6 +97,43 @@ export const useBmzDashboard = () => {
   });
   const profileMap = profilesQ.data ?? new Map<string, ProfileLite>();
   const loading = rowsQ.isLoading || (monitorIds.length > 0 && profilesQ.isLoading);
+
+  const rows = useMemo(
+    () =>
+      allRows.filter((r) => {
+        if (filters.lga && (r.lga || "") !== filters.lga) return false;
+        if (
+          filters.facility &&
+          !fuzzyMatchAny([r.linked_facility, cadreLabel(r.cadre || ""), r.cadre], filters.facility)
+        )
+          return false;
+        if (
+          filters.supervisor &&
+          !fuzzyMatchAny(
+            [r.state_supervisor, profileMap.get(r.monitor_id || "")?.name, profileMap.get(r.monitor_id || "")?.email],
+            filters.supervisor,
+          )
+        )
+          return false;
+        return true;
+      }),
+    [allRows, filters, profileMap],
+  );
+
+  const filterOptions = useMemo(
+    () => ({
+      lgas: uniqueSorted(allRows.map((r) => r.lga)),
+      facilities: uniqueSorted([
+        ...allRows.map((r) => r.linked_facility),
+        ...allRows.map((r) => cadreLabel(r.cadre || "")),
+      ]),
+      supervisors: uniqueSorted([
+        ...allRows.map((r) => r.state_supervisor),
+        ...[...profileMap.values()].map((p) => p.name),
+      ]),
+    }),
+    [allRows, profileMap],
+  );
 
   const reload = async () => {
     await qc.invalidateQueries({ queryKey: ["bmz"] });
@@ -255,7 +296,8 @@ export const useBmzDashboard = () => {
 
 
   return {
-    rows, loading, reload,
+    rows, allRows, loading, reload,
+    filters, setFilters, filterOptions,
     stats, byCadre, bySex, refresherBreakdown, activities, availability,
     byLga, challenges, flagged, points, draftCount, accountability, deleteVisits,
   };

@@ -110,9 +110,48 @@ export const useSeeClearDashboard = () => {
   });
 
   const simRows = useMemo(() => (simulate ? generateSeeClearSimulation().rows : []), [simulate]);
-  const rows = simulate ? simRows : safeArray<MonitoringRow>(rowsQuery.data);
+  const allRows = simulate ? simRows : safeArray<MonitoringRow>(rowsQuery.data);
   const profileMap = simulate ? SIM_PROFILES : (profilesQuery.data ?? new Map<string, ProfileLite>());
   const loading = simulate ? false : rowsQuery.isLoading;
+
+  const [filters, setFilters] = useState<ScopeFilterValues>({ lga: "", facility: "", supervisor: "" });
+
+  const rows = useMemo(
+    () =>
+      allRows.filter((r) => {
+        if (filters.lga && (r.lga || "") !== filters.lga) return false;
+        if (
+          filters.facility &&
+          !fuzzyMatchAny(
+            [r.facility_name, r.facility_level, LEVEL_LABEL[r.facility_level || ""], r.ownership],
+            filters.facility,
+          )
+        )
+          return false;
+        if (
+          filters.supervisor &&
+          !fuzzyMatchAny(
+            [profileMap.get(r.monitor_id || "")?.name, profileMap.get(r.monitor_id || "")?.email, r.monitor_id],
+            filters.supervisor,
+          )
+        )
+          return false;
+        return true;
+      }),
+    [allRows, filters, profileMap],
+  );
+
+  const filterOptions = useMemo(
+    () => ({
+      lgas: uniqueSorted(allRows.map((r) => r.lga)),
+      facilities: uniqueSorted([
+        ...allRows.map((r) => r.facility_name),
+        ...allRows.map((r) => LEVEL_LABEL[r.facility_level || ""]),
+      ]),
+      supervisors: uniqueSorted([...profileMap.values()].map((p) => p.name)),
+    }),
+    [allRows, profileMap],
+  );
 
   const reload = () => queryClient.invalidateQueries({ queryKey: seeclearKey });
 
