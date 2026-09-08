@@ -296,7 +296,8 @@ export const useBmzDashboard = () => {
 
 
   return {
-    rows, loading, reload,
+    rows, allRows, loading, reload,
+    filters, setFilters, filterOptions,
     stats, byCadre, bySex, refresherBreakdown, activities, availability,
     byLga, challenges, flagged, points, draftCount, accountability, deleteVisits,
   };
