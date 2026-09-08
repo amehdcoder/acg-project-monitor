@@ -1,5 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { fuzzyMatchAny, uniqueSorted } from "@/lib/fuzzyMatch";
+import type { ScopeFilterValues } from "@/components/shared/DashboardScopeFilters";
 import { DASHBOARD_QUERY_OPTIONS } from "@/lib/queryConfig";
 import { supabase } from "@/integrations/supabase/client";
 import {
