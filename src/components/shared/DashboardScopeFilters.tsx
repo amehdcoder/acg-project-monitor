@@ -14,7 +14,13 @@ export interface ScopeFilterValues {
   lga: string;
   facility: string;
   supervisor: string;
+  /** Exact visit date, YYYY-MM-DD ("" = any). */
+  date: string;
+  /** Visit month, YYYY-MM ("" = any). */
+  month: string;
 }
+
+export const EMPTY_SCOPE_FILTERS: ScopeFilterValues = { lga: "", facility: "", supervisor: "", date: "", month: "" };
 
 interface Props {
   values: ScopeFilterValues;
