@@ -8,6 +8,8 @@ import {
 import { generateSeeClearSimulation } from "@/lib/seeclear/simulation";
 import { buildAccountability, type ProfileLite } from "@/lib/accountability";
 import { safeArray } from "@/lib/safeData";
+import { fuzzyMatchAny, uniqueSorted } from "@/lib/fuzzyMatch";
+import type { ScopeFilterValues } from "@/components/shared/DashboardScopeFilters";
 
 export interface MonitoringRow {
   id: string;
