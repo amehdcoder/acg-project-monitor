@@ -52,7 +52,7 @@ const Kpi = ({ icon: Icon, label, value, tint, sub }: { icon: any; label: string
 );
 
 export default function SeeClearDashboard({ onClose }: Props) {
-  const { rows, stats, byLevel, byOwnership, readinessByLevel, equipment, referrals, dataQuality, flagged, challenges, points, draftCount, loading, reload, simulate, setSimulate, deleteFacilities, accountability, filters, setFilters, filterOptions } = useSeeClearDashboard();
+  const { rows, stats, byLevel, byOwnership, readinessByLevel, equipment, referrals, dataQuality, flagged, challenges, points, draftCount, loading, reload, simulate, setSimulate, deleteFacilities, accountability, filters, setFilters, filterOptions, totalCount } = useSeeClearDashboard();
   const { isOwner, isSuperAdmin, isOwnerLevel } = useAuth();
 
   const narrativeQuestions = useMemo(() => ([
@@ -196,7 +196,7 @@ export default function SeeClearDashboard({ onClose }: Props) {
           supervisorSuggestions={filterOptions.supervisors}
           facilityLabel="Facility type / name"
           matchCount={rows.length}
-          totalCount={rows.length}
+          totalCount={totalCount}
           accent={NAVY}
         />
 

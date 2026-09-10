@@ -347,7 +347,7 @@ export const useSeeClearDashboard = () => {
   };
 
   return {
-    rows, loading, reload, simulate, setSimulate,
+    rows, totalCount: allRows.length, loading, reload, simulate, setSimulate,
     filters, setFilters, filterOptions,
     stats, byLevel, byOwnership, readinessByLevel, equipment, referrals,
     dataQuality, flagged, challenges, points, draftCount, deleteFacilities, accountability,
