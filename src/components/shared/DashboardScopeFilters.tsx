@@ -45,7 +45,7 @@ const DashboardScopeFilters = ({
   totalCount,
   accent = "#2563eb",
 }: Props) => {
-  const active = [values.lga, values.facility, values.supervisor].filter(Boolean).length;
+  const active = [values.lga, values.facility, values.supervisor, values.date, values.month].filter(Boolean).length;
 
   return (
     <div className="rounded-2xl bg-white p-3 shadow-sm">
@@ -79,7 +79,7 @@ const DashboardScopeFilters = ({
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-5">
         <div className="space-y-1">
           <Label className="text-[11px] text-muted-foreground">LGA</Label>
           <Select
@@ -130,6 +130,26 @@ const DashboardScopeFilters = ({
               <option key={s} value={s} />
             ))}
           </datalist>
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-[11px] text-muted-foreground">Visit date</Label>
+          <Input
+            type="date"
+            className="h-9 text-sm"
+            value={values.date}
+            onChange={(e) => onChange({ ...values, date: e.target.value })}
+          />
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-[11px] text-muted-foreground">Visit month</Label>
+          <Input
+            type="month"
+            className="h-9 text-sm"
+            value={values.month}
+            onChange={(e) => onChange({ ...values, month: e.target.value })}
+          />
         </div>
       </div>
     </div>
