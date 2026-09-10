@@ -13,6 +13,7 @@ import {
 import { useBmzDashboard } from "@/hooks/useBmzDashboard";
 import { BMZ_GREEN, BMZ_TEAL, BMZ_DARK, readinessBand } from "@/lib/bmz/definition";
 import JigawaLgaMap from "./JigawaLgaMap";
+import DashboardScopeFilters from "@/components/shared/DashboardScopeFilters";
 import { exportJigawaEyeHealthWorkbook } from "@/lib/bmz/bmzExcelExport";
 import { formatDay, formatDuration } from "@/lib/accountability";
 import { toast } from "sonner";
@@ -140,6 +141,17 @@ export default function BmzDashboard({ onClose }: Props) {
           </div>
         ) : (
           <div className="mx-auto max-w-5xl space-y-4 pb-8">
+            <DashboardScopeFilters
+              values={d.filters}
+              onChange={d.setFilters}
+              lgas={d.filterOptions.lgas}
+              facilitySuggestions={d.filterOptions.facilities}
+              supervisorSuggestions={d.filterOptions.supervisors}
+              facilityLabel="Facility / cadre"
+              matchCount={d.rows.length}
+              totalCount={d.allRows.length}
+              accent={BMZ_GREEN}
+            />
             {/* KPI strip */}
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               <Kpi icon={Users} label="Monitoring visits" value={String(stats.total)} sub={`${d.draftCount} draft(s)`} color={BMZ_GREEN} />

@@ -26,6 +26,7 @@ import SeeClearKoboSyncDialog from "./SeeClearKoboSyncDialog";
 import SeeClearAccessManager from "./SeeClearAccessManager";
 import SeeClearRecordDialog from "./SeeClearRecordDialog";
 import useSeeClearKoboSchema from "@/hooks/useSeeClearKoboSchema";
+import DashboardScopeFilters from "@/components/shared/DashboardScopeFilters";
 
 const NAVY = "#0c2340";
 const BLUE = "#2563eb";
@@ -51,7 +52,7 @@ const Kpi = ({ icon: Icon, label, value, tint, sub }: { icon: any; label: string
 );
 
 export default function SeeClearDashboard({ onClose }: Props) {
-  const { rows, stats, byLevel, byOwnership, readinessByLevel, equipment, referrals, dataQuality, flagged, challenges, points, draftCount, loading, reload, simulate, setSimulate, deleteFacilities, accountability } = useSeeClearDashboard();
+  const { rows, stats, byLevel, byOwnership, readinessByLevel, equipment, referrals, dataQuality, flagged, challenges, points, draftCount, loading, reload, simulate, setSimulate, deleteFacilities, accountability, filters, setFilters, filterOptions } = useSeeClearDashboard();
   const { isOwner, isSuperAdmin, isOwnerLevel } = useAuth();
 
   const narrativeQuestions = useMemo(() => ([
@@ -186,6 +187,18 @@ export default function SeeClearDashboard({ onClose }: Props) {
           </div>
           <p className="text-xs font-medium text-muted-foreground">Last updated: {new Date().toLocaleString()}</p>
         </div>
+
+        <DashboardScopeFilters
+          values={filters}
+          onChange={setFilters}
+          lgas={filterOptions.lgas}
+          facilitySuggestions={filterOptions.facilities}
+          supervisorSuggestions={filterOptions.supervisors}
+          facilityLabel="Facility type / name"
+          matchCount={rows.length}
+          totalCount={rows.length}
+          accent={NAVY}
+        />
 
         {/* Live Kobo schema drift */}
         {isAdmin && driftCount > 0 && (
