@@ -116,7 +116,7 @@ export const useSeeClearDashboard = () => {
   const profileMap = simulate ? SIM_PROFILES : (profilesQuery.data ?? new Map<string, ProfileLite>());
   const loading = simulate ? false : rowsQuery.isLoading;
 
-  const [filters, setFilters] = useState<ScopeFilterValues>({ lga: "", facility: "", supervisor: "" });
+  const [filters, setFilters] = useState<ScopeFilterValues>({ lga: "", facility: "", supervisor: "", date: "", month: "" });
 
   const rows = useMemo(
     () =>

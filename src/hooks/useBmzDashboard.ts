@@ -71,7 +71,7 @@ export const useBmzDashboard = () => {
   });
   const allRows = rowsQ.data ?? [];
 
-  const [filters, setFilters] = useState<ScopeFilterValues>({ lga: "", facility: "", supervisor: "" });
+  const [filters, setFilters] = useState<ScopeFilterValues>({ lga: "", facility: "", supervisor: "", date: "", month: "" });
 
   const monitorIds = useMemo(
     () => [...new Set(allRows.map((r) => r.monitor_id).filter(Boolean))] as string[],

@@ -70,7 +70,7 @@ const DashboardScopeFilters = ({
               variant="ghost"
               size="sm"
               className="h-7 text-xs text-muted-foreground"
-              onClick={() => onChange({ lga: "", facility: "", supervisor: "" })}
+              onClick={() => onChange({ ...EMPTY_SCOPE_FILTERS })}
             >
               <X className="mr-1 h-3.5 w-3.5" />
               Clear
