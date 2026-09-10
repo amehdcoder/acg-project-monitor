@@ -122,6 +122,8 @@ export const useSeeClearDashboard = () => {
     () =>
       allRows.filter((r) => {
         if (filters.lga && (r.lga || "") !== filters.lga) return false;
+        if (filters.date && (r.date_of_visit || "").slice(0, 10) !== filters.date) return false;
+        if (filters.month && (r.date_of_visit || "").slice(0, 7) !== filters.month) return false;
         if (
           filters.facility &&
           !fuzzyMatchAny(
@@ -346,6 +348,7 @@ export const useSeeClearDashboard = () => {
 
   return {
     rows, loading, reload, simulate, setSimulate,
+    filters, setFilters, filterOptions,
     stats, byLevel, byOwnership, readinessByLevel, equipment, referrals,
     dataQuality, flagged, challenges, points, draftCount, deleteFacilities, accountability,
   };

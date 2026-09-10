@@ -102,6 +102,8 @@ export const useBmzDashboard = () => {
     () =>
       allRows.filter((r) => {
         if (filters.lga && (r.lga || "") !== filters.lga) return false;
+        if (filters.date && (r.date_of_visit || "").slice(0, 10) !== filters.date) return false;
+        if (filters.month && (r.date_of_visit || "").slice(0, 7) !== filters.month) return false;
         if (
           filters.facility &&
           !fuzzyMatchAny([r.linked_facility, cadreLabel(r.cadre || ""), r.cadre], filters.facility)
