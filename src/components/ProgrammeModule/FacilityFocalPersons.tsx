@@ -17,16 +17,22 @@ import {
 import { UserPlus, UserMinus, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useFacilities, FACILITY_TYPE_LABEL } from "@/lib/programmeModule/facilities";
+import {
+  useFacilities, FACILITY_TYPE_LABEL, ACCESS_LEVELS, ACCESS_LEVEL_LABEL,
+  type FacilityAccessLevel,
+} from "@/lib/programmeModule/facilities";
 
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   projectId: string;
+  /** Pre-selects a facility when opened from the facility registry. */
+  initialFacilityId?: string;
 }
 
 interface PersonRow {
-  id: string; facility_id: string; user_id: string; role: string; is_active: boolean;
+  id: string; facility_id: string; user_id: string; role: string;
+  access_level: FacilityAccessLevel; is_active: boolean;
 }
 interface ProfileRow { user_id: string; first_name: string; last_name: string; email: string }
 
