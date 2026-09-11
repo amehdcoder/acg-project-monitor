@@ -15,8 +15,12 @@ const json = (body: unknown, status = 200) =>
 
 interface IncomingRecord {
   id: string;
+  /** "form" (default) writes a project form submission; "seeclear" writes a
+   *  See Clear facility visit and forwards it to KoboToolbox. */
+  kind?: string;
   formId: string;
   data: Record<string, unknown>;
+  photos?: Record<string, string>;
   location?: { lat: number; lng: number } | null;
   withinGeofence?: boolean | null;
   submissionType?: string;
