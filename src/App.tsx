@@ -30,6 +30,16 @@ const AmehnitiesAI = lazy(() => import("./pages/AmehnitiesAI"));
 import SharedDashboard from "./pages/SharedDashboard";
 import JoinProject from "./pages/JoinProject";
 import DeviceCollectRoute from "./components/DeviceCollect/DeviceCollectRoute";
+import { useDeviceSession } from "@/hooks/useDeviceSession";
+
+/** Standalone collector build (`VITE_APP_FLAVOR=collect`): a phone app that
+ *  only ever shows the join screen and the Forms / Cases workspace. */
+const COLLECTOR_APP = import.meta.env.VITE_APP_FLAVOR === "collect";
+
+const CollectorHome = () => {
+  const { isDeviceMode } = useDeviceSession();
+  return isDeviceMode ? <DeviceCollectRoute /> : <JoinProject />;
+};
 import InstallBanner from "./components/InstallBanner";
 import PWAUpdatePrompt from "./components/PWAUpdatePrompt";
 import StorageWarningBanner from "./components/StorageWarningBanner";
