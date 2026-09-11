@@ -119,7 +119,7 @@ export async function repairKoboIdentity(config: QuizKoboConfig): Promise<Identi
  * identity exclusions). Safe to re-run — the webhook upserts by submission id.
  */
 export async function rescoreStoredSubmissions(config: QuizKoboConfig): Promise<number> {
-  if (!config.webhook_secret) return 0;
+  if (!config.has_webhook_secret) return 0;
   const { data: rows, error } = await supabase
     .from("quiz_kobo_submissions")
     .select("raw")
@@ -130,17 +130,14 @@ export async function rescoreStoredSubmissions(config: QuizKoboConfig): Promise<
   const payloads = (rows ?? []).map((r: any) => r.raw).filter(Boolean);
   if (!payloads.length) return 0;
 
-  const url = `${SUPABASE_URL}/functions/v1/kobo-quiz-webhook/${config.quiz_id}`;
   let saved = 0;
   for (let i = 0; i < payloads.length; i += 200) {
     const batch = payloads.slice(i, i + 200);
-    const resp = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-kobo-secret": config.webhook_secret },
-      body: JSON.stringify(batch),
+    // Replay happens server-side; the webhook secret stays on the server.
+    const { data: replay } = await supabase.functions.invoke("kobo-form-manager", {
+      body: { action: "quiz_replay", quiz_id: config.quiz_id, results: batch },
     });
-    const out = await resp.json().catch(() => ({}));
-    saved += Number((out as any)?.saved ?? 0);
+    saved += Number((replay as any)?.saved ?? 0);
   }
   return saved;
 }
