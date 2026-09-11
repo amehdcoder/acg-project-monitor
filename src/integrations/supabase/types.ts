@@ -7521,6 +7521,7 @@ export type Database = {
           allow_cases: boolean
           allow_forms: boolean
           code_hash: string
+          collector_user_id: string | null
           created_at: string
           created_by: string | null
           enabled: boolean
@@ -7535,6 +7536,7 @@ export type Database = {
           allow_cases?: boolean
           allow_forms?: boolean
           code_hash: string
+          collector_user_id?: string | null
           created_at?: string
           created_by?: string | null
           enabled?: boolean
@@ -7549,6 +7551,7 @@ export type Database = {
           allow_cases?: boolean
           allow_forms?: boolean
           code_hash?: string
+          collector_user_id?: string | null
           created_at?: string
           created_by?: string | null
           enabled?: boolean
