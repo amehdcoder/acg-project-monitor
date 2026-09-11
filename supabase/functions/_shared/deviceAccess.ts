@@ -36,6 +36,7 @@ export interface DeviceContext {
   label: string;
   allowForms: boolean;
   allowCases: boolean;
+  allowSeeclear: boolean;
   collectorUserId: string | null;
 }
 
