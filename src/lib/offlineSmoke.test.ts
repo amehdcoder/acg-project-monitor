@@ -112,7 +112,9 @@ describe("offline smoke — draft → ready → sent lifecycle", () => {
     const flaky = await syncFinalizedSavedForms();
     expect(serverRows.size).toBe(0);
     expect(flaky.synced).toBe(0);
-    // Stable connection → syncs once.
+    // Stable connection → syncs once, after the jittered backoff window.
+    const retryAt = store.get("rec-1").nextAttemptAt;
+    if (retryAt) vi.setSystemTime(new Date(new Date(retryAt).getTime() + 1));
     setOnline(true);
     const ok = await syncFinalizedSavedForms();
     expect(ok.synced).toBe(1);
