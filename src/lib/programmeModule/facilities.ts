@@ -99,3 +99,32 @@ export const useMyFacilities = () => {
 
   return { facilityIds, loading };
 };
+
+/** Access level the signed-in user holds at each facility. */
+export const useMyFacilityAccess = () => {
+  const [levels, setLevels] = useState<Record<string, FacilityAccessLevel>>({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) { if (!cancelled) { setLevels({}); setLoading(false); } return; }
+      const { data } = await supabase
+        .from("facility_focal_persons")
+        .select("facility_id,access_level")
+        .eq("user_id", auth.user.id)
+        .eq("is_active", true);
+      if (cancelled) return;
+      const map: Record<string, FacilityAccessLevel> = {};
+      for (const r of (data as { facility_id: string; access_level: FacilityAccessLevel }[]) || []) {
+        map[r.facility_id] = r.access_level;
+      }
+      setLevels(map);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  return { levels, loading };
+};
