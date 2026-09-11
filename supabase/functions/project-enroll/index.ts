@@ -115,13 +115,21 @@ Deno.serve(async (req) => {
       return json({ error: "enrolment_failed" }, 500);
     }
 
-    const bundle = await buildProjectBundle(config.project_id, !!config.allow_cases);
+    const bundle = await buildProjectBundle(
+      config.project_id,
+      !!config.allow_cases,
+      !!config.allow_seeclear,
+    );
     await audit(true);
 
     return json({
       token,
       device: { deviceId, label },
-      access: { allowForms: !!config.allow_forms, allowCases: !!config.allow_cases },
+      access: {
+        allowForms: !!config.allow_forms,
+        allowCases: !!config.allow_cases,
+        allowSeeclear: !!config.allow_seeclear,
+      },
       bundle,
     });
   } catch (e) {
