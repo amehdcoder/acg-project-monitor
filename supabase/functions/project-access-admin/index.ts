@@ -36,6 +36,10 @@ async function requireProjectManager(req: Request, projectId: string) {
   const { data: isAdminRes } = await db.rpc("is_admin", { _user_id: userId });
   if (isAdminRes === true) return userId;
 
+  // Platform owners and co-owners manage every project's collection access.
+  const { data: isOwnerRes } = await db.rpc("is_owner_or_co_owner", { _user_id: userId });
+  if (isOwnerRes === true) return userId;
+
   const { data: project } = await db
     .from("projects")
     .select("created_by")
