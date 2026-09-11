@@ -105,8 +105,9 @@ const AppSettingsDialog = ({ open, onOpenChange }: AppSettingsDialogProps) => {
     }
     setUploadingAvatar(true);
     try {
-      const ext = file.name.split(".").pop() || "png";
-      const path = `${user.id}/avatar-${Date.now()}.${ext}`;
+      const ext = (file.name.split(".").pop() || "png").replace(/[^a-zA-Z0-9]/g, "").slice(0, 8) || "png";
+      // Unguessable object path so public URLs cannot be enumerated
+      const path = `${user.id}/avatar-${crypto.randomUUID()}.${ext}`;
       const { error: uploadErr } = await supabase.storage
         .from("avatars")
         .upload(path, file, { upsert: true });
