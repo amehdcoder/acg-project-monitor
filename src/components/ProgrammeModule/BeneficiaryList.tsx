@@ -74,6 +74,13 @@ const BeneficiaryList = ({ beneficiaries, config, loading, onOpen, onRegister, o
             {lgas.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
           </SelectContent>
         </Select>
+        <Select value={facility} onValueChange={setFacility}>
+          <SelectTrigger className="w-[190px]"><SelectValue /></SelectTrigger>
+          <SelectContent className="z-[1200] max-h-72 bg-popover">
+            <SelectItem value="all">All facilities</SelectItem>
+            {facilities.map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
         <Button variant="outline" size="icon" onClick={onRefresh} aria-label="Refresh list">
           <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
         </Button>
