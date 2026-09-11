@@ -286,9 +286,9 @@ export function useSupervisorDashboard() {
           assigned_forms: userForms,
           assigned_projects: userProjects,
           last_login_at: (profile as any).last_seen_at || null,
-          last_ip_address: (profile as any).last_ip_address || null,
+          last_ip_address: deviceById.get(profile.user_id)?.last_ip_address || null,
           last_device_type: (profile as any).last_device_type || null,
-          device_phone_number: (profile as any).device_phone_number || null,
+          device_phone_number: deviceById.get(profile.user_id)?.device_phone_number || null,
         };
       });
 
