@@ -26,6 +26,7 @@ export interface DeviceSession {
   projectName: string;
   allowForms: boolean;
   allowCases: boolean;
+  allowSeeclear: boolean;
   bundle: DeviceSessionBundle;
   joinedAt: string;
   lastRefreshAt: string | null;
@@ -106,6 +107,7 @@ export async function enrolDevice(input: EnrolInput): Promise<DeviceSession> {
     projectName: body.bundle?.project?.name ?? "Project",
     allowForms: !!body.access?.allowForms,
     allowCases: !!body.access?.allowCases,
+    allowSeeclear: !!body.access?.allowSeeclear,
     bundle: body.bundle,
     joinedAt: new Date().toISOString(),
     lastRefreshAt: new Date().toISOString(),
@@ -137,6 +139,7 @@ export async function refreshDeviceBundle(session: DeviceSession): Promise<Devic
       ...session,
       allowForms: !!body.access?.allowForms,
       allowCases: !!body.access?.allowCases,
+      allowSeeclear: !!body.access?.allowSeeclear,
       bundle: body.bundle ?? session.bundle,
       projectName: body.bundle?.project?.name ?? session.projectName,
       lastRefreshAt: new Date().toISOString(),
@@ -150,8 +153,12 @@ export async function refreshDeviceBundle(session: DeviceSession): Promise<Devic
 
 export interface DeviceSyncRecord {
   id: string;
+  /** "seeclear" routes the record to the See Clear checklist intake. */
+  kind?: string;
   formId: string;
   data: Record<string, unknown>;
+  /** Evidence photos as data URLs, uploaded server-side on sync. */
+  photos?: Record<string, string>;
   location?: { lat: number; lng: number } | null;
   withinGeofence?: boolean | null;
   submissionType?: string;
