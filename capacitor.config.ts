@@ -6,9 +6,15 @@ import type { CapacitorConfig } from '@capacitor/cli';
 // / blank-screen failures on Android when connectivity is flaky or DNS to
 // monitor.amehnities.org is briefly unreachable. Hot-reload from the Lovable
 // sandbox should be enabled per-developer via a local override, not committed.
+// Two shippable apps from one codebase:
+//   APP_FLAVOR=collect  → "Amehnities Collect", the account-free collector app
+//                          (join by QR / project code, then Forms + Cases).
+//   default             → the full "Amehnities Monitor" app.
+const COLLECT = process.env.APP_FLAVOR === 'collect';
+
 const config: CapacitorConfig = {
-  appId: 'com.amehnities.monitor',
-  appName: 'Amehnities Monitor',
+  appId: COLLECT ? 'com.amehnities.collect' : 'com.amehnities.monitor',
+  appName: COLLECT ? 'Amehnities Collect' : 'Amehnities Monitor',
   webDir: 'dist',
   android: {
     allowMixedContent: true,
