@@ -45,7 +45,16 @@ export interface SavedFormEntry {
   // the deterministic merge engine to resolve divergent edits.
   deviceId?: string | null;
   rev?: number;
+  // Outbound queue machine: queued -> syncing -> synced | error. `status`
+  // remains the user-facing lifecycle (draft/finalized/sent); these fields
+  // track the transport attempt so retries are bounded and observable.
+  syncState?: SyncState;
+  syncAttempts?: number;
+  lastSyncError?: string | null;
+  nextAttemptAt?: string | null;
 }
+
+export type SyncState = "queued" | "syncing" | "synced" | "error";
 
 const DEVICE_ID_KEY = "amehnities_saved_forms_device_id";
 
