@@ -15,12 +15,14 @@ import { visibleComponents } from "@/lib/programmeModule/defaults";
 import type { ProgrammeModuleConfig } from "@/lib/programmeModule/types";
 import ConfigFieldRenderer, { AnswerMap, isRelevant } from "./ConfigFieldRenderer";
 import { recordAudit } from "./useProgrammeModule";
+import MentalHealthServiceForm, { mhFormForService } from "./MentalHealthServiceForm";
+import type { BeneficiaryRow } from "@/lib/programmeModule/types";
 
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   config: ProgrammeModuleConfig;
-  beneficiaryId: string;
+  beneficiary: BeneficiaryRow;
   moduleId: string;
   projectId: string;
   defaultComponent?: string;
@@ -28,8 +30,9 @@ interface Props {
 }
 
 const ServiceEntryDialog = ({
-  open, onOpenChange, config, beneficiaryId, moduleId, projectId, defaultComponent, onSaved,
+  open, onOpenChange, config, beneficiary, moduleId, projectId, defaultComponent, onSaved,
 }: Props) => {
+  const beneficiaryId = beneficiary.id;
   const { toast } = useToast();
   const components = useMemo(() => visibleComponents(config), [config]);
   const [componentKey, setComponentKey] = useState(defaultComponent || components[0]?.key || "");
@@ -41,6 +44,25 @@ const ServiceEntryDialog = ({
   const [saving, setSaving] = useState(false);
 
   const component = components.find((c) => c.key === componentKey);
+
+  // GAD-7 / PHQ-9 open the full standard screening instrument instead of the
+  // generic service form, so clinicians use the identical validated tool.
+  const mhForm = mhFormForService(serviceName);
+  if (open && mhForm) {
+    return (
+      <MentalHealthServiceForm
+        open={open}
+        onOpenChange={(v) => { if (!v) setServiceName(""); onOpenChange(v); }}
+        formKey={mhForm}
+        serviceName={serviceName}
+        componentKey={componentKey}
+        beneficiary={beneficiary}
+        moduleId={moduleId}
+        projectId={projectId}
+        onSaved={onSaved}
+      />
+    );
+  }
 
   const save = async () => {
     if (!componentKey) return;

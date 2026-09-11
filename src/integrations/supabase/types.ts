@@ -1453,6 +1453,7 @@ export type Database = {
           case_id: string
           created_at: string
           created_by: string
+          facility_id: string | null
           full_name: string
           id: string
           latitude: number | null
@@ -1476,6 +1477,7 @@ export type Database = {
           case_id: string
           created_at?: string
           created_by?: string
+          facility_id?: string | null
           full_name: string
           id?: string
           latitude?: number | null
@@ -1499,6 +1501,7 @@ export type Database = {
           case_id?: string
           created_at?: string
           created_by?: string
+          facility_id?: string | null
           full_name?: string
           id?: string
           latitude?: number | null
@@ -1519,6 +1522,13 @@ export type Database = {
           ward?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "beneficiaries_facility_id_fkey"
+            columns: ["facility_id"]
+            isOneToOne: false
+            referencedRelation: "health_facilities"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "beneficiaries_module_id_fkey"
             columns: ["module_id"]
@@ -1589,9 +1599,11 @@ export type Database = {
       beneficiary_referrals: {
         Row: {
           beneficiary_id: string
+          clinical_summary: string | null
           component_key: string | null
           created_at: string
           created_by: string
+          from_facility_id: string | null
           id: string
           notes: string | null
           project_id: string
@@ -1600,13 +1612,17 @@ export type Database = {
           referred_to: string
           status: string
           submission_uuid: string | null
+          to_facility_id: string | null
           updated_at: string
+          urgency: string
         }
         Insert: {
           beneficiary_id: string
+          clinical_summary?: string | null
           component_key?: string | null
           created_at?: string
           created_by?: string
+          from_facility_id?: string | null
           id?: string
           notes?: string | null
           project_id: string
@@ -1615,13 +1631,17 @@ export type Database = {
           referred_to: string
           status?: string
           submission_uuid?: string | null
+          to_facility_id?: string | null
           updated_at?: string
+          urgency?: string
         }
         Update: {
           beneficiary_id?: string
+          clinical_summary?: string | null
           component_key?: string | null
           created_at?: string
           created_by?: string
+          from_facility_id?: string | null
           id?: string
           notes?: string | null
           project_id?: string
@@ -1630,7 +1650,9 @@ export type Database = {
           referred_to?: string
           status?: string
           submission_uuid?: string | null
+          to_facility_id?: string | null
           updated_at?: string
+          urgency?: string
         }
         Relationships: [
           {
@@ -1641,10 +1663,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "beneficiary_referrals_from_facility_id_fkey"
+            columns: ["from_facility_id"]
+            isOneToOne: false
+            referencedRelation: "health_facilities"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "beneficiary_referrals_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beneficiary_referrals_to_facility_id_fkey"
+            columns: ["to_facility_id"]
+            isOneToOne: false
+            referencedRelation: "health_facilities"
             referencedColumns: ["id"]
           },
         ]
@@ -4607,6 +4643,47 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      facility_focal_persons: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          facility_id: string
+          id: string
+          is_active: boolean
+          role: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          facility_id: string
+          id?: string
+          is_active?: boolean
+          role?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          facility_id?: string
+          id?: string
+          is_active?: boolean
+          role?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facility_focal_persons_facility_id_fkey"
+            columns: ["facility_id"]
+            isOneToOne: false
+            referencedRelation: "health_facilities"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       feedback: {
         Row: {
@@ -10975,6 +11052,10 @@ export type Database = {
         Args: { _project_id: string; _role: string; _user_id: string }
         Returns: boolean
       }
+      has_facility_access_to_beneficiary: {
+        Args: { _beneficiary_id: string; _user_id: string }
+        Returns: boolean
+      }
       has_field_designation: { Args: { _user_id: string }; Returns: boolean }
       has_form_assignment: {
         Args: { _form_id: string; _user_id: string }
@@ -11042,6 +11123,10 @@ export type Database = {
       is_co_owner: { Args: { _user_id: string }; Returns: boolean }
       is_dashboard_admin: { Args: { _user_id: string }; Returns: boolean }
       is_email_deleted: { Args: { _email: string }; Returns: boolean }
+      is_facility_focal: {
+        Args: { _facility_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_irf_admin: { Args: never; Returns: boolean }
       is_mda_checklist_form: {
         Args: { _name: string; _settings: Json }
@@ -11379,6 +11464,7 @@ export type Database = {
         Args: { _fields: Json; _form_id: string; _user_id: string }
         Returns: boolean
       }
+      user_facility_ids: { Args: { _user_id: string }; Returns: string[] }
       user_has_microplan_project_access: {
         Args: { _uid: string }
         Returns: boolean

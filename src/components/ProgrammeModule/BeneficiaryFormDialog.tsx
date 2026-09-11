@@ -13,6 +13,11 @@ import ConfigFieldRenderer, {
   AnswerMap, applyCalculations, isRelevant, validateQuestion,
 } from "./ConfigFieldRenderer";
 import { recordAudit } from "./useProgrammeModule";
+import { Label } from "@/components/ui/label";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { useFacilities, FACILITY_TYPE_LABEL } from "@/lib/programmeModule/facilities";
 
 interface Props {
   open: boolean;
@@ -31,6 +36,10 @@ const BeneficiaryFormDialog = ({
   const [answers, setAnswers] = useState<AnswerMap>(() => ({ ...(existing?.profile || {}) }));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const { facilities } = useFacilities(projectId);
+  const [facilityId, setFacilityId] = useState<string>(
+    ((existing as unknown as { facility_id?: string | null })?.facility_id) || "",
+  );
 
   const sections = useMemo(
     () => (config.sections || []).filter((s) => !s.hidden && s.placement !== "hidden")
@@ -72,6 +81,7 @@ const BeneficiaryFormDialog = ({
         lga: (answers.lga as string) || null,
         ward: (answers.ward as string) || null,
         village: (answers.village as string) || null,
+        facility_id: facilityId || null,
       };
 
       if (existing) {
@@ -122,6 +132,22 @@ const BeneficiaryFormDialog = ({
         </DialogHeader>
         <ScrollArea className="max-h-[70dvh] px-5 py-4">
           <div className="space-y-6">
+            <div className="space-y-1.5">
+              <Label>Health facility (care home base)</Label>
+              <Select value={facilityId} onValueChange={setFacilityId}>
+                <SelectTrigger><SelectValue placeholder="Select registered facility…" /></SelectTrigger>
+                <SelectContent className="z-[1200] max-h-72 bg-popover">
+                  {facilities.map((f) => (
+                    <SelectItem key={f.id} value={f.id}>
+                      {f.name} — {FACILITY_TYPE_LABEL[f.facility_type]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Focal persons of this facility manage the case and see its full history.
+              </p>
+            </div>
             {sections.map((section) => (
               <div key={section.id} className="space-y-4">
                 <div>

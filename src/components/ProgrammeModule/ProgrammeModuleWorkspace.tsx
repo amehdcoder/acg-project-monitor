@@ -8,7 +8,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Plus, Settings2, CloudOff, RefreshCw, Layers } from "lucide-react";
+import { Plus, Settings2, CloudOff, RefreshCw, Layers, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { MODULE_TEMPLATES, normalizeConfig } from "@/lib/programmeModule/defaults";
@@ -19,6 +19,7 @@ import BeneficiaryList from "./BeneficiaryList";
 import BeneficiaryRecord from "./BeneficiaryRecord";
 import BeneficiaryFormDialog from "./BeneficiaryFormDialog";
 import ModuleConfigurator from "./ModuleConfigurator";
+import FacilityFocalPersons from "./FacilityFocalPersons";
 
 interface Props {
   projectId?: string;
@@ -40,6 +41,7 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
   const [activeId, setActiveId] = useState<string>("");
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
+  const [focalOpen, setFocalOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [selected, setSelected] = useState<BeneficiaryRow | null>(null);
   const [pending, setPending] = useState(queueCount());
@@ -144,6 +146,11 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
         <Button variant="outline" size="sm" onClick={() => void reload()} aria-label="Reload modules">
           <RefreshCw className="h-4 w-4" />
         </Button>
+        {canConfigure && (
+          <Button variant="outline" size="sm" className="gap-1" onClick={() => setFocalOpen(true)}>
+            <Users className="h-4 w-4" /> Facility focal persons
+          </Button>
+        )}
         {canConfigure && active && (
           <Button variant="outline" size="sm" className="gap-1" onClick={() => setConfigOpen(true)}>
             <Settings2 className="h-4 w-4" /> Configure
@@ -176,11 +183,14 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
           beneficiaries={beneficiaries}
           config={normalizeConfig(active.config)}
           loading={loadingBeneficiaries}
+          projectId={projectId}
           onOpen={setSelected}
           onRegister={() => setRegisterOpen(true)}
           onRefresh={() => void reloadBeneficiaries()}
         />
       )}
+
+      <FacilityFocalPersons open={focalOpen} onOpenChange={setFocalOpen} projectId={projectId} />
 
       {/* Template gallery */}
       <Dialog open={galleryOpen} onOpenChange={setGalleryOpen}>

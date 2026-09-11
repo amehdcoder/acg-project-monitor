@@ -22,6 +22,8 @@ import { useBeneficiaryRecord } from "./useProgrammeModule";
 import ServiceEntryDialog from "./ServiceEntryDialog";
 import ReferralDialog from "./ReferralDialog";
 import BeneficiaryFormDialog from "./BeneficiaryFormDialog";
+import LongitudinalOutcome from "./LongitudinalOutcome";
+import CareNetworkPanel from "./CareNetworkPanel";
 
 interface Props {
   beneficiary: BeneficiaryRow;
@@ -212,6 +214,8 @@ const BeneficiaryRecord = ({ beneficiary, config, moduleId, projectId, onBack, o
                 {components.map((c) => (
                   <TabsTrigger key={c.key} value={c.key}>{c.label}</TabsTrigger>
                 ))}
+                <TabsTrigger value="outcomes">Outcomes</TabsTrigger>
+                <TabsTrigger value="care">Care network</TabsTrigger>
                 <TabsTrigger value="history">History</TabsTrigger>
               </TabsList>
             </div>
@@ -396,6 +400,20 @@ const BeneficiaryRecord = ({ beneficiary, config, moduleId, projectId, onBack, o
               );
             })}
 
+            <TabsContent value="outcomes" className="mt-4">
+              <LongitudinalOutcome services={services} />
+            </TabsContent>
+
+            <TabsContent value="care" className="mt-4">
+              <CareNetworkPanel
+                beneficiary={beneficiary}
+                projectId={projectId}
+                referrals={referrals}
+                onRefer={() => setReferralOpen(true)}
+                onChanged={() => { void reload(); onChanged(); }}
+              />
+            </TabsContent>
+
             <TabsContent value="history" className="mt-4">
               <Card className="p-4">
                 <h3 className="mb-3 flex items-center gap-2 font-semibold text-foreground">
@@ -504,12 +522,13 @@ const BeneficiaryRecord = ({ beneficiary, config, moduleId, projectId, onBack, o
 
       <ServiceEntryDialog
         open={serviceOpen} onOpenChange={setServiceOpen} config={config}
-        beneficiaryId={beneficiary.id} moduleId={moduleId} projectId={projectId}
+        beneficiary={beneficiary} moduleId={moduleId} projectId={projectId}
         defaultComponent={serviceComponent} onSaved={() => { void reload(); onChanged(); }}
       />
       <ReferralDialog
         open={referralOpen} onOpenChange={setReferralOpen} config={config}
         beneficiaryId={beneficiary.id} projectId={projectId}
+        fromFacilityId={(beneficiary as unknown as { facility_id?: string | null }).facility_id || null}
         onSaved={() => { void reload(); onChanged(); }}
       />
       <BeneficiaryFormDialog
