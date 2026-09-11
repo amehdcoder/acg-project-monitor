@@ -38,6 +38,11 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   if (!user) {
+    // Account-free collectors (joined by project QR code) belong in the
+    // offline collector workspace, never on the sign-in screen.
+    if (readDeviceSession()) {
+      return <Navigate to="/collect" replace />;
+    }
     // Offline cold boot: the live session is still hydrating from the encrypted
     // device credential. If a cached session exists, keep the skeleton up rather
     // than flashing the sign-in page. If the user explicitly logged out (no
