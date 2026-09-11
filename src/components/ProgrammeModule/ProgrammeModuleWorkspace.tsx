@@ -122,7 +122,10 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
         moduleId={active.id}
         projectId={projectId}
         onBack={() => setSelected(null)}
-        canManage={canConfigure}
+        canManage={
+          canConfigure ||
+          facilityLevels[(selected as unknown as { facility_id?: string }).facility_id || ""] === "manage"
+        }
         onChanged={() => void reloadBeneficiaries()}
       />
     );
