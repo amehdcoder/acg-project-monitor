@@ -119,6 +119,7 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
         moduleId={active.id}
         projectId={projectId}
         onBack={() => setSelected(null)}
+        canManage={canConfigure}
         onChanged={() => void reloadBeneficiaries()}
       />
     );

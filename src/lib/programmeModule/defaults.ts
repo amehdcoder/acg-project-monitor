@@ -32,8 +32,19 @@ export const DEFAULT_STATUSES: StatusOption[] = [
   { value: "active", label: "Active", tone: "success" },
   { value: "on_hold", label: "On hold", tone: "warning" },
   { value: "exited", label: "Exited", tone: "neutral" },
+  { value: "completed", label: "Completed", tone: "info" },
   { value: "deceased", label: "Deceased", tone: "danger" },
 ];
+
+/**
+ * Statuses offered in the record's status menu: whatever the module was
+ * configured with, plus any of the standard five it does not carry yet, so
+ * existing modules gain "Completed" without needing to be re-configured.
+ */
+export const statusChoices = (configured: StatusOption[] = []): StatusOption[] => {
+  const seen = new Set(configured.map((s) => s.value));
+  return [...configured, ...DEFAULT_STATUSES.filter((s) => !seen.has(s.value))];
+};
 
 export const DEFAULT_RISK: StatusOption[] = [
   { value: "low", label: "Low", tone: "success" },
@@ -110,7 +121,8 @@ export const CISKULA_PRESET: ProgrammeModuleConfig = {
       "Visual acuity test", "Glasses provided", "Cataract screening",
     ]),
     component("mmdp_ntd", "MMDP / NTD", "Accessibility", "152 55% 40%", 2, [
-      "Limb care assessment", "Lymphoedema care", "Self-care training",
+      "Limb care assessment (baseline)", "Lymphoedema care outcome",
+      "Hydrocoele surgery outcome", "Self-care training",
     ]),
     component("mental_health", "Mental Health & Psychosocial Support", "Brain", "270 60% 52%", 3, [
       "GAD-7 assessment", "PHQ-9 assessment", "Counselling session",
