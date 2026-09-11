@@ -198,7 +198,7 @@ const CasesView = () => {
 
   // Owner profiles cache
   const [ownerProfiles, setOwnerProfiles] = useState<Map<string, string>>(new Map());
-  const [activeTab, setActiveTab] = useState<"cases" | "map" | "analytics" | "configure">("cases");
+  const [activeTab, setActiveTab] = useState<"cases" | "records" | "map" | "analytics" | "configure">("cases");
   const [showFollowUpCreator, setShowFollowUpCreator] = useState(false);
   const [showLongitudinal, setShowLongitudinal] = useState(false);
 
