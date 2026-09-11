@@ -8,6 +8,9 @@ import { MicroplanningView } from "@/components/Microplanning";
 import { StandardAssessmentView, MentalHealthAssessment } from "@/components/StandardAssessments";
 import { DigitalAttendanceView } from "@/components/DigitalAttendance";
 import UPRPForm from "@/components/UPRP/UPRPForm";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import ProgrammeModuleWorkspace from "@/components/ProgrammeModule/ProgrammeModuleWorkspace";
+import FollowUpsPanel from "@/components/ProgrammeModule/FollowUpsPanel";
 import UPRPSubmissionsView from "@/components/UPRP/UPRPSubmissionsView";
 import { OfficeFormsView } from "@/components/OfficeForms";
 import { ActionTrackerView } from "@/components/ActionTracker";
@@ -274,6 +277,8 @@ interface FormsViewProps {
 }
 
 const FormsView = ({ selectedProjectId }: FormsViewProps) => {
+  const [showBeneficiaryPanel, setShowBeneficiaryPanel] = useState(false);
+  const [beneficiaryTab, setBeneficiaryTab] = useState("records");
   const [searchQuery, setSearchQuery] = useState("");
   const [forms, setForms] = useState<Form[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -2373,6 +2378,40 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
             />
           </section>
         )}
+
+        {/* Beneficiary records & follow-up — the same longitudinal records as the
+            Cases page, so referrals and visits sit alongside the project forms. */}
+        {currentProjectId && !(mdaDashboardForm && canSeeMdaDashboard) && (
+          <section className="mx-auto w-full max-w-[1800px] space-y-3">
+            <button
+              onClick={() => setShowBeneficiaryPanel((v) => !v)}
+              className="flex w-full items-center gap-2 rounded-2xl border border-border bg-card px-4 py-3 text-left text-sm font-semibold text-foreground shadow-sm"
+            >
+              <ClipboardList className="h-5 w-5 text-primary" />
+              Beneficiary records & follow-up
+              <span className="ml-auto text-xs font-normal text-muted-foreground">
+                {showBeneficiaryPanel ? "Hide" : "Show"}
+              </span>
+            </button>
+            {showBeneficiaryPanel && (
+              <div className="rounded-2xl border border-border bg-card p-4">
+                <Tabs value={beneficiaryTab} onValueChange={setBeneficiaryTab}>
+                  <TabsList>
+                    <TabsTrigger value="records">Beneficiary records</TabsTrigger>
+                    <TabsTrigger value="followup">Follow-up</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="records" className="mt-4">
+                    <ProgrammeModuleWorkspace projectId={currentProjectId} canConfigure={isAdmin} />
+                  </TabsContent>
+                  <TabsContent value="followup" className="mt-4">
+                    <FollowUpsPanel projectId={currentProjectId} />
+                  </TabsContent>
+                </Tabs>
+              </div>
+            )}
+          </section>
+        )}
+
 
 
         {/* KoboCollect-style action menu — hidden while the inline MDA dashboard is open */}

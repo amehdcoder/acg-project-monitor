@@ -1596,6 +1596,62 @@ export type Database = {
           },
         ]
       }
+      beneficiary_delete_requests: {
+        Row: {
+          beneficiary_id: string
+          beneficiary_name: string
+          case_id: string | null
+          created_at: string
+          id: string
+          project_id: string
+          reason: string | null
+          requested_by: string
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          beneficiary_id: string
+          beneficiary_name: string
+          case_id?: string | null
+          created_at?: string
+          id?: string
+          project_id: string
+          reason?: string | null
+          requested_by: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          beneficiary_id?: string
+          beneficiary_name?: string
+          case_id?: string | null
+          created_at?: string
+          id?: string
+          project_id?: string
+          reason?: string | null
+          requested_by?: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "beneficiary_delete_requests_beneficiary_id_fkey"
+            columns: ["beneficiary_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiaries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       beneficiary_referrals: {
         Row: {
           beneficiary_id: string
@@ -10885,6 +10941,10 @@ export type Database = {
       }
       can_access_microplanning: { Args: { _user_id: string }; Returns: boolean }
       can_access_presence_topic: { Args: { _topic: string }; Returns: boolean }
+      can_approve_beneficiary_delete: {
+        Args: { _project_id: string; _user_id: string }
+        Returns: boolean
+      }
       can_bulk_data: {
         Args: { _action: string; _user_id: string }
         Returns: boolean
@@ -10972,6 +11032,10 @@ export type Database = {
       current_user_can_build_mda_followups_for_project: {
         Args: { p_project_id: string }
         Returns: boolean
+      }
+      decide_beneficiary_delete_request: {
+        Args: { _approve: boolean; _note?: string; _request_id: string }
+        Returns: undefined
       }
       ensure_ces_field_roles: {
         Args: { _project_id: string }

@@ -34,6 +34,12 @@ import LongitudinalOutcome from "./LongitudinalOutcome";
 import CareNetworkPanel from "./CareNetworkPanel";
 import LimbProgressPanel from "./LimbProgressPanel";
 import { recordAudit } from "./useProgrammeModule";
+import { requestBeneficiaryDeletion } from "@/lib/programmeModule/facilityOps";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 interface Props {
   beneficiary: BeneficiaryRow;
@@ -86,6 +92,26 @@ const BeneficiaryRecord = ({
   const [editOpen, setEditOpen] = useState(false);
   const [serviceComponent, setServiceComponent] = useState<string | undefined>();
   const [tab, setTab] = useState("overview");
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteReason, setDeleteReason] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
+
+  const submitDeleteRequest = async () => {
+    setDeleteBusy(true);
+    try {
+      await requestBeneficiaryDeletion({ beneficiary, reason: deleteReason });
+      toast({
+        title: "Deletion request sent",
+        description: "A Super Admin on this project, or the Owner, must approve it.",
+      });
+      setDeleteOpen(false);
+      setDeleteReason("");
+    } catch (e) {
+      toast({ title: "Could not send request", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
 
   const components = useMemo(() => visibleComponents(config), [config]);
   const progress = useMemo(() => computeProgress(config, services), [config, services]);
@@ -251,6 +277,17 @@ const BeneficiaryRecord = ({
                       )}
                       <DropdownMenuItem onSelect={() => setEditOpen(true)}>Edit profile</DropdownMenuItem>
                       <DropdownMenuItem onSelect={() => printRecord()}>Print / export record</DropdownMenuItem>
+                      {canManage && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onSelect={() => setDeleteOpen(true)}
+                          >
+                            Request deletion
+                          </DropdownMenuItem>
+                        </>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -625,6 +662,32 @@ const BeneficiaryRecord = ({
         open={editOpen} onOpenChange={setEditOpen} moduleId={moduleId} projectId={projectId}
         config={config} existing={beneficiary} onSaved={() => { void reload(); onChanged(); }}
       />
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Request deletion of {beneficiary.full_name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The record is only removed after a Super Admin assigned to this project, or the Owner,
+              approves the request.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Textarea
+            placeholder="Why should this record be removed?"
+            value={deleteReason}
+            onChange={(e) => setDeleteReason(e.target.value)}
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleteBusy}
+              onClick={(e) => { e.preventDefault(); void submitDeleteRequest(); }}
+            >
+              Send request
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

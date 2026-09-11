@@ -8,7 +8,10 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Plus, Settings2, CloudOff, RefreshCw, Layers, Users, Building2 } from "lucide-react";
+import {
+  Plus, Settings2, CloudOff, RefreshCw, Layers, Users, Building2, ShieldAlert,
+  LayoutGrid, CalendarClock, Hospital,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { MODULE_TEMPLATES, normalizeConfig } from "@/lib/programmeModule/defaults";
@@ -21,6 +24,9 @@ import BeneficiaryFormDialog from "./BeneficiaryFormDialog";
 import ModuleConfigurator from "./ModuleConfigurator";
 import FacilityFocalPersons from "./FacilityFocalPersons";
 import FacilityRegistry from "./FacilityRegistry";
+import FacilityDashboard from "./FacilityDashboard";
+import FollowUpsPanel from "./FollowUpsPanel";
+import DeleteRequestsPanel from "./DeleteRequestsPanel";
 import { useMyFacilityAccess } from "@/lib/programmeModule/facilities";
 
 interface Props {
@@ -51,6 +57,8 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
   const [selected, setSelected] = useState<BeneficiaryRow | null>(null);
   const [pending, setPending] = useState(queueCount());
   const [creating, setCreating] = useState(false);
+  const [deleteRequestsOpen, setDeleteRequestsOpen] = useState(false);
+  const [view, setView] = useState<"records" | "facility" | "followups">("records");
 
   const active: ProgrammeModuleRow | undefined = useMemo(
     () => modules.find((m) => m.id === activeId) || modules[0],
@@ -172,11 +180,35 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
           </Button>
         )}
         {canConfigure && (
+          <Button variant="outline" size="sm" className="gap-1" onClick={() => setDeleteRequestsOpen(true)}>
+            <ShieldAlert className="h-4 w-4" /> Deletion requests
+          </Button>
+        )}
+        {canConfigure && (
           <Button size="sm" className="gap-1" onClick={() => setGalleryOpen(true)} aria-label="Add programme module">
             <Plus className="h-4 w-4" /> Add module
           </Button>
         )}
       </div>
+
+      <div className="flex flex-wrap gap-2">
+        {([
+          { key: "records", label: "Beneficiary records", icon: LayoutGrid },
+          { key: "facility", label: "Facility dashboard", icon: Hospital },
+          { key: "followups", label: "Follow-ups & referrals", icon: CalendarClock },
+        ] as const).map((t) => (
+          <Button
+            key={t.key}
+            size="sm"
+            variant={view === t.key ? "default" : "outline"}
+            className="gap-1"
+            onClick={() => setView(t.key)}
+          >
+            <t.icon className="h-4 w-4" /> {t.label}
+          </Button>
+        ))}
+      </div>
+
 
       {!loading && modules.length === 0 && (
         <Card className="space-y-3 p-10 text-center">
@@ -193,7 +225,7 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
         </Card>
       )}
 
-      {active && (
+      {active && view === "records" && (
         <BeneficiaryList
           beneficiaries={beneficiaries}
           config={normalizeConfig(active.config)}
@@ -204,6 +236,29 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
           onRefresh={() => void reloadBeneficiaries()}
         />
       )}
+
+      {view === "facility" && (
+        <FacilityDashboard
+          projectId={projectId}
+          canSeeAllFacilities={canConfigure}
+          onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }}
+        />
+      )}
+
+      {view === "followups" && (
+        <FollowUpsPanel
+          projectId={projectId}
+          onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }}
+        />
+      )}
+
+      <DeleteRequestsPanel
+        open={deleteRequestsOpen}
+        onOpenChange={setDeleteRequestsOpen}
+        projectId={projectId}
+        onDecided={() => void reloadBeneficiaries()}
+      />
+
 
       <FacilityFocalPersons
         open={focalOpen}
