@@ -2,12 +2,16 @@
 // APIs (e.g. crypto.randomUUID on old Android WebViews) are patched before any
 // component renders and crashes.
 import { installCompatPolyfills } from "./lib/compat/polyfills";
+import { installStorageQuotaGuard } from "./lib/storageGuard";
 import "@fontsource/libre-baskerville/400.css";
 import "@fontsource/libre-baskerville/700.css";
 import "@fontsource/ibm-plex-sans/400.css";
 import "@fontsource/ibm-plex-sans/500.css";
 import "@fontsource/ibm-plex-sans/600.css";
 installCompatPolyfills();
+// Guard the browser storage quota BEFORE the auth client writes its session,
+// otherwise a full cache makes every sign-in fail with a quota error.
+installStorageQuotaGuard();
 
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
