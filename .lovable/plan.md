@@ -1,77 +1,91 @@
-# Microplanning Wizard Redesign + Real-Time Kobo Pipeline
+# Project-Centred App with Account-Free Data Collection (KoboCollect style)
 
-Two connected deliverables: (1) a modern, step-by-step wizard shell for the Geo-enabled Microplanning entry form, and (2) a real-time Kobo → Supabase → Dashboard sync path. Existing form logic, validation, and offline saving are preserved — only the shell, controls, and realtime plumbing change.
+## Goal
 
-## 1. Wizard shell (new component: `MicroplanWizardForm`)
+Make Projects the organising centre of the app, and let a project owner switch a
+project into **Open Collection** mode. In that mode field staff install the app,
+scan a QR code (or type a short project code + PIN), and get straight to that
+project's Forms and Cases pages — no email, no account, no password. Everything
+keeps working with no network at all: opening the app, filling forms, saving,
+and queuing records until a connection appears.
 
-Replaces the monolithic scrolling layout in `MicroplanEntryForm.tsx` with a stepper. Reuses all current field logic, validation, and submit path — only the container changes.
+Nothing changes for today's signed-in users and their projects. Existing
+projects stay exactly as they are until the owner explicitly turns Open
+Collection on for one.
 
-**Sections** (mapped from the existing form):
-1. Campaign & Project
-2. Administrative Hierarchy (State → LGA → Ward)
-3. Frontline Health Facility (FLHF)
-4. Community
-5. Settlement
-6. GPS & Coordinates
-7. Population Estimates
-8. PWD Breakdown
-9. Medicines / Allocations
-10. Review & Submit
+## What the owner sees
 
-**Design tokens** (added to `index.css` as semantic tokens — no hardcoded colors in components):
-- Surface: `bg-slate-50/50`, cards `rounded-2xl bg-white shadow-sm`
-- Primary `#2563EB`, ink `#0F172A`
-- State chips: emerald (synced), amber (draft), rose (error)
-- Typography: Inter, generous line-height, strong h/label contrast
+- Each project gets an **Access** panel: Standard (accounts only, the default and
+  the current behaviour) or Open Collection (accounts + QR enrolment).
+- Turning on Open Collection produces:
+  - a QR code and a printable/downloadable card,
+  - a 6-character project code plus an optional numeric PIN,
+  - which pages the enrolled device may see (Forms, Cases, or both),
+  - an optional expiry date and a "revoke all devices" button.
+- A device list per project: nickname, first seen, last sync, records sent, with
+  a per-device revoke.
 
-**Progress header**: sticky top bar with "Section X of 10 · <name>" and an animated `<Progress>` bar (shadcn) reflecting completed-required fields per step.
+## What the collector sees
 
-**Quick Navigator drawer**: shadcn `Sheet` from the left listing all 10 sections with per-section badges — Complete / Incomplete / Missing Required — computed from current form values + validation results. Click to jump.
+1. Opens the app, taps **Join a project** on the sign-in screen.
+2. Scans the QR code (camera) or enters the project code and PIN manually.
+3. Names the device/collector (e.g. "Aisha - Kaugama 3"), and lands directly on
+   the project's Forms page. Cases appear only if the project allows it.
+4. From then on the app opens straight into that project, even fully offline —
+   no sign-in screen, no spinner, no network needed.
+5. Records save locally as Draft, Finalized then Sent, and upload automatically
+   whenever connectivity returns. A queue badge shows what is still pending.
 
-**Sticky action bar** (bottom): Previous · Save Draft (with "Saved 2s ago") · Next / Submit. Submit shows loading + success micro-animation. Wired to existing `useSubmitLock` and offline queue.
+## Technical design
 
-## 2. Enhanced field controls (in `src/components/Microplanning/fields/`)
+### Enrolment and identity
+- New tables: `project_access_configs` (project, code hash, PIN hash, allowed
+  pages, expiry, active flag) and `project_devices` (project, device id, label,
+  enrol time, last seen, revoked flag). Both service-role only; no anon reads.
+- New edge function `project-enroll`: takes code + PIN + device label, verifies
+  against the config, registers the device, and returns a signed device token
+  (HMAC, project-scoped, revocable) plus the project's forms/case-type bundle.
+- New edge function `project-collect`: verifies the device token on every call
+  and performs submission inserts with the service role, stamping
+  `device_id`/`collector_label` instead of a user id. Submissions from devices
+  are flagged so dashboards can distinguish them.
+- Token and bundle are stored encrypted-at-rest in IndexedDB; the app never
+  needs Supabase auth for these devices.
 
-- `CascadingGeoSelect`: reuse GRID3 cascade, add instant search, "GRID3" badge when option comes from GRID3 dataset, inline "Other (specify)" text input when selected.
-- `PopulationStepper`: numeric input flanked by `-` / `+` touch targets (52px per mobile-ergonomics memory), live auto-sum of children 0–4 + 5–14 + adults 15+ displayed in a subtotal chip.
-- `GpsCaptureWidget`: replaces raw GPS field. Shows lat/lng, accuracy meter (`±Xm`), Leaflet mini-map preview, and a toggle "GRID3 pre-loaded ↔ Manual override". Uses existing `useGeolocation` + `gpsWarmer`.
+### Routing and shell
+- `DeviceSessionProvider` sits beside `AuthProvider`. `ProtectedRoute` resolves
+  in this order: signed-in user → enrolled device → `/auth`.
+- New routes: `/join` (scan/enter code) and a device-mode shell that renders the
+  existing `FormsView` and `CasesView` scoped to the enrolled project, with the
+  rest of the navigation hidden.
+- Projects become the entry surface for signed-in users too: the project picker
+  drives the Forms/Cases/Dashboard scope already present in `Index.tsx`, with a
+  clearer project switcher in the header.
 
-## 3. Real-time Kobo pipeline
+### Offline behaviour (KoboCollect parity)
+- The enrolment response caches the full form definitions, choice lists, case
+  types and geography for the project, so forms render synchronously offline.
+- Reuse the existing `savedForms` IndexedDB lifecycle (draft → finalized → sent)
+  and its device-id conflict merge; add a device-token sync path alongside the
+  current authenticated path.
+- A single outbound queue with exponential backoff, resumable attachment
+  uploads, and per-record error state visible in the Saved Forms manager.
+- Service worker already precaches the shell; extend it so `/join` and the
+  device shell are guaranteed offline-openable on a cold start.
 
-Existing `kobo-microplan-webhook` edge function already ingests + upserts on `idempotency_key`. Extend it and add realtime + UI:
+### Safety
+- Device tokens are project-scoped, expiring and revocable; revoking a device
+  rejects its next sync and wipes its cached bundle.
+- Codes and PINs are stored hashed; enrolment attempts are rate-limited and
+  audited.
+- All existing RLS stays untouched — device writes go only through the edge
+  function, never through the browser client.
 
-**a. Webhook function updates** (`supabase/functions/kobo-microplan-webhook/index.ts`)
-- Add `project_id` to the conflict target for the requested `(kobo_submission_id, project_id)` semantics: change upsert to `onConflict: "idempotency_key,project_id"` after adding a matching unique index.
-- Emit a `kobo_sync_events` row (`{ status, project_id, kobo_uuid, entry_id, at }`) that the UI subscribes to.
+## Build order
 
-**b. Migration**
-- Add composite unique index `microplan_entries (idempotency_key, project_id)`.
-- Create `public.kobo_sync_events` (project_id, kobo_uuid, entry_id, status, message, created_at), GRANTs, RLS: project admins + super admins read, service_role write.
-- `ALTER PUBLICATION supabase_realtime ADD TABLE public.microplan_entries, public.kobo_sync_events`.
-
-**c. Realtime in UI**
-- `useRealtimeMicroplanEntries(projectId)` hook: TanStack Query + `postgres_changes` on `microplan_entries` filtered by `project_id`; invalidates dashboard queries (`entries`, KPI counters, geotagged count).
-- `KoboSyncStatusChip`: header chip subscribing to `kobo_sync_events`, showing "Synced just now" / "Sync pending" / "Validation failed" with pulse animation.
-- `KoboSyncAuditDrawer`: slide-over listing the last 50 events, filterable by status.
-
-**d. Offline readiness**
-- Reuse existing offline queue. Draft badge in header shows "Saved locally — will sync when online" driven by `navigator.onLine` + queue length.
-
-## 4. Wiring
-
-- `MicroplanningView.tsx`: swap `MicroplanEntryForm` for `MicroplanWizardForm` behind a feature flag `wizard=true` (default on) so we can fall back if needed. Mount `KoboSyncStatusChip` in the tab header and the audit drawer trigger next to it.
-- Dashboards (`MdaAdaptiveDashboard`, KPI tiles): consume the same TanStack query keys the realtime hook invalidates — no direct changes needed beyond hook adoption.
-
-## Technical notes
-
-- Wizard state lives in the existing form store; per-step validity computed via existing `formFieldValidation` helpers.
-- Save Draft continues to write through `savedForms` / offline queue; timestamp comes from the last successful write.
-- Realtime channels torn down on unmount (per cloud-realtime rules) to avoid subscription leaks.
-- All new colors/shadows go through `index.css` tokens; no `bg-white`/`text-black` literals in components except via shadcn variants.
-- No changes to auth, RLS shape beyond the new table, or Kobo secret rotation flow.
-
-## Out of scope
-
-- Rewriting non-microplanning forms.
-- Changing Kobo mapping/versioning UI (already shipped).
-- Server-side XLSForm regeneration.
+1. Tables, hashing, and the owner-facing Access panel + QR generation.
+2. `project-enroll` edge function and the `/join` screen (scan + manual entry).
+3. Device session provider, routing, and the device-mode Forms/Cases shell.
+4. `project-collect` submission path and the offline queue integration.
+5. Device management (list, revoke, expiry) and enrolment audit.
+6. Project-centred navigation polish for signed-in users.
