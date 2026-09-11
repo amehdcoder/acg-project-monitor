@@ -124,7 +124,7 @@ const Section = ({
   );
 };
 
-export default function SeeClearFormFiller({ onClose, deviceMode }: Props) {
+export default function SeeClearFormFiller({ onClose, deviceMode, savedDraft }: Props) {
   const { user, isOwner, isSuperAdmin, isOwnerLevel } = useAuth();
   const isDevice = !!deviceMode;
   const isAdmin = Boolean(!isDevice && (isOwner || isSuperAdmin || isOwnerLevel));
