@@ -38,6 +38,14 @@ const STEPS = ["Facility Profile", "Checklist", "Review & Submit"];
 
 interface Props {
   onClose: () => void;
+  /** Account-free collector mode: no sign-in, evidence and the visit are
+   *  queued locally and pushed by the device sync engine. */
+  deviceMode?: {
+    deviceId: string;
+    collectorLabel: string;
+    projectId: string;
+    onSaved?: () => void;
+  };
 }
 
 const Field = ({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) => (
@@ -109,11 +117,15 @@ const Section = ({
   );
 };
 
-export default function SeeClearFormFiller({ onClose }: Props) {
+export default function SeeClearFormFiller({ onClose, deviceMode }: Props) {
   const { user, isOwner, isSuperAdmin, isOwnerLevel } = useAuth();
-  const isAdmin = Boolean(isOwner || isSuperAdmin || isOwnerLevel);
+  const isDevice = !!deviceMode;
+  const isAdmin = Boolean(!isDevice && (isOwner || isSuperAdmin || isOwnerLevel));
   const [accessOpen, setAccessOpen] = useState(false);
-  const { schema, fields: koboFields, choices: koboChoices, driftCount } = useSeeClearKoboSchema(true);
+  // Device collectors have no database session — the cached checklist is used.
+  const { schema, fields: koboFields, choices: koboChoices, driftCount } = useSeeClearKoboSchema(!isDevice);
+  // Evidence captured offline is held as data URLs until the device syncs.
+  const [devicePhotos, setDevicePhotos] = useState<Record<string, string>>({});
   // Live Kobo overlay — question wording, options and added/removed questions
   // follow whatever is currently deployed on the linked KoboToolbox form.
   const live = useMemo(() => buildSeeClearLive(koboFields, koboChoices), [koboFields, koboChoices]);
@@ -187,7 +199,27 @@ export default function SeeClearFormFiller({ onClose }: Props) {
   const reviewValid = requiredEvidenceComplete && challenges.length > 0 && recommendations.length > 0 && remarks.trim() !== "" && !!officerSig && !!inchargeSig;
 
   const handlePhoto = async (slot: string, file: File | null) => {
-    if (!file || !user?.id) return;
+    if (!file) return;
+    if (isDevice) {
+      setUploading(slot);
+      try {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(new Error("Could not read the photo"));
+          reader.readAsDataURL(file);
+        });
+        setDevicePhotos((p) => ({ ...p, [slot]: dataUrl }));
+        setEvidence((e) => ({ ...e, [slot]: `pending:${slot}` }));
+        toast.success("Photo saved on this device");
+      } catch (e: any) {
+        toast.error(e.message || "Could not save photo");
+      } finally {
+        setUploading(null);
+      }
+      return;
+    }
+    if (!user?.id) return;
     setUploading(slot);
     try {
       const ext = file.name.split(".").pop() || "jpg";
@@ -203,7 +235,7 @@ export default function SeeClearFormFiller({ onClose }: Props) {
   };
 
   const submit = async (asDraft: boolean) => {
-    if (!user?.id) return;
+    if (!isDevice && !user?.id) return;
     if (!asDraft && !profileValid) { toast.error("Complete all required facility information."); setStep(0); return; }
     if (!asDraft && !checklistValid) { toast.error("Answer every checklist item, staff on duty and all equipment statuses."); setStep(1); return; }
     if (!asDraft && !reviewValid) { toast.error("Attach required photos, select challenges & recommendations, add remarks and both sign-offs."); setStep(2); return; }
