@@ -1448,6 +1448,280 @@ export type Database = {
         }
         Relationships: []
       }
+      beneficiaries: {
+        Row: {
+          case_id: string
+          created_at: string
+          created_by: string
+          full_name: string
+          id: string
+          latitude: number | null
+          lga: string | null
+          longitude: number | null
+          module_id: string
+          next_follow_up_date: string | null
+          photo_url: string | null
+          profile: Json
+          project_id: string
+          risk_level: string | null
+          state: string | null
+          status: string
+          submission_uuid: string | null
+          updated_at: string
+          version: number
+          village: string | null
+          ward: string | null
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          created_by?: string
+          full_name: string
+          id?: string
+          latitude?: number | null
+          lga?: string | null
+          longitude?: number | null
+          module_id: string
+          next_follow_up_date?: string | null
+          photo_url?: string | null
+          profile?: Json
+          project_id: string
+          risk_level?: string | null
+          state?: string | null
+          status?: string
+          submission_uuid?: string | null
+          updated_at?: string
+          version?: number
+          village?: string | null
+          ward?: string | null
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          created_by?: string
+          full_name?: string
+          id?: string
+          latitude?: number | null
+          lga?: string | null
+          longitude?: number | null
+          module_id?: string
+          next_follow_up_date?: string | null
+          photo_url?: string | null
+          profile?: Json
+          project_id?: string
+          risk_level?: string | null
+          state?: string | null
+          status?: string
+          submission_uuid?: string | null
+          updated_at?: string
+          version?: number
+          village?: string | null
+          ward?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "beneficiaries_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "programme_modules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beneficiaries_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      beneficiary_audit: {
+        Row: {
+          action: string
+          actor_id: string
+          beneficiary_id: string
+          created_at: string
+          field_name: string | null
+          id: string
+          new_value: string | null
+          old_value: string | null
+          project_id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string
+          beneficiary_id: string
+          created_at?: string
+          field_name?: string | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          project_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string
+          beneficiary_id?: string
+          created_at?: string
+          field_name?: string | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "beneficiary_audit_beneficiary_id_fkey"
+            columns: ["beneficiary_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beneficiary_audit_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      beneficiary_referrals: {
+        Row: {
+          beneficiary_id: string
+          component_key: string | null
+          created_at: string
+          created_by: string
+          id: string
+          notes: string | null
+          project_id: string
+          reason: string | null
+          referral_date: string
+          referred_to: string
+          status: string
+          submission_uuid: string | null
+          updated_at: string
+        }
+        Insert: {
+          beneficiary_id: string
+          component_key?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          notes?: string | null
+          project_id: string
+          reason?: string | null
+          referral_date?: string
+          referred_to: string
+          status?: string
+          submission_uuid?: string | null
+          updated_at?: string
+        }
+        Update: {
+          beneficiary_id?: string
+          component_key?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          notes?: string | null
+          project_id?: string
+          reason?: string | null
+          referral_date?: string
+          referred_to?: string
+          status?: string
+          submission_uuid?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "beneficiary_referrals_beneficiary_id_fkey"
+            columns: ["beneficiary_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beneficiary_referrals_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      beneficiary_services: {
+        Row: {
+          beneficiary_id: string
+          component_key: string
+          created_at: string
+          data: Json
+          id: string
+          module_id: string
+          project_id: string
+          recorded_by: string
+          result: string | null
+          service_date: string
+          service_name: string | null
+          status: string
+          submission_uuid: string | null
+          updated_at: string
+        }
+        Insert: {
+          beneficiary_id: string
+          component_key: string
+          created_at?: string
+          data?: Json
+          id?: string
+          module_id: string
+          project_id: string
+          recorded_by?: string
+          result?: string | null
+          service_date?: string
+          service_name?: string | null
+          status?: string
+          submission_uuid?: string | null
+          updated_at?: string
+        }
+        Update: {
+          beneficiary_id?: string
+          component_key?: string
+          created_at?: string
+          data?: Json
+          id?: string
+          module_id?: string
+          project_id?: string
+          recorded_by?: string
+          result?: string | null
+          service_date?: string
+          service_name?: string | null
+          status?: string
+          submission_uuid?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "beneficiary_services_beneficiary_id_fkey"
+            columns: ["beneficiary_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beneficiary_services_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "programme_modules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beneficiary_services_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bloomberg_local_form_audit: {
         Row: {
           created_at: string
@@ -7531,6 +7805,56 @@ export type Database = {
         }
         Relationships: []
       }
+      programme_modules: {
+        Row: {
+          case_seq: number
+          config: Json
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          is_active: boolean
+          is_template: boolean
+          name: string
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          case_seq?: number
+          config?: Json
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_template?: boolean
+          name: string
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          case_seq?: number
+          config?: Json
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_template?: boolean
+          name?: string
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "programme_modules_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_access_configs: {
         Row: {
           allow_cases: boolean
@@ -10838,6 +11162,10 @@ export type Database = {
               ward: string
             }[]
           }
+      next_beneficiary_case_id: {
+        Args: { _module_id: string }
+        Returns: string
+      }
       office_form_approver_role: {
         Args: { _form_code: string }
         Returns: string

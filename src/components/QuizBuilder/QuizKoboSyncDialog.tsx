@@ -165,7 +165,7 @@ export default function QuizKoboSyncDialog({ open, onClose, quizId, quizTitle, c
       };
       const { error } = await supabase
         .from("quiz_kobo_configs")
-        .upsert(payload, { onConflict: "quiz_id" });
+        .upsert(payload as never, { onConflict: "quiz_id" });
       if (error) throw error;
       toast({ title: "Kobo sync settings saved" });
       onSaved();
