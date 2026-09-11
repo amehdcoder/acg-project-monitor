@@ -145,36 +145,41 @@ Deno.serve(async (req) => {
       })
       .map((r) => ({
         id: r.id,
+        submission_uuid: r.submissionUuid || r.id,
         form_id: r.formId,
         user_id: ctx.collectorUserId,
         data: r.data ?? {},
         location: r.location ?? null,
         within_geofence: r.withinGeofence ?? null,
         submission_type: r.submissionType || "regular",
-        status: "sent",
         submitted_at: r.submittedAt || now,
-        synced_at: now,
+        client_submitted_at: r.clientSubmittedAt || r.submittedAt || now,
         device_id: ctx.deviceId,
         collector_label: ctx.label,
       }));
 
     if (rows.length > 0) {
-      // Idempotent: the client's deterministic record id keys the upsert, so a
-      // retry after a lost acknowledgement never duplicates a record.
-      const { error } = await db.from("form_submissions").upsert(rows, { onConflict: "id" });
+      // Single atomic transaction keyed on the device-generated
+      // submission_uuid: partial batches can't leave orphan rows and a retry
+      // after a lost acknowledgement is de-duplicated, not duplicated.
+      const { data: ingested, error } = await db.rpc("ingest_form_submissions", { _rows: rows });
       if (error) {
-        console.error("project-collect upsert error", error);
+        console.error("project-collect ingest error", error);
         return json({ error: "write_failed", detail: error.message }, 500);
       }
-      accepted.push(...rows.map((r) => r.id));
+      const landed = new Set(
+        (ingested ?? []).map((row: any) => String(row.accepted_uuid ?? row)),
+      );
+      for (const r of rows) {
+        if (landed.has(String(r.submission_uuid))) accepted.push(r.id);
+        else rejected.push({ id: r.id, reason: "write_failed" });
+      }
+      // Lock-free: no counter update on a hot shared row. Device throughput is
+      // read from the project_device_activity view instead.
       await db
         .from("project_devices")
         .update({ last_seen_at: now })
         .eq("id", ctx.deviceRowId);
-      await db.rpc("increment_device_records", {
-        _device_row_id: ctx.deviceRowId,
-        _count: rows.length,
-      }).catch(() => {});
     }
 
     return json({ accepted, rejected });
