@@ -204,6 +204,8 @@ const FacilityFocalPersons = ({ open, onOpenChange, projectId, initialFacilityId
                       <p className="text-sm font-medium text-foreground">{nameOf(r.user_id)}</p>
                       <p className="text-xs text-muted-foreground">
                         {ROLES.find((x) => x.value === r.role)?.label || r.role}
+                        {" · "}
+                        {ACCESS_LEVEL_LABEL[r.access_level] || r.access_level}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
