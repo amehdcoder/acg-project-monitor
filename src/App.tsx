@@ -7,6 +7,8 @@ import { isTransientBackendError, describeBackendError } from "@/lib/safeData";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { useEffect, lazy, Suspense } from "react";
 import { AuthProvider } from "@/hooks/useAuth";
+import { DeviceSessionProvider } from "@/hooks/useDeviceSession";
+import { initDeviceAutoSync } from "@/lib/deviceSync";
 import { LanguageProvider } from "@/hooks/useLanguage";
 import { ImpersonationProvider } from "@/hooks/useImpersonation";
 import { ThemeProvider } from "next-themes";
