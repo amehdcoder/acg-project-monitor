@@ -274,6 +274,8 @@ interface FormsViewProps {
 }
 
 const FormsView = ({ selectedProjectId }: FormsViewProps) => {
+  const [showBeneficiaryPanel, setShowBeneficiaryPanel] = useState(false);
+  const [beneficiaryTab, setBeneficiaryTab] = useState("records");
   const [searchQuery, setSearchQuery] = useState("");
   const [forms, setForms] = useState<Form[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
