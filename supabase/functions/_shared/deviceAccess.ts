@@ -98,5 +98,14 @@ export async function buildProjectBundle(
     caseTypes = data ?? [];
   }
 
-  return { project: project ?? null, forms: forms ?? [], caseTypes, syncedAt: new Date().toISOString() };
+  // Extra checklists the device may fill offline alongside the project forms.
+  const specialForms = allowSeeclear ? ["seeclear"] : [];
+
+  return {
+    project: project ?? null,
+    forms: forms ?? [],
+    caseTypes,
+    specialForms,
+    syncedAt: new Date().toISOString(),
+  };
 }
