@@ -10871,7 +10871,15 @@ export type Database = {
         Args: { _action: string; _user_id: string }
         Returns: boolean
       }
+      can_create_dashboard: {
+        Args: { _form_id: string; _user_id: string }
+        Returns: boolean
+      }
       can_edit_dashboard: { Args: { _user_id: string }; Returns: boolean }
+      can_edit_dashboard_row: {
+        Args: { _dashboard_id: string; _user_id: string }
+        Returns: boolean
+      }
       can_edit_dashboards: { Args: { _user_id: string }; Returns: boolean }
       can_join_mesh_room: { Args: { _room_id: string }; Returns: boolean }
       can_locate_community: {
