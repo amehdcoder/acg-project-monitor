@@ -22,7 +22,8 @@ import {
   readDeviceSession,
   sendDeviceRecords,
   deviceUserId,
-  clearDeviceSession,
+  noteSessionRejected,
+  noteSessionAccepted,
   type DeviceSyncRecord,
 } from "@/lib/deviceSession";
 import { withQueueLock, backoffDelay, isRetryable } from "@/lib/syncLock";
