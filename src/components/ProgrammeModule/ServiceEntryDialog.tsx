@@ -47,6 +47,7 @@ const ServiceEntryDialog = ({
   const [result, setResult] = useState("");
   const [status, setStatus] = useState(config.workflow.serviceStatuses[0]?.value || "on_track");
   const [answers, setAnswers] = useState<AnswerMap>({});
+  const [followUp, setFollowUp] = useState<FollowUpValue>(emptyFollowUp);
   const [saving, setSaving] = useState(false);
 
   const component = components.find((c) => c.key === componentKey);
@@ -70,6 +71,24 @@ const ServiceEntryDialog = ({
     );
   }
 
+  // Limb care, lymphoedema and hydrocoele visits open the MMDP visit form with
+  // pictures, measurements and the on-device progress comparison.
+  if (open && isMmdpService(componentKey, serviceName)) {
+    return (
+      <MmdpServiceForm
+        open={open}
+        onOpenChange={(v) => { if (!v) setServiceName(""); onOpenChange(v); }}
+        serviceName={serviceName}
+        componentKey={componentKey}
+        beneficiary={beneficiary}
+        moduleId={moduleId}
+        projectId={projectId}
+        priorServices={priorServices}
+        onSaved={onSaved}
+      />
+    );
+  }
+
   const save = async () => {
     if (!componentKey) return;
     setSaving(true);
@@ -84,13 +103,23 @@ const ServiceEntryDialog = ({
         service_date: serviceDate,
         result: result || null,
         status,
-        data: answers as Record<string, unknown>,
+        data: {
+          ...(answers as Record<string, unknown>),
+          follow_up_date: followUp.date || undefined,
+          follow_up_time: followUp.time || undefined,
+          follow_up_location: followUp.location || undefined,
+        } as Record<string, unknown>,
         submission_uuid: newUuid(),
         recorded_by: auth.user?.id,
       };
       if (navigator.onLine) {
         const { error } = await supabase.from("beneficiary_services").insert(payload as never);
         if (error) throw error;
+        if (followUp.date) {
+          await supabase.from("beneficiaries")
+            .update({ next_follow_up_date: followUp.date } as never)
+            .eq("id", beneficiaryId);
+        }
         await recordAudit({
           beneficiary_id: beneficiaryId, project_id: projectId,
           action: "service_recorded", field_name: componentKey, new_value: payload.service_name || "",
