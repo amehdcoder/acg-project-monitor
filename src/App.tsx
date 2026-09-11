@@ -28,6 +28,8 @@ import XlsFormCoverHarness from "./pages/XlsFormCoverHarness";
 import LearningLog from "./pages/LearningLog";
 const AmehnitiesAI = lazy(() => import("./pages/AmehnitiesAI"));
 import SharedDashboard from "./pages/SharedDashboard";
+import JoinProject from "./pages/JoinProject";
+import DeviceCollectRoute from "./components/DeviceCollect/DeviceCollectRoute";
 import InstallBanner from "./components/InstallBanner";
 import PWAUpdatePrompt from "./components/PWAUpdatePrompt";
 import StorageWarningBanner from "./components/StorageWarningBanner";
