@@ -20,6 +20,7 @@ import SavedFormsManager from "@/components/FormFiller/SavedFormsManager";
 import { listAllSavedEntries } from "@/lib/savedForms";
 import { syncDeviceRecords } from "@/lib/deviceSync";
 import SeeClearFormFiller from "@/components/SeeClear/SeeClearFormFiller";
+import DeviceCaseFiller from "@/components/DeviceCollect/DeviceCaseFiller";
 
 type SavedMode = "edit" | "send" | "view" | null;
 
@@ -39,6 +40,7 @@ const DeviceCollectShell = () => {
   const [syncing, setSyncing] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [seeClearOpen, setSeeClearOpen] = useState(false);
+  const [caseType, setCaseType] = useState<any | null>(null);
 
   const userId = session ? deviceUserId(session.deviceId) : "";
 
@@ -53,7 +55,7 @@ const DeviceCollectShell = () => {
     setCounts({ draft: mine(draft), finalized: mine(finalized), sent: mine(sent) });
   }, [userId]);
 
-  useEffect(() => { void loadCounts(); }, [loadCounts, fillingFormId, savedMode, seeClearOpen]);
+  useEffect(() => { void loadCounts(); }, [loadCounts, fillingFormId, savedMode, seeClearOpen, caseType]);
 
   useEffect(() => {
     const on = () => setOnline(true);
@@ -104,6 +106,19 @@ const DeviceCollectShell = () => {
           collectorLabel: session.label,
           projectId: session.projectId,
         }}
+      />
+    );
+  }
+
+  if (caseType) {
+    return (
+      <DeviceCaseFiller
+        caseType={caseType}
+        deviceId={session.deviceId}
+        projectId={session.projectId}
+        collectorLabel={session.label}
+        onClose={() => setCaseType(null)}
+        onSaved={() => void loadCounts()}
       />
     );
   }
@@ -247,10 +262,18 @@ const DeviceCollectShell = () => {
                 </CardContent></Card>
               )}
               {(session.bundle?.caseTypes ?? []).map((ct: any) => (
-                <Card key={ct.id}>
+                <Card
+                  key={ct.id}
+                  className="cursor-pointer hover:border-primary/50 transition-colors"
+                  onClick={() => setCaseType(ct)}
+                >
                   <CardHeader className="py-4">
-                    <CardTitle className="text-base">{ct.label || ct.name}</CardTitle>
-                    {ct.description && <CardDescription>{ct.description}</CardDescription>}
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Briefcase className="h-4 w-4 text-primary" /> {ct.label || ct.name}
+                    </CardTitle>
+                    <CardDescription>
+                      {ct.description || "Open a new case — works offline."}
+                    </CardDescription>
                   </CardHeader>
                 </Card>
               ))}

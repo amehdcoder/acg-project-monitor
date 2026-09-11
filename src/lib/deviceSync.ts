@@ -22,8 +22,17 @@ const isOnline = () => (typeof navigator === "undefined" ? true : navigator.onLi
 
 const toRecord = (entry: SavedFormEntry): DeviceSyncRecord => ({
   id: entry.submissionId || entry.id,
-  // See Clear visits are routed to the checklist intake server-side.
-  kind: entry.settings?.kind === "seeclear" ? "seeclear" : undefined,
+  // See Clear visits and cases are routed to their own intake server-side.
+  kind:
+    entry.settings?.kind === "seeclear"
+      ? "seeclear"
+      : entry.settings?.kind === "case"
+        ? "case"
+        : undefined,
+  caseTypeId: entry.settings?.kind === "case" ? (entry.settings?.caseTypeId as string) : undefined,
+  caseName: entry.settings?.kind === "case"
+    ? ((entry.settings?.caseName as string) || entry.displayName || "Case")
+    : undefined,
   photos: entry.settings?.kind === "seeclear"
     ? (entry.settings?.photos as Record<string, string> | undefined)
     : undefined,

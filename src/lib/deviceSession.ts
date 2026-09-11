@@ -153,8 +153,11 @@ export async function refreshDeviceBundle(session: DeviceSession): Promise<Devic
 
 export interface DeviceSyncRecord {
   id: string;
-  /** "seeclear" routes the record to the See Clear checklist intake. */
+  /** "seeclear" routes to the checklist intake, "case" opens a project case. */
   kind?: string;
+  /** Case records: which case type to open and the case display name. */
+  caseTypeId?: string;
+  caseName?: string;
   formId: string;
   data: Record<string, unknown>;
   /** Evidence photos as data URLs, uploaded server-side on sync. */
