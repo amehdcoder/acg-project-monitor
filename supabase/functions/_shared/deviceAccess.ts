@@ -57,7 +57,7 @@ export async function verifyDeviceToken(req: Request): Promise<DeviceContext | n
 
   const { data: config } = await db
     .from("project_access_configs")
-    .select("enabled, allow_forms, allow_cases, expires_at, collector_user_id")
+    .select("enabled, allow_forms, allow_cases, allow_seeclear, expires_at, collector_user_id")
     .eq("project_id", device.project_id)
     .maybeSingle();
   if (!config || !config.enabled) return null;
