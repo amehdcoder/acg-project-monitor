@@ -194,7 +194,19 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
         />
       )}
 
-      <FacilityFocalPersons open={focalOpen} onOpenChange={setFocalOpen} projectId={projectId} />
+      <FacilityFocalPersons
+        open={focalOpen}
+        onOpenChange={setFocalOpen}
+        projectId={projectId}
+        initialFacilityId={focalFacilityId}
+      />
+      <FacilityRegistry
+        open={registryOpen}
+        onOpenChange={setRegistryOpen}
+        projectId={projectId}
+        canManage={canConfigure}
+        onManageTeam={(id) => { setFocalFacilityId(id); setFocalOpen(true); }}
+      />
 
       {/* Template gallery */}
       <Dialog open={galleryOpen} onOpenChange={setGalleryOpen}>
