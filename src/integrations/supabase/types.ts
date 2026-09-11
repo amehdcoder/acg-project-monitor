@@ -4646,6 +4646,7 @@ export type Database = {
       }
       facility_focal_persons: {
         Row: {
+          access_level: string
           created_at: string
           created_by: string | null
           facility_id: string
@@ -4656,6 +4657,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          access_level?: string
           created_at?: string
           created_by?: string | null
           facility_id: string
@@ -4666,6 +4668,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          access_level?: string
           created_at?: string
           created_by?: string | null
           facility_id?: string
@@ -10963,6 +10966,7 @@ export type Database = {
         Args: { _project_id: string }
         Returns: string
       }
+      facility_access_level: { Args: { _facility_id: string }; Returns: string }
       get_direct_unread_by_user: {
         Args: never
         Returns: {

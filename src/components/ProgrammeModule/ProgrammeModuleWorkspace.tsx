@@ -8,7 +8,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Plus, Settings2, CloudOff, RefreshCw, Layers, Users } from "lucide-react";
+import { Plus, Settings2, CloudOff, RefreshCw, Layers, Users, Building2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { MODULE_TEMPLATES, normalizeConfig } from "@/lib/programmeModule/defaults";
@@ -20,6 +20,8 @@ import BeneficiaryRecord from "./BeneficiaryRecord";
 import BeneficiaryFormDialog from "./BeneficiaryFormDialog";
 import ModuleConfigurator from "./ModuleConfigurator";
 import FacilityFocalPersons from "./FacilityFocalPersons";
+import FacilityRegistry from "./FacilityRegistry";
+import { useMyFacilityAccess } from "@/lib/programmeModule/facilities";
 
 interface Props {
   projectId?: string;
@@ -42,6 +44,9 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
   const [focalOpen, setFocalOpen] = useState(false);
+  const [registryOpen, setRegistryOpen] = useState(false);
+  const { levels: facilityLevels } = useMyFacilityAccess();
+  const [focalFacilityId, setFocalFacilityId] = useState<string | undefined>(undefined);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [selected, setSelected] = useState<BeneficiaryRow | null>(null);
   const [pending, setPending] = useState(queueCount());
@@ -119,7 +124,10 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
         moduleId={active.id}
         projectId={projectId}
         onBack={() => setSelected(null)}
-        canManage={canConfigure}
+        canManage={
+          canConfigure ||
+          facilityLevels[(selected as unknown as { facility_id?: string }).facility_id || ""] === "manage"
+        }
         onChanged={() => void reloadBeneficiaries()}
       />
     );
@@ -147,9 +155,15 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
         <Button variant="outline" size="sm" onClick={() => void reload()} aria-label="Reload modules">
           <RefreshCw className="h-4 w-4" />
         </Button>
+        <Button variant="outline" size="sm" className="gap-1" onClick={() => setRegistryOpen(true)}>
+          <Building2 className="h-4 w-4" /> Health facilities
+        </Button>
         {canConfigure && (
-          <Button variant="outline" size="sm" className="gap-1" onClick={() => setFocalOpen(true)}>
-            <Users className="h-4 w-4" /> Facility focal persons
+          <Button
+            variant="outline" size="sm" className="gap-1"
+            onClick={() => { setFocalFacilityId(undefined); setFocalOpen(true); }}
+          >
+            <Users className="h-4 w-4" /> Facility teams
           </Button>
         )}
         {canConfigure && active && (
@@ -191,7 +205,19 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
         />
       )}
 
-      <FacilityFocalPersons open={focalOpen} onOpenChange={setFocalOpen} projectId={projectId} />
+      <FacilityFocalPersons
+        open={focalOpen}
+        onOpenChange={setFocalOpen}
+        projectId={projectId}
+        initialFacilityId={focalFacilityId}
+      />
+      <FacilityRegistry
+        open={registryOpen}
+        onOpenChange={setRegistryOpen}
+        projectId={projectId}
+        canManage={canConfigure}
+        onManageTeam={(id) => { setFocalFacilityId(id); setFocalOpen(true); }}
+      />
 
       {/* Template gallery */}
       <Dialog open={galleryOpen} onOpenChange={setGalleryOpen}>

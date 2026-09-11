@@ -15,14 +15,30 @@ export interface FacilityRow {
   contact_phone: string | null;
 }
 
+export type FacilityAccessLevel = "view" | "record" | "manage";
+
 export interface FocalPersonRow {
   id: string;
   facility_id: string;
   user_id: string;
   role: string;
+  access_level: FacilityAccessLevel;
   is_active: boolean;
   created_at: string;
 }
+
+/** How much of a facility's beneficiary records a team member may work with. */
+export const ACCESS_LEVELS: { value: FacilityAccessLevel; label: string; hint: string }[] = [
+  { value: "view", label: "View only", hint: "Can read beneficiary records and history." },
+  { value: "record", label: "Record services", hint: "Can add services, referrals and follow-ups." },
+  { value: "manage", label: "Full management", hint: "Can edit profiles, status and referrals." },
+];
+
+export const ACCESS_LEVEL_LABEL: Record<FacilityAccessLevel, string> = {
+  view: "View only",
+  record: "Record services",
+  manage: "Full management",
+};
 
 export const FACILITY_TYPE_LABEL: Record<FacilityRow["facility_type"], string> = {
   phc: "Primary Health Centre",
@@ -82,4 +98,33 @@ export const useMyFacilities = () => {
   }, []);
 
   return { facilityIds, loading };
+};
+
+/** Access level the signed-in user holds at each facility. */
+export const useMyFacilityAccess = () => {
+  const [levels, setLevels] = useState<Record<string, FacilityAccessLevel>>({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) { if (!cancelled) { setLevels({}); setLoading(false); } return; }
+      const { data } = await supabase
+        .from("facility_focal_persons")
+        .select("facility_id,access_level")
+        .eq("user_id", auth.user.id)
+        .eq("is_active", true);
+      if (cancelled) return;
+      const map: Record<string, FacilityAccessLevel> = {};
+      for (const r of (data as { facility_id: string; access_level: FacilityAccessLevel }[]) || []) {
+        map[r.facility_id] = r.access_level;
+      }
+      setLevels(map);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  return { levels, loading };
 };

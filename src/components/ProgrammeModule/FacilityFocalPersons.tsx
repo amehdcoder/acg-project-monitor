@@ -17,16 +17,22 @@ import {
 import { UserPlus, UserMinus, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useFacilities, FACILITY_TYPE_LABEL } from "@/lib/programmeModule/facilities";
+import {
+  useFacilities, FACILITY_TYPE_LABEL, ACCESS_LEVELS, ACCESS_LEVEL_LABEL,
+  type FacilityAccessLevel,
+} from "@/lib/programmeModule/facilities";
 
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   projectId: string;
+  /** Pre-selects a facility when opened from the facility registry. */
+  initialFacilityId?: string;
 }
 
 interface PersonRow {
-  id: string; facility_id: string; user_id: string; role: string; is_active: boolean;
+  id: string; facility_id: string; user_id: string; role: string;
+  access_level: FacilityAccessLevel; is_active: boolean;
 }
 interface ProfileRow { user_id: string; first_name: string; last_name: string; email: string }
 
@@ -37,20 +43,21 @@ const ROLES = [
   { value: "records_officer", label: "Records officer" },
 ];
 
-const FacilityFocalPersons = ({ open, onOpenChange, projectId }: Props) => {
+const FacilityFocalPersons = ({ open, onOpenChange, projectId, initialFacilityId }: Props) => {
   const { toast } = useToast();
   const { facilities } = useFacilities(projectId);
   const [people, setPeople] = useState<PersonRow[]>([]);
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
-  const [facilityId, setFacilityId] = useState("");
+  const [facilityId, setFacilityId] = useState(initialFacilityId || "");
   const [userId, setUserId] = useState("");
   const [role, setRole] = useState("focal_person");
+  const [accessLevel, setAccessLevel] = useState<FacilityAccessLevel>("manage");
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     const [p, pr] = await Promise.all([
-      supabase.from("facility_focal_persons").select("id,facility_id,user_id,role,is_active"),
+      supabase.from("facility_focal_persons").select("id,facility_id,user_id,role,access_level,is_active"),
       supabase.from("profiles").select("user_id,first_name,last_name,email").order("first_name").limit(1000),
     ]);
     setPeople((p.data as PersonRow[]) || []);
@@ -58,6 +65,7 @@ const FacilityFocalPersons = ({ open, onOpenChange, projectId }: Props) => {
   }, []);
 
   useEffect(() => { if (open) void load(); }, [open, load]);
+  useEffect(() => { if (open && initialFacilityId) setFacilityId(initialFacilityId); }, [open, initialFacilityId]);
 
   const nameOf = useCallback(
     (uid: string) => {
@@ -83,11 +91,14 @@ const FacilityFocalPersons = ({ open, onOpenChange, projectId }: Props) => {
       const { error } = await supabase
         .from("facility_focal_persons")
         .upsert(
-          { facility_id: facilityId, user_id: userId, role, is_active: true, created_by: auth.user?.id } as never,
+          {
+            facility_id: facilityId, user_id: userId, role, access_level: accessLevel,
+            is_active: true, created_by: auth.user?.id,
+          } as never,
           { onConflict: "facility_id,user_id" },
         );
       if (error) throw error;
-      toast({ title: "Focal person assigned" });
+      toast({ title: "Team member assigned", description: ACCESS_LEVEL_LABEL[accessLevel] });
       setUserId("");
       await load();
     } catch (e) {
@@ -157,9 +168,27 @@ const FacilityFocalPersons = ({ open, onOpenChange, projectId }: Props) => {
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-1.5">
+            <Label>Access to beneficiary records</Label>
+            <Select value={accessLevel} onValueChange={(v) => setAccessLevel(v as FacilityAccessLevel)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent className="z-[1200] bg-popover">
+                {ACCESS_LEVELS.map((a) => (
+                  <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {ACCESS_LEVELS.find((a) => a.value === accessLevel)?.hint}
+            </p>
+          </div>
           <Button className="gap-1" disabled={busy || !facilityId || !userId} onClick={assign}>
-            <UserPlus className="h-4 w-4" /> Assign focal person
+            <UserPlus className="h-4 w-4" /> Assign to facility
           </Button>
+          <p className="text-xs text-muted-foreground">
+            A facility can carry at most two active focal persons; other members are added as
+            clinicians, pharmacists or records officers with the access level you choose.
+          </p>
         </Card>
 
         <div className="space-y-3">
@@ -175,6 +204,8 @@ const FacilityFocalPersons = ({ open, onOpenChange, projectId }: Props) => {
                       <p className="text-sm font-medium text-foreground">{nameOf(r.user_id)}</p>
                       <p className="text-xs text-muted-foreground">
                         {ROLES.find((x) => x.value === r.role)?.label || r.role}
+                        {" · "}
+                        {ACCESS_LEVEL_LABEL[r.access_level] || r.access_level}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">

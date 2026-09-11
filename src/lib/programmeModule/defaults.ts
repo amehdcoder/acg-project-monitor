@@ -407,6 +407,31 @@ export const ageFromDob = (dob?: unknown): string => {
   return `${years} years`;
 };
 
+/**
+ * Services that every standard component should offer. Modules created from an
+ * earlier template keep all their own services and simply gain the missing
+ * ones, so clinicians see (for example) the hydrocoele surgery outcome visit
+ * without an administrator having to re-configure anything.
+ */
+const STANDARD_SERVICES: Record<string, string[]> = {
+  mmdp_ntd: [
+    "Limb care assessment (baseline)",
+    "Lymphoedema care outcome",
+    "Hydrocoele surgery outcome",
+    "Self-care training",
+  ],
+  mental_health: ["GAD-7 assessment", "PHQ-9 assessment", "Counselling session"],
+};
+
+const upgradeServices = (components: ProgrammeComponent[]): ProgrammeComponent[] =>
+  components.map((c) => {
+    const extra = STANDARD_SERVICES[c.key];
+    if (!extra) return c;
+    const have = new Set((c.services || []).map((s) => s.toLowerCase()));
+    const missing = extra.filter((s) => !have.has(s.toLowerCase()));
+    return missing.length ? { ...c, services: [...(c.services || []), ...missing] } : c;
+  });
+
 export const normalizeConfig = (raw: unknown): ProgrammeModuleConfig => {
   const cfg = (raw || {}) as Partial<ProgrammeModuleConfig>;
   if (!cfg.components || !cfg.sections) return applyRegistrationChoices({ ...BLANK_PRESET });
@@ -414,7 +439,7 @@ export const normalizeConfig = (raw: unknown): ProgrammeModuleConfig => {
     version: cfg.version ?? 1,
     branding: { ...BLANK_PRESET.branding, ...(cfg.branding || {}) },
     caseId: { ...BLANK_PRESET.caseId, ...(cfg.caseId || {}) },
-    components: cfg.components,
+    components: upgradeServices(cfg.components),
     sections: cfg.sections,
     workflow: { ...BLANK_PRESET.workflow, ...(cfg.workflow || {}) },
     layout: { ...BLANK_PRESET.layout, ...(cfg.layout || {}) },
