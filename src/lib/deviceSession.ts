@@ -13,6 +13,8 @@ export interface DeviceSessionBundle {
   project: { id: string; name: string; description?: string | null } | null;
   forms: any[];
   caseTypes: any[];
+  /** Built-in checklists this project's devices may fill, e.g. "seeclear". */
+  specialForms?: string[];
   syncedAt: string;
 }
 
