@@ -149,10 +149,9 @@ Deno.serve(async (req) => {
       if (body.pin === null) pinHash = null;
       else if (typeof body.pin === "string" && body.pin.trim()) pinHash = await sha256Hex(body.pin.trim());
 
-      const collectorUserId = enabled
-        ? await ensureCollectorUser(projectId, project?.name ?? "Project", existing?.collector_user_id ?? null)
-        : existing?.collector_user_id ?? null;
-
+      // The owner's choices are written FIRST and never depend on provisioning
+      // the hidden collection account — a slow or refused account creation must
+      // never make it look as though the settings were never saved.
       const payload = {
         project_id: projectId,
         enabled,
@@ -163,7 +162,7 @@ Deno.serve(async (req) => {
         allow_cases: allowCases,
         allow_seeclear: allowSeeclear,
         expires_at: expiresAt,
-        collector_user_id: collectorUserId,
+        collector_user_id: existing?.collector_user_id ?? null,
         created_by: existing?.created_by ?? userId,
       };
 
@@ -174,11 +173,36 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (error) return json({ error: "save_failed", detail: error.message }, 500);
 
+      let config = data;
+      let warning: string | null = null;
+      if (enabled) {
+        try {
+          const collectorUserId = await ensureCollectorUser(
+            projectId,
+            project?.name ?? "Project",
+            existing?.collector_user_id ?? null,
+          );
+          if (collectorUserId && collectorUserId !== data?.collector_user_id) {
+            const { data: patched } = await db
+              .from("project_access_configs")
+              .update({ collector_user_id: collectorUserId })
+              .eq("project_id", projectId)
+              .select("*")
+              .maybeSingle();
+            if (patched) config = patched;
+          }
+        } catch (accountError) {
+          console.error("collector account provisioning failed", accountError);
+          warning =
+            "Settings were saved, but the collection account could not be prepared yet. Save again to retry before collectors send records.";
+        }
+      }
+
       // Rotating the code invalidates every device that joined with the old one.
       if (rotate && existing) {
         await db.from("project_devices").update({ revoked: true }).eq("project_id", projectId);
       }
-      return json({ config: data });
+      return json({ config, warning });
     }
 
     if (action === "revoke_device") {
