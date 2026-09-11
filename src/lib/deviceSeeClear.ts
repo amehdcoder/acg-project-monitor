@@ -22,6 +22,8 @@ export interface DeviceSeeClearVisit {
   row: Record<string, any>;
   photos: Record<string, string>;
   gps: { lat: number; lng: number; accuracy?: number } | null;
+  /** Complete on-screen answers, so a saved draft reopens exactly as left. */
+  draftState?: Record<string, any>;
 }
 
 export async function saveDeviceSeeClearVisit(visit: DeviceSeeClearVisit): Promise<void> {
@@ -37,7 +39,14 @@ export async function saveDeviceSeeClearVisit(visit: DeviceSeeClearVisit): Promi
     questions: [],
     groups: [],
     geofence: null,
-    settings: { kind: "seeclear", photos: visit.photos, collectorLabel: visit.collectorLabel },
+    settings: {
+      kind: "seeclear",
+      photos: visit.photos,
+      collectorLabel: visit.collectorLabel,
+      // Every answer as shown on screen (including section answers that the
+      // submission row only keeps as scores) so Drafts can resume the visit.
+      draftState: visit.draftState ?? null,
+    },
     responses: visit.row,
     gps: visit.gps,
     submissionData: visit.row,
