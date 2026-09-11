@@ -35,6 +35,12 @@ vi.mock("@/lib/savedForms", () => ({
     const existing = store.get(id);
     if (existing) store.set(id, { ...existing, ...patch, status });
   },
+  markSyncState: async (id: string, syncState: string, patch: any = {}) => {
+    const existing = store.get(id);
+    if (existing) store.set(id, { ...existing, ...patch, syncState });
+  },
+  isBackingOff: (entry: any) =>
+    !!entry.nextAttemptAt && new Date(entry.nextAttemptAt).getTime() > Date.now(),
 }));
 
 vi.mock("@/lib/specialFormBridge", () => ({
