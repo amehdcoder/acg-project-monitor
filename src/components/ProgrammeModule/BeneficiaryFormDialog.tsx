@@ -18,6 +18,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useFacilities, FACILITY_TYPE_LABEL } from "@/lib/programmeModule/facilities";
+import PhotoCaptureField from "./PhotoCaptureField";
 
 interface Props {
   open: boolean;
