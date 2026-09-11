@@ -48,12 +48,19 @@ async function requireProjectManager(req: Request, projectId: string) {
   return project?.created_by === userId ? userId : null;
 }
 
-/** Look an existing collection account up by e-mail across every page of users. */
+/** Look an existing collection account up by e-mail, cheaply then exhaustively. */
 async function findUserByEmail(email: string): Promise<string | null> {
   const db = admin();
   const target = email.toLowerCase();
-  // Projects on a mature workspace sit behind hundreds of real accounts, so a
-  // single first page is never enough — walk the whole list.
+
+  // The indexed profiles row is the fast path on a workspace with many users.
+  const { data: profile } = await db
+    .from("profiles")
+    .select("user_id")
+    .ilike("email", target)
+    .maybeSingle();
+  if (profile?.user_id) return profile.user_id as string;
+
   for (let page = 1; page <= 25; page++) {
     const { data, error } = await db.auth.admin.listUsers({ page, perPage: 200 });
     if (error) break;
@@ -74,10 +81,6 @@ async function ensureCollectorUser(projectId: string, projectName: string, exist
   }
   const email = `collect+${projectId}@devices.amehnities.org`;
 
-  // Reuse the account from an earlier configuration before trying to create one.
-  const found = await findUserByEmail(email);
-  if (found) return found;
-
   const password = crypto.randomUUID() + crypto.randomUUID();
   const { data: created, error } = await db.auth.admin.createUser({
     email,
@@ -87,8 +90,9 @@ async function ensureCollectorUser(projectId: string, projectName: string, exist
   });
   if (created?.user?.id) return created.user.id;
 
-  const retry = await findUserByEmail(email);
-  if (retry) return retry;
+  // Already provisioned by an earlier save — reuse it.
+  const found = await findUserByEmail(email);
+  if (found) return found;
   throw new Error(error?.message || "collector_account_failed");
 }
 
@@ -145,10 +149,9 @@ Deno.serve(async (req) => {
       if (body.pin === null) pinHash = null;
       else if (typeof body.pin === "string" && body.pin.trim()) pinHash = await sha256Hex(body.pin.trim());
 
-      const collectorUserId = enabled
-        ? await ensureCollectorUser(projectId, project?.name ?? "Project", existing?.collector_user_id ?? null)
-        : existing?.collector_user_id ?? null;
-
+      // The owner's choices are written FIRST and never depend on provisioning
+      // the hidden collection account — a slow or refused account creation must
+      // never make it look as though the settings were never saved.
       const payload = {
         project_id: projectId,
         enabled,
@@ -159,7 +162,7 @@ Deno.serve(async (req) => {
         allow_cases: allowCases,
         allow_seeclear: allowSeeclear,
         expires_at: expiresAt,
-        collector_user_id: collectorUserId,
+        collector_user_id: existing?.collector_user_id ?? null,
         created_by: existing?.created_by ?? userId,
       };
 
@@ -170,11 +173,36 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (error) return json({ error: "save_failed", detail: error.message }, 500);
 
+      let config = data;
+      let warning: string | null = null;
+      if (enabled) {
+        try {
+          const collectorUserId = await ensureCollectorUser(
+            projectId,
+            project?.name ?? "Project",
+            existing?.collector_user_id ?? null,
+          );
+          if (collectorUserId && collectorUserId !== data?.collector_user_id) {
+            const { data: patched } = await db
+              .from("project_access_configs")
+              .update({ collector_user_id: collectorUserId })
+              .eq("project_id", projectId)
+              .select("*")
+              .maybeSingle();
+            if (patched) config = patched;
+          }
+        } catch (accountError) {
+          console.error("collector account provisioning failed", accountError);
+          warning =
+            "Settings were saved, but the collection account could not be prepared yet. Save again to retry before collectors send records.";
+        }
+      }
+
       // Rotating the code invalidates every device that joined with the old one.
       if (rotate && existing) {
         await db.from("project_devices").update({ revoked: true }).eq("project_id", projectId);
       }
-      return json({ config: data });
+      return json({ config, warning });
     }
 
     if (action === "revoke_device") {
