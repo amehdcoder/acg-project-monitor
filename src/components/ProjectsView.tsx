@@ -540,6 +540,12 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
                       <Settings className="mr-2 h-4 w-4" />
                       Settings
                     </DropdownMenuItem>
+                    {(isSuperAdmin || isOwnerLevel) && (
+                      <DropdownMenuItem onClick={() => setAccessProject({ id: project.id, name: project.name })}>
+                        <QrCode className="mr-2 h-4 w-4" />
+                        Collect without accounts
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem
                       onClick={() => handleDeleteProject(project.id)}
                       className="text-destructive"
