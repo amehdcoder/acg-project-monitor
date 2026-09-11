@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
   try {
     const ctx = await verifyDeviceToken(req);
     if (!ctx) return json({ error: "device_not_authorized" }, 401);
-    if (!ctx.allowForms) return json({ error: "forms_not_allowed" }, 403);
+    if (!ctx.allowForms && !ctx.allowSeeclear) return json({ error: "forms_not_allowed" }, 403);
     if (!ctx.collectorUserId) return json({ error: "collection_account_missing" }, 409);
 
     const body = await req.json().catch(() => ({}));
