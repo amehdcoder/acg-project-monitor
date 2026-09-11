@@ -528,6 +528,7 @@ const BeneficiaryRecord = ({ beneficiary, config, moduleId, projectId, onBack, o
       <ReferralDialog
         open={referralOpen} onOpenChange={setReferralOpen} config={config}
         beneficiaryId={beneficiary.id} projectId={projectId}
+        fromFacilityId={(beneficiary as unknown as { facility_id?: string | null }).facility_id || null}
         onSaved={() => { void reload(); onChanged(); }}
       />
       <BeneficiaryFormDialog
