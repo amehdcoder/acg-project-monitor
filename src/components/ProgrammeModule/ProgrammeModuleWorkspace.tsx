@@ -225,7 +225,7 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
         </Card>
       )}
 
-      {active && (
+      {active && view === "records" && (
         <BeneficiaryList
           beneficiaries={beneficiaries}
           config={normalizeConfig(active.config)}
@@ -236,6 +236,29 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
           onRefresh={() => void reloadBeneficiaries()}
         />
       )}
+
+      {view === "facility" && (
+        <FacilityDashboard
+          projectId={projectId}
+          canSeeAllFacilities={canConfigure}
+          onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }}
+        />
+      )}
+
+      {view === "followups" && (
+        <FollowUpsPanel
+          projectId={projectId}
+          onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }}
+        />
+      )}
+
+      <DeleteRequestsPanel
+        open={deleteRequestsOpen}
+        onOpenChange={setDeleteRequestsOpen}
+        projectId={projectId}
+        onDecided={() => void reloadBeneficiaries()}
+      />
+
 
       <FacilityFocalPersons
         open={focalOpen}
