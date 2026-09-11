@@ -9,14 +9,22 @@ import {
 } from "@/components/ui/table";
 import {
   ChevronLeft, MoreHorizontal, Pencil, CloudOff, Cloud, AlertTriangle,
-  CalendarClock, ArrowLeftRight, History, MapPin, Printer,
+  CalendarClock, ArrowLeftRight, History, MapPin, Printer, Check,
 } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { BeneficiaryRow, ProgrammeModuleConfig } from "@/lib/programmeModule/types";
 import {
   ageFromDob, computeProgress, evaluateDataQuality, labelFor, latestServiceFor,
-  toneClasses, toneFor, visibleComponents,
+  statusChoices, toneClasses, toneFor, visibleComponents,
 } from "@/lib/programmeModule/defaults";
+import { useMediaUrl } from "@/lib/programmeModule/media";
+import { isMmdpVisit } from "@/lib/programmeModule/mmdp";
 import { resolveIcon } from "./icons";
 import { useBeneficiaryRecord } from "./useProgrammeModule";
 import ServiceEntryDialog from "./ServiceEntryDialog";
@@ -24,6 +32,8 @@ import ReferralDialog from "./ReferralDialog";
 import BeneficiaryFormDialog from "./BeneficiaryFormDialog";
 import LongitudinalOutcome from "./LongitudinalOutcome";
 import CareNetworkPanel from "./CareNetworkPanel";
+import LimbProgressPanel from "./LimbProgressPanel";
+import { recordAudit } from "./useProgrammeModule";
 
 interface Props {
   beneficiary: BeneficiaryRow;
@@ -32,6 +42,8 @@ interface Props {
   projectId: string;
   onBack: () => void;
   onChanged: () => void;
+  /** Administrators can change the beneficiary's status from the record. */
+  canManage?: boolean;
 }
 
 const fmtDate = (d?: string | null) =>
@@ -62,8 +74,13 @@ const FieldRow = ({ label, value }: { label: string; value: string }) => (
   </div>
 );
 
-const BeneficiaryRecord = ({ beneficiary, config, moduleId, projectId, onBack, onChanged }: Props) => {
+const BeneficiaryRecord = ({
+  beneficiary, config, moduleId, projectId, onBack, onChanged, canManage = false,
+}: Props) => {
   const { services, referrals, audit, reload } = useBeneficiaryRecord(beneficiary.id);
+  const { toast } = useToast();
+  const portrait = useMediaUrl(beneficiary.photo_url);
+  const [statusSaving, setStatusSaving] = useState(false);
   const [serviceOpen, setServiceOpen] = useState(false);
   const [referralOpen, setReferralOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -108,6 +125,44 @@ const BeneficiaryRecord = ({ beneficiary, config, moduleId, projectId, onBack, o
 
   const printRecord = () => window.print();
 
+  const statuses = useMemo(() => statusChoices(config.workflow.statuses), [config.workflow.statuses]);
+
+  const changeStatus = async (value: string) => {
+    if (value === beneficiary.status) return;
+    setStatusSaving(true);
+    try {
+      const { error } = await supabase.from("beneficiaries")
+        .update({ status: value } as never).eq("id", beneficiary.id);
+      if (error) throw error;
+      await recordAudit({
+        beneficiary_id: beneficiary.id, project_id: projectId, action: "status_changed",
+        field_name: "status", old_value: beneficiary.status, new_value: value,
+      });
+      toast({ title: `Status set to ${labelFor(statuses, value)}` });
+      void reload();
+      onChanged();
+    } catch (e) {
+      toast({ title: "Could not update status", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setStatusSaving(false);
+    }
+  };
+
+  /** Latest follow-up appointment captured on a service. */
+  const nextFollowUp = useMemo(() => {
+    for (const s of services) {
+      const d = (s.data || {}) as Record<string, unknown>;
+      if (d.follow_up_date) {
+        return {
+          date: String(d.follow_up_date),
+          time: String(d.follow_up_time || ""),
+          location: String(d.follow_up_location || ""),
+        };
+      }
+    }
+    return null;
+  }, [services]);
+
   return (
     <div className="space-y-4">
       {/* Module masthead */}
@@ -139,15 +194,15 @@ const BeneficiaryRecord = ({ beneficiary, config, moduleId, projectId, onBack, o
                 <div
                   className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted text-2xl font-semibold text-muted-foreground"
                 >
-                  {beneficiary.photo_url
-                    ? <img src={beneficiary.photo_url} alt={`${beneficiary.full_name} portrait`} className="h-full w-full object-cover" />
+                  {portrait
+                    ? <img src={portrait} alt={`${beneficiary.full_name} portrait`} className="h-full w-full object-cover" />
                     : beneficiary.full_name.slice(0, 2).toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="font-display text-2xl font-bold text-foreground">{beneficiary.full_name}</h2>
-                    <Badge variant="outline" className={cn("border", toneClasses[toneFor(config.workflow.statuses, beneficiary.status)])}>
-                      {labelFor(config.workflow.statuses, beneficiary.status)}
+                    <Badge variant="outline" className={cn("border", toneClasses[toneFor(statuses, beneficiary.status)])}>
+                      {labelFor(statuses, beneficiary.status)}
                     </Badge>
                     {beneficiary.__pending && (
                       <Badge variant="outline" className="gap-1 border-amber-500/30 bg-amber-500/10 text-amber-700">
@@ -171,9 +226,33 @@ const BeneficiaryRecord = ({ beneficiary, config, moduleId, projectId, onBack, o
                   <Button size="sm" onClick={() => setEditOpen(true)} className="gap-1">
                     <Pencil className="h-3.5 w-3.5" /> Edit Profile
                   </Button>
-                  <Button size="sm" variant="outline" onClick={printRecord} aria-label="More actions">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button size="sm" variant="outline" aria-label="More actions" disabled={statusSaving}>
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="z-[1200] w-56 bg-popover">
+                      {canManage ? (
+                        <>
+                          <DropdownMenuLabel>Set beneficiary status</DropdownMenuLabel>
+                          {statuses.map((s) => (
+                            <DropdownMenuItem key={s.value} onSelect={() => void changeStatus(s.value)}>
+                              <span className="flex-1">{s.label}</span>
+                              {beneficiary.status === s.value && <Check className="h-4 w-4" />}
+                            </DropdownMenuItem>
+                          ))}
+                          <DropdownMenuSeparator />
+                        </>
+                      ) : (
+                        <DropdownMenuLabel className="font-normal text-xs text-muted-foreground">
+                          Only administrators can change the status.
+                        </DropdownMenuLabel>
+                      )}
+                      <DropdownMenuItem onSelect={() => setEditOpen(true)}>Edit profile</DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => printRecord()}>Print / export record</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             </Card>
@@ -395,13 +474,19 @@ const BeneficiaryRecord = ({ beneficiary, config, moduleId, projectId, onBack, o
                         </TableBody>
                       </Table>
                     </div>
+                    {rows.some(isMmdpVisit) && (
+                      <div className="mt-4">
+                        <LimbProgressPanel services={rows} />
+                      </div>
+                    )}
                   </Card>
                 </TabsContent>
               );
             })}
 
-            <TabsContent value="outcomes" className="mt-4">
+            <TabsContent value="outcomes" className="mt-4 space-y-4">
               <LongitudinalOutcome services={services} />
+              {services.some(isMmdpVisit) && <LimbProgressPanel services={services} />}
             </TabsContent>
 
             <TabsContent value="care" className="mt-4">
@@ -470,8 +555,12 @@ const BeneficiaryRecord = ({ beneficiary, config, moduleId, projectId, onBack, o
               <h3 className="mb-2 flex items-center gap-2 font-semibold text-foreground">
                 <CalendarClock className="h-4 w-4" /> Next Follow-up
               </h3>
-              <FieldRow label="Date" value={fmtDate(beneficiary.next_follow_up_date)} />
-              <FieldRow label="Location" value={beneficiary.village || beneficiary.lga || ""} />
+              <FieldRow label="Date" value={fmtDate(nextFollowUp?.date || beneficiary.next_follow_up_date)} />
+              <FieldRow label="Time" value={nextFollowUp?.time || ""} />
+              <FieldRow
+                label="Location"
+                value={nextFollowUp?.location || beneficiary.village || beneficiary.lga || ""}
+              />
             </Card>
           )}
 
@@ -523,7 +612,8 @@ const BeneficiaryRecord = ({ beneficiary, config, moduleId, projectId, onBack, o
       <ServiceEntryDialog
         open={serviceOpen} onOpenChange={setServiceOpen} config={config}
         beneficiary={beneficiary} moduleId={moduleId} projectId={projectId}
-        defaultComponent={serviceComponent} onSaved={() => { void reload(); onChanged(); }}
+        defaultComponent={serviceComponent} priorServices={services}
+        onSaved={() => { void reload(); onChanged(); }}
       />
       <ReferralDialog
         open={referralOpen} onOpenChange={setReferralOpen} config={config}
