@@ -55,7 +55,7 @@ const DeviceCollectShell = () => {
     setCounts({ draft: mine(draft), finalized: mine(finalized), sent: mine(sent) });
   }, [userId]);
 
-  useEffect(() => { void loadCounts(); }, [loadCounts, fillingFormId, savedMode, seeClearOpen]);
+  useEffect(() => { void loadCounts(); }, [loadCounts, fillingFormId, savedMode, seeClearOpen, caseType]);
 
   useEffect(() => {
     const on = () => setOnline(true);
@@ -106,6 +106,19 @@ const DeviceCollectShell = () => {
           collectorLabel: session.label,
           projectId: session.projectId,
         }}
+      />
+    );
+  }
+
+  if (caseType) {
+    return (
+      <DeviceCaseFiller
+        caseType={caseType}
+        deviceId={session.deviceId}
+        projectId={session.projectId}
+        collectorLabel={session.label}
+        onClose={() => setCaseType(null)}
+        onSaved={() => void loadCounts()}
       />
     );
   }
