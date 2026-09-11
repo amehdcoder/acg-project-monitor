@@ -41,6 +41,8 @@ const BeneficiaryFormDialog = ({
   const [facilityId, setFacilityId] = useState<string>(
     ((existing as unknown as { facility_id?: string | null })?.facility_id) || "",
   );
+  const [photoUrl, setPhotoUrl] = useState<string | null>(existing?.photo_url || null);
+
 
   const sections = useMemo(
     () => (config.sections || []).filter((s) => !s.hidden && s.placement !== "hidden")
