@@ -180,11 +180,35 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
           </Button>
         )}
         {canConfigure && (
+          <Button variant="outline" size="sm" className="gap-1" onClick={() => setDeleteRequestsOpen(true)}>
+            <ShieldAlert className="h-4 w-4" /> Deletion requests
+          </Button>
+        )}
+        {canConfigure && (
           <Button size="sm" className="gap-1" onClick={() => setGalleryOpen(true)} aria-label="Add programme module">
             <Plus className="h-4 w-4" /> Add module
           </Button>
         )}
       </div>
+
+      <div className="flex flex-wrap gap-2">
+        {([
+          { key: "records", label: "Beneficiary records", icon: LayoutGrid },
+          { key: "facility", label: "Facility dashboard", icon: Hospital },
+          { key: "followups", label: "Follow-ups & referrals", icon: CalendarClock },
+        ] as const).map((t) => (
+          <Button
+            key={t.key}
+            size="sm"
+            variant={view === t.key ? "default" : "outline"}
+            className="gap-1"
+            onClick={() => setView(t.key)}
+          >
+            <t.icon className="h-4 w-4" /> {t.label}
+          </Button>
+        ))}
+      </div>
+
 
       {!loading && modules.length === 0 && (
         <Card className="space-y-3 p-10 text-center">
