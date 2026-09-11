@@ -168,9 +168,27 @@ const FacilityFocalPersons = ({ open, onOpenChange, projectId, initialFacilityId
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-1.5">
+            <Label>Access to beneficiary records</Label>
+            <Select value={accessLevel} onValueChange={(v) => setAccessLevel(v as FacilityAccessLevel)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent className="z-[1200] bg-popover">
+                {ACCESS_LEVELS.map((a) => (
+                  <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {ACCESS_LEVELS.find((a) => a.value === accessLevel)?.hint}
+            </p>
+          </div>
           <Button className="gap-1" disabled={busy || !facilityId || !userId} onClick={assign}>
-            <UserPlus className="h-4 w-4" /> Assign focal person
+            <UserPlus className="h-4 w-4" /> Assign to facility
           </Button>
+          <p className="text-xs text-muted-foreground">
+            A facility can carry at most two active focal persons; other members are added as
+            clinicians, pharmacists or records officers with the access level you choose.
+          </p>
         </Card>
 
         <div className="space-y-3">
