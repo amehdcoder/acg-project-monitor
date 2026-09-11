@@ -33,3 +33,34 @@ APP_FLAVOR=collect npx cap run android   # or: run ios
 - Cold boots read the cached session synchronously — no spinner, no network.
 - Saved and finalised records live in IndexedDB and are pushed in batches of 25
   with retry/backoff by the shared device sync loop.
+
+## Building a shareable APK for a real collector
+
+Lovable's build environment has no Android SDK, so the APK is produced on your
+own machine (or any CI runner with Android tooling):
+
+1. **Export to GitHub** from Lovable, then `git clone` the repository.
+2. Install prerequisites: Node 18+, **Java 17**, Android Studio (Android SDK,
+   with `ANDROID_HOME` set).
+3. Run:
+
+   ```bash
+   npm install
+   npm run collect:apk
+   ```
+
+4. The script builds the collector bundle, syncs Capacitor, assembles the APK
+   and copies it to `./Amehnities-Collect.apk`.
+
+### Sending it to a data collector
+
+- Share `Amehnities-Collect.apk` by WhatsApp, Drive link or email.
+- On the phone: open the file → allow **Install unknown apps** for the app doing
+  the opening → **Install**.
+- Launch **Amehnities Collect** → scan the project QR code (Projects → project
+  menu → *Collect without accounts*) or type the 6-character code and PIN.
+- Then turn airplane mode on and confirm forms still open, fill and save; the
+  records sync automatically once data returns.
+
+For Play Store distribution use `./gradlew bundleRelease` with your own signing
+keystore instead of the debug APK above.
