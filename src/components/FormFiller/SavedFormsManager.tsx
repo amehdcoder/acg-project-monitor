@@ -199,17 +199,18 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
             description: "These records stay queued and will be sent automatically.",
           });
         }
-      } else
-      for (const entry of targets) {
-        try {
-          const ok = await syncSavedFormEntry(entry);
-          if (ok) {
-            synced++;
-          } else {
+      } else {
+        for (const entry of targets) {
+          try {
+            const ok = await syncSavedFormEntry(entry);
+            if (ok) {
+              synced++;
+            } else {
+              failed++;
+            }
+          } catch {
             failed++;
           }
-        } catch {
-          failed++;
         }
       }
       if (synced > 0) {
