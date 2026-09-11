@@ -151,7 +151,7 @@ export async function intakeSeeClearRecord(
   if (pushed) {
     await db
       .from("seeclear_monitoring")
-      .update({ kobo_form_uid: null, source: "device+kobo" })
+      .update({ source: "device+kobo" })
       .eq("submission_uuid", record.id);
   }
   return { ok: true };
