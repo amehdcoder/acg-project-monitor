@@ -219,6 +219,36 @@
   }
 }
 
+@layer components {
+  .collector-shell {
+    --background: 150 18% 97%;
+    --foreground: 187 46% 17%;
+    --card: 0 0% 100%;
+    --card-foreground: 187 46% 17%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 187 46% 17%;
+    --primary: 187 58% 17%;
+    --primary-foreground: 150 18% 97%;
+    --secondary: 178 21% 92%;
+    --secondary-foreground: 181 75% 27%;
+    --muted: 150 13% 94%;
+    --muted-foreground: 184 12% 42%;
+    --accent: 43 86% 62%;
+    --accent-foreground: 187 58% 17%;
+    --border: 174 16% 84%;
+    --input: 174 16% 80%;
+    --ring: 179 75% 27%;
+    --radius: 0.5rem;
+    --shadow-card: 0 8px 24px -16px hsl(187 58% 17% / 0.32);
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+  }
+
+  .collector-shell .collector-title {
+    font-family: "Libre Baskerville", Georgia, serif;
+    letter-spacing: 0;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;

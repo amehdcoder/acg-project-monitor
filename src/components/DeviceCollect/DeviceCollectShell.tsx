@@ -10,8 +10,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   FileText, FolderOpen, Inbox, LogOut, RefreshCw, Send, Cloud, CloudOff, Briefcase, Loader2,
-  ClipboardCheck,
+  ClipboardCheck, Search, ChevronRight, CircleCheck, Clock3, Smartphone,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useDeviceSession } from "@/hooks/useDeviceSession";
 import { deviceUserId } from "@/lib/deviceSession";
@@ -41,6 +42,8 @@ const DeviceCollectShell = () => {
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [seeClearOpen, setSeeClearOpen] = useState(false);
   const [caseType, setCaseType] = useState<any | null>(null);
+  const [activeTab, setActiveTab] = useState("forms");
+  const [search, setSearch] = useState("");
 
   const userId = session ? deviceUserId(session.deviceId) : "";
 
@@ -70,13 +73,18 @@ const DeviceCollectShell = () => {
 
   const forms = useMemo(() => {
     const list = session?.bundle?.forms ?? [];
-    return list.filter((f: any) => (f.status ? f.status !== "archived" : true));
+    return list.filter((form: any) => !form.status || ["active", "published"].includes(String(form.status).toLowerCase()));
   }, [session]);
 
   const activeForm = useMemo(
     () => forms.find((f: any) => f.id === fillingFormId) ?? null,
     [forms, fillingFormId],
   );
+  const visibleForms = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    if (!needle) return forms;
+    return forms.filter((form: any) => `${form.name ?? ""} ${form.description ?? ""}`.toLowerCase().includes(needle));
+  }, [forms, search]);
 
   const doSync = async () => {
     if (!session) return;
@@ -158,23 +166,23 @@ const DeviceCollectShell = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-20 border-b bg-card/95 backdrop-blur">
-        <div className="mx-auto max-w-3xl px-4 py-3 flex items-center justify-between gap-3">
+    <div className="collector-shell min-h-[100dvh] bg-background pb-20 text-foreground">
+      <header className="sticky top-0 z-20 border-b border-primary/15 bg-primary text-primary-foreground shadow-soft">
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-4">
           <div className="min-w-0">
-            <p className="text-xs text-muted-foreground truncate">Collecting for</p>
-            <h1 className="font-display text-lg font-semibold truncate">{session.projectName}</h1>
-            <p className="text-xs text-muted-foreground truncate">{session.label}</p>
+            <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-widest text-primary-foreground/65">Field workspace</p>
+            <h1 className="collector-title truncate text-lg font-bold">{session.projectName}</h1>
+            <p className="flex items-center gap-1.5 truncate text-xs text-primary-foreground/70"><Smartphone className="h-3 w-3" /> {session.label}</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <Badge variant={online ? "secondary" : "outline"} className="gap-1">
+            <Badge className="gap-1 border-primary-foreground/15 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/10">
               {online ? <Cloud className="h-3 w-3" /> : <CloudOff className="h-3 w-3" />}
               {online ? "Online" : "Offline"}
             </Badge>
-            <Button size="icon" variant="ghost" onClick={() => void doSync()} disabled={syncing} aria-label="Send queued records">
+            <Button size="icon" variant="ghost" className="text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground" onClick={() => void doSync()} disabled={syncing} aria-label="Send queued records">
               {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             </Button>
-            <Button size="icon" variant="ghost" onClick={() => setConfirmLeave(true)} aria-label="Leave project">
+            <Button size="icon" variant="ghost" className="text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground" onClick={() => setConfirmLeave(true)} aria-label="Leave project">
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
@@ -182,8 +190,14 @@ const DeviceCollectShell = () => {
       </header>
 
       <main className="mx-auto max-w-3xl px-4 py-5">
-        <Tabs defaultValue="forms">
-          <TabsList className="w-full">
+        <section className="mb-5 grid grid-cols-3 gap-2" aria-label="Record summary">
+          <div className="rounded-md border bg-card p-3 shadow-soft"><Clock3 className="mb-2 h-4 w-4 text-accent" /><p className="text-xl font-semibold">{counts.draft}</p><p className="text-[11px] text-muted-foreground">Drafts</p></div>
+          <div className="rounded-md border bg-card p-3 shadow-soft"><Send className="mb-2 h-4 w-4 text-primary" /><p className="text-xl font-semibold">{counts.finalized}</p><p className="text-[11px] text-muted-foreground">Queued</p></div>
+          <div className="rounded-md border bg-card p-3 shadow-soft"><CircleCheck className="mb-2 h-4 w-4 text-status-success" /><p className="text-xl font-semibold">{counts.sent}</p><p className="text-[11px] text-muted-foreground">Sent</p></div>
+        </section>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="w-full border bg-card p-1 shadow-soft">
             <TabsTrigger value="forms" className="flex-1">
               <FileText className="mr-1.5 h-4 w-4" /> Forms
             </TabsTrigger>
@@ -200,14 +214,23 @@ const DeviceCollectShell = () => {
             )}
           </TabsList>
 
-          <TabsContent value="forms" className="mt-4 space-y-3">
+          <TabsContent value="forms" className="mt-5 space-y-3">
+            <div className="mb-4">
+              <h2 className="collector-title text-xl font-bold">Forms &amp; Checklists</h2>
+              <p className="mt-1 text-xs text-muted-foreground">Available for this project, even without a connection.</p>
+            </div>
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search forms and checklists" className="h-12 bg-card pl-10" aria-label="Search forms and checklists" />
+            </div>
             {session.allowSeeclear && (
-              <Card className="cursor-pointer border-primary/40 hover:border-primary transition-colors" onClick={() => setSeeClearOpen(true)}>
+              <Card className="cursor-pointer border-primary/35 bg-card shadow-soft transition-colors hover:border-primary" onClick={() => setSeeClearOpen(true)}>
                 <CardHeader className="py-4">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <ClipboardCheck className="h-4 w-4 text-primary" /> See Clear Eye Health Facility Checklist
-                  </CardTitle>
-                  <CardDescription>Full facility visit checklist — works completely offline.</CardDescription>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-primary/10"><ClipboardCheck className="h-5 w-5 text-primary" /></div>
+                    <div className="min-w-0 flex-1"><CardTitle className="collector-title text-base">See Clear Eye Health Facility Checklist</CardTitle><CardDescription className="mt-1">Facility visit checklist · Offline ready</CardDescription></div>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                  </div>
                 </CardHeader>
               </Card>
             )}
@@ -216,21 +239,23 @@ const DeviceCollectShell = () => {
                 No forms have been published to this project yet.
               </CardContent></Card>
             )}
-            {forms.map((form: any, i: number) => (
+            {visibleForms.map((form: any, i: number) => (
               <motion.div key={form.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
-                <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setFillingFormId(form.id)}>
+                <Card className="cursor-pointer bg-card shadow-soft transition-colors hover:border-primary/60" onClick={() => setFillingFormId(form.id)}>
                   <CardHeader className="py-4">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <FolderOpen className="h-4 w-4 text-primary" /> {form.name}
-                    </CardTitle>
-                    {form.description && <CardDescription className="line-clamp-2">{form.description}</CardDescription>}
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-secondary"><FolderOpen className="h-5 w-5 text-primary" /></div>
+                      <div className="min-w-0 flex-1"><CardTitle className="collector-title text-base">{form.name}</CardTitle>{form.description && <CardDescription className="mt-1 line-clamp-2">{form.description}</CardDescription>}<p className="mt-1 text-[11px] font-medium text-primary">Offline ready</p></div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                    </div>
                   </CardHeader>
                 </Card>
               </motion.div>
             ))}
           </TabsContent>
 
-          <TabsContent value="records" className="mt-4 space-y-3">
+          <TabsContent value="records" className="mt-5 space-y-3">
+            <div className="mb-4"><h2 className="collector-title text-xl font-bold">Recent Records</h2><p className="mt-1 text-xs text-muted-foreground">Continue drafts and manage records waiting to send.</p></div>
             <Card className="cursor-pointer hover:border-primary/50" onClick={() => setSavedMode("edit")}>
               <CardHeader className="py-4">
                 <CardTitle className="text-base">Drafts <Badge variant="secondary" className="ml-2">{counts.draft}</Badge></CardTitle>
@@ -249,13 +274,14 @@ const DeviceCollectShell = () => {
                 <CardDescription>Records already delivered to the project.</CardDescription>
               </CardHeader>
             </Card>
-            <Button className="w-full" onClick={() => void doSync()} disabled={syncing || counts.finalized === 0}>
+            <Button size="lg" className="w-full" onClick={() => void doSync()} disabled={syncing || counts.finalized === 0}>
               <Send className="mr-2 h-4 w-4" /> Send {counts.finalized} queued record(s)
             </Button>
           </TabsContent>
 
           {session.allowCases && (
-            <TabsContent value="cases" className="mt-4 space-y-3">
+            <TabsContent value="cases" className="mt-5 space-y-3">
+              <div className="mb-4"><h2 className="collector-title text-xl font-bold">Active Cases</h2><p className="mt-1 text-xs text-muted-foreground">Open and save project cases while offline.</p></div>
               {(session.bundle?.caseTypes ?? []).length === 0 && (
                 <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">
                   No case types have been set up for this project yet.
@@ -281,6 +307,14 @@ const DeviceCollectShell = () => {
           )}
         </Tabs>
       </main>
+
+      <nav className="fixed inset-x-0 bottom-0 z-20 border-t bg-card/95 backdrop-blur" aria-label="Collector navigation">
+        <div className="mx-auto grid h-16 max-w-3xl grid-cols-3 px-3">
+          <Button variant="ghost" className={`h-full flex-col gap-1 rounded-none text-xs ${activeTab === "forms" ? "text-primary" : "text-muted-foreground"}`} onClick={() => setActiveTab("forms")}><FileText className="h-5 w-5" />Forms</Button>
+          <Button variant="ghost" className={`h-full flex-col gap-1 rounded-none text-xs ${activeTab === "records" ? "text-primary" : "text-muted-foreground"}`} onClick={() => setActiveTab("records")}><Inbox className="h-5 w-5" />Records</Button>
+          <Button variant="ghost" disabled={!session.allowCases} className={`h-full flex-col gap-1 rounded-none text-xs ${activeTab === "cases" ? "text-primary" : "text-muted-foreground"}`} onClick={() => setActiveTab("cases")}><Briefcase className="h-5 w-5" />Cases</Button>
+        </div>
+      </nav>
 
       <AlertDialog open={confirmLeave} onOpenChange={setConfirmLeave}>
         <AlertDialogContent>
