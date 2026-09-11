@@ -145,6 +145,7 @@ const App = () => (
           <PWAUpdatePrompt />
           <BrowserRouter>
             <AuthProvider>
+              <DeviceSessionProvider>
               <ImpersonationProvider>
                 <ScrollToTop />
                 <GpsWarmer />
