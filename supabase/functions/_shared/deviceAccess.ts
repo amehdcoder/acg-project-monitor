@@ -80,6 +80,12 @@ export async function verifyDeviceToken(req: Request): Promise<DeviceContext | n
   };
 }
 
+/** Forms a collector must never see: unfinished or retired definitions. */
+const COLLECTABLE = (status: unknown) => {
+  const value = String(status ?? "active").toLowerCase();
+  return !["draft", "archived", "deleted", "inactive", "disabled"].includes(value);
+};
+
 /** Everything a device needs to run fully offline for its project. */
 export async function buildProjectBundle(
   projectId: string,
@@ -88,13 +94,36 @@ export async function buildProjectBundle(
   allowSeeclear = false,
 ) {
   const db = admin();
-  const [{ data: project }, formsResult] = await Promise.all([
+  const nowIso = new Date().toISOString();
+
+  const [{ data: project }, ownResult, grantResult] = await Promise.all([
     db.from("projects").select("id, name, description").eq("id", projectId).maybeSingle(),
     allowForms
-      ? db.from("forms").select("*").eq("project_id", projectId).in("status", ["active", "published"])
-      : Promise.resolve({ data: [] }),
+      ? db.from("forms").select("*").eq("project_id", projectId)
+      : Promise.resolve({ data: [] as any[] }),
+    allowForms
+      ? db.from("form_project_grants").select("form_id, starts_at, expires_at").eq("project_id", projectId)
+      : Promise.resolve({ data: [] as any[] }),
   ]);
-  const forms = formsResult.data;
+
+  // Forms shared into this project from elsewhere count as the project's own
+  // checklists, exactly as they do for signed-in users.
+  const grantedIds = ((grantResult.data ?? []) as any[])
+    .filter((g) =>
+      (!g.starts_at || g.starts_at <= nowIso) && (!g.expires_at || g.expires_at > nowIso))
+    .map((g) => g.form_id);
+
+  let granted: any[] = [];
+  if (grantedIds.length > 0) {
+    const { data } = await db.from("forms").select("*").in("id", grantedIds);
+    granted = data ?? [];
+  }
+
+  const byId = new Map<string, any>();
+  for (const form of [...((ownResult.data ?? []) as any[]), ...granted]) {
+    if (COLLECTABLE(form.status)) byId.set(form.id, form);
+  }
+  const forms = Array.from(byId.values());
 
   let caseTypes: unknown[] = [];
   if (allowCases) {

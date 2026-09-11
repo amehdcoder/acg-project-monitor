@@ -73,7 +73,12 @@ const DeviceCollectShell = () => {
 
   const forms = useMemo(() => {
     const list = session?.bundle?.forms ?? [];
-    return list.filter((form: any) => !form.status || ["active", "published"].includes(String(form.status).toLowerCase()));
+    // Show every deployed checklist the project holds; only unfinished or
+    // retired definitions are hidden.
+    return list.filter((form: any) =>
+      !["draft", "archived", "deleted", "inactive", "disabled"].includes(
+        String(form.status ?? "active").toLowerCase(),
+      ));
   }, [session]);
 
   const activeForm = useMemo(
