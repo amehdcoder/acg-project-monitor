@@ -114,8 +114,11 @@ const ProjectAccessDialog = ({ projectId, projectName, open, onOpenChange }: Pro
       setPin("");
       toast.success(extra.rotateCode ? "New project code generated" : "Access settings saved");
       await load();
-    } catch {
-      toast.error("Could not save the access settings.");
+    } catch (err) {
+      const reason = String((err as Error)?.message || "");
+      toast.error("Could not save the access settings.", {
+        description: reason && reason !== "request_failed" ? reason : undefined,
+      });
     } finally {
       setSaving(false);
     }
