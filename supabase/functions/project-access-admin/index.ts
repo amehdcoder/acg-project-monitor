@@ -44,6 +44,23 @@ async function requireProjectManager(req: Request, projectId: string) {
   return project?.created_by === userId ? userId : null;
 }
 
+/** Look an existing collection account up by e-mail across every page of users. */
+async function findUserByEmail(email: string): Promise<string | null> {
+  const db = admin();
+  const target = email.toLowerCase();
+  // Projects on a mature workspace sit behind hundreds of real accounts, so a
+  // single first page is never enough — walk the whole list.
+  for (let page = 1; page <= 25; page++) {
+    const { data, error } = await db.auth.admin.listUsers({ page, perPage: 200 });
+    if (error) break;
+    const users = data?.users ?? [];
+    const match = users.find((u: any) => String(u.email ?? "").toLowerCase() === target);
+    if (match) return match.id;
+    if (users.length < 200) break;
+  }
+  return null;
+}
+
 /** One hidden collection account per project keeps every existing FK and RLS rule intact. */
 async function ensureCollectorUser(projectId: string, projectName: string, existing: string | null) {
   const db = admin();
@@ -52,6 +69,11 @@ async function ensureCollectorUser(projectId: string, projectName: string, exist
     if (data?.user) return existing;
   }
   const email = `collect+${projectId}@devices.amehnities.org`;
+
+  // Reuse the account from an earlier configuration before trying to create one.
+  const found = await findUserByEmail(email);
+  if (found) return found;
+
   const password = crypto.randomUUID() + crypto.randomUUID();
   const { data: created, error } = await db.auth.admin.createUser({
     email,
@@ -61,14 +83,9 @@ async function ensureCollectorUser(projectId: string, projectName: string, exist
   });
   if (created?.user?.id) return created.user.id;
 
-  // Already provisioned earlier — find it by email.
-  if (error) {
-    const { data: list } = await db.auth.admin.listUsers({ page: 1, perPage: 200 });
-    const match = list?.users?.find((u: any) => u.email === email);
-    if (match) return match.id;
-    throw error;
-  }
-  throw new Error("collector_account_failed");
+  const retry = await findUserByEmail(email);
+  if (retry) return retry;
+  throw new Error(error?.message || "collector_account_failed");
 }
 
 Deno.serve(async (req) => {

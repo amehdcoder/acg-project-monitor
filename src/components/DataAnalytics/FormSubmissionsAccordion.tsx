@@ -94,7 +94,12 @@ const FormSubmissionsAccordion = ({ form, profiles }: FormSubmissionsAccordionPr
         form_id: s.form_id,
         form_name: form.name,
         user_id: s.user_id,
-        submitter_name: profiles.get(s.user_id) || "Unknown",
+        // Records sent from a QR-joined phone carry the collector's own name,
+        // so accountability shows the field worker, not the shared device account.
+        submitter_name:
+          (s.collector_label ? String(s.collector_label).trim() : "") ||
+          profiles.get(s.user_id) ||
+          "Unknown",
         location: loc.location,
         state: loc.state,
         submitted_at: s.submitted_at || s.created_at,
