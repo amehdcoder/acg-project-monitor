@@ -40,6 +40,7 @@ const DeviceCollectShell = () => {
   const [syncing, setSyncing] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [seeClearOpen, setSeeClearOpen] = useState(false);
+  const [caseType, setCaseType] = useState<any | null>(null);
 
   const userId = session ? deviceUserId(session.deviceId) : "";
 
