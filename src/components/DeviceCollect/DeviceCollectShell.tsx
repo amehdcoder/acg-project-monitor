@@ -19,7 +19,7 @@ import SavedFormsManager from "@/components/FormFiller/SavedFormsManager";
 import { listAllSavedEntries } from "@/lib/savedForms";
 import { syncDeviceRecords } from "@/lib/deviceSync";
 
-type SavedMode = "edit" | "send" | "sent" | null;
+type SavedMode = "edit" | "send" | "view" | null;
 
 /**
  * Device-mode workspace for collectors who joined by QR code.
@@ -202,7 +202,7 @@ const DeviceCollectShell = () => {
                 <CardDescription>Finalized records queued until a connection is available.</CardDescription>
               </CardHeader>
             </Card>
-            <Card className="cursor-pointer hover:border-primary/50" onClick={() => setSavedMode("sent")}>
+            <Card className="cursor-pointer hover:border-primary/50" onClick={() => setSavedMode("view")}>
               <CardHeader className="py-4">
                 <CardTitle className="text-base">Sent <Badge variant="secondary" className="ml-2">{counts.sent}</Badge></CardTitle>
                 <CardDescription>Records already delivered to the project.</CardDescription>
