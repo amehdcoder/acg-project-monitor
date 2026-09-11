@@ -196,6 +196,7 @@ Deno.serve(async (req) => {
     return json({ error: "unknown_action" }, 400);
   } catch (e) {
     console.error("project-access-admin error", e);
-    return json({ error: "unexpected_error" }, 500);
+    // Surface the real reason so the panel can tell the owner what to fix.
+    return json({ error: "unexpected_error", detail: String((e as Error)?.message || e) }, 500);
   }
 });
