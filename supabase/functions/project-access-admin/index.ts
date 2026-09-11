@@ -114,6 +114,7 @@ Deno.serve(async (req) => {
       const enabled = body.enabled !== false;
       const allowForms = body.allowForms !== false;
       const allowCases = body.allowCases === true;
+      const allowSeeclear = body.allowSeeclear === true;
       const expiresAt = body.expiresAt ? new Date(body.expiresAt).toISOString() : null;
 
       const rotate = body.rotateCode === true || !existing;
@@ -135,6 +136,7 @@ Deno.serve(async (req) => {
         pin_hash: pinHash,
         allow_forms: allowForms,
         allow_cases: allowCases,
+        allow_seeclear: allowSeeclear,
         expires_at: expiresAt,
         collector_user_id: collectorUserId,
         created_by: existing?.created_by ?? userId,
