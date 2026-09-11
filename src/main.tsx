@@ -2,6 +2,11 @@
 // APIs (e.g. crypto.randomUUID on old Android WebViews) are patched before any
 // component renders and crashes.
 import { installCompatPolyfills } from "./lib/compat/polyfills";
+import "@fontsource/libre-baskerville/400.css";
+import "@fontsource/libre-baskerville/700.css";
+import "@fontsource/ibm-plex-sans/400.css";
+import "@fontsource/ibm-plex-sans/500.css";
+import "@fontsource/ibm-plex-sans/600.css";
 installCompatPolyfills();
 
 import { createRoot } from "react-dom/client";
