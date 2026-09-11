@@ -2414,9 +2414,11 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
 
 
-        {/* KoboCollect-style action menu — hidden while the inline MDA dashboard is open */}
-        {!(mdaDashboardForm && canSeeMdaDashboard) && (
+        {/* KoboCollect-style action menu — hidden while the inline MDA dashboard
+            or the Beneficiary records & follow-up panel is open. */}
+        {!(mdaDashboardForm && canSeeMdaDashboard) && !showBeneficiaryPanel && (
         <section className="mx-auto w-full max-w-md space-y-3">
+
 
 
           {/* "Open your form" — primary entry */}
