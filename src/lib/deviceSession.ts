@@ -153,6 +153,10 @@ export async function refreshDeviceBundle(session: DeviceSession): Promise<Devic
 
 export interface DeviceSyncRecord {
   id: string;
+  /** Immutable idempotency key generated on the device at capture time. */
+  submissionUuid?: string;
+  /** The on-device moment the record was completed (authoritative clock). */
+  clientSubmittedAt?: string;
   /** "seeclear" routes to the checklist intake, "case" opens a project case. */
   kind?: string;
   /** Case records: which case type to open and the case display name. */
@@ -178,6 +182,12 @@ export async function sendDeviceRecords(
     body: JSON.stringify({ records }),
   });
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body?.error || "sync_failed");
+  if (!res.ok) {
+    // Carry the HTTP status so the queue worker can tell a retryable server
+    // problem (5xx) from a permanent rejection (4xx).
+    const err = new Error(body?.error || "sync_failed") as Error & { status?: number };
+    err.status = res.status;
+    throw err;
+  }
   return { accepted: body.accepted ?? [], rejected: body.rejected ?? [] };
 }
