@@ -199,6 +199,12 @@ const ServiceEntryDialog = ({
                 onChange={(v) => q.name && setAnswers((p) => ({ ...p, [q.name as string]: v }))}
               />
             ))}
+
+          <FollowUpFields
+            value={followUp}
+            onChange={setFollowUp}
+            locationSuggestion={beneficiary.village || beneficiary.lga || ""}
+          />
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
