@@ -5,6 +5,7 @@
 // written with the service role against the project's collection account.
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { admin, verifyDeviceToken } from "../_shared/deviceAccess.ts";
+import { intakeSeeClearRecord } from "../_shared/seeclearDeviceIntake.ts";
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
