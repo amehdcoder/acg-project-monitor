@@ -354,7 +354,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         [profileRes, roleRes] = await withTimeout(
           Promise.all([
-            supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
+            supabase.from("profiles").select("id, user_id, email, first_name, last_name, phone_number, alternate_phone, alternate_email, designation, other_designation, state, lga, ward, is_active, is_owner, created_at, updated_at, notification_preferences, avatar_url, last_seen_at, last_device_type, approval_status, has_seen_tour, is_co_owner, location_tracking_enabled, current_version, has_quiz_access").eq("user_id", userId).maybeSingle(),
             supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
           ]),
           5000,
@@ -880,7 +880,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // freshness, so it must never hold the login screen for a long time.
       const [profileRes, roleRes] = await withTimeout(
         Promise.all([
-          supabase.from("profiles").select("*").eq("user_id", data.user.id).maybeSingle(),
+          supabase.from("profiles").select("id, user_id, email, first_name, last_name, phone_number, alternate_phone, alternate_email, designation, other_designation, state, lga, ward, is_active, is_owner, created_at, updated_at, notification_preferences, avatar_url, last_seen_at, last_device_type, approval_status, has_seen_tour, is_co_owner, location_tracking_enabled, current_version, has_quiz_access").eq("user_id", data.user.id).maybeSingle(),
           supabase.from("user_roles").select("role").eq("user_id", data.user.id).maybeSingle(),
         ]),
         3500,
