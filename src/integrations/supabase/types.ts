@@ -3676,6 +3676,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           form_uid: string
+          has_api_token: boolean | null
           id: string
           is_active: boolean
           name: string
@@ -3687,6 +3688,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           form_uid: string
+          has_api_token?: boolean | null
           id?: string
           is_active?: boolean
           name: string
@@ -3698,6 +3700,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           form_uid?: string
+          has_api_token?: boolean | null
           id?: string
           is_active?: boolean
           name?: string
@@ -5416,6 +5419,7 @@ export type Database = {
           form_status: string
           form_title: string | null
           form_uid: string
+          has_api_token: boolean | null
           id: string
           kobo_server_url: string
           last_deployed_at: string | null
@@ -5432,6 +5436,7 @@ export type Database = {
           form_status?: string
           form_title?: string | null
           form_uid: string
+          has_api_token?: boolean | null
           id?: string
           kobo_server_url?: string
           last_deployed_at?: string | null
@@ -5448,6 +5453,7 @@ export type Database = {
           form_status?: string
           form_title?: string | null
           form_uid?: string
+          has_api_token?: boolean | null
           id?: string
           kobo_server_url?: string
           last_deployed_at?: string | null
@@ -8203,6 +8209,8 @@ export type Database = {
           created_by: string | null
           form_title: string | null
           form_uid: string
+          has_api_token: boolean | null
+          has_webhook_secret: boolean | null
           id: string
           identity_fields: Json
           last_event_at: string | null
@@ -8220,6 +8228,8 @@ export type Database = {
           created_by?: string | null
           form_title?: string | null
           form_uid: string
+          has_api_token?: boolean | null
+          has_webhook_secret?: boolean | null
           id?: string
           identity_fields?: Json
           last_event_at?: string | null
@@ -8237,6 +8247,8 @@ export type Database = {
           created_by?: string | null
           form_title?: string | null
           form_uid?: string
+          has_api_token?: boolean | null
+          has_webhook_secret?: boolean | null
           id?: string
           identity_fields?: Json
           last_event_at?: string | null
@@ -10893,6 +10905,15 @@ export type Database = {
       owner_restore_records: { Args: { _record_ids: string[] }; Returns: Json }
       presence_topic_project: { Args: { _topic: string }; Returns: string }
       profile_co_owner_flag: { Args: { _user_id: string }; Returns: boolean }
+      profile_device_metadata: {
+        Args: { _user_ids?: string[] }
+        Returns: {
+          device_info: Json
+          device_phone_number: string
+          last_ip_address: string
+          user_id: string
+        }[]
+      }
       profile_owner_flag: { Args: { _user_id: string }; Returns: boolean }
       prune_mda_lens_access_events: { Args: never; Returns: undefined }
       record_inactive_login_attempt: {
