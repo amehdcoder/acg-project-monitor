@@ -142,7 +142,7 @@ export default function IntegratedSupervisoryView() {
       setSyncing(true);
       try {
         // Delta sync: only submissions newer than what we already hold.
-        const prev = cacheRef.current;
+        const prev = silent ? cacheRef.current : null;
         const { cache: c, feed, scopeStates, delta } = await fetchScopedSubmissions(feeds[0]?.id ?? null, prev);
         applyCache(c);
         setFeedScopeStates(scopeStates);
@@ -177,7 +177,8 @@ export default function IntegratedSupervisoryView() {
     }
     setSyncing(true);
     try {
-      const c = await fetchSubmissions(cfg, id);
+      // A user-triggered refresh re-downloads everything so deletions/edits land.
+      const c = await fetchSubmissions(cfg, id, { full: !silent });
       applyCache(c);
       setUsingSharedFeed(false);
       setSyncError(null);

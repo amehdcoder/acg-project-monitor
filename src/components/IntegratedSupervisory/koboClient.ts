@@ -297,7 +297,10 @@ export async function fetchSubmissions(
   connectionId?: string | null,
   opts: { full?: boolean } = {},
 ): Promise<KoboCache> {
-  const prev = opts.full ? null : loadKoboCache(connectionId);
+  const cached = opts.full ? null : loadKoboCache(connectionId);
+  // A cache belonging to a different Kobo asset must never be merged into the
+  // new form's data — repointing a connection forces a complete re-download.
+  const prev = cached && cached.formUid && cached.formUid !== cfg.formUid ? null : cached;
   const since = prev?.survey?.length ? latestSubmissionTime(prev) : null;
 
   const first = await fetchPage(cfg, 0, since);

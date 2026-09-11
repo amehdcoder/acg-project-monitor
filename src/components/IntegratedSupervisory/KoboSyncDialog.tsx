@@ -81,7 +81,8 @@ export default function KoboSyncDialog({ open, onOpenChange, onSynced, connectio
     saveKoboConfig(cfg, id);
     setSyncing(true);
     try {
-      const c = await fetchSubmissions(cfg, id);
+      // Manual sync = authoritative full re-download (drops rows deleted in Kobo).
+      const c = await fetchSubmissions(cfg, id, { full: true });
       const warn = c.validation?.warnings?.length ?? 0;
       toast({
         title: "Sync complete",
