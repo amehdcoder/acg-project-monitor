@@ -10,6 +10,7 @@ import { Search, UserPlus, CloudOff, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BeneficiaryRow, ProgrammeModuleConfig } from "@/lib/programmeModule/types";
 import { evaluateDataQuality, labelFor, toneClasses, toneFor } from "@/lib/programmeModule/defaults";
+import { useFacilities } from "@/lib/programmeModule/facilities";
 
 interface Props {
   beneficiaries: BeneficiaryRow[];
@@ -18,12 +19,17 @@ interface Props {
   onOpen: (b: BeneficiaryRow) => void;
   onRegister: () => void;
   onRefresh: () => void;
+  projectId?: string;
 }
 
-const BeneficiaryList = ({ beneficiaries, config, loading, onOpen, onRegister, onRefresh }: Props) => {
+const BeneficiaryList = ({ beneficiaries, config, loading, onOpen, onRegister, onRefresh, projectId }: Props) => {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [lga, setLga] = useState("all");
+  const [facility, setFacility] = useState("all");
+  const { facilities } = useFacilities(projectId);
+  const facilityName = (b: BeneficiaryRow) =>
+    facilities.find((f) => f.id === (b as unknown as { facility_id?: string | null }).facility_id)?.name || "";
 
   const lgas = useMemo(
     () => Array.from(new Set(beneficiaries.map((b) => b.lga).filter(Boolean) as string[])).sort(),
@@ -35,12 +41,14 @@ const BeneficiaryList = ({ beneficiaries, config, loading, onOpen, onRegister, o
     return beneficiaries.filter((b) => {
       if (status !== "all" && b.status !== status) return false;
       if (lga !== "all" && b.lga !== lga) return false;
+      if (facility !== "all"
+        && (b as unknown as { facility_id?: string | null }).facility_id !== facility) return false;
       if (!term) return true;
       return [b.full_name, b.case_id, String(b.profile?.phone ?? ""), b.village]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(term));
     });
-  }, [beneficiaries, search, status, lga]);
+  }, [beneficiaries, search, status, lga, facility]);
 
   return (
     <div className="space-y-4">
@@ -95,7 +103,7 @@ const BeneficiaryList = ({ beneficiaries, config, loading, onOpen, onRegister, o
                 </Badge>
               </div>
               <p className="mt-2 text-sm text-muted-foreground">
-                {[b.village, b.lga, b.state].filter(Boolean).join(" · ") || "Location not recorded"}
+                {[facilityName(b), b.village, b.lga, b.state].filter(Boolean).join(" · ") || "Location not recorded"}
               </p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {b.__pending && (
