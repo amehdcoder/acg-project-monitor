@@ -273,7 +273,7 @@ export default function QuizKoboSyncDialog({ open, onClose, quizId, quizTitle, c
                     type={showToken ? "text" : "password"}
                     value={apiToken}
                     onChange={(e) => setApiToken(e.target.value)}
-                    placeholder="Kobo API token"
+                    placeholder={config?.has_api_token ? "Token saved — leave blank to keep it" : "Kobo API token"}
                   />
                   <Button type="button" variant="outline" size="icon" onClick={() => setShowToken((s) => !s)}>
                     {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
