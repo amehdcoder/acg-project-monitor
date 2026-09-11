@@ -15,7 +15,9 @@ import {
   TrendingUp,
   ClipboardList,
   MessageCircle,
+  QrCode,
 } from "lucide-react";
+import ProjectAccessDialog from "@/components/DeviceCollect/ProjectAccessDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -103,6 +105,7 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
   const [settingsForm, setSettingsForm] = useState<{ status: string }>({ status: "active" });
   const [savingSettings, setSavingSettings] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [accessProject, setAccessProject] = useState<{ id: string; name: string } | null>(null);
   const { user, role, isSuperAdmin, isOwnerLevel, loading: authLoading } = useAuth();
   const { logAction } = useAdminSurveillance();
 
@@ -540,6 +543,12 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
                       <Settings className="mr-2 h-4 w-4" />
                       Settings
                     </DropdownMenuItem>
+                    {(isSuperAdmin || isOwnerLevel) && (
+                      <DropdownMenuItem onClick={() => setAccessProject({ id: project.id, name: project.name })}>
+                        <QrCode className="mr-2 h-4 w-4" />
+                        Collect without accounts
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem
                       onClick={() => handleDeleteProject(project.id)}
                       className="text-destructive"
@@ -749,6 +758,15 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {accessProject && (
+        <ProjectAccessDialog
+          projectId={accessProject.id}
+          projectName={accessProject.name}
+          open={!!accessProject}
+          onOpenChange={(o) => { if (!o) setAccessProject(null); }}
+        />
+      )}
     </div>
   );
 };

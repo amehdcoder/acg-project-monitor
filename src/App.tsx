@@ -7,6 +7,8 @@ import { isTransientBackendError, describeBackendError } from "@/lib/safeData";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { useEffect, lazy, Suspense } from "react";
 import { AuthProvider } from "@/hooks/useAuth";
+import { DeviceSessionProvider } from "@/hooks/useDeviceSession";
+import { initDeviceAutoSync } from "@/lib/deviceSync";
 import { LanguageProvider } from "@/hooks/useLanguage";
 import { ImpersonationProvider } from "@/hooks/useImpersonation";
 import { ThemeProvider } from "next-themes";
@@ -26,6 +28,8 @@ import XlsFormCoverHarness from "./pages/XlsFormCoverHarness";
 import LearningLog from "./pages/LearningLog";
 const AmehnitiesAI = lazy(() => import("./pages/AmehnitiesAI"));
 import SharedDashboard from "./pages/SharedDashboard";
+import JoinProject from "./pages/JoinProject";
+import DeviceCollectRoute from "./components/DeviceCollect/DeviceCollectRoute";
 import InstallBanner from "./components/InstallBanner";
 import PWAUpdatePrompt from "./components/PWAUpdatePrompt";
 import StorageWarningBanner from "./components/StorageWarningBanner";
@@ -55,6 +59,7 @@ const ScrollToTop = () => {
 const GpsWarmer = () => {
   useEffect(() => {
     const stop = startGpsWarmer();
+    initDeviceAutoSync();
     return stop;
   }, []);
   return null;
@@ -141,6 +146,7 @@ const App = () => (
           <PWAUpdatePrompt />
           <BrowserRouter>
             <AuthProvider>
+              <DeviceSessionProvider>
               <ImpersonationProvider>
                 <ScrollToTop />
                 <GpsWarmer />
@@ -172,10 +178,13 @@ const App = () => (
                     <Route path="/__test/microplan-kpi" element={<MicroplanKpiHarness />} />
                     <Route path="/__test/xlsform-cover" element={<XlsFormCoverHarness />} />
                     <Route path="/shared/dashboard/:token" element={<SharedDashboard />} />
+                    <Route path="/join" element={<JoinProject />} />
+                    <Route path="/collect" element={<DeviceCollectRoute />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                 </RouteErrorBoundary>
               </ImpersonationProvider>
+              </DeviceSessionProvider>
             </AuthProvider>
           </BrowserRouter>
         </TooltipProvider>
