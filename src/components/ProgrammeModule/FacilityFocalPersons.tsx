@@ -91,11 +91,14 @@ const FacilityFocalPersons = ({ open, onOpenChange, projectId, initialFacilityId
       const { error } = await supabase
         .from("facility_focal_persons")
         .upsert(
-          { facility_id: facilityId, user_id: userId, role, is_active: true, created_by: auth.user?.id } as never,
+          {
+            facility_id: facilityId, user_id: userId, role, access_level: accessLevel,
+            is_active: true, created_by: auth.user?.id,
+          } as never,
           { onConflict: "facility_id,user_id" },
         );
       if (error) throw error;
-      toast({ title: "Focal person assigned" });
+      toast({ title: "Team member assigned", description: ACCESS_LEVEL_LABEL[accessLevel] });
       setUserId("");
       await load();
     } catch (e) {
