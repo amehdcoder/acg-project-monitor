@@ -168,6 +168,9 @@ const ConfigFieldRenderer = ({ question, value, onChange, error, answers, onPatc
   };
 
   const control = () => {
+    if (geoName && answers && (question.type === "text" || question.type === "select_one")) {
+      return geoControl();
+    }
     switch (question.type) {
       case "note":
         return <p className="text-sm text-muted-foreground">{question.hint}</p>;
