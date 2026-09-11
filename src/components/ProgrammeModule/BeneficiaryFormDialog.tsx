@@ -85,6 +85,7 @@ const BeneficiaryFormDialog = ({
         ward: (answers.ward as string) || null,
         village: (answers.village as string) || null,
         facility_id: facilityId || null,
+        photo_url: photoUrl,
       };
 
       if (existing) {
@@ -135,6 +136,14 @@ const BeneficiaryFormDialog = ({
         </DialogHeader>
         <ScrollArea className="max-h-[70dvh] px-5 py-4">
           <div className="space-y-6">
+            <PhotoCaptureField
+              label="Patient photograph"
+              hint="Helps field teams recognise the beneficiary at follow-up visits."
+              value={photoUrl}
+              projectId={projectId}
+              beneficiaryId={existing?.id || "new"}
+              onChange={(v) => setPhotoUrl(v)}
+            />
             <div className="space-y-1.5">
               <Label>Health facility (care home base)</Label>
               <Select value={facilityId} onValueChange={setFacilityId}>
