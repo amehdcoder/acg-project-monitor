@@ -47,6 +47,12 @@ interface Props {
     projectId: string;
     onSaved?: () => void;
   };
+  /** A previously saved device draft being reopened from "Drafts". */
+  savedDraft?: {
+    id: string;
+    submissionId?: string | null;
+    settings?: Record<string, any> | null;
+  } | null;
 }
 
 const Field = ({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) => (
