@@ -251,6 +251,17 @@ const BeneficiaryRecord = ({
                       )}
                       <DropdownMenuItem onSelect={() => setEditOpen(true)}>Edit profile</DropdownMenuItem>
                       <DropdownMenuItem onSelect={() => printRecord()}>Print / export record</DropdownMenuItem>
+                      {canManage && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onSelect={() => setDeleteOpen(true)}
+                          >
+                            Request deletion
+                          </DropdownMenuItem>
+                        </>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
