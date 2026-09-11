@@ -189,7 +189,7 @@ const DeviceCollectShell = () => {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-4 py-5">
+      <main className="safe-area-bottom mx-auto max-w-3xl px-3 py-4 sm:px-4 sm:py-5">
         <section className="mb-5 grid grid-cols-3 gap-2" aria-label="Record summary">
           <div className="rounded-md border bg-card p-3 shadow-soft"><Clock3 className="mb-2 h-4 w-4 text-accent" /><p className="text-xl font-semibold">{counts.draft}</p><p className="text-[11px] text-muted-foreground">Drafts</p></div>
           <div className="rounded-md border bg-card p-3 shadow-soft"><Send className="mb-2 h-4 w-4 text-primary" /><p className="text-xl font-semibold">{counts.finalized}</p><p className="text-[11px] text-muted-foreground">Queued</p></div>

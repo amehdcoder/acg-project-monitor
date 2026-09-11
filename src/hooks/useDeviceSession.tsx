@@ -4,6 +4,7 @@ import {
   enrolDevice,
   readDeviceSession,
   refreshDeviceBundle,
+  requestDurableStorage,
   type DeviceSession,
   type EnrolInput,
 } from "@/lib/deviceSession";
