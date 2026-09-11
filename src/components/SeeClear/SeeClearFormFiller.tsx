@@ -174,6 +174,49 @@ export default function SeeClearFormFiller({ onClose, deviceMode, savedDraft }: 
   const [inchargeSig, setInchargeSig] = useState("");
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
+  // Reopening a saved draft must keep the SAME local record and submission id,
+  // so finishing the visit updates the draft instead of creating a second one.
+  const recordIds = useRef({
+    entryId: savedDraft?.id || newEntryId(),
+    submissionId: savedDraft?.submissionId || crypto.randomUUID(),
+  });
+
+  // Restore every answer captured before the draft was saved.
+  const hydrated = useRef(false);
+  useEffect(() => {
+    if (hydrated.current) return;
+    const d = savedDraft?.settings?.draftState as Record<string, any> | undefined | null;
+    if (!d) return;
+    hydrated.current = true;
+    if (d.dateOfVisit) setDateOfVisit(d.dateOfVisit);
+    setState(d.state ?? "");
+    setLga(d.lga ?? "");
+    setWard(d.ward ?? "");
+    setCommunity(d.community ?? "");
+    setFacilityName(d.facilityName ?? "");
+    if (d.level) setLevel(d.level);
+    if (d.ownership) setOwnership(d.ownership);
+    if (d.funcStatus) setFuncStatus(d.funcStatus);
+    setFocalName(d.focalName ?? "");
+    setFocalDesignation(d.focalDesignation ?? "");
+    setFocalPhone(d.focalPhone ?? "");
+    setTeam(Array.isArray(d.team) ? d.team : []);
+    if (d.gps) setGps(d.gps);
+    setGeneral(d.general ?? {});
+    setStaffOnDuty(d.staffOnDuty ?? "");
+    setHr(d.hr ?? {});
+    setInfra(d.infra ?? {});
+    setEquip(d.equip ?? {});
+    setEvidence(d.evidence ?? {});
+    setChallenges(Array.isArray(d.challenges) ? d.challenges : []);
+    setRecommendations(Array.isArray(d.recommendations) ? d.recommendations : []);
+    setRemarks(d.remarks ?? "");
+    setOfficerSig(d.officerSig ?? "");
+    setInchargeSig(d.inchargeSig ?? "");
+    const photos = savedDraft?.settings?.photos as Record<string, string> | undefined;
+    if (photos) setDevicePhotos(photos);
+  }, [savedDraft]);
+
   const states = useMemo(() => getAllStates(), []);
   const lgas = useMemo(() => (state ? getLGAsForState(state) : []), [state]);
   const wards = useMemo(() => (state && lga ? getWardsForLGA(state, lga) : []), [state, lga]);
