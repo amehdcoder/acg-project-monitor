@@ -12,7 +12,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { isIdentityQuestion } from "./scoring";
 import type { QuizKoboConfig } from "@/hooks/useQuizKobo";
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 
 export interface FullSyncResult {
   fetched: number;
@@ -42,9 +41,8 @@ const PAGE = 200;
 
 export async function fullSyncKobo(config: QuizKoboConfig): Promise<FullSyncResult> {
   const cleanedConfig = await sanitizeQuestionConfig(config).catch(() => false);
-  if (!config.webhook_secret) return { fetched: 0, saved: 0, deleted: 0, cleanedConfig };
+  if (!config.has_webhook_secret) return { fetched: 0, saved: 0, deleted: 0, cleanedConfig };
 
-  const webhookUrl = `${SUPABASE_URL}/functions/v1/kobo-quiz-webhook/${config.quiz_id}`;
   const liveIds = new Set<string>();
   let fetched = 0;
   let saved = 0;
@@ -58,9 +56,9 @@ export async function fullSyncKobo(config: QuizKoboConfig): Promise<FullSyncResu
       const { data, error } = await supabase.functions.invoke("kobo-form-manager", {
         body: {
           action: "fetch_submissions",
+          quiz_id: config.quiz_id,
           server_url: config.server_url,
           form_uid: config.form_uid,
-          api_token: config.api_token,
           page_size: PAGE,
           page,
         },
@@ -78,13 +76,11 @@ export async function fullSyncKobo(config: QuizKoboConfig): Promise<FullSyncResu
 
       // Re-play every payload through the scoring webhook so edits made on
       // KoboToolbox (changed answers, corrected names) are re-scored locally.
-      const resp = await fetch(webhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-kobo-secret": config.webhook_secret },
-        body: JSON.stringify(results),
+      // Re-scoring runs server-side so the webhook secret never reaches the browser.
+      const { data: replay } = await supabase.functions.invoke("kobo-form-manager", {
+        body: { action: "quiz_replay", quiz_id: config.quiz_id, results },
       });
-      const out = await resp.json().catch(() => ({}));
-      saved += Number((out as any)?.saved ?? 0);
+      saved += Number((replay as any)?.saved ?? 0);
 
       if (results.length < PAGE) break;
     }

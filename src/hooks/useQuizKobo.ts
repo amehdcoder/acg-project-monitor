@@ -19,9 +19,11 @@ export interface QuizKoboConfig {
   server_url: string;
   form_uid: string;
   form_title: string | null;
-  api_token: string;
+  /** True when a Kobo API token is stored server-side (never exposed). */
+  has_api_token: boolean;
   sync_mode: string;
-  webhook_secret: string;
+  /** True when a webhook secret exists server-side (never exposed). */
+  has_webhook_secret: boolean;
   question_config: QuizKoboQuestion[];
   identity_fields: QuizKoboIdentityFields;
   last_sync_at: string | null;
@@ -59,7 +61,7 @@ export function useQuizKobo(quizId: string | null | undefined) {
     if (!quizId) { setConfig(null); setSubmissions([]); setLoading(false); return; }
     if (!silent) setLoading(true);
     const [{ data: cfg, error: cfgErr }, { data: subs, error: subErr }] = await Promise.all([
-      supabase.from("quiz_kobo_configs").select("*").eq("quiz_id", quizId).maybeSingle(),
+      supabase.from("quiz_kobo_configs").select("id, quiz_id, server_url, form_uid, form_title, sync_mode, question_config, identity_fields, last_sync_at, last_event_at, has_api_token, has_webhook_secret").eq("quiz_id", quizId).maybeSingle(),
       supabase.from("quiz_kobo_submissions").select("*").eq("quiz_id", quizId)
         .order("submitted_at", { ascending: false }).limit(5000),
     ]);
