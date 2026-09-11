@@ -196,14 +196,16 @@ const TABLE_BLOCKED_COLUMNS: Record<string, Set<string>> = {
   profiles: new Set([
     "email", "phone", "phone_number", "personal_email", "whatsapp",
     "date_of_birth", "address", "nin", "bvn", "bank_account",
+    "alternate_email", "alternate_phone", "device_phone_number",
+    "last_ip_address", "device_info", "last_device_type", "notification_preferences",
   ]),
 };
 
 // Only these columns of `profiles` may be read via a share link (names used to
 // label charts). Everything else — especially contact details — is withheld.
 const PROFILES_ALLOWED_COLUMNS = new Set<string>([
-  "id", "user_id", "first_name", "last_name", "full_name", "display_name",
-  "designation", "role", "project_id", "avatar_url",
+  "id", "user_id", "first_name", "last_name",
+  "designation", "avatar_url",
 ]);
 
 function sanitizeColumns(table: string, columns: string): string {
