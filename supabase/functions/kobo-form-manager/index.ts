@@ -277,10 +277,94 @@ Deno.serve(async (req) => {
       return j({ ok: true, secret: newSecret, rotated_at: new Date().toISOString() });
     }
 
+
+    // --- Stored credential resolution -------------------------------------
+    // Kobo API tokens are no longer readable by the browser. Admin callers may
+    // reference a stored connection instead of sending the token: the token is
+    // then read here with the service role and never leaves the server.
+    async function resolveCredentials(p: any): Promise<{ server_url?: string; form_uid?: string; api_token?: string }> {
+      let server_url = p.server_url as string | undefined;
+      let form_uid = p.form_uid as string | undefined;
+      let api_token = p.api_token as string | undefined;
+      if (api_token) return { server_url, form_uid, api_token };
+
+      if (p.quiz_id) {
+        const { data } = await admin
+          .from("quiz_kobo_configs")
+          .select("server_url, form_uid, api_token")
+          .eq("quiz_id", p.quiz_id)
+          .maybeSingle();
+        if (data) {
+          server_url = server_url || (data.server_url as string);
+          form_uid = form_uid || (data.form_uid as string);
+          api_token = (data.api_token as string) || undefined;
+        }
+      } else if (p.config_id) {
+        const { data } = await admin
+          .from("kobo_form_configs")
+          .select("kobo_server_url, form_uid, api_token")
+          .eq("id", p.config_id)
+          .maybeSingle();
+        if (data) {
+          server_url = server_url || (data.kobo_server_url as string);
+          form_uid = form_uid || (data.form_uid as string);
+          api_token = (data.api_token as string) || undefined;
+        }
+      } else if (p.feed_id) {
+        const { data } = await admin
+          .from("checklist_dashboard_feeds")
+          .select("server_url, form_uid, api_token")
+          .eq("id", p.feed_id)
+          .maybeSingle();
+        if (data) {
+          server_url = server_url || (data.server_url as string);
+          form_uid = form_uid || (data.form_uid as string);
+          api_token = (data.api_token as string) || undefined;
+        }
+      }
+      return { server_url, form_uid, api_token };
+    }
+
+    // Returns the per-quiz webhook secret to an admin so they can paste it into
+    // the KoboToolbox REST service (shared secret: the admin must hold it).
+    if (action === "get_quiz_webhook_secret") {
+      const forbid = await ensureAdmin();
+      if (forbid) return forbid;
+      const { data } = await admin
+        .from("quiz_kobo_configs")
+        .select("webhook_secret")
+        .eq("quiz_id", params.quiz_id)
+        .maybeSingle();
+      if (!data?.webhook_secret) return j({ error: "No webhook secret for this quiz" }, 404);
+      return j({ ok: true, secret: data.webhook_secret });
+    }
+
+    // Replays Kobo submission payloads through the quiz scoring webhook using
+    // the stored secret, so the browser never handles it.
+    if (action === "quiz_replay") {
+      const forbid = await ensureAdmin();
+      if (forbid) return forbid;
+      const { quiz_id, results } = params;
+      if (!quiz_id || !Array.isArray(results)) return j({ error: "Missing quiz_id/results" }, 400);
+      const { data } = await admin
+        .from("quiz_kobo_configs")
+        .select("webhook_secret")
+        .eq("quiz_id", quiz_id)
+        .maybeSingle();
+      if (!data?.webhook_secret) return j({ error: "No webhook secret for this quiz" }, 404);
+      const resp = await fetch(`${SUPABASE_URL}/functions/v1/kobo-quiz-webhook/${quiz_id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-kobo-secret": data.webhook_secret as string },
+        body: JSON.stringify(results),
+      });
+      const out = await resp.json().catch(() => ({}));
+      return j({ ok: resp.ok, saved: Number((out as any)?.saved ?? 0) });
+    }
+
     if (action === "test_connection" || action === "inspect") {
       const forbid = await ensureAdmin();
       if (forbid) return forbid;
-      const { server_url, form_uid, api_token } = params;
+      const { server_url, form_uid, api_token } = await resolveCredentials(params);
       if (!server_url || !form_uid || !api_token) return j({ error: "Missing server_url/form_uid/api_token" }, 400);
       const res = await probe(server_url, form_uid, api_token);
       return j({
@@ -658,7 +742,8 @@ Deno.serve(async (req) => {
     if (action === "fetch_submissions") {
       const forbid = await ensureAdmin();
       if (forbid) return forbid;
-      const { server_url, form_uid, api_token, page_size, page, since, skip_asset } = params;
+      const { page_size, page, since, skip_asset } = params;
+      const { server_url, form_uid, api_token } = await resolveCredentials(params);
       if (!server_url || !form_uid || !api_token) return j({ error: "Missing server_url/form_uid/api_token" }, 400);
       const limit = Math.min(Math.max(Number(page_size) || 100, 1), 500);
       const start = Math.max(Number(page) || 0, 0) * limit;
