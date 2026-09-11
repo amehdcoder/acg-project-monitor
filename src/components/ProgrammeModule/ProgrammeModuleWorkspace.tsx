@@ -20,6 +20,7 @@ import BeneficiaryRecord from "./BeneficiaryRecord";
 import BeneficiaryFormDialog from "./BeneficiaryFormDialog";
 import ModuleConfigurator from "./ModuleConfigurator";
 import FacilityFocalPersons from "./FacilityFocalPersons";
+import FacilityRegistry from "./FacilityRegistry";
 
 interface Props {
   projectId?: string;
