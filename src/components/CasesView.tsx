@@ -1628,6 +1628,10 @@ const CasesView = () => {
             <ClipboardList className="h-4 w-4" />
             Case List
           </TabsTrigger>
+          <TabsTrigger value="records" className="gap-1.5 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-primary px-1 pb-2.5">
+            <Users className="h-4 w-4" />
+            Beneficiary Records
+          </TabsTrigger>
           <TabsTrigger value="map" className="gap-1.5 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-primary px-1 pb-2.5">
             <MapIcon className="h-4 w-4" />
             Map View
