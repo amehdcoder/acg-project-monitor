@@ -73,11 +73,7 @@ Deno.serve(async (req) => {
       (forms ?? []).filter((f: any) => f.project_id === ctx.projectId).map((f: any) => f.id),
     );
 
-    const accepted: string[] = [];
-    const rejected: { id: string; reason: string }[] = [];
-    const now = new Date().toISOString();
-
-    const rows = records
+    const rows = formRecords
       .filter((r) => {
         if (!r?.id || !r?.formId) {
           rejected.push({ id: r?.id ?? "unknown", reason: "invalid_record" });
