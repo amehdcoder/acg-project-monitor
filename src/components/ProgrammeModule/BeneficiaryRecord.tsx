@@ -662,6 +662,32 @@ const BeneficiaryRecord = ({
         open={editOpen} onOpenChange={setEditOpen} moduleId={moduleId} projectId={projectId}
         config={config} existing={beneficiary} onSaved={() => { void reload(); onChanged(); }}
       />
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Request deletion of {beneficiary.full_name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The record is only removed after a Super Admin assigned to this project, or the Owner,
+              approves the request.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Textarea
+            placeholder="Why should this record be removed?"
+            value={deleteReason}
+            onChange={(e) => setDeleteReason(e.target.value)}
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleteBusy}
+              onClick={(e) => { e.preventDefault(); void submitDeleteRequest(); }}
+            >
+              Send request
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
