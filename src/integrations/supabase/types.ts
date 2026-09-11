@@ -7520,6 +7520,7 @@ export type Database = {
         Row: {
           allow_cases: boolean
           allow_forms: boolean
+          allow_seeclear: boolean
           code_hash: string
           collector_user_id: string | null
           created_at: string
@@ -7535,6 +7536,7 @@ export type Database = {
         Insert: {
           allow_cases?: boolean
           allow_forms?: boolean
+          allow_seeclear?: boolean
           code_hash: string
           collector_user_id?: string | null
           created_at?: string
@@ -7550,6 +7552,7 @@ export type Database = {
         Update: {
           allow_cases?: boolean
           allow_forms?: boolean
+          allow_seeclear?: boolean
           code_hash?: string
           collector_user_id?: string | null
           created_at?: string
