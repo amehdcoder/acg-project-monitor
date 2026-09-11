@@ -36,6 +36,7 @@ export interface DeviceContext {
   label: string;
   allowForms: boolean;
   allowCases: boolean;
+  allowSeeclear: boolean;
   collectorUserId: string | null;
 }
 
@@ -56,7 +57,7 @@ export async function verifyDeviceToken(req: Request): Promise<DeviceContext | n
 
   const { data: config } = await db
     .from("project_access_configs")
-    .select("enabled, allow_forms, allow_cases, expires_at, collector_user_id")
+    .select("enabled, allow_forms, allow_cases, allow_seeclear, expires_at, collector_user_id")
     .eq("project_id", device.project_id)
     .maybeSingle();
   if (!config || !config.enabled) return null;
@@ -74,12 +75,17 @@ export async function verifyDeviceToken(req: Request): Promise<DeviceContext | n
     label: device.label,
     allowForms: !!config.allow_forms,
     allowCases: !!config.allow_cases,
+    allowSeeclear: !!config.allow_seeclear,
     collectorUserId: config.collector_user_id ?? null,
   };
 }
 
 /** Everything a device needs to run fully offline for its project. */
-export async function buildProjectBundle(projectId: string, allowCases: boolean) {
+export async function buildProjectBundle(
+  projectId: string,
+  allowCases: boolean,
+  allowSeeclear = false,
+) {
   const db = admin();
   const [{ data: project }, { data: forms }] = await Promise.all([
     db.from("projects").select("id, name, description").eq("id", projectId).maybeSingle(),
@@ -92,5 +98,14 @@ export async function buildProjectBundle(projectId: string, allowCases: boolean)
     caseTypes = data ?? [];
   }
 
-  return { project: project ?? null, forms: forms ?? [], caseTypes, syncedAt: new Date().toISOString() };
+  // Extra checklists the device may fill offline alongside the project forms.
+  const specialForms = allowSeeclear ? ["seeclear"] : [];
+
+  return {
+    project: project ?? null,
+    forms: forms ?? [],
+    caseTypes,
+    specialForms,
+    syncedAt: new Date().toISOString(),
+  };
 }

@@ -266,6 +266,18 @@ export async function queueOrInsert(
   return { queued: true, idempotencyKey };
 }
 
+/** Rows still waiting in the offline queue for one table (newest first). */
+export async function listPendingRows(table: string): Promise<Record<string, any>[]> {
+  try {
+    return (await getAllRecords())
+      .filter((r) => r.table === table)
+      .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""))
+      .map((r) => r.row);
+  } catch {
+    return [];
+  }
+}
+
 export async function getPendingInsertCount(): Promise<number> {
   try {
     return (await getAllRecords()).length;

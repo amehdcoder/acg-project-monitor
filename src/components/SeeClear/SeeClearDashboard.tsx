@@ -52,7 +52,7 @@ const Kpi = ({ icon: Icon, label, value, tint, sub }: { icon: any; label: string
 );
 
 export default function SeeClearDashboard({ onClose }: Props) {
-  const { rows, stats, byLevel, byOwnership, readinessByLevel, equipment, referrals, dataQuality, flagged, challenges, points, draftCount, loading, reload, simulate, setSimulate, deleteFacilities, accountability, filters, setFilters, filterOptions, totalCount } = useSeeClearDashboard();
+  const { rows, stats, byLevel, byOwnership, readinessByLevel, equipment, referrals, dataQuality, flagged, challenges, points, draftCount, loading, reload, simulate, setSimulate, deleteFacilities, accountability, filters, setFilters, filterOptions, totalCount, pendingCount } = useSeeClearDashboard();
   const { isOwner, isSuperAdmin, isOwnerLevel } = useAuth();
 
   const narrativeQuestions = useMemo(() => ([
@@ -199,6 +199,13 @@ export default function SeeClearDashboard({ onClose }: Props) {
           totalCount={totalCount}
           accent={NAVY}
         />
+
+        {pendingCount > 0 && (
+          <div className="rounded-xl border border-sky-300 bg-sky-50 p-3 text-sm text-sky-900">
+            {pendingCount} visit{pendingCount === 1 ? "" : "s"} saved on this device are waiting for a
+            connection. They are shown below and will upload automatically.
+          </div>
+        )}
 
         {/* Live Kobo schema drift */}
         {isAdmin && driftCount > 0 && (

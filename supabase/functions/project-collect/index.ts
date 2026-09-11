@@ -5,6 +5,7 @@
 // written with the service role against the project's collection account.
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { admin, verifyDeviceToken } from "../_shared/deviceAccess.ts";
+import { intakeSeeClearRecord } from "../_shared/seeclearDeviceIntake.ts";
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -14,8 +15,12 @@ const json = (body: unknown, status = 200) =>
 
 interface IncomingRecord {
   id: string;
+  /** "form" (default) writes a project form submission; "seeclear" writes a
+   *  See Clear facility visit and forwards it to KoboToolbox. */
+  kind?: string;
   formId: string;
   data: Record<string, unknown>;
+  photos?: Record<string, string>;
   location?: { lat: number; lng: number } | null;
   withinGeofence?: boolean | null;
   submissionType?: string;
@@ -28,7 +33,7 @@ Deno.serve(async (req) => {
   try {
     const ctx = await verifyDeviceToken(req);
     if (!ctx) return json({ error: "device_not_authorized" }, 401);
-    if (!ctx.allowForms) return json({ error: "forms_not_allowed" }, 403);
+    if (!ctx.allowForms && !ctx.allowSeeclear) return json({ error: "forms_not_allowed" }, 403);
     if (!ctx.collectorUserId) return json({ error: "collection_account_missing" }, 409);
 
     const body = await req.json().catch(() => ({}));
@@ -37,8 +42,29 @@ Deno.serve(async (req) => {
 
     const db = admin();
 
+    const accepted: string[] = [];
+    const rejected: { id: string; reason: string }[] = [];
+    const now = new Date().toISOString();
+
+    // See Clear facility visits go to the checklist table (and on to Kobo).
+    const seeclear = records.filter((r) => r.kind === "seeclear");
+    for (const record of seeclear) {
+      if (!ctx.allowSeeclear) {
+        rejected.push({ id: record.id, reason: "seeclear_not_allowed" });
+        continue;
+      }
+      const res = await intakeSeeClearRecord(
+        { id: record.id, data: record.data ?? {}, photos: record.photos, submittedAt: record.submittedAt },
+        { collectorUserId: ctx.collectorUserId, deviceId: ctx.deviceId, label: ctx.label },
+      );
+      if (res.ok) accepted.push(record.id);
+      else rejected.push({ id: record.id, reason: res.reason ?? "write_failed" });
+    }
+
+    const formRecords = records.filter((r) => r.kind !== "seeclear");
+
     // Only forms that belong to this device's project may be written.
-    const formIds = Array.from(new Set(records.map((r) => String(r.formId))));
+    const formIds = Array.from(new Set(formRecords.map((r) => String(r.formId))));
     const { data: forms } = await db
       .from("forms")
       .select("id, project_id")
@@ -47,14 +73,14 @@ Deno.serve(async (req) => {
       (forms ?? []).filter((f: any) => f.project_id === ctx.projectId).map((f: any) => f.id),
     );
 
-    const accepted: string[] = [];
-    const rejected: { id: string; reason: string }[] = [];
-    const now = new Date().toISOString();
-
-    const rows = records
+    const rows = formRecords
       .filter((r) => {
         if (!r?.id || !r?.formId) {
           rejected.push({ id: r?.id ?? "unknown", reason: "invalid_record" });
+          return false;
+        }
+        if (!ctx.allowForms) {
+          rejected.push({ id: r.id, reason: "forms_not_allowed" });
           return false;
         }
         if (!allowedForms.has(r.formId)) {

@@ -48,6 +48,7 @@ const ProjectAccessDialog = ({ projectId, projectName, open, onOpenChange }: Pro
   const [enabled, setEnabled] = useState(false);
   const [allowForms, setAllowForms] = useState(true);
   const [allowCases, setAllowCases] = useState(false);
+  const [allowSeeclear, setAllowSeeclear] = useState(false);
   const [expiresAt, setExpiresAt] = useState("");
   const [pin, setPin] = useState("");
 
@@ -72,6 +73,7 @@ const ProjectAccessDialog = ({ projectId, projectName, open, onOpenChange }: Pro
         setEnabled(!!data.config.enabled);
         setAllowForms(!!data.config.allow_forms);
         setAllowCases(!!data.config.allow_cases);
+        setAllowSeeclear(!!data.config.allow_seeclear);
         setExpiresAt(data.config.expires_at ? String(data.config.expires_at).slice(0, 10) : "");
       }
     } catch {
@@ -91,6 +93,7 @@ const ProjectAccessDialog = ({ projectId, projectName, open, onOpenChange }: Pro
         enabled,
         allowForms,
         allowCases,
+        allowSeeclear,
         expiresAt: expiresAt || null,
         pin: pin.trim() ? pin.trim() : undefined,
         ...extra,
@@ -151,6 +154,13 @@ const ProjectAccessDialog = ({ projectId, projectName, open, onOpenChange }: Pro
             <div className="flex items-center justify-between">
               <Label className="text-sm">Allow Cases</Label>
               <Switch checked={allowCases} onCheckedChange={setAllowCases} />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="text-sm">See Clear facility checklist</Label>
+                <p className="text-xs text-muted-foreground">Collectors fill the eye-health visit checklist offline.</p>
+              </div>
+              <Switch checked={allowSeeclear} onCheckedChange={setAllowSeeclear} />
             </div>
 
             <div className="grid grid-cols-2 gap-3">

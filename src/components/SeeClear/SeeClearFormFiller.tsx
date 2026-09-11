@@ -25,6 +25,7 @@ import { mirrorSpecialForm, SEECLEAR_FORM_ID } from "@/lib/specialFormBridge";
 import { newEntryId } from "@/lib/savedForms";
 import { queueOrUploadMedia } from "@/lib/offlineMedia";
 import { queueOrInsert } from "@/lib/offlineSubmissions";
+import { saveDeviceSeeClearVisit } from "@/lib/deviceSeeClear";
 import handsLogo from "@/assets/logo-amehnities.png";
 import coatOfArms from "@/assets/nigeria-coat-of-arms.png.asset.json";
 import { downloadSeeClearXlsForm } from "@/lib/seeclear/xlsform";
@@ -38,6 +39,14 @@ const STEPS = ["Facility Profile", "Checklist", "Review & Submit"];
 
 interface Props {
   onClose: () => void;
+  /** Account-free collector mode: no sign-in, evidence and the visit are
+   *  queued locally and pushed by the device sync engine. */
+  deviceMode?: {
+    deviceId: string;
+    collectorLabel: string;
+    projectId: string;
+    onSaved?: () => void;
+  };
 }
 
 const Field = ({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) => (
@@ -109,11 +118,15 @@ const Section = ({
   );
 };
 
-export default function SeeClearFormFiller({ onClose }: Props) {
+export default function SeeClearFormFiller({ onClose, deviceMode }: Props) {
   const { user, isOwner, isSuperAdmin, isOwnerLevel } = useAuth();
-  const isAdmin = Boolean(isOwner || isSuperAdmin || isOwnerLevel);
+  const isDevice = !!deviceMode;
+  const isAdmin = Boolean(!isDevice && (isOwner || isSuperAdmin || isOwnerLevel));
   const [accessOpen, setAccessOpen] = useState(false);
-  const { schema, fields: koboFields, choices: koboChoices, driftCount } = useSeeClearKoboSchema(true);
+  // Device collectors have no database session — the cached checklist is used.
+  const { schema, fields: koboFields, choices: koboChoices, driftCount } = useSeeClearKoboSchema(!isDevice);
+  // Evidence captured offline is held as data URLs until the device syncs.
+  const [devicePhotos, setDevicePhotos] = useState<Record<string, string>>({});
   // Live Kobo overlay — question wording, options and added/removed questions
   // follow whatever is currently deployed on the linked KoboToolbox form.
   const live = useMemo(() => buildSeeClearLive(koboFields, koboChoices), [koboFields, koboChoices]);
@@ -187,7 +200,27 @@ export default function SeeClearFormFiller({ onClose }: Props) {
   const reviewValid = requiredEvidenceComplete && challenges.length > 0 && recommendations.length > 0 && remarks.trim() !== "" && !!officerSig && !!inchargeSig;
 
   const handlePhoto = async (slot: string, file: File | null) => {
-    if (!file || !user?.id) return;
+    if (!file) return;
+    if (isDevice) {
+      setUploading(slot);
+      try {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(new Error("Could not read the photo"));
+          reader.readAsDataURL(file);
+        });
+        setDevicePhotos((p) => ({ ...p, [slot]: dataUrl }));
+        setEvidence((e) => ({ ...e, [slot]: `pending:${slot}` }));
+        toast.success("Photo saved on this device");
+      } catch (e: any) {
+        toast.error(e.message || "Could not save photo");
+      } finally {
+        setUploading(null);
+      }
+      return;
+    }
+    if (!user?.id) return;
     setUploading(slot);
     try {
       const ext = file.name.split(".").pop() || "jpg";
@@ -203,7 +236,7 @@ export default function SeeClearFormFiller({ onClose }: Props) {
   };
 
   const submit = async (asDraft: boolean) => {
-    if (!user?.id) return;
+    if (!isDevice && !user?.id) return;
     if (!asDraft && !profileValid) { toast.error("Complete all required facility information."); setStep(0); return; }
     if (!asDraft && !checklistValid) { toast.error("Answer every checklist item, staff on duty and all equipment statuses."); setStep(1); return; }
     if (!asDraft && !reviewValid) { toast.error("Attach required photos, select challenges & recommendations, add remarks and both sign-offs."); setStep(2); return; }
@@ -211,9 +244,7 @@ export default function SeeClearFormFiller({ onClose }: Props) {
     try {
       const submissionId = crypto.randomUUID();
       const mirrorId = newEntryId();
-      const { queued } = await queueOrInsert("seeclear_monitoring", {
-        id: submissionId,
-        monitor_id: user.id,
+      const visitRow = {
         date_of_visit: dateOfVisit,
         state, lga, ward, community,
         facility_name: facilityName,
@@ -235,16 +266,44 @@ export default function SeeClearFormFiller({ onClose }: Props) {
         referral_compliance: scores.overallPct >= 60,
         readiness_score: scores.overallPct,
         overall_score: scores.overallPct,
-        evidence, challenges, recommendations, remarks,
+        challenges, recommendations, remarks,
         officer_signature: officerSig, incharge_signature: inchargeSig,
         critical_gap: challenges[0] || null,
+      };
+
+      // Account-free collector: queue locally, sync later through the device
+      // channel. Nothing here needs a network connection.
+      if (isDevice) {
+        await saveDeviceSeeClearVisit({
+          entryId: mirrorId,
+          submissionId,
+          deviceId: deviceMode!.deviceId,
+          projectId: deviceMode!.projectId,
+          collectorLabel: deviceMode!.collectorLabel,
+          asDraft,
+          title: facilityName ? `${facilityName} — ${state}, ${lga}` : `${state}, ${lga}`,
+          row: { ...visitRow, evidence },
+          photos: devicePhotos,
+          gps: gps ? { lat: gps.lat, lng: gps.lng, accuracy: gps.accuracy } : null,
+        });
+        toast.success(asDraft ? "Draft saved on this device" : "Visit saved — it will sync automatically");
+        deviceMode!.onSaved?.();
+        onClose();
+        return;
+      }
+
+      const { queued } = await queueOrInsert("seeclear_monitoring", {
+        ...visitRow,
+        id: submissionId,
+        monitor_id: user!.id,
+        evidence,
         status: asDraft ? "draft" : "sent",
       }, true, {
         mirrorEntryId: mirrorId,
       });
       await mirrorSpecialForm({
         id: mirrorId,
-        userId: user.id,
+        userId: user!.id,
         formId: SEECLEAR_FORM_ID,
         formName: "See Clear Eye Health Facility Monitoring Checklist",
         formDescription: facilityName ? `${facilityName} — ${state}, ${lga}` : `${state}, ${lga}`,

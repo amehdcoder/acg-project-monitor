@@ -9,6 +9,7 @@ import { generateSeeClearSimulation } from "@/lib/seeclear/simulation";
 import { buildAccountability, type ProfileLite } from "@/lib/accountability";
 import { safeArray } from "@/lib/safeData";
 import { fuzzyMatchAny, uniqueSorted } from "@/lib/fuzzyMatch";
+import { listPendingRows } from "@/lib/offlineSubmissions";
 import type { ScopeFilterValues } from "@/components/shared/DashboardScopeFilters";
 
 export interface MonitoringRow {
@@ -111,8 +112,24 @@ export const useSeeClearDashboard = () => {
     ...DASHBOARD_QUERY_OPTIONS,
   });
 
+  // Visits saved on this device while offline — shown straight away and
+  // replaced by the server copy the moment the queue drains.
+  const pendingQuery = useQuery<MonitoringRow[]>({
+    queryKey: ["seeclear-pending-visits"],
+    queryFn: async () =>
+      (await listPendingRows("seeclear_monitoring")).map((r) => ({ ...r, __pending: true })) as MonitoringRow[],
+    enabled: !simulate,
+    refetchInterval: 15_000,
+  });
+
   const simRows = useMemo(() => (simulate ? generateSeeClearSimulation().rows : []), [simulate]);
-  const allRows = simulate ? simRows : safeArray<MonitoringRow>(rowsQuery.data);
+  const serverRows = simulate ? simRows : safeArray<MonitoringRow>(rowsQuery.data);
+  const pendingRows = simulate ? [] : safeArray<MonitoringRow>(pendingQuery.data);
+  const allRows = useMemo(() => {
+    if (pendingRows.length === 0) return serverRows;
+    const seen = new Set(serverRows.map((r) => r.id));
+    return [...pendingRows.filter((r) => !seen.has(r.id)), ...serverRows];
+  }, [serverRows, pendingRows]);
   const profileMap = simulate ? SIM_PROFILES : (profilesQuery.data ?? new Map<string, ProfileLite>());
   const loading = simulate ? false : rowsQuery.isLoading;
 
@@ -347,7 +364,8 @@ export const useSeeClearDashboard = () => {
   };
 
   return {
-    rows, totalCount: allRows.length, loading, reload, simulate, setSimulate,
+    rows, totalCount: allRows.length, pendingCount: pendingRows.length,
+    loading, reload, simulate, setSimulate,
     filters, setFilters, filterOptions,
     stats, byLevel, byOwnership, readinessByLevel, equipment, referrals,
     dataQuality, flagged, challenges, points, draftCount, deleteFacilities, accountability,

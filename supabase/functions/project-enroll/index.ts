@@ -33,10 +33,14 @@ Deno.serve(async (req) => {
     if (action === "refresh") {
       const ctx = await verifyDeviceToken(req);
       if (!ctx) return json({ error: "device_not_authorized" }, 401);
-      const bundle = await buildProjectBundle(ctx.projectId, ctx.allowCases);
+      const bundle = await buildProjectBundle(ctx.projectId, ctx.allowCases, ctx.allowSeeclear);
       return json({
         device: { deviceId: ctx.deviceId, label: ctx.label },
-        access: { allowForms: ctx.allowForms, allowCases: ctx.allowCases },
+        access: {
+          allowForms: ctx.allowForms,
+          allowCases: ctx.allowCases,
+          allowSeeclear: ctx.allowSeeclear,
+        },
         bundle,
       });
     }
@@ -111,13 +115,21 @@ Deno.serve(async (req) => {
       return json({ error: "enrolment_failed" }, 500);
     }
 
-    const bundle = await buildProjectBundle(config.project_id, !!config.allow_cases);
+    const bundle = await buildProjectBundle(
+      config.project_id,
+      !!config.allow_cases,
+      !!config.allow_seeclear,
+    );
     await audit(true);
 
     return json({
       token,
       device: { deviceId, label },
-      access: { allowForms: !!config.allow_forms, allowCases: !!config.allow_cases },
+      access: {
+        allowForms: !!config.allow_forms,
+        allowCases: !!config.allow_cases,
+        allowSeeclear: !!config.allow_seeclear,
+      },
       bundle,
     });
   } catch (e) {
