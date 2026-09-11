@@ -57,7 +57,19 @@ const ProjectAccessDialog = ({ projectId, projectName, open, onOpenChange }: Pro
       const { data, error } = await supabase.functions.invoke("project-access-admin", {
         body: { projectId, ...payload },
       });
-      if (error) throw error;
+      if (error) {
+        // The server explains exactly why a save was refused; read it out of the
+        // failed response instead of showing a blank "could not save".
+        let detail = "";
+        try {
+          const body = await (error as any)?.context?.json?.();
+          detail = body?.detail || body?.error || "";
+        } catch {
+          /* no readable body — fall back to the generic message */
+        }
+        throw new Error(detail || (error as Error).message || "request_failed");
+      }
+      if ((data as any)?.error) throw new Error((data as any).detail || (data as any).error);
       return data as any;
     },
     [projectId],
