@@ -291,8 +291,8 @@ export default function SeeClearFormFiller({ onClose, deviceMode, savedDraft }: 
     if (!asDraft && !reviewValid) { toast.error("Attach required photos, select challenges & recommendations, add remarks and both sign-offs."); setStep(2); return; }
     setSaving(true);
     try {
-      const submissionId = crypto.randomUUID();
-      const mirrorId = newEntryId();
+      const submissionId = recordIds.current.submissionId;
+      const mirrorId = recordIds.current.entryId;
       const visitRow = {
         date_of_visit: dateOfVisit,
         state, lga, ward, community,
@@ -334,6 +334,12 @@ export default function SeeClearFormFiller({ onClose, deviceMode, savedDraft }: 
           row: { ...visitRow, evidence },
           photos: devicePhotos,
           gps: gps ? { lat: gps.lat, lng: gps.lng, accuracy: gps.accuracy } : null,
+          draftState: {
+            dateOfVisit, state, lga, ward, community, facilityName, level, ownership,
+            funcStatus, focalName, focalDesignation, focalPhone, team, gps,
+            general, staffOnDuty, hr, infra, equip,
+            evidence, challenges, recommendations, remarks, officerSig, inchargeSig,
+          },
         });
         toast.success(asDraft ? "Draft saved on this device" : "Visit saved — it will sync automatically");
         deviceMode!.onSaved?.();
