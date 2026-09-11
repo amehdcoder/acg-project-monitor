@@ -8,7 +8,10 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { MapPin, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
+import { getCommunities, getCommunitiesByWard } from "@/lib/grid3NigeriaData";
+import { GEO_FIELDS } from "@/lib/programmeModule/registrationChoices";
 
 export type AnswerMap = Record<string, unknown>;
 
@@ -84,12 +87,73 @@ interface Props {
   value: unknown;
   onChange: (value: unknown) => void;
   error?: string | null;
+  /** All answers on the form — enables cascading State → LGA → Ward → Community. */
+  answers?: AnswerMap;
+  /** Sets another field, e.g. clearing LGA and Ward when the State changes. */
+  onPatch?: (values: Record<string, unknown>) => void;
 }
 
-const ConfigFieldRenderer = ({ question, value, onChange, error }: Props) => {
+const ConfigFieldRenderer = ({ question, value, onChange, error, answers, onPatch }: Props) => {
   const [locating, setLocating] = useState(false);
   const id = `q-${question.id}`;
   const multiline = question.appearance?.includes("multiline");
+  const listId = `${id}-list`;
+
+  // Cascading administrative geography, backed by the official INEC / GRID3
+  // registry bundled with the app so it also works with no network.
+  const geoName = GEO_FIELDS.includes(question.name || "") ? question.name : null;
+  const stateValue = String(answers?.state ?? "");
+  const lgaValue = String(answers?.lga ?? "");
+  const wardValue = String(answers?.ward ?? "");
+
+  const geoChoices = useMemo(() => {
+    if (!geoName) return [] as string[];
+    try {
+      if (geoName === "state") return getAllStates();
+      if (geoName === "lga") return stateValue ? getLGAsForState(stateValue) : [];
+      if (geoName === "ward") return stateValue && lgaValue ? getWardsForLGA(stateValue, lgaValue) : [];
+      if (!stateValue || !lgaValue) return [];
+      const byWard = wardValue ? getCommunitiesByWard(stateValue, lgaValue, wardValue) : [];
+      return byWard.length ? byWard : getCommunities(stateValue, lgaValue);
+    } catch {
+      return [];
+    }
+  }, [geoName, stateValue, lgaValue, wardValue]);
+
+  const geoControl = () => {
+    // Village / community: autocomplete against the registry but still typable,
+    // because new settlements are found in the field.
+    if (geoName === "village") {
+      return (
+        <>
+          <Input id={id} list={listId} value={String(value ?? "")} placeholder="Start typing the community name…"
+            onChange={(e) => onChange(e.target.value)} />
+          <datalist id={listId}>
+            {geoChoices.slice(0, 500).map((c) => <option key={c} value={c} />)}
+          </datalist>
+        </>
+      );
+    }
+    const disabled = geoChoices.length === 0;
+    const clears: Record<string, unknown> =
+      geoName === "state" ? { lga: "", ward: "", village: "" }
+        : geoName === "lga" ? { ward: "", village: "" }
+          : { village: "" };
+    return (
+      <Select
+        value={String(value ?? "")}
+        onValueChange={(v) => { onChange(v); onPatch?.(clears); }}
+        disabled={disabled}
+      >
+        <SelectTrigger id={id}>
+          <SelectValue placeholder={disabled ? "Select the level above first" : "Select…"} />
+        </SelectTrigger>
+        <SelectContent className="z-[1200] max-h-72 bg-popover">
+          {geoChoices.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+        </SelectContent>
+      </Select>
+    );
+  };
 
   const captureGps = () => {
     setLocating(true);
