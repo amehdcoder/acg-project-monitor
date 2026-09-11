@@ -4511,8 +4511,10 @@ export type Database = {
       form_submissions: {
         Row: {
           client_submitted_at: string | null
+          collector_label: string | null
           created_at: string
           data: Json
+          device_id: string | null
           form_id: string
           id: string
           location: Json | null
@@ -4528,8 +4530,10 @@ export type Database = {
         }
         Insert: {
           client_submitted_at?: string | null
+          collector_label?: string | null
           created_at?: string
           data?: Json
+          device_id?: string | null
           form_id: string
           id?: string
           location?: Json | null
@@ -4545,8 +4549,10 @@ export type Database = {
         }
         Update: {
           client_submitted_at?: string | null
+          collector_label?: string | null
           created_at?: string
           data?: Json
+          device_id?: string | null
           form_id?: string
           id?: string
           location?: Json | null
@@ -7507,6 +7513,136 @@ export type Database = {
           updated_at?: string
           user_id?: string
           ward?: string | null
+        }
+        Relationships: []
+      }
+      project_access_configs: {
+        Row: {
+          allow_cases: boolean
+          allow_forms: boolean
+          code_hash: string
+          created_at: string
+          created_by: string | null
+          enabled: boolean
+          expires_at: string | null
+          id: string
+          join_code: string
+          pin_hash: string | null
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          allow_cases?: boolean
+          allow_forms?: boolean
+          code_hash: string
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          expires_at?: string | null
+          id?: string
+          join_code: string
+          pin_hash?: string | null
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          allow_cases?: boolean
+          allow_forms?: boolean
+          code_hash?: string
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          expires_at?: string | null
+          id?: string
+          join_code?: string
+          pin_hash?: string | null
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_access_configs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_devices: {
+        Row: {
+          created_at: string
+          device_id: string
+          enrolled_at: string
+          id: string
+          label: string
+          last_seen_at: string | null
+          project_id: string
+          records_sent: number
+          revoked: boolean
+          token_hash: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          device_id: string
+          enrolled_at?: string
+          id?: string
+          label: string
+          last_seen_at?: string | null
+          project_id: string
+          records_sent?: number
+          revoked?: boolean
+          token_hash: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          device_id?: string
+          enrolled_at?: string
+          id?: string
+          label?: string
+          last_seen_at?: string | null
+          project_id?: string
+          records_sent?: number
+          revoked?: boolean
+          token_hash?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_devices_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_enroll_attempts: {
+        Row: {
+          created_at: string
+          id: string
+          ip: string | null
+          join_code: string | null
+          reason: string | null
+          success: boolean
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ip?: string | null
+          join_code?: string | null
+          reason?: string | null
+          success?: boolean
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ip?: string | null
+          join_code?: string | null
+          reason?: string | null
+          success?: boolean
         }
         Relationships: []
       }
