@@ -9,6 +9,8 @@
     "prebuild": "npx tsx scripts/generate-sitemap.ts",
     "build": "vite build",
     "build:dev": "vite build --mode development",
+    "build:collect": "VITE_APP_FLAVOR=collect vite build",
+    "collect:sync": "VITE_APP_FLAVOR=collect vite build && APP_FLAVOR=collect npx cap sync",
     "lint": "eslint .",
     "preview": "vite preview",
     "test:e2e": "playwright test",
