@@ -32,8 +32,19 @@ export const DEFAULT_STATUSES: StatusOption[] = [
   { value: "active", label: "Active", tone: "success" },
   { value: "on_hold", label: "On hold", tone: "warning" },
   { value: "exited", label: "Exited", tone: "neutral" },
+  { value: "completed", label: "Completed", tone: "info" },
   { value: "deceased", label: "Deceased", tone: "danger" },
 ];
+
+/**
+ * Statuses offered in the record's status menu: whatever the module was
+ * configured with, plus any of the standard five it does not carry yet, so
+ * existing modules gain "Completed" without needing to be re-configured.
+ */
+export const statusChoices = (configured: StatusOption[] = []): StatusOption[] => {
+  const seen = new Set(configured.map((s) => s.value));
+  return [...configured, ...DEFAULT_STATUSES.filter((s) => !seen.has(s.value))];
+};
 
 export const DEFAULT_RISK: StatusOption[] = [
   { value: "low", label: "Low", tone: "success" },
