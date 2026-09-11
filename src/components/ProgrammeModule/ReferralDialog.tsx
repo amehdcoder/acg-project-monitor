@@ -90,7 +90,7 @@ const ReferralDialog = ({ open, onOpenChange, config, beneficiaryId, projectId, 
             <Label>Reason</Label>
             <Select value={reason} onValueChange={setReason}>
               <SelectTrigger><SelectValue placeholder="Select reason…" /></SelectTrigger>
-              <SelectContent className="z-[120] bg-popover">
+              <SelectContent className="z-[1200] bg-popover">
                 {config.workflow.referralReasons.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -99,7 +99,7 @@ const ReferralDialog = ({ open, onOpenChange, config, beneficiaryId, projectId, 
             <Label>Programme component (optional)</Label>
             <Select value={componentKey} onValueChange={setComponentKey}>
               <SelectTrigger><SelectValue placeholder="Not linked" /></SelectTrigger>
-              <SelectContent className="z-[120] bg-popover">
+              <SelectContent className="z-[1200] bg-popover">
                 {visibleComponents(config).map((c) => <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -113,7 +113,7 @@ const ReferralDialog = ({ open, onOpenChange, config, beneficiaryId, projectId, 
               <Label>Status</Label>
               <Select value={status} onValueChange={setStatus}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent className="z-[120] bg-popover">
+                <SelectContent className="z-[1200] bg-popover">
                   {config.workflow.referralStatuses.map((s) => (
                     <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                   ))}

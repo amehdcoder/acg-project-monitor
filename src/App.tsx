@@ -25,6 +25,7 @@ import MdaLensHarness from "./pages/MdaLensHarness";
 
 import MicroplanKpiHarness from "./pages/MicroplanKpiHarness";
 import XlsFormCoverHarness from "./pages/XlsFormCoverHarness";
+import ProgrammeFormHarness from "./pages/ProgrammeFormHarness";
 import LearningLog from "./pages/LearningLog";
 const AmehnitiesAI = lazy(() => import("./pages/AmehnitiesAI"));
 import SharedDashboard from "./pages/SharedDashboard";
@@ -194,6 +195,7 @@ const App = () => (
 
                     <Route path="/__test/microplan-kpi" element={<MicroplanKpiHarness />} />
                     <Route path="/__test/xlsform-cover" element={<XlsFormCoverHarness />} />
+                    <Route path="/__test/programme-form" element={<ProgrammeFormHarness />} />
                     <Route path="/shared/dashboard/:token" element={<SharedDashboard />} />
                     <Route path="/join" element={<JoinProject />} />
                     <Route path="/collect" element={<DeviceCollectRoute />} />

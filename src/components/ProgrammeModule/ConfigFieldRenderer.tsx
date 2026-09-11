@@ -123,7 +123,7 @@ const ConfigFieldRenderer = ({ question, value, onChange, error }: Props) => {
         return (
           <Select value={String(value ?? "")} onValueChange={onChange}>
             <SelectTrigger id={id}><SelectValue placeholder="Select…" /></SelectTrigger>
-            <SelectContent className="z-[120] bg-popover">
+            <SelectContent className="z-[1200] bg-popover">
               {(question.options || []).map((o) => (
                 <SelectItem key={o.id} value={o.value}>{o.label}</SelectItem>
               ))}
