@@ -28,6 +28,9 @@ const EXTRA_STANDARD_FORMS: StandardFormOption[] = [
   // Geo-enabled microplanning
   { code: "microplan_entry", name: "Geo-enabled Microplanning Entry Form", group: "Microplanning" },
 
+  // Longitudinal beneficiary / case record
+  { code: "beneficiary_record", name: "Longitudinal Beneficiary Record", group: "Programme Activity Forms" },
+
   // Programme activity
   { code: "uprp", name: "Participants Bank Details Verification Form", group: "Programme Activity Forms" },
   { code: "attendance", name: "Digital Attendance", group: "Programme Activity Forms" },

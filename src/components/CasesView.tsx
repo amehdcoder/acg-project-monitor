@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, lazy, Suspense } from "react";
+import ProgrammeModuleWorkspace from "@/components/ProgrammeModule/ProgrammeModuleWorkspace";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -198,7 +199,7 @@ const CasesView = () => {
 
   // Owner profiles cache
   const [ownerProfiles, setOwnerProfiles] = useState<Map<string, string>>(new Map());
-  const [activeTab, setActiveTab] = useState<"cases" | "map" | "analytics" | "configure">("cases");
+  const [activeTab, setActiveTab] = useState<"cases" | "records" | "map" | "analytics" | "configure">("cases");
   const [showFollowUpCreator, setShowFollowUpCreator] = useState(false);
   const [showLongitudinal, setShowLongitudinal] = useState(false);
 
@@ -1627,6 +1628,10 @@ const CasesView = () => {
             <ClipboardList className="h-4 w-4" />
             Case List
           </TabsTrigger>
+          <TabsTrigger value="records" className="gap-1.5 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-primary px-1 pb-2.5">
+            <Users className="h-4 w-4" />
+            Beneficiary Records
+          </TabsTrigger>
           <TabsTrigger value="map" className="gap-1.5 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-primary px-1 pb-2.5">
             <MapIcon className="h-4 w-4" />
             Map View
@@ -1848,6 +1853,13 @@ const CasesView = () => {
           </div>
         </TabsContent>
 
+
+        <TabsContent value="records" className="mt-4">
+          <ProgrammeModuleWorkspace
+            projectId={projectFilter !== "all" ? projectFilter : projects[0]?.id}
+            canConfigure={isAdmin}
+          />
+        </TabsContent>
 
         <TabsContent value="map" className="mt-4">
           <CaseLocationMap
