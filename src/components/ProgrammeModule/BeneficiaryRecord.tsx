@@ -86,6 +86,26 @@ const BeneficiaryRecord = ({
   const [editOpen, setEditOpen] = useState(false);
   const [serviceComponent, setServiceComponent] = useState<string | undefined>();
   const [tab, setTab] = useState("overview");
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteReason, setDeleteReason] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
+
+  const submitDeleteRequest = async () => {
+    setDeleteBusy(true);
+    try {
+      await requestBeneficiaryDeletion({ beneficiary, reason: deleteReason });
+      toast({
+        title: "Deletion request sent",
+        description: "A Super Admin on this project, or the Owner, must approve it.",
+      });
+      setDeleteOpen(false);
+      setDeleteReason("");
+    } catch (e) {
+      toast({ title: "Could not send request", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
 
   const components = useMemo(() => visibleComponents(config), [config]);
   const progress = useMemo(() => computeProgress(config, services), [config, services]);
