@@ -104,12 +104,21 @@ export function useSupervisorDashboard() {
     try {
       const currentDateRange = dateRangeRef.current;
 
-      // Fetch ALL profiles (not just active), including last_seen_at
-      const { data: profiles, error: profilesErr } = await supabase
-        .from("profiles")
-        .select("user_id, first_name, last_name, designation, state, lga, ward, email, phone_number, alternate_email, alternate_phone, is_active, last_seen_at, last_ip_address, last_device_type, device_phone_number");
+      // Fetch ALL profiles (not just active), including last_seen_at.
+      // IP / device details are deliberately NOT in this table read: they are
+      // only released to owner-tier accounts through a checked function below.
+      const [{ data: profiles, error: profilesErr }, { data: deviceMeta }] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("user_id, first_name, last_name, designation, state, lga, ward, email, phone_number, alternate_email, alternate_phone, is_active, last_seen_at, last_device_type"),
+        (supabase as any).rpc("profile_device_metadata"),
+      ]);
 
       if (profilesErr) throw profilesErr;
+
+      const deviceById = new Map<string, any>(
+        ((deviceMeta as any[]) || []).map((d) => [d.user_id, d]),
+      );
 
       // Fetch all user roles
       const { data: rolesData } = await supabase
