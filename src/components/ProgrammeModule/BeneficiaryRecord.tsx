@@ -34,6 +34,12 @@ import LongitudinalOutcome from "./LongitudinalOutcome";
 import CareNetworkPanel from "./CareNetworkPanel";
 import LimbProgressPanel from "./LimbProgressPanel";
 import { recordAudit } from "./useProgrammeModule";
+import { requestBeneficiaryDeletion } from "@/lib/programmeModule/facilityOps";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 interface Props {
   beneficiary: BeneficiaryRow;
