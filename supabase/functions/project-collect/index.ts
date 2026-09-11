@@ -16,8 +16,10 @@ const json = (body: unknown, status = 200) =>
 interface IncomingRecord {
   id: string;
   /** "form" (default) writes a project form submission; "seeclear" writes a
-   *  See Clear facility visit and forwards it to KoboToolbox. */
+   *  See Clear facility visit; "case" opens a project case. */
   kind?: string;
+  caseTypeId?: string;
+  caseName?: string;
   formId: string;
   data: Record<string, unknown>;
   photos?: Record<string, string>;
