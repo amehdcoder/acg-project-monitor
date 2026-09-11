@@ -239,15 +239,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
     if (navigator.onLine) {
       try {
-        // Written through a validated SECURITY DEFINER RPC (no direct table
-        // INSERT is permitted) so anonymous callers can't inject arbitrary rows.
-        await supabase.rpc("record_inactive_login_attempt" as any, {
-          _email: payload.email,
-          _reason: payload.reason,
-          _mode: payload.mode,
-          _attempted_user_id: payload.attempted_user_id,
-          _user_agent: payload.user_agent,
-          _metadata: payload.metadata,
+        // Written server-side (service role) so signed-out clients need no
+        // database privileges and cannot inject arbitrary rows.
+        await supabase.functions.invoke("auth-precheck", {
+          body: {
+            action: "record_inactive_login_attempt",
+            email: payload.email,
+            reason: payload.reason,
+            mode: payload.mode,
+            attempted_user_id: payload.attempted_user_id,
+            user_agent: payload.user_agent,
+            metadata: payload.metadata,
+          },
         });
       } catch (e) {
         console.warn("Failed to record inactive login attempt:", e);
@@ -266,18 +269,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const queue = JSON.parse(localStorage.getItem("ces_inactive_attempt_queue") || "[]");
       if (queue.length === 0) return;
-      // Flush each queued record through the validated RPC (direct table
-      // inserts are no longer permitted).
+      // Flush each queued record through the server-side helper.
       const results = await Promise.allSettled(
         queue.map((item: any) =>
-          supabase.rpc("record_inactive_login_attempt" as any, {
-            _email: item.email,
-            _reason: item.reason,
-            _mode: item.mode,
-            _attempted_user_id: item.attempted_user_id ?? null,
-            _user_agent: item.user_agent ?? null,
-            _metadata: item.metadata ?? {},
-            _created_at: item.created_at ?? new Date().toISOString(),
+          supabase.functions.invoke("auth-precheck", {
+            body: {
+              action: "record_inactive_login_attempt",
+              email: item.email,
+              reason: item.reason,
+              mode: item.mode,
+              attempted_user_id: item.attempted_user_id ?? null,
+              user_agent: item.user_agent ?? null,
+              metadata: item.metadata ?? {},
+              created_at: item.created_at ?? new Date().toISOString(),
+            },
           }),
         ),
       );

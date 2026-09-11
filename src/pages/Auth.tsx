@@ -225,10 +225,10 @@ const Auth = () => {
 
     // Permanently removed accounts can never be recreated with the same email.
     try {
-      const { data: removed } = await supabase.rpc("is_email_deleted", {
-        _email: data.email,
+      const { data: precheck } = await supabase.functions.invoke("auth-precheck", {
+        body: { action: "is_email_deleted", email: data.email },
       });
-      if (removed === true) {
+      if ((precheck as { deleted?: boolean } | null)?.deleted === true) {
         setIsLoading(false);
         toast({
           title: "Account unavailable",
