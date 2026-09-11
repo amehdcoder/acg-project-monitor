@@ -75,12 +75,17 @@ export async function verifyDeviceToken(req: Request): Promise<DeviceContext | n
     label: device.label,
     allowForms: !!config.allow_forms,
     allowCases: !!config.allow_cases,
+    allowSeeclear: !!config.allow_seeclear,
     collectorUserId: config.collector_user_id ?? null,
   };
 }
 
 /** Everything a device needs to run fully offline for its project. */
-export async function buildProjectBundle(projectId: string, allowCases: boolean) {
+export async function buildProjectBundle(
+  projectId: string,
+  allowCases: boolean,
+  allowSeeclear = false,
+) {
   const db = admin();
   const [{ data: project }, { data: forms }] = await Promise.all([
     db.from("projects").select("id, name, description").eq("id", projectId).maybeSingle(),
