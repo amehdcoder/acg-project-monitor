@@ -1854,6 +1854,13 @@ const CasesView = () => {
         </TabsContent>
 
 
+        <TabsContent value="records" className="mt-4">
+          <ProgrammeModuleWorkspace
+            projectId={projectFilter !== "all" ? projectFilter : projects[0]?.id}
+            canConfigure={isAdmin}
+          />
+        </TabsContent>
+
         <TabsContent value="map" className="mt-4">
           <CaseLocationMap
             projectFilter={projectFilter}
