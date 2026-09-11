@@ -29,11 +29,14 @@ interface Props {
   moduleId: string;
   projectId: string;
   defaultComponent?: string;
+  /** Existing services — used by MMDP visits to compare with previous visits. */
+  priorServices?: BeneficiaryServiceRow[];
   onSaved: () => void;
 }
 
 const ServiceEntryDialog = ({
-  open, onOpenChange, config, beneficiary, moduleId, projectId, defaultComponent, onSaved,
+  open, onOpenChange, config, beneficiary, moduleId, projectId, defaultComponent,
+  priorServices = [], onSaved,
 }: Props) => {
   const beneficiaryId = beneficiary.id;
   const { toast } = useToast();
