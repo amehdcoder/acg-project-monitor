@@ -758,6 +758,15 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {accessProject && (
+        <ProjectAccessDialog
+          projectId={accessProject.id}
+          projectName={accessProject.name}
+          open={!!accessProject}
+          onOpenChange={(o) => { if (!o) setAccessProject(null); }}
+        />
+      )}
     </div>
   );
 };
