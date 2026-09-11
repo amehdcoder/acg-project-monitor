@@ -46,6 +46,8 @@ import {
 import { isBloombergSavedEntry, isSpecialBridgeEntry } from "@/lib/specialFormBridge";
 import { captureAndUploadDeviceAuditSnapshots } from "@/lib/bloomberg/deviceAuditSnapshot";
 import { syncSavedFormEntry } from "@/lib/savedFormAutoSync";
+import { syncDeviceRecords } from "@/lib/deviceSync";
+import SeeClearFormFiller from "@/components/SeeClear/SeeClearFormFiller";
 
 export type SavedFormsMode = "edit" | "send" | "view" | "delete";
 
@@ -185,16 +187,30 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
     let synced = 0;
     let failed = 0;
     try {
-      for (const entry of targets) {
-        try {
-          const ok = await syncSavedFormEntry(entry);
-          if (ok) {
-            synced++;
-          } else {
+      // Account-free collectors have no database session: their records must
+      // go through the device channel, not the signed-in submissions path.
+      if (targets.some((e) => (e.userId || "").startsWith("device:"))) {
+        const result = await syncDeviceRecords();
+        synced = result.synced;
+        failed = result.failed;
+        if (synced === 0 && failed === 0) {
+          toast({
+            title: "Nothing sent yet",
+            description: "These records stay queued and will be sent automatically.",
+          });
+        }
+      } else {
+        for (const entry of targets) {
+          try {
+            const ok = await syncSavedFormEntry(entry);
+            if (ok) {
+              synced++;
+            } else {
+              failed++;
+            }
+          } catch {
             failed++;
           }
-        } catch {
-          failed++;
         }
       }
       if (synced > 0) {
@@ -244,6 +260,25 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
   }
 
   if (editing) {
+    // See Clear visits captured on an account-free device have no generic
+    // question list — reopen them in the checklist itself with every answer
+    // restored, instead of an empty form.
+    if (editing.settings?.kind === "seeclear" && editing.deviceId) {
+      return (
+        <SeeClearFormFiller
+          deviceMode={{
+            deviceId: editing.deviceId,
+            collectorLabel: String(editing.settings?.collectorLabel || ""),
+            projectId: editing.projectId || "",
+          }}
+          savedDraft={editing}
+          onClose={() => {
+            setEditing(null);
+            load();
+          }}
+        />
+      );
+    }
     if (isBloombergSavedEntry(editing)) {
       return (
         <BloombergFormFiller
