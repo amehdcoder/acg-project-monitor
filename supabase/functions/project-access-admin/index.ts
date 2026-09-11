@@ -48,12 +48,19 @@ async function requireProjectManager(req: Request, projectId: string) {
   return project?.created_by === userId ? userId : null;
 }
 
-/** Look an existing collection account up by e-mail across every page of users. */
+/** Look an existing collection account up by e-mail, cheaply then exhaustively. */
 async function findUserByEmail(email: string): Promise<string | null> {
   const db = admin();
   const target = email.toLowerCase();
-  // Projects on a mature workspace sit behind hundreds of real accounts, so a
-  // single first page is never enough — walk the whole list.
+
+  // The indexed profiles row is the fast path on a workspace with many users.
+  const { data: profile } = await db
+    .from("profiles")
+    .select("user_id")
+    .ilike("email", target)
+    .maybeSingle();
+  if (profile?.user_id) return profile.user_id as string;
+
   for (let page = 1; page <= 25; page++) {
     const { data, error } = await db.auth.admin.listUsers({ page, perPage: 200 });
     if (error) break;
@@ -74,10 +81,6 @@ async function ensureCollectorUser(projectId: string, projectName: string, exist
   }
   const email = `collect+${projectId}@devices.amehnities.org`;
 
-  // Reuse the account from an earlier configuration before trying to create one.
-  const found = await findUserByEmail(email);
-  if (found) return found;
-
   const password = crypto.randomUUID() + crypto.randomUUID();
   const { data: created, error } = await db.auth.admin.createUser({
     email,
@@ -87,8 +90,9 @@ async function ensureCollectorUser(projectId: string, projectName: string, exist
   });
   if (created?.user?.id) return created.user.id;
 
-  const retry = await findUserByEmail(email);
-  if (retry) return retry;
+  // Already provisioned by an earlier save — reuse it.
+  const found = await findUserByEmail(email);
+  if (found) return found;
   throw new Error(error?.message || "collector_account_failed");
 }
 
