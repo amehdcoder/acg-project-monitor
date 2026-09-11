@@ -117,7 +117,9 @@ export const useSeeClearDashboard = () => {
   const pendingQuery = useQuery<MonitoringRow[]>({
     queryKey: ["seeclear-pending-visits"],
     queryFn: async () =>
-      (await listPendingRows("seeclear_monitoring")).map((r) => ({ ...r, __pending: true })) as MonitoringRow[],
+      (await listPendingRows("seeclear_monitoring")).map(
+        (r) => ({ ...r, __pending: true }) as unknown as MonitoringRow,
+      ),
     enabled: !simulate,
     refetchInterval: 15_000,
   });
