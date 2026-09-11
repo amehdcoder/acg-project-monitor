@@ -10637,6 +10637,10 @@ export type Database = {
         Args: { _code: string; _user_id: string }
         Returns: boolean
       }
+      increment_device_records: {
+        Args: { _count: number; _device_row_id: string }
+        Returns: undefined
+      }
       invoke_mda_sync_job: { Args: never; Returns: undefined }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_assignment_active: {
