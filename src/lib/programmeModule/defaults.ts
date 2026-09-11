@@ -409,8 +409,8 @@ export const ageFromDob = (dob?: unknown): string => {
 
 export const normalizeConfig = (raw: unknown): ProgrammeModuleConfig => {
   const cfg = (raw || {}) as Partial<ProgrammeModuleConfig>;
-  if (!cfg.components || !cfg.sections) return { ...BLANK_PRESET };
-  return {
+  if (!cfg.components || !cfg.sections) return applyRegistrationChoices({ ...BLANK_PRESET });
+  return applyRegistrationChoices({
     version: cfg.version ?? 1,
     branding: { ...BLANK_PRESET.branding, ...(cfg.branding || {}) },
     caseId: { ...BLANK_PRESET.caseId, ...(cfg.caseId || {}) },
@@ -419,5 +419,5 @@ export const normalizeConfig = (raw: unknown): ProgrammeModuleConfig => {
     workflow: { ...BLANK_PRESET.workflow, ...(cfg.workflow || {}) },
     layout: { ...BLANK_PRESET.layout, ...(cfg.layout || {}) },
     dataQuality: cfg.dataQuality || [],
-  };
+  });
 };
