@@ -79,6 +79,10 @@ Deno.serve(async (req) => {
           rejected.push({ id: r?.id ?? "unknown", reason: "invalid_record" });
           return false;
         }
+        if (!ctx.allowForms) {
+          rejected.push({ id: r.id, reason: "forms_not_allowed" });
+          return false;
+        }
         if (!allowedForms.has(r.formId)) {
           rejected.push({ id: r.id, reason: "form_not_in_project" });
           return false;
