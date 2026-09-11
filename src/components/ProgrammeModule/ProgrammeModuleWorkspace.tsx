@@ -130,7 +130,7 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
         {modules.length > 0 && (
           <Select value={active?.id || ""} onValueChange={setActiveId}>
             <SelectTrigger className="w-[260px]"><SelectValue placeholder="Select module" /></SelectTrigger>
-            <SelectContent className="z-[120] bg-popover">
+            <SelectContent className="z-[1200] bg-popover">
               {modules.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
             </SelectContent>
           </Select>

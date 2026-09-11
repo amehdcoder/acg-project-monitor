@@ -54,14 +54,14 @@ const BeneficiaryList = ({ beneficiaries, config, loading, onOpen, onRegister, o
         </div>
         <Select value={status} onValueChange={setStatus}>
           <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
-          <SelectContent className="z-[120] bg-popover">
+          <SelectContent className="z-[1200] bg-popover">
             <SelectItem value="all">All statuses</SelectItem>
             {config.workflow.statuses.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={lga} onValueChange={setLga}>
           <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
-          <SelectContent className="z-[120] bg-popover">
+          <SelectContent className="z-[1200] bg-popover">
             <SelectItem value="all">All LGAs</SelectItem>
             {lgas.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
           </SelectContent>

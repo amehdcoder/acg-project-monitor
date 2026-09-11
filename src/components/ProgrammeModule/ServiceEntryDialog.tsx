@@ -91,7 +91,7 @@ const ServiceEntryDialog = ({
             <Label>Programme component</Label>
             <Select value={componentKey} onValueChange={setComponentKey}>
               <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent className="z-[120] bg-popover">
+              <SelectContent className="z-[1200] bg-popover">
                 {components.map((c) => <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -102,7 +102,7 @@ const ServiceEntryDialog = ({
               <Label>Service</Label>
               <Select value={serviceName} onValueChange={setServiceName}>
                 <SelectTrigger><SelectValue placeholder="Select service…" /></SelectTrigger>
-                <SelectContent className="z-[120] bg-popover">
+                <SelectContent className="z-[1200] bg-popover">
                   {component.services.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -118,7 +118,7 @@ const ServiceEntryDialog = ({
               <Label>Status</Label>
               <Select value={status} onValueChange={setStatus}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent className="z-[120] bg-popover">
+                <SelectContent className="z-[1200] bg-popover">
                   {config.workflow.serviceStatuses.map((s) => (
                     <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                   ))}

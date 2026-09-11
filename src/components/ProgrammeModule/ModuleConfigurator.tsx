@@ -194,13 +194,13 @@ const ModuleConfigurator = ({ open, onOpenChange, moduleId, moduleName, config, 
                       />
                       <Select value={c.icon} onValueChange={(v) => setComponents(draft.components.map((x) => x.key === c.key ? { ...x, icon: v } : x))}>
                         <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
-                        <SelectContent className="z-[130] bg-popover">
+                        <SelectContent className="z-[1200] bg-popover">
                           {COMPONENT_ICON_CHOICES.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}
                         </SelectContent>
                       </Select>
                       <Select value={c.color} onValueChange={(v) => setComponents(draft.components.map((x) => x.key === c.key ? { ...x, color: v } : x))}>
                         <SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger>
-                        <SelectContent className="z-[130] bg-popover">
+                        <SelectContent className="z-[1200] bg-popover">
                           {COMPONENT_COLOR_CHOICES.map((col) => (
                             <SelectItem key={col} value={col}>
                               <span className="flex items-center gap-2">
@@ -257,7 +257,7 @@ const ModuleConfigurator = ({ open, onOpenChange, moduleId, moduleName, config, 
                     <Input className="min-w-[180px] flex-1" value={s.label} onChange={(e) => updateSection(s.id, { label: e.target.value })} />
                     <Select value={s.placement} onValueChange={(v) => updateSection(s.id, { placement: v as ProfileSection["placement"] })}>
                       <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
-                      <SelectContent className="z-[130] bg-popover">
+                      <SelectContent className="z-[1200] bg-popover">
                         <SelectItem value="personal">Personal card</SelectItem>
                         <SelectItem value="clinical">Clinical card</SelectItem>
                         <SelectItem value="location">Location card</SelectItem>
@@ -280,7 +280,7 @@ const ModuleConfigurator = ({ open, onOpenChange, moduleId, moduleName, config, 
                             onChange={(e) => updateQuestion(s.id, q.id, { name: e.target.value })} />
                           <Select value={q.type} onValueChange={(v) => updateQuestion(s.id, q.id, { type: v as QuestionType })}>
                             <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
-                            <SelectContent className="z-[130] bg-popover">
+                            <SelectContent className="z-[1200] bg-popover">
                               {QUESTION_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                             </SelectContent>
                           </Select>
