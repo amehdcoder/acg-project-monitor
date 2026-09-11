@@ -7717,6 +7717,21 @@ export type Database = {
         }
         Relationships: []
       }
+      owner_emails: {
+        Row: {
+          created_at: string
+          email: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+        }
+        Relationships: []
+      }
       patient_referrals: {
         Row: {
           accepted_by: string | null
@@ -11150,6 +11165,7 @@ export type Database = {
         Returns: boolean
       }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
+      is_owner_email: { Args: { _email: string }; Returns: boolean }
       is_owner_level: { Args: { _user_id: string }; Returns: boolean }
       is_owner_or_co_owner: { Args: { _user_id: string }; Returns: boolean }
       is_platform_owner: { Args: { _user_id: string }; Returns: boolean }

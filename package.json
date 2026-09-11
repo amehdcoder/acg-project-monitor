@@ -18,7 +18,7 @@
     "android:splash": "bash scripts/apply-android-splash.sh"
   },
   "dependencies": {
-    "@capacitor/cli": "^8.4.2",
+    "@capacitor/cli": "^8.5.2",
     "@capacitor/core": "^8.3.0",
     "@capacitor/geolocation": "^7.0.0",
     "@diffusionstudio/vits-web": "^1.0.3",
