@@ -15,7 +15,9 @@ import {
   TrendingUp,
   ClipboardList,
   MessageCircle,
+  QrCode,
 } from "lucide-react";
+import ProjectAccessDialog from "@/components/DeviceCollect/ProjectAccessDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
