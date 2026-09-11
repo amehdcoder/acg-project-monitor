@@ -692,6 +692,14 @@ const Auth = () => {
           </Tabs>
         </CardContent>
         <div className="border-t px-4 sm:px-6 py-3">
+          <a
+            href="/join"
+            className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-primary/40 py-2.5 text-sm font-medium text-primary hover:bg-primary/5"
+          >
+            Joining with a project code or QR code? Collect without an account
+          </a>
+        </div>
+        <div className="border-t px-4 sm:px-6 py-3">
           <div className="flex items-center justify-between gap-3">
             <p className="text-[11px] leading-tight text-muted-foreground">
               Trouble loading or signing in? Recover safely — your offline data stays on this device.
