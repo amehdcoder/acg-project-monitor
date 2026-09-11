@@ -95,21 +95,22 @@ Deno.serve(async (req) => {
           case_type_id: typeId,
           project_id: ctx.projectId,
           owner_id: ctx.collectorUserId,
-          opened_by: ctx.collectorUserId,
-          last_modified_by: ctx.collectorUserId,
           name: String(r.caseName || "Case").slice(0, 200),
           properties: r.data ?? {},
           status: "open",
           opened_at: r.submittedAt || now,
+          client_submitted_at: r.clientSubmittedAt || r.submittedAt || now,
         });
       }
       if (caseRows.length > 0) {
-        const { error } = await db.from("cases").upsert(caseRows, { onConflict: "id" });
+        // Atomic, idempotent, last-write-wins ingestion in a single
+        // transaction — no partial writes and no duplicate cases on retry.
+        const { data: ok, error } = await db.rpc("ingest_cases", { _rows: caseRows });
         if (error) {
-          console.error("project-collect case upsert error", error);
+          console.error("project-collect case ingest error", error);
           for (const row of caseRows) rejected.push({ id: String(row.id), reason: "write_failed" });
         } else {
-          accepted.push(...caseRows.map((row) => String(row.id)));
+          accepted.push(...(ok ?? []).map((row: any) => String(row.accepted_id ?? row)));
         }
       }
     }
