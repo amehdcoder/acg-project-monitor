@@ -59,6 +59,7 @@ const ScrollToTop = () => {
 const GpsWarmer = () => {
   useEffect(() => {
     const stop = startGpsWarmer();
+    initDeviceAutoSync();
     return stop;
   }, []);
   return null;
