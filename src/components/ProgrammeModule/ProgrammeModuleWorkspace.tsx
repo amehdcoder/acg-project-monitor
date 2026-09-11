@@ -150,9 +150,15 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
         <Button variant="outline" size="sm" onClick={() => void reload()} aria-label="Reload modules">
           <RefreshCw className="h-4 w-4" />
         </Button>
+        <Button variant="outline" size="sm" className="gap-1" onClick={() => setRegistryOpen(true)}>
+          <Building2 className="h-4 w-4" /> Health facilities
+        </Button>
         {canConfigure && (
-          <Button variant="outline" size="sm" className="gap-1" onClick={() => setFocalOpen(true)}>
-            <Users className="h-4 w-4" /> Facility focal persons
+          <Button
+            variant="outline" size="sm" className="gap-1"
+            onClick={() => { setFocalFacilityId(undefined); setFocalOpen(true); }}
+          >
+            <Users className="h-4 w-4" /> Facility teams
           </Button>
         )}
         {canConfigure && active && (
