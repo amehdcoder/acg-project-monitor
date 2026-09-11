@@ -16,7 +16,10 @@ import type { ProgrammeModuleConfig } from "@/lib/programmeModule/types";
 import ConfigFieldRenderer, { AnswerMap, isRelevant } from "./ConfigFieldRenderer";
 import { recordAudit } from "./useProgrammeModule";
 import MentalHealthServiceForm, { mhFormForService } from "./MentalHealthServiceForm";
-import type { BeneficiaryRow } from "@/lib/programmeModule/types";
+import MmdpServiceForm, { isMmdpService } from "./MmdpServiceForm";
+import FollowUpFields, { emptyFollowUp } from "./FollowUpFields";
+import type { FollowUpValue } from "./FollowUpFields";
+import type { BeneficiaryRow, BeneficiaryServiceRow } from "@/lib/programmeModule/types";
 
 interface Props {
   open: boolean;
