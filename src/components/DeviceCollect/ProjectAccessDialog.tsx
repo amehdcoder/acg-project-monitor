@@ -75,25 +75,28 @@ const ProjectAccessDialog = ({ projectId, projectName, open, onOpenChange }: Pro
     [projectId],
   );
 
+  /** Mirror the stored settings onto the switches, so what is shown is what is saved. */
+  const applyConfig = useCallback((cfg: AccessConfig | null) => {
+    setConfig(cfg);
+    setEnabled(!!cfg?.enabled);
+    setAllowForms(cfg ? !!(cfg as any).allow_forms : true);
+    setAllowCases(!!(cfg as any)?.allow_cases);
+    setAllowSeeclear(!!(cfg as any)?.allow_seeclear);
+    setExpiresAt(cfg?.expires_at ? String(cfg.expires_at).slice(0, 10) : "");
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const data = await call({ action: "get" });
-      setConfig(data.config);
+      applyConfig(data.config ?? null);
       setDevices(data.devices ?? []);
-      if (data.config) {
-        setEnabled(!!data.config.enabled);
-        setAllowForms(!!data.config.allow_forms);
-        setAllowCases(!!data.config.allow_cases);
-        setAllowSeeclear(!!data.config.allow_seeclear);
-        setExpiresAt(data.config.expires_at ? String(data.config.expires_at).slice(0, 10) : "");
-      }
     } catch {
       toast.error("Could not load the access settings for this project.");
     } finally {
       setLoading(false);
     }
-  }, [call]);
+  }, [call, applyConfig]);
 
   useEffect(() => { if (open) void load(); }, [open, load]);
 
@@ -110,10 +113,21 @@ const ProjectAccessDialog = ({ projectId, projectName, open, onOpenChange }: Pro
         pin: pin.trim() ? pin.trim() : undefined,
         ...extra,
       });
-      setConfig(data.config);
       setPin("");
-      toast.success(extra.rotateCode ? "New project code generated" : "Access settings saved");
-      await load();
+      // Re-read from the server and confirm the stored settings really match
+      // what was asked for, so a silent partial save can never look successful.
+      const fresh = await call({ action: "get" });
+      const stored = (fresh.config ?? data.config ?? null) as AccessConfig | null;
+      applyConfig(stored);
+      setDevices(fresh.devices ?? []);
+
+      if (!stored || !!stored.enabled !== enabled) {
+        toast.error("The access settings did not save. Please try again.");
+      } else if (data.warning) {
+        toast.warning(String(data.warning));
+      } else {
+        toast.success(extra.rotateCode ? "New project code generated" : "Access settings saved");
+      }
     } catch (err) {
       const reason = String((err as Error)?.message || "");
       toast.error("Could not save the access settings.", {
