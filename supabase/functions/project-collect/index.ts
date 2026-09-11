@@ -65,7 +65,56 @@ Deno.serve(async (req) => {
       else rejected.push({ id: record.id, reason: res.reason ?? "write_failed" });
     }
 
-    const formRecords = records.filter((r) => r.kind !== "seeclear");
+    // Cases opened offline on a device.
+    const caseRecords = records.filter((r) => r.kind === "case");
+    if (caseRecords.length > 0) {
+      const caseTypeIds = Array.from(
+        new Set(caseRecords.map((r) => String(r.caseTypeId || r.formId))),
+      );
+      const { data: caseTypes } = await db
+        .from("case_types")
+        .select("id, project_id")
+        .in("id", caseTypeIds);
+      const allowedTypes = new Set(
+        (caseTypes ?? []).filter((c: any) => c.project_id === ctx.projectId).map((c: any) => c.id),
+      );
+
+      const caseRows: Record<string, unknown>[] = [];
+      for (const r of caseRecords) {
+        const typeId = String(r.caseTypeId || r.formId);
+        if (!ctx.allowCases) {
+          rejected.push({ id: r.id, reason: "cases_not_allowed" });
+          continue;
+        }
+        if (!allowedTypes.has(typeId)) {
+          rejected.push({ id: r.id, reason: "case_type_not_in_project" });
+          continue;
+        }
+        caseRows.push({
+          id: r.id,
+          case_type_id: typeId,
+          project_id: ctx.projectId,
+          owner_id: ctx.collectorUserId,
+          opened_by: ctx.collectorUserId,
+          last_modified_by: ctx.collectorUserId,
+          name: String(r.caseName || "Case").slice(0, 200),
+          properties: r.data ?? {},
+          status: "open",
+          opened_at: r.submittedAt || now,
+        });
+      }
+      if (caseRows.length > 0) {
+        const { error } = await db.from("cases").upsert(caseRows, { onConflict: "id" });
+        if (error) {
+          console.error("project-collect case upsert error", error);
+          for (const row of caseRows) rejected.push({ id: String(row.id), reason: "write_failed" });
+        } else {
+          accepted.push(...caseRows.map((row) => String(row.id)));
+        }
+      }
+    }
+
+    const formRecords = records.filter((r) => r.kind !== "seeclear" && r.kind !== "case");
 
     // Only forms that belong to this device's project may be written.
     const formIds = Array.from(new Set(formRecords.map((r) => String(r.formId))));
