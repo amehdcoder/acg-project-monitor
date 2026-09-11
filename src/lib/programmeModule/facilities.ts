@@ -15,14 +15,30 @@ export interface FacilityRow {
   contact_phone: string | null;
 }
 
+export type FacilityAccessLevel = "view" | "record" | "manage";
+
 export interface FocalPersonRow {
   id: string;
   facility_id: string;
   user_id: string;
   role: string;
+  access_level: FacilityAccessLevel;
   is_active: boolean;
   created_at: string;
 }
+
+/** How much of a facility's beneficiary records a team member may work with. */
+export const ACCESS_LEVELS: { value: FacilityAccessLevel; label: string; hint: string }[] = [
+  { value: "view", label: "View only", hint: "Can read beneficiary records and history." },
+  { value: "record", label: "Record services", hint: "Can add services, referrals and follow-ups." },
+  { value: "manage", label: "Full management", hint: "Can edit profiles, status and referrals." },
+];
+
+export const ACCESS_LEVEL_LABEL: Record<FacilityAccessLevel, string> = {
+  view: "View only",
+  record: "Record services",
+  manage: "Full management",
+};
 
 export const FACILITY_TYPE_LABEL: Record<FacilityRow["facility_type"], string> = {
   phc: "Primary Health Centre",
