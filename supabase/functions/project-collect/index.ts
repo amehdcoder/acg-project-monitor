@@ -42,8 +42,29 @@ Deno.serve(async (req) => {
 
     const db = admin();
 
+    const accepted: string[] = [];
+    const rejected: { id: string; reason: string }[] = [];
+    const now = new Date().toISOString();
+
+    // See Clear facility visits go to the checklist table (and on to Kobo).
+    const seeclear = records.filter((r) => r.kind === "seeclear");
+    for (const record of seeclear) {
+      if (!ctx.allowSeeclear) {
+        rejected.push({ id: record.id, reason: "seeclear_not_allowed" });
+        continue;
+      }
+      const res = await intakeSeeClearRecord(
+        { id: record.id, data: record.data ?? {}, photos: record.photos, submittedAt: record.submittedAt },
+        { collectorUserId: ctx.collectorUserId, deviceId: ctx.deviceId, label: ctx.label },
+      );
+      if (res.ok) accepted.push(record.id);
+      else rejected.push({ id: record.id, reason: res.reason ?? "write_failed" });
+    }
+
+    const formRecords = records.filter((r) => r.kind !== "seeclear");
+
     // Only forms that belong to this device's project may be written.
-    const formIds = Array.from(new Set(records.map((r) => String(r.formId))));
+    const formIds = Array.from(new Set(formRecords.map((r) => String(r.formId))));
     const { data: forms } = await db
       .from("forms")
       .select("id, project_id")
