@@ -43,20 +43,21 @@ const ROLES = [
   { value: "records_officer", label: "Records officer" },
 ];
 
-const FacilityFocalPersons = ({ open, onOpenChange, projectId }: Props) => {
+const FacilityFocalPersons = ({ open, onOpenChange, projectId, initialFacilityId }: Props) => {
   const { toast } = useToast();
   const { facilities } = useFacilities(projectId);
   const [people, setPeople] = useState<PersonRow[]>([]);
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
-  const [facilityId, setFacilityId] = useState("");
+  const [facilityId, setFacilityId] = useState(initialFacilityId || "");
   const [userId, setUserId] = useState("");
   const [role, setRole] = useState("focal_person");
+  const [accessLevel, setAccessLevel] = useState<FacilityAccessLevel>("manage");
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     const [p, pr] = await Promise.all([
-      supabase.from("facility_focal_persons").select("id,facility_id,user_id,role,is_active"),
+      supabase.from("facility_focal_persons").select("id,facility_id,user_id,role,access_level,is_active"),
       supabase.from("profiles").select("user_id,first_name,last_name,email").order("first_name").limit(1000),
     ]);
     setPeople((p.data as PersonRow[]) || []);
@@ -64,6 +65,7 @@ const FacilityFocalPersons = ({ open, onOpenChange, projectId }: Props) => {
   }, []);
 
   useEffect(() => { if (open) void load(); }, [open, load]);
+  useEffect(() => { if (open && initialFacilityId) setFacilityId(initialFacilityId); }, [open, initialFacilityId]);
 
   const nameOf = useCallback(
     (uid: string) => {
