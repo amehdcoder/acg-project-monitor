@@ -50,9 +50,9 @@ export async function repairKoboIdentity(config: QuizKoboConfig): Promise<Identi
   const { data, error } = await supabase.functions.invoke("kobo-form-manager", {
     body: {
       action: "fetch_submissions",
+      quiz_id: config.quiz_id,
       server_url: config.server_url,
       form_uid: config.form_uid,
-      api_token: config.api_token,
       page_size: 1,
       page: 0,
     },
