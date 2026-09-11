@@ -20,7 +20,6 @@ import {
 } from "./scoring";
 import type { QuizKoboConfig } from "@/hooks/useQuizKobo";
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 
 export interface IdentityRepairResult {
   repaired: boolean;
