@@ -121,7 +121,8 @@ export const CISKULA_PRESET: ProgrammeModuleConfig = {
       "Visual acuity test", "Glasses provided", "Cataract screening",
     ]),
     component("mmdp_ntd", "MMDP / NTD", "Accessibility", "152 55% 40%", 2, [
-      "Limb care assessment", "Lymphoedema care", "Self-care training",
+      "Limb care assessment (baseline)", "Lymphoedema care outcome",
+      "Hydrocoele surgery outcome", "Self-care training",
     ]),
     component("mental_health", "Mental Health & Psychosocial Support", "Brain", "270 60% 52%", 3, [
       "GAD-7 assessment", "PHQ-9 assessment", "Counselling session",
