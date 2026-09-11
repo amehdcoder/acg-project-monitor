@@ -2402,6 +2402,7 @@ export type Database = {
       cases: {
         Row: {
           case_type_id: string
+          client_submitted_at: string | null
           closed_at: string | null
           closed_by: string | null
           closure_reason: string | null
@@ -2421,9 +2422,12 @@ export type Database = {
           risk_level: string | null
           sharing_level: string | null
           status: string
+          submission_uuid: string | null
+          version: number
         }
         Insert: {
           case_type_id: string
+          client_submitted_at?: string | null
           closed_at?: string | null
           closed_by?: string | null
           closure_reason?: string | null
@@ -2443,9 +2447,12 @@ export type Database = {
           risk_level?: string | null
           sharing_level?: string | null
           status?: string
+          submission_uuid?: string | null
+          version?: number
         }
         Update: {
           case_type_id?: string
+          client_submitted_at?: string | null
           closed_at?: string | null
           closed_by?: string | null
           closure_reason?: string | null
@@ -2465,6 +2472,8 @@ export type Database = {
           risk_level?: string | null
           sharing_level?: string | null
           status?: string
+          submission_uuid?: string | null
+          version?: number
         }
         Relationships: [
           {
@@ -10200,6 +10209,26 @@ export type Database = {
       }
     }
     Views: {
+      project_device_activity: {
+        Row: {
+          device_id: string | null
+          device_row_id: string | null
+          label: string | null
+          last_record_at: string | null
+          last_seen_at: string | null
+          project_id: string | null
+          records_received: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_devices_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_form_submissions_enriched: {
         Row: {
           client_submitted_at: string | null
@@ -10643,6 +10672,18 @@ export type Database = {
       increment_device_records: {
         Args: { _count: number; _device_row_id: string }
         Returns: undefined
+      }
+      ingest_cases: {
+        Args: { _rows: Json }
+        Returns: {
+          accepted_id: string
+        }[]
+      }
+      ingest_form_submissions: {
+        Args: { _rows: Json }
+        Returns: {
+          accepted_uuid: string
+        }[]
       }
       invoke_mda_sync_job: { Args: never; Returns: undefined }
       is_admin: { Args: { _user_id: string }; Returns: boolean }

@@ -45,7 +45,16 @@ export interface SavedFormEntry {
   // the deterministic merge engine to resolve divergent edits.
   deviceId?: string | null;
   rev?: number;
+  // Outbound queue machine: queued -> syncing -> synced | error. `status`
+  // remains the user-facing lifecycle (draft/finalized/sent); these fields
+  // track the transport attempt so retries are bounded and observable.
+  syncState?: SyncState;
+  syncAttempts?: number;
+  lastSyncError?: string | null;
+  nextAttemptAt?: string | null;
 }
+
+export type SyncState = "queued" | "syncing" | "synced" | "error";
 
 const DEVICE_ID_KEY = "amehnities_saved_forms_device_id";
 
@@ -275,6 +284,32 @@ export const setSavedEntryStatus = async (
 
 
 export const newEntryId = (): string => crypto.randomUUID();
+
+/**
+ * Record a transport-state transition for a queued entry. Written straight to
+ * IndexedDB (no revision bump, no audit entry) so bookkeeping never inflates
+ * the record's merge revision.
+ */
+export const markSyncState = async (
+  id: string,
+  syncState: SyncState,
+  patch: Partial<Pick<SavedFormEntry, "syncAttempts" | "lastSyncError" | "nextAttemptAt">> = {},
+): Promise<void> => {
+  const existing = await getSavedEntry(id);
+  if (!existing) return;
+  const next: SavedFormEntry = { ...existing, ...patch, syncState };
+  const db = await initDB();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE, "readwrite");
+    const req = tx.objectStore(STORE).put(next);
+    req.onerror = () => reject(req.error);
+    req.onsuccess = () => resolve();
+  });
+};
+
+/** True when a queued entry is still inside its backoff window. */
+export const isBackingOff = (entry: SavedFormEntry): boolean =>
+  !!entry.nextAttemptAt && new Date(entry.nextAttemptAt).getTime() > Date.now();
 
 export const buildSavedEntryDisplayName = (entry: Pick<SavedFormEntry, "formName" | "respondentName" | "updatedAt" | "finalizedAt" | "createdAt">): string => {
   const name = entry.respondentName?.trim() || "Unnamed respondent";

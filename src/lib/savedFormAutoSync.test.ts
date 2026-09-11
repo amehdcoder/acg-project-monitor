@@ -35,6 +35,12 @@ vi.mock("@/lib/savedForms", () => ({
     const existing = store.get(id);
     if (existing) store.set(id, { ...existing, ...patch, status });
   },
+  markSyncState: async (id: string, syncState: string, patch: any = {}) => {
+    const existing = store.get(id);
+    if (existing) store.set(id, { ...existing, ...patch, syncState });
+  },
+  isBackingOff: (entry: any) =>
+    !!entry.nextAttemptAt && new Date(entry.nextAttemptAt).getTime() > Date.now(),
 }));
 
 vi.mock("@/lib/specialFormBridge", () => ({
@@ -94,7 +100,11 @@ describe("savedFormAutoSync exactly-once", () => {
     const first = await syncFinalizedSavedForms();
     expect(first.failed).toBe(1);
     expect(store.get("e1").status).toBe("finalized");
+    expect(store.get("e1").syncState).toBe("error");
 
+    // The failed entry waits out its jittered backoff window before retrying.
+    const waitUntil = new Date(store.get("e1").nextAttemptAt).getTime();
+    vi.setSystemTime(new Date(waitUntil + 1));
     const second = await syncFinalizedSavedForms();
     expect(second.synced).toBe(1);
     // Despite multiple write attempts, the deterministic id keeps it to one row.
