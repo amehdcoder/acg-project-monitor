@@ -165,7 +165,7 @@ const JoinProject = () => {
                 </Label>
                 <Input id="code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())}
                   placeholder="e.g. K7M2QP" autoCapitalize="characters"
-                  className="h-13 border-primary/20 text-center font-mono text-lg uppercase tracking-[0.3em]" />
+                  className="h-12 border-primary/20 text-center font-mono text-lg uppercase tracking-[0.3em]" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="pin" className="font-semibold">Project PIN <span className="font-normal text-muted-foreground">(optional)</span></Label>

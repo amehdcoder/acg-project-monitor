@@ -73,7 +73,7 @@ const DeviceCollectShell = () => {
 
   const forms = useMemo(() => {
     const list = session?.bundle?.forms ?? [];
-    return list.filter((f: any) => (f.status ? f.status !== "archived" : true));
+    return list.filter((form: any) => !form.status || ["active", "published"].includes(String(form.status).toLowerCase()));
   }, [session]);
 
   const activeForm = useMemo(
