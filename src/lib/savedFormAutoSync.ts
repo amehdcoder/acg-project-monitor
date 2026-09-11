@@ -1,10 +1,17 @@
 import { supabase } from "@/integrations/supabase/client";
-import { listAllSavedEntries, setSavedEntryStatus, type SavedFormEntry } from "@/lib/savedForms";
+import {
+  listAllSavedEntries,
+  setSavedEntryStatus,
+  markSyncState,
+  isBackingOff,
+  type SavedFormEntry,
+} from "@/lib/savedForms";
 import { isSpecialBridgeEntry, syncSpecialSavedForm } from "@/lib/specialFormBridge";
 import { recordMetric, startTimer } from "@/lib/metrics";
+import { stampSyncContract } from "@/lib/syncContract";
+import { withQueueLock, backoffDelay, isRetryable, runCapped } from "@/lib/syncLock";
 
 let started = false;
-let syncing = false;
 
 // Per-entry in-flight guard. Overlapping triggers (online event + interval +
 // visibilitychange firing near-simultaneously) must never process the same
@@ -32,24 +39,30 @@ export async function syncSavedFormEntry(entry: SavedFormEntry): Promise<boolean
 
   const submissionId = submissionIdForEntry(entry);
   const sentAt = new Date().toISOString();
-  const row = {
-    id: submissionId,
-    form_id: entry.formId,
-    user_id: entry.userId,
-    data: entry.submissionData || entry.responses || {},
-    location: entry.submissionLocation || null,
-    within_geofence: entry.withinGeofence ?? null,
-    submission_type: entry.submissionType || "regular",
-    status: "sent",
-    submitted_at: entry.finalizedAt || entry.updatedAt || sentAt,
-    synced_at: sentAt,
-  };
+  // Stamp the immutable idempotency contract: submission_uuid is unique
+  // server-side, so a duplicate arriving after a network drop is ignored.
+  const row = stampSyncContract(
+    {
+      id: submissionId,
+      form_id: entry.formId,
+      user_id: entry.userId,
+      data: entry.submissionData || entry.responses || {},
+      location: entry.submissionLocation || null,
+      within_geofence: entry.withinGeofence ?? null,
+      submission_type: entry.submissionType || "regular",
+      status: "sent",
+      submitted_at: entry.finalizedAt || entry.updatedAt || sentAt,
+      synced_at: sentAt,
+    },
+    submissionId,
+    entry.finalizedAt || entry.createdAt || sentAt,
+  );
   // Idempotent write: upsert keyed on the deterministic id. If a previous
   // attempt actually reached the server but the client never saw the ack, this
   // overwrites the same row rather than inserting a second copy.
   const { error } = await supabase
     .from("form_submissions")
-    .upsert(row as any, { onConflict: "id" });
+    .upsert(row as any, { onConflict: "id", ignoreDuplicates: false });
   if (error) throw error;
   await setSavedEntryStatus(entry.id, "sent", {
     submissionId,
@@ -57,44 +70,61 @@ export async function syncSavedFormEntry(entry: SavedFormEntry): Promise<boolean
     offline: false,
     displayName: entry.displayName || null,
   });
+  await markSyncState(entry.id, "synced", { lastSyncError: null, nextAttemptAt: null });
   return true;
 }
 
 
-export async function syncFinalizedSavedForms(): Promise<{ synced: number; failed: number }> {
-  if (syncing || !isOnline()) return { synced: 0, failed: 0 };
-  const { data } = await supabase.auth.getSession().catch(() => ({ data: { session: null } } as any));
-  const userId = data?.session?.user?.id;
-  if (!userId) return { synced: 0, failed: 0 };
-
-  syncing = true;
+async function drain(userId: string): Promise<{ synced: number; failed: number }> {
   const stop = startTimer("saved_form_sync_batch");
   let synced = 0;
   let failed = 0;
   try {
-    const entries = (await listAllSavedEntries("finalized")).filter((e) => e.userId === userId);
-    for (const entry of entries) {
-      if (!isOnline()) break;
-      // Skip entries already being processed by an overlapping trigger so the
-      // same "Ready to send" item can never be sent twice.
-      if (inFlight.has(entry.id)) continue;
-      inFlight.add(entry.id);
-      try {
-        if (await withTimeout(syncSavedFormEntry(entry))) synced++;
-      } catch {
-        failed++;
-      } finally {
-        inFlight.delete(entry.id);
-      }
-    }
+    const entries = (await listAllSavedEntries("finalized")).filter(
+      (e) => e.userId === userId && e.syncState !== "syncing" && !isBackingOff(e),
+    );
+    // At most two uploads in flight so a large backlog drains steadily without
+    // opening a burst of concurrent connections from every device at once.
+    await runCapped(
+      entries.map((entry) => async () => {
+        if (!isOnline()) return;
+        if (inFlight.has(entry.id)) return;
+        inFlight.add(entry.id);
+        await markSyncState(entry.id, "syncing");
+        try {
+          if (await withTimeout(syncSavedFormEntry(entry))) synced++;
+        } catch (err) {
+          failed++;
+          const attempts = (entry.syncAttempts ?? 0) + 1;
+          await markSyncState(entry.id, "error", {
+            syncAttempts: attempts,
+            lastSyncError: String((err as Error)?.message || "sync_failed"),
+            nextAttemptAt: isRetryable(err)
+              ? new Date(Date.now() + backoffDelay(attempts)).toISOString()
+              : null,
+          });
+        } finally {
+          inFlight.delete(entry.id);
+        }
+      }),
+    );
   } finally {
-    syncing = false;
     stop(failed === 0, { synced, failed });
   }
   if (synced > 0 || failed > 0) {
     recordMetric("saved_form_sync_result", 0, failed === 0, { synced, failed });
   }
   return { synced, failed };
+}
+
+export async function syncFinalizedSavedForms(): Promise<{ synced: number; failed: number }> {
+  if (!isOnline()) return { synced: 0, failed: 0 };
+  const { data } = await supabase.auth.getSession().catch(() => ({ data: { session: null } } as any));
+  const userId = data?.session?.user?.id;
+  if (!userId) return { synced: 0, failed: 0 };
+  // Cross-tab mutex: only one worker anywhere may drain the queue at a time.
+  const result = await withQueueLock("saved_forms", () => drain(userId));
+  return result ?? { synced: 0, failed: 0 };
 }
 
 export function initSavedFormAutoSync() {
