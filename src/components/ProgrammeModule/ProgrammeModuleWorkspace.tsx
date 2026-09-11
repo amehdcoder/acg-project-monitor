@@ -43,6 +43,8 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
   const [focalOpen, setFocalOpen] = useState(false);
+  const [registryOpen, setRegistryOpen] = useState(false);
+  const [focalFacilityId, setFocalFacilityId] = useState<string | undefined>(undefined);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [selected, setSelected] = useState<BeneficiaryRow | null>(null);
   const [pending, setPending] = useState(queueCount());
