@@ -18,6 +18,7 @@ interface AccessConfig {
   join_code: string;
   allow_forms: boolean;
   allow_cases: boolean;
+  allow_seeclear?: boolean;
   expires_at: string | null;
   pin_hash: string | null;
 }
