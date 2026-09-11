@@ -63,6 +63,9 @@ export default function QuizKoboSyncDialog({ open, onClose, quizId, quizTitle, c
   const [identity, setIdentity] = useState<QuizKoboIdentityFields>({});
   const [showToken, setShowToken] = useState(false);
   const [showSecret, setShowSecret] = useState(false);
+  // The stored webhook secret is fetched on demand through the admin-gated
+  // edge function; it is never selectable from the browser.
+  const [webhookSecret, setWebhookSecret] = useState("");
   const [busy, setBusy] = useState<null | "test" | "import" | "save" | "register" | "pull">(null);
   const [groupFilter, setGroupFilter] = useState("all");
 
@@ -70,12 +73,19 @@ export default function QuizKoboSyncDialog({ open, onClose, quizId, quizTitle, c
     if (!open) return;
     setServerUrl(config?.server_url ?? "https://kf.kobotoolbox.org");
     setFormUid(config?.form_uid ?? "");
-    setApiToken(config?.api_token ?? "");
+    setApiToken("");
     setSyncMode(config?.sync_mode ?? "webhook");
     setFormTitle(config?.form_title ?? null);
     setQuestions(Array.isArray(config?.question_config) ? config!.question_config : []);
     setIdentity(config?.identity_fields ?? {});
-  }, [open, config]);
+    setWebhookSecret("");
+    if (config?.has_webhook_secret) {
+      void supabase.functions
+        .invoke("kobo-form-manager", { body: { action: "get_quiz_webhook_secret", quiz_id: quizId } })
+        .then(({ data }) => setWebhookSecret(((data as any)?.secret as string) ?? ""))
+        .catch(() => {});
+    }
+  }, [open, config, quizId]);
 
   const webhookUrl = `${SUPABASE_URL}/functions/v1/kobo-quiz-webhook/${quizId}`;
   const groups = useMemo(() => groupsOf(questions), [questions]);
@@ -99,7 +109,8 @@ export default function QuizKoboSyncDialog({ open, onClose, quizId, quizTitle, c
     setBusy("test");
     try {
       const res = await callManager({
-        action: "test_connection", server_url: serverUrl, form_uid: formUid, api_token: apiToken,
+        action: "test_connection", quiz_id: quizId, server_url: serverUrl, form_uid: formUid,
+        ...(apiToken.trim() ? { api_token: apiToken.trim() } : {}),
       });
       setFormTitle(res?.form_title ?? null);
       toast({ title: "Connection successful", description: `${res?.form_title ?? formUid} — ${res?.submission_count ?? 0} submissions on Kobo.` });
@@ -112,7 +123,8 @@ export default function QuizKoboSyncDialog({ open, onClose, quizId, quizTitle, c
     setBusy("import");
     try {
       const res = await callManager({
-        action: "fetch_submissions", server_url: serverUrl, form_uid: formUid, api_token: apiToken,
+        action: "fetch_submissions", quiz_id: quizId, server_url: serverUrl, form_uid: formUid,
+        ...(apiToken.trim() ? { api_token: apiToken.trim() } : {}),
         page_size: 1, page: 0,
       });
       const parsed = parseKoboForm(res?.survey ?? [], res?.choices ?? []);
@@ -135,7 +147,7 @@ export default function QuizKoboSyncDialog({ open, onClose, quizId, quizTitle, c
   };
 
   const save = async () => {
-    if (!formUid.trim() || !apiToken.trim()) {
+    if (!formUid.trim() || (!apiToken.trim() && !config?.has_api_token)) {
       toast({ title: "Form UID and API token are required", variant: "destructive" });
       return;
     }
@@ -146,7 +158,7 @@ export default function QuizKoboSyncDialog({ open, onClose, quizId, quizTitle, c
         server_url: serverUrl.trim().replace(/\/+$/, ""),
         form_uid: formUid.trim(),
         form_title: formTitle,
-        api_token: apiToken.trim(),
+        ...(apiToken.trim() ? { api_token: apiToken.trim() } : {}),
         sync_mode: syncMode,
         question_config: questions as unknown as any,
         identity_fields: identity as unknown as any,
@@ -163,7 +175,7 @@ export default function QuizKoboSyncDialog({ open, onClose, quizId, quizTitle, c
   };
 
   const registerWebhook = async () => {
-    if (!config?.webhook_secret) {
+    if (!webhookSecret) {
       toast({ title: "Save the connection first", variant: "destructive" });
       return;
     }
@@ -175,7 +187,7 @@ export default function QuizKoboSyncDialog({ open, onClose, quizId, quizTitle, c
         active: true,
         email_notification: false,
         export_type: "json",
-        settings: { custom_headers: { "x-kobo-secret": config.webhook_secret } },
+        settings: { custom_headers: { "x-kobo-secret": webhookSecret } },
       };
       await navigator.clipboard.writeText(JSON.stringify(body, null, 2)).catch(() => {});
       toast({
@@ -186,7 +198,7 @@ export default function QuizKoboSyncDialog({ open, onClose, quizId, quizTitle, c
   };
 
   const pullBackfill = async () => {
-    if (!config?.webhook_secret) {
+    if (!config?.has_webhook_secret) {
       toast({ title: "Save the connection first", variant: "destructive" });
       return;
     }
@@ -198,19 +210,15 @@ export default function QuizKoboSyncDialog({ open, onClose, quizId, quizTitle, c
       // eslint-disable-next-line no-constant-condition
       while (true) {
         const res = await callManager({
-          action: "fetch_submissions", server_url: serverUrl, form_uid: formUid, api_token: apiToken,
+          action: "fetch_submissions", quiz_id: quizId, server_url: serverUrl, form_uid: formUid,
+          ...(apiToken.trim() ? { api_token: apiToken.trim() } : {}),
           page_size: 200, page,
         });
         const results: any[] = Array.isArray(res?.results) ? res.results : [];
         if (!results.length) break;
         fetched += results.length;
-        const resp = await fetch(webhookUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-kobo-secret": config.webhook_secret },
-          body: JSON.stringify(results),
-        });
-        const out = await resp.json().catch(() => ({}));
-        saved += Number(out?.saved ?? 0);
+        const replay = await callManager({ action: "quiz_replay", quiz_id: quizId, results });
+        saved += Number(replay?.saved ?? 0);
         if (results.length < 200 || page > 50) break;
         page += 1;
       }
@@ -459,7 +467,7 @@ export default function QuizKoboSyncDialog({ open, onClose, quizId, quizTitle, c
                     <Input
                       readOnly
                       type={showSecret ? "text" : "password"}
-                      value={config?.webhook_secret ?? "Save the connection to generate a secret"}
+                      value={webhookSecret || "Save the connection to generate a secret"}
                       className="font-mono text-xs"
                     />
                     <Button variant="outline" size="icon" onClick={() => setShowSecret((s) => !s)}>
@@ -467,8 +475,8 @@ export default function QuizKoboSyncDialog({ open, onClose, quizId, quizTitle, c
                     </Button>
                     <Button
                       variant="outline" size="icon"
-                      onClick={() => copyText(config?.webhook_secret ?? "", "Secret")}
-                      disabled={!config?.webhook_secret}
+                      onClick={() => copyText(webhookSecret, "Secret")}
+                      disabled={!webhookSecret}
                     >
                       <Copy className="h-4 w-4" />
                     </Button>
