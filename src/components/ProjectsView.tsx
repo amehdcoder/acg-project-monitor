@@ -105,6 +105,7 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
   const [settingsForm, setSettingsForm] = useState<{ status: string }>({ status: "active" });
   const [savingSettings, setSavingSettings] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [accessProject, setAccessProject] = useState<{ id: string; name: string } | null>(null);
   const { user, role, isSuperAdmin, isOwnerLevel, loading: authLoading } = useAuth();
   const { logAction } = useAdminSurveillance();
 
