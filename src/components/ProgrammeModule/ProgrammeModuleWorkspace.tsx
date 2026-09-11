@@ -45,6 +45,7 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
   const [configOpen, setConfigOpen] = useState(false);
   const [focalOpen, setFocalOpen] = useState(false);
   const [registryOpen, setRegistryOpen] = useState(false);
+  const { levels: facilityLevels } = useMyFacilityAccess();
   const [focalFacilityId, setFocalFacilityId] = useState<string | undefined>(undefined);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [selected, setSelected] = useState<BeneficiaryRow | null>(null);
