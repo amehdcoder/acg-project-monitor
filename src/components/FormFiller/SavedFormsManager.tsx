@@ -244,6 +244,25 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
   }
 
   if (editing) {
+    // See Clear visits captured on an account-free device have no generic
+    // question list — reopen them in the checklist itself with every answer
+    // restored, instead of an empty form.
+    if (editing.settings?.kind === "seeclear" && editing.deviceId) {
+      return (
+        <SeeClearFormFiller
+          deviceMode={{
+            deviceId: editing.deviceId,
+            collectorLabel: String(editing.settings?.collectorLabel || ""),
+            projectId: editing.projectId || "",
+          }}
+          savedDraft={editing}
+          onClose={() => {
+            setEditing(null);
+            load();
+          }}
+        />
+      );
+    }
     if (isBloombergSavedEntry(editing)) {
       return (
         <BloombergFormFiller
