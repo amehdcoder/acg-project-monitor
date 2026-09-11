@@ -177,10 +177,13 @@ const App = () => (
                     <Route path="/__test/microplan-kpi" element={<MicroplanKpiHarness />} />
                     <Route path="/__test/xlsform-cover" element={<XlsFormCoverHarness />} />
                     <Route path="/shared/dashboard/:token" element={<SharedDashboard />} />
+                    <Route path="/join" element={<JoinProject />} />
+                    <Route path="/collect" element={<DeviceCollectRoute />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                 </RouteErrorBoundary>
               </ImpersonationProvider>
+              </DeviceSessionProvider>
             </AuthProvider>
           </BrowserRouter>
         </TooltipProvider>
