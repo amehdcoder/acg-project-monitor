@@ -156,7 +156,9 @@ export const CISKULA_PRESET: ProgrammeModuleConfig = {
         q("address", "Address", "text"),
         q("household_size", "Household Size", "number"),
         q("household_head", "Household Head", "select_one", { options: opts(["Yes", "No"]) }),
-        q("vulnerability_status", "Vulnerability Status", "text"),
+        q("vulnerability_status", "Vulnerability Status", "select_one", {
+          options: choiceOptions(VULNERABILITY_STATUS),
+        }),
       ],
     },
     {
