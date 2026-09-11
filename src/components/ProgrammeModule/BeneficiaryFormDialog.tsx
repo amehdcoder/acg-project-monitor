@@ -177,6 +177,10 @@ const BeneficiaryFormDialog = ({
                           question={q}
                           value={q.name ? answers[q.name] : ""}
                           error={q.name ? errors[q.name] : null}
+                          answers={answers}
+                          onPatch={(vals) =>
+                            setAnswers((prev) => applyCalculations(allQuestions, { ...prev, ...vals }))
+                          }
                           onChange={(v) => q.name && setValue(q.name, v)}
                         />
                       </div>

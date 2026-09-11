@@ -9,6 +9,11 @@ import type {
   StatusOption,
 } from "./types";
 
+import {
+  applyRegistrationChoices, choiceOptions, INCOME_SOURCE, OCCUPATION,
+  PRIMARY_HEALTH_CONDITION, VULNERABILITY_STATUS,
+} from "./registrationChoices";
+
 export const uid = () => Math.random().toString(36).slice(2, 10);
 
 const q = (
@@ -156,7 +161,9 @@ export const CISKULA_PRESET: ProgrammeModuleConfig = {
         q("address", "Address", "text"),
         q("household_size", "Household Size", "number"),
         q("household_head", "Household Head", "select_one", { options: opts(["Yes", "No"]) }),
-        q("vulnerability_status", "Vulnerability Status", "text"),
+        q("vulnerability_status", "Vulnerability Status", "select_one", {
+          options: choiceOptions(VULNERABILITY_STATUS),
+        }),
       ],
     },
     {
@@ -165,13 +172,18 @@ export const CISKULA_PRESET: ProgrammeModuleConfig = {
       placement: "clinical",
       order: 2,
       questions: [
-        q("primary_condition", "Primary Health Condition", "text"),
+        q("primary_condition", "Primary Health Condition", "select_one", {
+          options: choiceOptions(PRIMARY_HEALTH_CONDITION),
+        }),
+        q("primary_condition_other", "Other condition (specify)", "text", {
+          relevant: "${primary_condition} = 'Other (Specify)'",
+        }),
         q("disability", "Disability", "select_one", { options: opts(["Yes", "No"]) }),
         q("mental_health_status", "Mental Health Status", "select_one", { options: opts(["Normal", "Mild", "Moderate", "Severe"]) }),
         q("nutrition_status", "Nutrition Status", "select_one", { options: opts(["Good", "Moderate", "Poor"]) }),
         q("education_level", "Education Level", "select_one", { options: opts(["None", "Primary", "Secondary", "Tertiary"]) }),
-        q("occupation", "Occupation", "text"),
-        q("income_source", "Income Source", "text"),
+        q("occupation", "Occupation", "select_one", { options: choiceOptions(OCCUPATION) }),
+        q("income_source", "Income Source", "select_one", { options: choiceOptions(INCOME_SOURCE) }),
         q("consent_obtained", "Consent Obtained", "select_one", { options: opts(["Yes", "No"]), required: true }),
       ],
     },
@@ -397,8 +409,8 @@ export const ageFromDob = (dob?: unknown): string => {
 
 export const normalizeConfig = (raw: unknown): ProgrammeModuleConfig => {
   const cfg = (raw || {}) as Partial<ProgrammeModuleConfig>;
-  if (!cfg.components || !cfg.sections) return { ...BLANK_PRESET };
-  return {
+  if (!cfg.components || !cfg.sections) return applyRegistrationChoices({ ...BLANK_PRESET });
+  return applyRegistrationChoices({
     version: cfg.version ?? 1,
     branding: { ...BLANK_PRESET.branding, ...(cfg.branding || {}) },
     caseId: { ...BLANK_PRESET.caseId, ...(cfg.caseId || {}) },
@@ -407,5 +419,5 @@ export const normalizeConfig = (raw: unknown): ProgrammeModuleConfig => {
     workflow: { ...BLANK_PRESET.workflow, ...(cfg.workflow || {}) },
     layout: { ...BLANK_PRESET.layout, ...(cfg.layout || {}) },
     dataQuality: cfg.dataQuality || [],
-  };
+  });
 };
