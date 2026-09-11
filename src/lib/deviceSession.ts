@@ -164,6 +164,8 @@ export async function enrolDevice(input: EnrolInput): Promise<DeviceSession> {
     lastRefreshAt: new Date().toISOString(),
   };
   writeDeviceSession(session);
+  noteSessionAccepted();
+  requestDurableStorage();
   return session;
 }
 
@@ -181,17 +183,20 @@ export async function refreshDeviceBundle(session: DeviceSession): Promise<Devic
       body: JSON.stringify({ action: "refresh" }),
     });
     if (res.status === 401 || res.status === 403) {
-      clearDeviceSession();
-      return null;
+      // Tolerate a stray refusal; only a repeated one really ends the session.
+      return noteSessionRejected() ? null : session;
     }
     if (!res.ok) return null;
     const body = await res.json();
+    noteSessionAccepted();
     const next: DeviceSession = {
       ...session,
       allowForms: !!body.access?.allowForms,
       allowCases: !!body.access?.allowCases,
       allowSeeclear: !!body.access?.allowSeeclear,
-      bundle: body.bundle ?? session.bundle,
+      // Never drop cached forms because a refresh came back thin — the collector
+      // must keep working with what they already have.
+      bundle: body.bundle?.project ? body.bundle : session.bundle,
       projectName: body.bundle?.project?.name ?? session.projectName,
       lastRefreshAt: new Date().toISOString(),
     };
