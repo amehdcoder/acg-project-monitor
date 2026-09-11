@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   FileText, FolderOpen, Inbox, LogOut, RefreshCw, Send, Cloud, CloudOff, Briefcase, Loader2,
+  ClipboardCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useDeviceSession } from "@/hooks/useDeviceSession";
@@ -18,6 +19,7 @@ import FormFiller from "@/components/FormFiller/FormFiller";
 import SavedFormsManager from "@/components/FormFiller/SavedFormsManager";
 import { listAllSavedEntries } from "@/lib/savedForms";
 import { syncDeviceRecords } from "@/lib/deviceSync";
+import SeeClearFormFiller from "@/components/SeeClear/SeeClearFormFiller";
 
 type SavedMode = "edit" | "send" | "view" | null;
 
@@ -36,6 +38,7 @@ const DeviceCollectShell = () => {
   const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
   const [syncing, setSyncing] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const [seeClearOpen, setSeeClearOpen] = useState(false);
 
   const userId = session ? deviceUserId(session.deviceId) : "";
 
@@ -50,7 +53,7 @@ const DeviceCollectShell = () => {
     setCounts({ draft: mine(draft), finalized: mine(finalized), sent: mine(sent) });
   }, [userId]);
 
-  useEffect(() => { void loadCounts(); }, [loadCounts, fillingFormId, savedMode]);
+  useEffect(() => { void loadCounts(); }, [loadCounts, fillingFormId, savedMode, seeClearOpen]);
 
   useEffect(() => {
     const on = () => setOnline(true);
@@ -91,6 +94,19 @@ const DeviceCollectShell = () => {
   };
 
   if (!session) return null;
+
+  if (seeClearOpen) {
+    return (
+      <SeeClearFormFiller
+        onClose={() => setSeeClearOpen(false)}
+        deviceMode={{
+          deviceId: session.deviceId,
+          collectorLabel: session.label,
+          projectId: session.projectId,
+        }}
+      />
+    );
+  }
 
   if (activeForm) {
     const questions = Array.isArray(activeForm.questions)
@@ -170,7 +186,17 @@ const DeviceCollectShell = () => {
           </TabsList>
 
           <TabsContent value="forms" className="mt-4 space-y-3">
-            {forms.length === 0 && (
+            {session.allowSeeclear && (
+              <Card className="cursor-pointer border-primary/40 hover:border-primary transition-colors" onClick={() => setSeeClearOpen(true)}>
+                <CardHeader className="py-4">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <ClipboardCheck className="h-4 w-4 text-primary" /> See Clear Eye Health Facility Checklist
+                  </CardTitle>
+                  <CardDescription>Full facility visit checklist — works completely offline.</CardDescription>
+                </CardHeader>
+              </Card>
+            )}
+            {forms.length === 0 && !session.allowSeeclear && (
               <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">
                 No forms have been published to this project yet.
               </CardContent></Card>
