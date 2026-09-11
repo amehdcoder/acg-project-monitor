@@ -11057,8 +11057,10 @@ export type Database = {
         Args: { _form_id: string; _limit?: number; _offset?: number }
         Returns: {
           client_submitted_at: string
+          collector_label: string
           created_at: string
           data: Json
+          device_id: string
           form_id: string
           id: string
           location: Json

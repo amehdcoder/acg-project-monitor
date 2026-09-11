@@ -4,6 +4,7 @@ import {
   enrolDevice,
   readDeviceSession,
   refreshDeviceBundle,
+  requestDurableStorage,
   type DeviceSession,
   type EnrolInput,
 } from "@/lib/deviceSession";
@@ -43,6 +44,8 @@ export const DeviceSessionProvider = ({ children }: { children: React.ReactNode 
   // Best-effort background refresh — never blocks the UI.
   useEffect(() => {
     if (!session) return;
+    // Ask the phone to keep this join and its queued records out of eviction.
+    requestDurableStorage();
     void refresh();
     const onOnline = () => void refresh();
     window.addEventListener("online", onOnline);

@@ -166,9 +166,9 @@ const DeviceCollectShell = () => {
   }
 
   return (
-    <div className="collector-shell min-h-[100dvh] bg-background pb-20 text-foreground">
+    <div className="collector-shell safe-area-x min-h-[100dvh] w-full max-w-[100vw] overflow-x-hidden bg-background pb-24 text-foreground">
       <header className="sticky top-0 z-20 border-b border-primary/15 bg-primary text-primary-foreground shadow-soft">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-4">
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-3 py-3 sm:px-4 sm:py-4">
           <div className="min-w-0">
             <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-widest text-primary-foreground/65">Field workspace</p>
             <h1 className="collector-title truncate text-lg font-bold">{session.projectName}</h1>
@@ -189,7 +189,7 @@ const DeviceCollectShell = () => {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-4 py-5">
+      <main className="safe-area-bottom mx-auto max-w-3xl px-3 py-4 sm:px-4 sm:py-5">
         <section className="mb-5 grid grid-cols-3 gap-2" aria-label="Record summary">
           <div className="rounded-md border bg-card p-3 shadow-soft"><Clock3 className="mb-2 h-4 w-4 text-accent" /><p className="text-xl font-semibold">{counts.draft}</p><p className="text-[11px] text-muted-foreground">Drafts</p></div>
           <div className="rounded-md border bg-card p-3 shadow-soft"><Send className="mb-2 h-4 w-4 text-primary" /><p className="text-xl font-semibold">{counts.finalized}</p><p className="text-[11px] text-muted-foreground">Queued</p></div>

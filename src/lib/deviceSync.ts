@@ -22,7 +22,8 @@ import {
   readDeviceSession,
   sendDeviceRecords,
   deviceUserId,
-  clearDeviceSession,
+  noteSessionRejected,
+  noteSessionAccepted,
   type DeviceSyncRecord,
 } from "@/lib/deviceSession";
 import { withQueueLock, backoffDelay, isRetryable } from "@/lib/syncLock";
@@ -83,6 +84,7 @@ async function drain(): Promise<{ synced: number; failed: number }> {
     try {
       const { accepted, rejected } = await sendDeviceRecords(session.token, batch.map(toRecord));
       batchAttempt = 0;
+      noteSessionAccepted();
       const acceptedSet = new Set(accepted);
       const reasons = new Map(rejected.map((r) => [r.id, r.reason]));
       const sentAt = new Date().toISOString();
@@ -114,8 +116,10 @@ async function drain(): Promise<{ synced: number; failed: number }> {
     } catch (err: any) {
       failed += batch.length;
       if (err?.message === "device_not_authorized") {
-        // Access was revoked or the code was rotated — stop and clear.
-        clearDeviceSession();
+        // Access may have been revoked — but a single refusal can also be a
+        // blip, so the join only ends after repeated rejections. Queued
+        // records are never discarded either way.
+        noteSessionRejected();
         break;
       }
       const retryable = isRetryable(err);

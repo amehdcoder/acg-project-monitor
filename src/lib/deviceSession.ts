@@ -70,8 +70,59 @@ export const writeDeviceSession = (session: DeviceSession): void => {
 export const clearDeviceSession = (): void => {
   try {
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(REJECT_KEY);
   } catch {
     /* ignore */
+  }
+};
+
+// A joined project must survive flaky networks, server hiccups and Android
+// putting the app to sleep. Only a *sustained* refusal from the server ends the
+// session — a single 401/403 (rotated edge deploy, brief outage, clock skew)
+// never wipes a collector's cached forms in the middle of field work.
+const REJECT_KEY = "amehnities:device-session:rejections";
+const MAX_REJECTIONS = 3;
+
+const readRejections = (): number => {
+  try {
+    return Number(localStorage.getItem(REJECT_KEY) || "0") || 0;
+  } catch {
+    return 0;
+  }
+};
+
+export const noteSessionAccepted = (): void => {
+  try {
+    localStorage.removeItem(REJECT_KEY);
+  } catch {
+    /* ignore */
+  }
+};
+
+/**
+ * Record an authoritative rejection. Returns true only once the server has
+ * refused this device repeatedly, which is when the session is really gone.
+ */
+export const noteSessionRejected = (): boolean => {
+  const next = readRejections() + 1;
+  try {
+    localStorage.setItem(REJECT_KEY, String(next));
+  } catch {
+    /* ignore */
+  }
+  if (next >= MAX_REJECTIONS) {
+    clearDeviceSession();
+    return true;
+  }
+  return false;
+};
+
+/** Ask the browser to keep this device's data instead of evicting it. */
+export const requestDurableStorage = (): void => {
+  try {
+    void navigator.storage?.persist?.();
+  } catch {
+    /* not supported — localStorage still holds the session */
   }
 };
 
@@ -113,6 +164,8 @@ export async function enrolDevice(input: EnrolInput): Promise<DeviceSession> {
     lastRefreshAt: new Date().toISOString(),
   };
   writeDeviceSession(session);
+  noteSessionAccepted();
+  requestDurableStorage();
   return session;
 }
 
@@ -130,17 +183,20 @@ export async function refreshDeviceBundle(session: DeviceSession): Promise<Devic
       body: JSON.stringify({ action: "refresh" }),
     });
     if (res.status === 401 || res.status === 403) {
-      clearDeviceSession();
-      return null;
+      // Tolerate a stray refusal; only a repeated one really ends the session.
+      return noteSessionRejected() ? null : session;
     }
     if (!res.ok) return null;
     const body = await res.json();
+    noteSessionAccepted();
     const next: DeviceSession = {
       ...session,
       allowForms: !!body.access?.allowForms,
       allowCases: !!body.access?.allowCases,
       allowSeeclear: !!body.access?.allowSeeclear,
-      bundle: body.bundle ?? session.bundle,
+      // Never drop cached forms because a refresh came back thin — the collector
+      // must keep working with what they already have.
+      bundle: body.bundle?.project ? body.bundle : session.bundle,
       projectName: body.bundle?.project?.name ?? session.projectName,
       lastRefreshAt: new Date().toISOString(),
     };
