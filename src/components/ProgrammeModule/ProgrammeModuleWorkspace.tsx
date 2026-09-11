@@ -57,6 +57,8 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
   const [selected, setSelected] = useState<BeneficiaryRow | null>(null);
   const [pending, setPending] = useState(queueCount());
   const [creating, setCreating] = useState(false);
+  const [deleteRequestsOpen, setDeleteRequestsOpen] = useState(false);
+  const [view, setView] = useState<"records" | "facility" | "followups">("records");
 
   const active: ProgrammeModuleRow | undefined = useMemo(
     () => modules.find((m) => m.id === activeId) || modules[0],
