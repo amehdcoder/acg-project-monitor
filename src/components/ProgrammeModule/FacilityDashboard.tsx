@@ -240,8 +240,15 @@ const FacilityDashboard = ({ projectId, canSeeAllFacilities = false, onOpenBenef
                 <p className="text-xs text-muted-foreground">
                   {r.referral_date} · {r.reason || "No reason recorded"}
                 </p>
+                {r.followup_date && (
+                  <p className="mt-1 flex items-center gap-1 text-xs text-purple-700">
+                    <CalendarClock className="h-3.5 w-3.5" />
+                    Follow-up {[r.followup_date, r.followup_time, r.followup_location].filter(Boolean).join(" · ")}
+                  </p>
+                )}
               </div>
               <Badge variant="outline" className={cn("border", statusTone[r.status] || "")}>{r.status}</Badge>
+              <Badge variant="outline">{REFERRAL_OUTCOME_LABEL[r.outcome || "pending"]}</Badge>
             </Card>
           ))}
         </TabsContent>
