@@ -59,13 +59,44 @@ const FacilityDashboard = ({ projectId, canSeeAllFacilities = false, onOpenBenef
 
   const facility = visible.find((f) => f.id === facilityId);
   const { beneficiaries, incoming, outgoing, loading, reload } = useFacilityDashboard(facilityId);
+  const [referredNames, setReferredNames] = useState<Record<string, string>>({});
+  const [outcomeFor, setOutcomeFor] = useState<BeneficiaryReferralRow | null>(null);
+
   const nameById = useMemo(() => {
     const m = new Map<string, string>();
     for (const b of beneficiaries) m.set(b.id, b.full_name);
+    for (const [id, n] of Object.entries(referredNames)) if (!m.has(id)) m.set(id, n);
     return m;
-  }, [beneficiaries]);
+  }, [beneficiaries, referredNames]);
+
+  // Names of patients referred in from other facilities (not on our own list).
+  useEffect(() => {
+    const own = new Set(beneficiaries.map((b) => b.id));
+    const missing = Array.from(new Set(incoming.map((r) => r.beneficiary_id)))
+      .filter((id) => !own.has(id) && !referredNames[id]);
+    if (missing.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      const { data } = await supabase
+        .from("beneficiaries").select("id,full_name").in("id", missing);
+      if (cancelled || !data) return;
+      setReferredNames((prev) => {
+        const next = { ...prev };
+        for (const r of data as { id: string; full_name: string }[]) next[r.id] = r.full_name;
+        return next;
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [incoming, beneficiaries, referredNames]);
 
   const pendingIn = incoming.filter((r) => r.status === "initiated");
+  const dueFollowUps = incoming.filter(
+    (r) => r.followup_date && !CLOSED_OUTCOMES.includes(r.outcome || "pending"),
+  );
+  const closedIn = incoming.filter((r) => CLOSED_OUTCOMES.includes(r.outcome || "pending"));
+  const completionRate = incoming.length
+    ? Math.round((closedIn.length / incoming.length) * 100)
+    : 0;
 
   const decide = async (id: string, status: string) => {
     try {
