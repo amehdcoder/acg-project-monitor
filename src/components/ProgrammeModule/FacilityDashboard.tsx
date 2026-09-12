@@ -6,14 +6,18 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, ArrowDownLeft, ArrowUpRight, Users, RefreshCw } from "lucide-react";
+import { Building2, ArrowDownLeft, ArrowUpRight, Users, RefreshCw, CalendarClock, ClipboardCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
-import type { BeneficiaryRow } from "@/lib/programmeModule/types";
+import type { BeneficiaryReferralRow, BeneficiaryRow } from "@/lib/programmeModule/types";
 import {
   FACILITY_TYPE_LABEL, useFacilities, useMyFacilityAccess,
 } from "@/lib/programmeModule/facilities";
-import { setReferralStatus, useFacilityDashboard } from "@/lib/programmeModule/facilityOps";
+import {
+  CLOSED_OUTCOMES, REFERRAL_OUTCOME_LABEL, setReferralStatus, useFacilityDashboard,
+} from "@/lib/programmeModule/facilityOps";
+import ReferralOutcomeDialog from "./ReferralOutcomeDialog";
 
 interface Props {
   projectId?: string;
@@ -56,13 +60,44 @@ const FacilityDashboard = ({ projectId, canSeeAllFacilities = false, onOpenBenef
 
   const facility = visible.find((f) => f.id === facilityId);
   const { beneficiaries, incoming, outgoing, loading, reload } = useFacilityDashboard(facilityId);
+  const [referredNames, setReferredNames] = useState<Record<string, string>>({});
+  const [outcomeFor, setOutcomeFor] = useState<BeneficiaryReferralRow | null>(null);
+
   const nameById = useMemo(() => {
     const m = new Map<string, string>();
     for (const b of beneficiaries) m.set(b.id, b.full_name);
+    for (const [id, n] of Object.entries(referredNames)) if (!m.has(id)) m.set(id, n);
     return m;
-  }, [beneficiaries]);
+  }, [beneficiaries, referredNames]);
+
+  // Names of patients referred in from other facilities (not on our own list).
+  useEffect(() => {
+    const own = new Set(beneficiaries.map((b) => b.id));
+    const missing = Array.from(new Set(incoming.map((r) => r.beneficiary_id)))
+      .filter((id) => !own.has(id) && !referredNames[id]);
+    if (missing.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      const { data } = await supabase
+        .from("beneficiaries").select("id,full_name").in("id", missing);
+      if (cancelled || !data) return;
+      setReferredNames((prev) => {
+        const next = { ...prev };
+        for (const r of data as { id: string; full_name: string }[]) next[r.id] = r.full_name;
+        return next;
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [incoming, beneficiaries, referredNames]);
 
   const pendingIn = incoming.filter((r) => r.status === "initiated");
+  const dueFollowUps = incoming.filter(
+    (r) => r.followup_date && !CLOSED_OUTCOMES.includes(r.outcome || "pending"),
+  );
+  const closedIn = incoming.filter((r) => CLOSED_OUTCOMES.includes(r.outcome || "pending"));
+  const completionRate = incoming.length
+    ? Math.round((closedIn.length / incoming.length) * 100)
+    : 0;
 
   const decide = async (id: string, status: string) => {
     try {
@@ -117,12 +152,24 @@ const FacilityDashboard = ({ projectId, canSeeAllFacilities = false, onOpenBenef
         </p>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {stat("Beneficiaries", beneficiaries.length, "text-foreground")}
         {stat("Referrals in", incoming.length, "text-blue-600")}
         {stat("Awaiting response", pendingIn.length, "text-amber-600")}
-        {stat("Referrals out", outgoing.length, "text-emerald-600")}
+        {stat("Follow-ups due", dueFollowUps.length, "text-purple-600")}
+        {stat("Closed referrals", closedIn.length, "text-emerald-600")}
+        {stat("Referrals out", outgoing.length, "text-slate-600")}
       </div>
+
+      <Card className="p-4">
+        <div className="mb-2 flex items-center justify-between text-sm">
+          <span className="font-medium text-foreground">Referral follow-up progress</span>
+          <span className="text-muted-foreground">{completionRate}% closed</span>
+        </div>
+        <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
+          <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${completionRate}%` }} />
+        </div>
+      </Card>
 
       <Tabs defaultValue="incoming">
         <TabsList>
@@ -152,20 +199,30 @@ const FacilityDashboard = ({ projectId, canSeeAllFacilities = false, onOpenBenef
                   {r.referral_date} · {r.reason || "No reason recorded"}
                 </p>
                 {r.notes && <p className="mt-1 text-xs text-muted-foreground">{r.notes}</p>}
+                {(r.followup_date || r.followup_location) && (
+                  <p className="mt-1 flex items-center gap-1 text-xs text-purple-700">
+                    <CalendarClock className="h-3.5 w-3.5" />
+                    Follow-up {[r.followup_date, r.followup_time, r.followup_location].filter(Boolean).join(" · ")}
+                  </p>
+                )}
+                {r.outcome_notes && (
+                  <p className="mt-1 text-xs text-muted-foreground">Outcome note: {r.outcome_notes}</p>
+                )}
               </div>
-              <Badge variant="outline" className={cn("border", urgencyTone[(r as unknown as { urgency?: string }).urgency || "routine"])}>
-                {(r as unknown as { urgency?: string }).urgency || "routine"}
+              <Badge variant="outline" className={cn("border", urgencyTone[r.urgency || "routine"])}>
+                {r.urgency || "routine"}
               </Badge>
               <Badge variant="outline" className={cn("border", statusTone[r.status] || "")}>{r.status}</Badge>
+              <Badge variant="outline">{REFERRAL_OUTCOME_LABEL[r.outcome || "pending"]}</Badge>
               {r.status === "initiated" && (
                 <div className="flex gap-2">
                   <Button size="sm" onClick={() => void decide(r.id, "accepted")}>Accept</Button>
                   <Button size="sm" variant="outline" onClick={() => void decide(r.id, "declined")}>Decline</Button>
                 </div>
               )}
-              {r.status === "accepted" && (
-                <Button size="sm" variant="outline" onClick={() => void decide(r.id, "completed")}>
-                  Mark completed
+              {r.status !== "declined" && (
+                <Button size="sm" variant="outline" className="gap-1" onClick={() => setOutcomeFor(r)}>
+                  <ClipboardCheck className="h-4 w-4" /> Record outcome
                 </Button>
               )}
             </Card>
@@ -183,8 +240,15 @@ const FacilityDashboard = ({ projectId, canSeeAllFacilities = false, onOpenBenef
                 <p className="text-xs text-muted-foreground">
                   {r.referral_date} · {r.reason || "No reason recorded"}
                 </p>
+                {r.followup_date && (
+                  <p className="mt-1 flex items-center gap-1 text-xs text-purple-700">
+                    <CalendarClock className="h-3.5 w-3.5" />
+                    Follow-up {[r.followup_date, r.followup_time, r.followup_location].filter(Boolean).join(" · ")}
+                  </p>
+                )}
               </div>
               <Badge variant="outline" className={cn("border", statusTone[r.status] || "")}>{r.status}</Badge>
+              <Badge variant="outline">{REFERRAL_OUTCOME_LABEL[r.outcome || "pending"]}</Badge>
             </Card>
           ))}
         </TabsContent>

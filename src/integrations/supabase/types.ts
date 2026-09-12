@@ -1659,9 +1659,16 @@ export type Database = {
           component_key: string | null
           created_at: string
           created_by: string
+          followup_date: string | null
+          followup_location: string | null
+          followup_time: string | null
           from_facility_id: string | null
           id: string
           notes: string | null
+          outcome: string
+          outcome_notes: string | null
+          outcome_recorded_at: string | null
+          outcome_recorded_by: string | null
           project_id: string
           reason: string | null
           referral_date: string
@@ -1678,9 +1685,16 @@ export type Database = {
           component_key?: string | null
           created_at?: string
           created_by?: string
+          followup_date?: string | null
+          followup_location?: string | null
+          followup_time?: string | null
           from_facility_id?: string | null
           id?: string
           notes?: string | null
+          outcome?: string
+          outcome_notes?: string | null
+          outcome_recorded_at?: string | null
+          outcome_recorded_by?: string | null
           project_id: string
           reason?: string | null
           referral_date?: string
@@ -1697,9 +1711,16 @@ export type Database = {
           component_key?: string | null
           created_at?: string
           created_by?: string
+          followup_date?: string | null
+          followup_location?: string | null
+          followup_time?: string | null
           from_facility_id?: string | null
           id?: string
           notes?: string | null
+          outcome?: string
+          outcome_notes?: string | null
+          outcome_recorded_at?: string | null
+          outcome_recorded_by?: string | null
           project_id?: string
           reason?: string | null
           referral_date?: string
@@ -10964,6 +10985,10 @@ export type Database = {
         Args: { _project_id: string; _user_id: string }
         Returns: boolean
       }
+      can_manage_at_facility: {
+        Args: { _facility_id: string; _user_id: string }
+        Returns: boolean
+      }
       can_manage_case: {
         Args: { _case_id: string; _user_id: string }
         Returns: boolean
@@ -11000,6 +11025,10 @@ export type Database = {
       }
       can_read_quiz_kobo: {
         Args: { _quiz_id: string; _user_id: string }
+        Returns: boolean
+      }
+      can_record_at_facility: {
+        Args: { _facility_id: string; _user_id: string }
         Returns: boolean
       }
       can_review_after_hours: {
@@ -11046,6 +11075,10 @@ export type Database = {
         Returns: string
       }
       facility_access_level: { Args: { _facility_id: string }; Returns: string }
+      facility_access_level_for: {
+        Args: { _facility_id: string; _user_id: string }
+        Returns: string
+      }
       get_direct_unread_by_user: {
         Args: never
         Returns: {
