@@ -164,6 +164,17 @@ export interface BeneficiaryReferralRow {
   status: string;
   notes: string | null;
   created_at: string;
+  to_facility_id?: string | null;
+  from_facility_id?: string | null;
+  urgency?: string | null;
+  clinical_summary?: string | null;
+  /** Follow-up tracking recorded by the receiving facility. */
+  outcome?: string | null;
+  outcome_notes?: string | null;
+  followup_date?: string | null;
+  followup_time?: string | null;
+  followup_location?: string | null;
+  outcome_recorded_at?: string | null;
   __pending?: boolean;
 }
 
