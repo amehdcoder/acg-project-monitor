@@ -199,20 +199,30 @@ const FacilityDashboard = ({ projectId, canSeeAllFacilities = false, onOpenBenef
                   {r.referral_date} · {r.reason || "No reason recorded"}
                 </p>
                 {r.notes && <p className="mt-1 text-xs text-muted-foreground">{r.notes}</p>}
+                {(r.followup_date || r.followup_location) && (
+                  <p className="mt-1 flex items-center gap-1 text-xs text-purple-700">
+                    <CalendarClock className="h-3.5 w-3.5" />
+                    Follow-up {[r.followup_date, r.followup_time, r.followup_location].filter(Boolean).join(" · ")}
+                  </p>
+                )}
+                {r.outcome_notes && (
+                  <p className="mt-1 text-xs text-muted-foreground">Outcome note: {r.outcome_notes}</p>
+                )}
               </div>
-              <Badge variant="outline" className={cn("border", urgencyTone[(r as unknown as { urgency?: string }).urgency || "routine"])}>
-                {(r as unknown as { urgency?: string }).urgency || "routine"}
+              <Badge variant="outline" className={cn("border", urgencyTone[r.urgency || "routine"])}>
+                {r.urgency || "routine"}
               </Badge>
               <Badge variant="outline" className={cn("border", statusTone[r.status] || "")}>{r.status}</Badge>
+              <Badge variant="outline">{REFERRAL_OUTCOME_LABEL[r.outcome || "pending"]}</Badge>
               {r.status === "initiated" && (
                 <div className="flex gap-2">
                   <Button size="sm" onClick={() => void decide(r.id, "accepted")}>Accept</Button>
                   <Button size="sm" variant="outline" onClick={() => void decide(r.id, "declined")}>Decline</Button>
                 </div>
               )}
-              {r.status === "accepted" && (
-                <Button size="sm" variant="outline" onClick={() => void decide(r.id, "completed")}>
-                  Mark completed
+              {r.status !== "declined" && (
+                <Button size="sm" variant="outline" className="gap-1" onClick={() => setOutcomeFor(r)}>
+                  <ClipboardCheck className="h-4 w-4" /> Record outcome
                 </Button>
               )}
             </Card>
