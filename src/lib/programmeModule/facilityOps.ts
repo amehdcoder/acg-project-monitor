@@ -71,6 +71,49 @@ export const setReferralStatus = async (referralId: string, status: string) => {
   if (error) throw error;
 };
 
+/** Outcomes a receiving facility can record against an assigned referral. */
+export const REFERRAL_OUTCOMES = [
+  { value: "pending", label: "Awaiting visit" },
+  { value: "attended", label: "Patient attended" },
+  { value: "treated", label: "Treated" },
+  { value: "referred_on", label: "Referred on" },
+  { value: "not_attended", label: "Did not attend" },
+  { value: "lost_to_followup", label: "Lost to follow-up" },
+] as const;
+
+export const REFERRAL_OUTCOME_LABEL: Record<string, string> =
+  Object.fromEntries(REFERRAL_OUTCOMES.map((o) => [o.value, o.label]));
+
+/** Outcomes that close the referral loop. */
+export const CLOSED_OUTCOMES = ["treated", "referred_on", "lost_to_followup"];
+
+export interface ReferralOutcomeInput {
+  outcome: string;
+  outcome_notes?: string;
+  followup_date?: string;
+  followup_time?: string;
+  followup_location?: string;
+  status?: string;
+}
+
+export const saveReferralOutcome = async (referralId: string, input: ReferralOutcomeInput) => {
+  const { data: auth } = await supabase.auth.getUser();
+  const { error } = await supabase
+    .from("beneficiary_referrals")
+    .update({
+      outcome: input.outcome,
+      outcome_notes: input.outcome_notes || null,
+      followup_date: input.followup_date || null,
+      followup_time: input.followup_time || null,
+      followup_location: input.followup_location || null,
+      outcome_recorded_by: auth.user?.id ?? null,
+      outcome_recorded_at: new Date().toISOString(),
+      ...(input.status ? { status: input.status } : {}),
+    } as never)
+    .eq("id", referralId);
+  if (error) throw error;
+};
+
 /** Deletion requests raised on a project's beneficiaries. */
 export const useDeleteRequests = (projectId?: string) => {
   const [requests, setRequests] = useState<DeleteRequestRow[]>([]);
