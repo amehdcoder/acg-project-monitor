@@ -6,14 +6,17 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, ArrowDownLeft, ArrowUpRight, Users, RefreshCw } from "lucide-react";
+import { Building2, ArrowDownLeft, ArrowUpRight, Users, RefreshCw, CalendarClock, ClipboardCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import type { BeneficiaryRow } from "@/lib/programmeModule/types";
+import type { BeneficiaryReferralRow, BeneficiaryRow } from "@/lib/programmeModule/types";
 import {
   FACILITY_TYPE_LABEL, useFacilities, useMyFacilityAccess,
 } from "@/lib/programmeModule/facilities";
-import { setReferralStatus, useFacilityDashboard } from "@/lib/programmeModule/facilityOps";
+import {
+  CLOSED_OUTCOMES, REFERRAL_OUTCOME_LABEL, setReferralStatus, useFacilityDashboard,
+} from "@/lib/programmeModule/facilityOps";
+import ReferralOutcomeDialog from "./ReferralOutcomeDialog";
 
 interface Props {
   projectId?: string;
