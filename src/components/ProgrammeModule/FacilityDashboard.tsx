@@ -152,12 +152,24 @@ const FacilityDashboard = ({ projectId, canSeeAllFacilities = false, onOpenBenef
         </p>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {stat("Beneficiaries", beneficiaries.length, "text-foreground")}
         {stat("Referrals in", incoming.length, "text-blue-600")}
         {stat("Awaiting response", pendingIn.length, "text-amber-600")}
-        {stat("Referrals out", outgoing.length, "text-emerald-600")}
+        {stat("Follow-ups due", dueFollowUps.length, "text-purple-600")}
+        {stat("Closed referrals", closedIn.length, "text-emerald-600")}
+        {stat("Referrals out", outgoing.length, "text-slate-600")}
       </div>
+
+      <Card className="p-4">
+        <div className="mb-2 flex items-center justify-between text-sm">
+          <span className="font-medium text-foreground">Referral follow-up progress</span>
+          <span className="text-muted-foreground">{completionRate}% closed</span>
+        </div>
+        <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
+          <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${completionRate}%` }} />
+        </div>
+      </Card>
 
       <Tabs defaultValue="incoming">
         <TabsList>
