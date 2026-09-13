@@ -268,14 +268,6 @@ const BeneficiaryList = ({ beneficiaries, config, loading, onOpen, onRegister, o
               </Card>
             );
           })}
-
-        {unassigned.total > 0 && (
-          <Card
-            role="button" tabIndex={0}
-            onClick={() => setActiveFacilityId(null as unknown as string) /* placeholder */}
-            className="hidden"
-          />
-        )}
       </div>
 
       {unassigned.total > 0 && (
