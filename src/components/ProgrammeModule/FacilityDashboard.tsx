@@ -278,6 +278,14 @@ const FacilityDashboard = ({ projectId, canSeeAllFacilities = false, onOpenBenef
           ))}
         </TabsContent>
       </Tabs>
+
+      <ReferralOutcomeDialog
+        open={Boolean(outcomeFor)}
+        onOpenChange={(v) => { if (!v) setOutcomeFor(null); }}
+        referral={outcomeFor}
+        beneficiaryName={outcomeFor ? nameById.get(outcomeFor.beneficiary_id) : undefined}
+        onSaved={() => { setOutcomeFor(null); void reload(); }}
+      />
     </div>
   );
 };

@@ -10,8 +10,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Building2, Pill, Share2, Phone, MapPin, AlertTriangle } from "lucide-react";
+import { Building2, Pill, Share2, Phone, MapPin, AlertTriangle, CalendarClock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { REFERRAL_OUTCOME_LABEL } from "@/lib/programmeModule/facilityOps";
 import { useToast } from "@/hooks/use-toast";
 import { useFacilities, FACILITY_TYPE_LABEL } from "@/lib/programmeModule/facilities";
 import type { BeneficiaryReferralRow, BeneficiaryRow } from "@/lib/programmeModule/types";
@@ -207,6 +208,18 @@ const CareNetworkPanel = ({ beneficiary, projectId, referrals, onRefer, onChange
               {r.reason && <p className="text-sm text-muted-foreground">Reason: {r.reason}</p>}
               {row.clinical_summary && (
                 <p className="rounded-md bg-muted/50 p-2 text-sm text-foreground">{row.clinical_summary}</p>
+              )}
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline">{REFERRAL_OUTCOME_LABEL[r.outcome || "pending"]}</Badge>
+                {(r.followup_date || r.followup_location) && (
+                  <span className="flex items-center gap-1 text-xs text-purple-700">
+                    <CalendarClock className="h-3.5 w-3.5" />
+                    Follow-up {[r.followup_date, r.followup_time, r.followup_location].filter(Boolean).join(" · ")}
+                  </span>
+                )}
+              </div>
+              {r.outcome_notes && (
+                <p className="text-xs text-muted-foreground">Outcome note: {r.outcome_notes}</p>
               )}
               {!r.__pending && (
                 <div className="flex flex-wrap gap-2 pt-1">
