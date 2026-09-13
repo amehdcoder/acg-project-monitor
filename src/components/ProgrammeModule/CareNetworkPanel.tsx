@@ -10,8 +10,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Building2, Pill, Share2, Phone, MapPin, AlertTriangle } from "lucide-react";
+import { Building2, Pill, Share2, Phone, MapPin, AlertTriangle, CalendarClock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { REFERRAL_OUTCOME_LABEL } from "@/lib/programmeModule/facilityOps";
 import { useToast } from "@/hooks/use-toast";
 import { useFacilities, FACILITY_TYPE_LABEL } from "@/lib/programmeModule/facilities";
 import type { BeneficiaryReferralRow, BeneficiaryRow } from "@/lib/programmeModule/types";
