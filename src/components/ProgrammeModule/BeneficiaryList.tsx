@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -80,7 +81,8 @@ const BeneficiaryList = ({ beneficiaries, config, loading, onOpen, onRegister, o
   const rows = useMemo(() => {
     const term = search.trim().toLowerCase();
     return beneficiaries.filter((b) => {
-      if (facilityIdOf(b) !== activeFacilityId) return false;
+      const fid = facilityIdOf(b);
+      if (activeFacilityId === "__unassigned__" ? fid !== null : fid !== activeFacilityId) return false;
       if (status !== "all" && b.status !== status) return false;
       if (lga !== "all" && b.lga !== lga) return false;
       if (!term) return true;
