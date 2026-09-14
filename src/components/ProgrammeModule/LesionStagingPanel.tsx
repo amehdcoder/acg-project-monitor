@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/table";
 import {
   ScanEye, Loader2, TrendingDown, TrendingUp, Minus, Info, Ruler, Camera,
+  Brain, CheckCircle2, GraduationCap,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
