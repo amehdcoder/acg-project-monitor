@@ -230,6 +230,7 @@ const LesionStagingPanel = ({
 
 
       const { data: auth } = await supabase.auth.getUser();
+      const confirmed = confirmStage === "" ? null : Number(confirmStage);
       const { error } = await db.from("beneficiary_lesion_assessments").insert({
         project_id: projectId,
         module_id: moduleId,
