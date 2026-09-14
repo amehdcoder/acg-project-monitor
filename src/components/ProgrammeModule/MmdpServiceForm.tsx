@@ -136,6 +136,7 @@ const MmdpServiceForm = ({
         follow_up_date: followUp.date || undefined,
         follow_up_time: followUp.time || undefined,
         follow_up_location: followUp.location || undefined,
+        ...(experience as Record<string, unknown>),
       };
       const payload = {
         beneficiary_id: beneficiary.id,
