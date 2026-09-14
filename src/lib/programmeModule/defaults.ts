@@ -446,8 +446,10 @@ const upgradeServices = (components: ProgrammeComponent[]): ProgrammeComponent[]
 
 export const normalizeConfig = (raw: unknown): ProgrammeModuleConfig => {
   const cfg = (raw || {}) as Partial<ProgrammeModuleConfig>;
-  if (!cfg.components || !cfg.sections) return applyRegistrationChoices({ ...BLANK_PRESET });
-  return applyRegistrationChoices({
+  if (!cfg.components || !cfg.sections) {
+    return withStandardProfileSections(applyRegistrationChoices({ ...BLANK_PRESET }));
+  }
+  return withStandardProfileSections(applyRegistrationChoices({
     version: cfg.version ?? 1,
     branding: { ...BLANK_PRESET.branding, ...(cfg.branding || {}) },
     caseId: { ...BLANK_PRESET.caseId, ...(cfg.caseId || {}) },
