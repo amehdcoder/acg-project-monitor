@@ -300,7 +300,12 @@ export const markSyncState = async (
 ): Promise<void> => {
   const existing = await getSavedEntry(id);
   if (!existing) return;
-  const next: SavedFormEntry = { ...existing, ...patch, syncState };
+  const next: SavedFormEntry = {
+    ...existing,
+    ...patch,
+    syncState,
+    syncStartedAt: syncState === "syncing" ? new Date().toISOString() : null,
+  };
   const db = await initDB();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE, "readwrite");
