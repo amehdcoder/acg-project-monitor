@@ -260,7 +260,17 @@ const LesionStagingPanel = ({
           segmentationQuality: metrics?.segmentationQuality ?? null,
           box: metrics?.box ?? null,
           rationale: staged.rationale,
+          learned: learned
+            ? { stage: learned.stage, confidence: learned.confidence, samples: model?.samples ?? 0 }
+            : null,
         },
+        features,
+        model_stage: learned?.stage ?? null,
+        model_confidence: learned ? +learned.confidence.toFixed(3) : null,
+        confirmed_stage: confirmed,
+        confirmed_stage_label: confirmed == null ? null : stageLabelFor(condition, confirmed),
+        confirmed_by: confirmed == null ? null : auth.user?.id ?? null,
+        confirmed_at: confirmed == null ? null : new Date().toISOString(),
         notes: notes || null,
         created_by: auth.user?.id,
       });
@@ -269,6 +279,7 @@ const LesionStagingPanel = ({
       setImagePath(null); setDataUrl(null); setMetrics(null); setNotes("");
       setCriteria({}); setMeasures({});
       await load();
+      await reloadModel();
     } catch (e) {
       toast({ title: "Could not save the assessment", description: (e as Error).message, variant: "destructive" });
     } finally {
