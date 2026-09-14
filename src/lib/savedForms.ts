@@ -319,6 +319,20 @@ export const markSyncState = async (
 export const isBackingOff = (entry: SavedFormEntry): boolean =>
   !!entry.nextAttemptAt && new Date(entry.nextAttemptAt).getTime() > Date.now();
 
+/**
+ * How long a "syncing" lease stays valid. If the app is killed mid-upload the
+ * persisted lease would otherwise block the record forever, so anything older
+ * than this is reclaimed and retried (uploads are idempotent by submission id).
+ */
+export const SYNC_LEASE_MS = 2 * 60_000;
+
+/** True when the entry is genuinely being uploaded right now (fresh lease). */
+export const hasActiveSyncLease = (entry: SavedFormEntry): boolean => {
+  if (entry.syncState !== "syncing") return false;
+  if (!entry.syncStartedAt) return false; // orphan from an older build — reclaim
+  return Date.now() - new Date(entry.syncStartedAt).getTime() < SYNC_LEASE_MS;
+};
+
 export const buildSavedEntryDisplayName = (entry: Pick<SavedFormEntry, "formName" | "respondentName" | "updatedAt" | "finalizedAt" | "createdAt">): string => {
   const name = entry.respondentName?.trim() || "Unnamed respondent";
   const when = entry.finalizedAt || entry.updatedAt || entry.createdAt;
