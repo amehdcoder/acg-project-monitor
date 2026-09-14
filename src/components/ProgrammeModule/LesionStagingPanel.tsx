@@ -310,9 +310,55 @@ const LesionStagingPanel = ({
             </p>
           )}
 
-          {metrics && staged && (
-            <div className="grid gap-4 rounded-lg border border-border p-3 md:grid-cols-[200px_minmax(0,1fr)]">
-              {metrics.overlay && (
+          {(CLINICAL_CRITERIA[condition].length > 0 || MEASUREMENT_FIELDS[condition].length > 0) && (
+            <div className="grid gap-4 rounded-lg border border-border p-3 lg:grid-cols-2">
+              {CLINICAL_CRITERIA[condition].length > 0 && (
+                <div>
+                  <p className="text-sm font-medium text-foreground">Signs seen on examination</p>
+                  <p className="mb-2 text-xs text-muted-foreground">
+                    Tick everything present — the highest sign sets the stage on the recognised scale.
+                  </p>
+                  <div className="space-y-1.5">
+                    {CLINICAL_CRITERIA[condition].map((c) => (
+                      <label key={c.key} className="flex cursor-pointer items-start gap-2 text-sm">
+                        <Checkbox
+                          className="mt-0.5"
+                          checked={!!criteria[c.key]}
+                          onCheckedChange={(v) => setCriteria((p) => ({ ...p, [c.key]: v === true }))}
+                        />
+                        <span className="text-foreground">{c.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {MEASUREMENT_FIELDS[condition].length > 0 && (
+                <div>
+                  <p className="text-sm font-medium text-foreground">Measurements at this visit</p>
+                  <p className="mb-2 text-xs text-muted-foreground">
+                    Used to grade size-based scales and to chart change between visits.
+                  </p>
+                  <div className="space-y-2">
+                    {MEASUREMENT_FIELDS[condition].map((f) => (
+                      <div key={f.key}>
+                        <Label className="text-xs">{f.label} ({f.unit})</Label>
+                        <Input
+                          type="number" inputMode="decimal" className="mt-1 h-9"
+                          value={measures[f.key] ?? ""}
+                          onChange={(e) => setMeasures((p) => ({ ...p, [f.key]: e.target.value }))}
+                        />
+                        {f.hint && <p className="mt-0.5 text-[11px] text-muted-foreground">{f.hint}</p>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {hasEvidence && (
+            <div className="grid gap-4 rounded-lg border border-primary/30 bg-primary/[0.03] p-3 md:grid-cols-[200px_minmax(0,1fr)]">
+              {metrics?.overlay && (
                 <div>
                   <img src={metrics.overlay} alt="Detected lesion region" className="w-full rounded-md" />
                   <p className="mt-1 text-center text-[11px] text-muted-foreground">Highlighted = measured region</p>
