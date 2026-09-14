@@ -799,3 +799,23 @@ export const stageFromEvidence = (
     inputs,
   };
 };
+
+/* ------------------------------------------------------------------ */
+/* Stage label tables, shared with the learned model                   */
+/* ------------------------------------------------------------------ */
+
+export const STAGE_LABELS: Record<LesionCondition, string[]> = {
+  lymphoedema: LYMPH_LABELS,
+  trachoma_tt: TRACHOMA_LABELS,
+  hydrocoele: ["Not staged", "Grade 1 — mild", "Grade 2 — moderate", "Grade 3 — large", "Grade 4 — very large"],
+  buruli_ulcer: ["Not staged", "Category I — single lesion under 5 cm", "Category II — 5 to 15 cm", "Category III — over 15 cm, multiple or critical site"],
+  leprosy_ulcer: ["Grade 0 — skin intact", "Grade 1 — superficial ulcer", "Grade 2 — deep ulcer", "Grade 3 — abscess or bone infection", "Grade 4 — gangrene"],
+  wound: ["Not gradable", "Clean wound", "Sloughy wound", "Infected wound"],
+  other: ["Not staged", "Stage 1", "Stage 2", "Stage 3", "Stage 4"],
+};
+
+/** Label for a numeric stage on the scale used for that condition. */
+export const stageLabelFor = (condition: LesionCondition, stage: number) => {
+  const table = STAGE_LABELS[condition] || STAGE_LABELS.other;
+  return table[Math.max(0, Math.min(table.length - 1, Math.round(stage)))] || `Stage ${stage}`;
+};

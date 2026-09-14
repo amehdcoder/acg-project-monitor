@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/table";
 import {
   ScanEye, Loader2, TrendingDown, TrendingUp, Minus, Info, Ruler, Camera,
+  Brain, CheckCircle2, GraduationCap,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -29,9 +30,14 @@ import { resolveMediaUrl } from "@/lib/programmeModule/media";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   CLINICAL_CRITERIA, LESION_CONDITIONS, MEASUREMENT_FIELDS, SCALE_REFERENCES,
-  analyseLesion, compareLesions, conditionLabel, stageFromEvidence, TREND_TONE,
+  STAGE_LABELS, analyseLesion, compareLesions, conditionLabel, stageFromEvidence,
+  stageLabelFor, TREND_TONE,
   type LesionCondition, type LesionMetrics,
 } from "@/lib/programmeModule/lesionVision";
+import {
+  MIN_TRAINING_CASES, buildFeatures, confirmAssessmentStage, predictStage,
+  useLesionStageModel,
+} from "@/lib/programmeModule/lesionModel";
 import PhotoCaptureField from "./PhotoCaptureField";
 
 interface Props {
@@ -55,6 +61,10 @@ interface AssessmentRow {
   stage_label: string | null;
   percent_change: number | null;
   notes: string | null;
+  confirmed_stage: number | null;
+  confirmed_stage_label: string | null;
+  model_stage: number | null;
+  model_confidence: number | null;
 }
 
 const db = supabase as unknown as { from: (t: string) => any };
@@ -102,7 +112,7 @@ const LesionStagingPanel = ({
   const load = useCallback(async () => {
     setLoading(true);
     const { data } = await db.from("beneficiary_lesion_assessments")
-      .select("id,condition,body_site,assessed_on,image_path,area_fraction,area_mm2,redness_index,stage,stage_label,percent_change,notes")
+      .select("id,condition,body_site,assessed_on,image_path,area_fraction,area_mm2,redness_index,stage,stage_label,percent_change,notes,confirmed_stage,confirmed_stage_label,model_stage,model_confidence")
       .eq("beneficiary_id", beneficiaryId)
       .order("assessed_on", { ascending: false })
       .limit(200);
@@ -154,6 +164,54 @@ const LesionStagingPanel = ({
     || Object.values(criteria).some(Boolean)
     || Object.values(numericMeasures).some((v) => v != null);
 
+  /* Learned staging — trained on the stages clinicians confirmed here. */
+  const {
+    model, confirmedCount, training, retrain, reload: reloadModel,
+  } = useLesionStageModel(projectId, condition);
+
+  const features = useMemo(
+    () => buildFeatures(condition, { criteria, measures: numericMeasures, metrics }),
+    [condition, criteria, numericMeasures, metrics],
+  );
+
+  const learned = useMemo(
+    () => (model && hasEvidence ? predictStage(model, features) : null),
+    [model, features, hasEvidence],
+  );
+
+  // The stage the clinician is asked to confirm — the learned one when the
+  // model is confident enough, otherwise the rule-based grade.
+  const suggestedStage = learned && learned.confidence >= 0.5 ? learned.stage : staged.stage;
+  const [confirmStage, setConfirmStage] = useState<string>("");
+  useEffect(() => { setConfirmStage(String(suggestedStage)); }, [suggestedStage]);
+
+  const stageOptions = useMemo(
+    () => (STAGE_LABELS[condition] || []).map((label, index) => ({ value: String(index), label })),
+    [condition],
+  );
+
+  const confirmRow = async (row: AssessmentRow, stage: number) => {
+    try {
+      await confirmAssessmentStage(row.id, row.condition as LesionCondition, stage);
+      toast({
+        title: "Stage confirmed",
+        description: "This case now trains the staging model for the project.",
+      });
+      await load();
+      await reloadModel();
+    } catch (e) {
+      toast({ title: "Could not confirm", description: (e as Error).message, variant: "destructive" });
+    }
+  };
+
+  const runTraining = async () => {
+    const result = await retrain();
+    toast({
+      title: result.trained ? "Model retrained" : "Not enough confirmed cases yet",
+      description: result.message,
+    });
+  };
+
   const save = async () => {
     if (!hasEvidence) {
       toast({
@@ -172,6 +230,7 @@ const LesionStagingPanel = ({
 
 
       const { data: auth } = await supabase.auth.getUser();
+      const confirmed = confirmStage === "" || confirmStage === "none" ? null : Number(confirmStage);
       const { error } = await db.from("beneficiary_lesion_assessments").insert({
         project_id: projectId,
         module_id: moduleId,
@@ -201,7 +260,17 @@ const LesionStagingPanel = ({
           segmentationQuality: metrics?.segmentationQuality ?? null,
           box: metrics?.box ?? null,
           rationale: staged.rationale,
+          learned: learned
+            ? { stage: learned.stage, confidence: learned.confidence, samples: model?.samples ?? 0 }
+            : null,
         },
+        features,
+        model_stage: learned?.stage ?? null,
+        model_confidence: learned ? +learned.confidence.toFixed(3) : null,
+        confirmed_stage: confirmed,
+        confirmed_stage_label: confirmed == null ? null : stageLabelFor(condition, confirmed),
+        confirmed_by: confirmed == null ? null : auth.user?.id ?? null,
+        confirmed_at: confirmed == null ? null : new Date().toISOString(),
         notes: notes || null,
         created_by: auth.user?.id,
       });
@@ -210,6 +279,7 @@ const LesionStagingPanel = ({
       setImagePath(null); setDataUrl(null); setMetrics(null); setNotes("");
       setCriteria({}); setMeasures({});
       await load();
+      await reloadModel();
     } catch (e) {
       toast({ title: "Could not save the assessment", description: (e as Error).message, variant: "destructive" });
     } finally {
@@ -392,11 +462,55 @@ const LesionStagingPanel = ({
                     <span>Picture quality: {(metrics.segmentationQuality * 100).toFixed(0)}%</span>
                   </div>
                 )}
+                {learned && (
+                  <div className="rounded-md border border-teal-200 bg-teal-50/70 p-2.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge className="gap-1 bg-teal-700 text-white">
+                        <Brain className="h-3 w-3" /> Learned from real cases
+                      </Badge>
+                      <span className="text-sm font-medium text-teal-900">{learned.label}</span>
+                      <Badge variant="outline" className="border-teal-300 text-teal-800">
+                        {Math.round(learned.confidence * 100)}% likely
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-xs text-teal-900">
+                      Trained on {model?.samples ?? 0} stages confirmed by clinicians on this
+                      project, agreeing with them {Math.round((model?.accuracy ?? 0) * 100)}% of
+                      the time on cases it had not seen.
+                    </p>
+                    {learned.ranked.length > 1 && (
+                      <p className="mt-1 text-[11px] text-teal-800">
+                        Next most likely: {learned.ranked[1].label} ({Math.round(learned.ranked[1].probability * 100)}%).
+                      </p>
+                    )}
+                  </div>
+                )}
                 <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
                   <Info className="mt-0.5 h-3 w-3 shrink-0" />
                   A measurement aid for a trained clinician — it does not diagnose and never replaces examination.
                 </p>
               </div>
+            </div>
+          )}
+
+          {hasEvidence && stageOptions.length > 0 && (
+            <div className="rounded-lg border border-border p-3">
+              <Label className="flex items-center gap-1.5 text-sm">
+                <CheckCircle2 className="h-4 w-4 text-primary" /> Stage confirmed by the clinician
+              </Label>
+              <p className="mb-2 mt-0.5 text-xs text-muted-foreground">
+                Agree with the suggestion or correct it. Every confirmed stage teaches the model
+                how this condition really looks in your own patients.
+              </p>
+              <Select value={confirmStage} onValueChange={setConfirmStage}>
+                <SelectTrigger className="max-w-md"><SelectValue placeholder="Not confirmed" /></SelectTrigger>
+                <SelectContent className="z-[1200] max-h-72 bg-popover">
+                  <SelectItem value="none">Do not confirm yet</SelectItem>
+                  {stageOptions.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
 
@@ -414,6 +528,31 @@ const LesionStagingPanel = ({
         </Card>
       )}
 
+      <Card className="space-y-2 p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-100 text-teal-800">
+            <GraduationCap className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h4 className="font-semibold text-foreground">Staging model for {conditionLabel(condition)}</h4>
+            <p className="text-xs text-muted-foreground">
+              {model
+                ? `Learning from ${model.samples} confirmed cases · agrees with clinicians ${Math.round(model.accuracy * 100)}% of the time · last trained ${fmtDate(model.trainedAt)}`
+                : `${confirmedCount} confirmed case${confirmedCount === 1 ? "" : "s"} so far — ${MIN_TRAINING_CASES} across two or more stages starts the learning.`}
+            </p>
+          </div>
+          <Button size="sm" variant="outline" disabled={training} onClick={() => void runTraining()}>
+            {training ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Brain className="mr-1 h-4 w-4" />}
+            Train on confirmed cases
+          </Button>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Training happens on this device from measurements and ticked signs only — photographs are
+          never sent anywhere for it. The recognised clinical scale always stays visible beside the
+          learned stage.
+        </p>
+      </Card>
+
       <Card className="p-4">
         <h4 className="mb-2 font-semibold text-foreground">Assessment history</h4>
         <Separator className="mb-2" />
@@ -426,6 +565,7 @@ const LesionStagingPanel = ({
                 <TableHead>Condition / site</TableHead>
                 <TableHead>Measured size</TableHead>
                 <TableHead>Stage</TableHead>
+                <TableHead>Confirmed stage</TableHead>
                 <TableHead>Change</TableHead>
               </TableRow>
             </TableHeader>
@@ -439,7 +579,33 @@ const LesionStagingPanel = ({
                     <div className="text-xs text-muted-foreground">{r.body_site || "—"}</div>
                   </TableCell>
                   <TableCell>{sizeText(r)}</TableCell>
-                  <TableCell>{r.stage_label || "—"}</TableCell>
+                  <TableCell>
+                    <div>{r.stage_label || "—"}</div>
+                    {r.model_stage != null && (
+                      <div className="text-[11px] text-teal-700">
+                        Model: {stageLabelFor(r.condition as LesionCondition, r.model_stage)}
+                        {r.model_confidence != null && ` (${Math.round(r.model_confidence * 100)}%)`}
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell className="min-w-[220px]">
+                    {canRecord ? (
+                      <Select
+                        value={r.confirmed_stage == null ? "none" : String(r.confirmed_stage)}
+                        onValueChange={(v) => { if (v !== "none") void confirmRow(r, Number(v)); }}
+                      >
+                        <SelectTrigger className="h-8"><SelectValue placeholder="Confirm stage" /></SelectTrigger>
+                        <SelectContent className="z-[1200] max-h-72 bg-popover">
+                          <SelectItem value="none">Not confirmed</SelectItem>
+                          {(STAGE_LABELS[r.condition as LesionCondition] || []).map((label, i) => (
+                            <SelectItem key={label} value={String(i)}>{label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <span className="text-muted-foreground">{r.confirmed_stage_label || "Not confirmed"}</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     {r.percent_change == null ? (
                       <span className="text-muted-foreground">Baseline</span>
@@ -456,7 +622,7 @@ const LesionStagingPanel = ({
               ))}
               {!loading && rows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">
                     No visual assessment recorded yet.
                   </TableCell>
                 </TableRow>
