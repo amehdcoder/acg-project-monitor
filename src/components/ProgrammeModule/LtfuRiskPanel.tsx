@@ -33,6 +33,7 @@ import type { BeneficiaryRow } from "@/lib/programmeModule/types";
 import {
   bandLabel, bandTone, rankLtfuRisk, type RiskInput, type RiskResult,
 } from "@/lib/programmeModule/ltfuRisk";
+import ChewVisitMap from "./ChewVisitMap";
 
 interface Props {
   projectId: string;
@@ -317,6 +318,8 @@ const LtfuRiskPanel = ({
           </Table>
         </div>
       </Card>
+
+      <ChewVisitMap visits={dispatches} beneficiaries={beneficiaries} facilities={facilities} />
 
       <Card className="p-4">
         <h4 className="mb-2 font-semibold text-foreground">Home visits dispatched</h4>

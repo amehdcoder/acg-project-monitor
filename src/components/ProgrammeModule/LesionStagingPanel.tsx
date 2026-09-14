@@ -26,9 +26,10 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { toneClasses } from "@/lib/programmeModule/defaults";
 import { resolveMediaUrl } from "@/lib/programmeModule/media";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
-  LESION_CONDITIONS, SCALE_REFERENCES, analyseLesion, compareLesions, conditionLabel,
-  stageLesion, TREND_TONE,
+  CLINICAL_CRITERIA, LESION_CONDITIONS, MEASUREMENT_FIELDS, SCALE_REFERENCES,
+  analyseLesion, compareLesions, conditionLabel, stageFromEvidence, TREND_TONE,
   type LesionCondition, type LesionMetrics,
 } from "@/lib/programmeModule/lesionVision";
 import PhotoCaptureField from "./PhotoCaptureField";
@@ -95,6 +96,8 @@ const LesionStagingPanel = ({
   const [metrics, setMetrics] = useState<LesionMetrics | null>(null);
   const [analysing, setAnalysing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [criteria, setCriteria] = useState<Record<string, boolean>>({});
+  const [measures, setMeasures] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -133,19 +136,40 @@ const LesionStagingPanel = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reference]);
 
-  const staged = metrics ? stageLesion(condition, metrics) : null;
+  const numericMeasures = useMemo(() => {
+    const out: Record<string, number | null> = {};
+    for (const [k, v] of Object.entries(measures)) {
+      const n = Number(v);
+      out[k] = v !== "" && Number.isFinite(n) ? n : null;
+    }
+    return out;
+  }, [measures]);
+
+  const staged = useMemo(
+    () => stageFromEvidence(condition, { criteria, measures: numericMeasures, metrics }),
+    [condition, criteria, numericMeasures, metrics],
+  );
+
+  const hasEvidence = !!metrics
+    || Object.values(criteria).some(Boolean)
+    || Object.values(numericMeasures).some((v) => v != null);
 
   const save = async () => {
-    if (!metrics) {
-      toast({ title: "Take a picture first", description: "The measurement comes from the photograph." });
+    if (!hasEvidence) {
+      toast({
+        title: "Nothing to stage yet",
+        description: "Take a picture, tick the signs seen, or record a measurement.",
+      });
       return;
     }
     setSaving(true);
     try {
       const previous = sameCondition[0];
       const prevValue = Number(previous?.area_mm2 ?? previous?.area_fraction ?? 0);
-      const newValue = Number(metrics.areaMm2 ?? metrics.areaFraction);
-      const percentChange = prevValue > 0 ? +(((newValue - prevValue) / prevValue) * 100).toFixed(1) : null;
+      const newValue = Number(metrics?.areaMm2 ?? metrics?.areaFraction ?? 0);
+      const percentChange = prevValue > 0 && newValue > 0
+        ? +(((newValue - prevValue) / prevValue) * 100).toFixed(1) : null;
+
 
       const { data: auth } = await supabase.auth.getUser();
       const { error } = await db.from("beneficiary_lesion_assessments").insert({
@@ -158,25 +182,33 @@ const LesionStagingPanel = ({
         assessed_on: assessedOn,
         image_path: imagePath,
         reference_mm: Number(reference) || null,
-        area_fraction: metrics.areaFraction,
-        area_mm2: metrics.areaMm2,
-        width_fraction: metrics.widthFraction,
-        redness_index: metrics.rednessIndex,
-        stage: staged?.stage ?? null,
-        stage_label: staged?.label ?? null,
+        area_fraction: metrics?.areaFraction ?? null,
+        area_mm2: metrics?.areaMm2 ?? null,
+        width_fraction: metrics?.widthFraction ?? null,
+        redness_index: metrics?.rednessIndex ?? null,
+        stage: staged.stage,
+        stage_label: staged.label,
         percent_change: percentChange,
         analysis: {
-          edgeIrregularity: metrics.edgeIrregularity,
-          segmentationQuality: metrics.segmentationQuality,
-          box: metrics.box,
-          rationale: staged?.rationale,
+          scale: staged.scale,
+          source: staged.source,
+          confidence: staged.confidence,
+          inputs: staged.inputs,
+          criteria,
+          measures: numericMeasures,
+          longestMm: metrics?.longestMm ?? null,
+          edgeIrregularity: metrics?.edgeIrregularity ?? null,
+          segmentationQuality: metrics?.segmentationQuality ?? null,
+          box: metrics?.box ?? null,
+          rationale: staged.rationale,
         },
         notes: notes || null,
         created_by: auth.user?.id,
       });
       if (error) throw error;
-      toast({ title: "Assessment saved", description: staged?.label });
+      toast({ title: "Assessment saved", description: staged.label });
       setImagePath(null); setDataUrl(null); setMetrics(null); setNotes("");
+      setCriteria({}); setMeasures({});
       await load();
     } catch (e) {
       toast({ title: "Could not save the assessment", description: (e as Error).message, variant: "destructive" });
@@ -216,7 +248,7 @@ const LesionStagingPanel = ({
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <Label className="text-sm">Condition</Label>
-              <Select value={condition} onValueChange={(v) => { setCondition(v as LesionCondition); setMetrics(null); }}>
+              <Select value={condition} onValueChange={(v) => { setCondition(v as LesionCondition); setMetrics(null); setCriteria({}); setMeasures({}); }}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent className="z-[1200] bg-popover">
                   {LESION_CONDITIONS.map((c) => (
@@ -278,9 +310,55 @@ const LesionStagingPanel = ({
             </p>
           )}
 
-          {metrics && staged && (
-            <div className="grid gap-4 rounded-lg border border-border p-3 md:grid-cols-[200px_minmax(0,1fr)]">
-              {metrics.overlay && (
+          {(CLINICAL_CRITERIA[condition].length > 0 || MEASUREMENT_FIELDS[condition].length > 0) && (
+            <div className="grid gap-4 rounded-lg border border-border p-3 lg:grid-cols-2">
+              {CLINICAL_CRITERIA[condition].length > 0 && (
+                <div>
+                  <p className="text-sm font-medium text-foreground">Signs seen on examination</p>
+                  <p className="mb-2 text-xs text-muted-foreground">
+                    Tick everything present — the highest sign sets the stage on the recognised scale.
+                  </p>
+                  <div className="space-y-1.5">
+                    {CLINICAL_CRITERIA[condition].map((c) => (
+                      <label key={c.key} className="flex cursor-pointer items-start gap-2 text-sm">
+                        <Checkbox
+                          className="mt-0.5"
+                          checked={!!criteria[c.key]}
+                          onCheckedChange={(v) => setCriteria((p) => ({ ...p, [c.key]: v === true }))}
+                        />
+                        <span className="text-foreground">{c.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {MEASUREMENT_FIELDS[condition].length > 0 && (
+                <div>
+                  <p className="text-sm font-medium text-foreground">Measurements at this visit</p>
+                  <p className="mb-2 text-xs text-muted-foreground">
+                    Used to grade size-based scales and to chart change between visits.
+                  </p>
+                  <div className="space-y-2">
+                    {MEASUREMENT_FIELDS[condition].map((f) => (
+                      <div key={f.key}>
+                        <Label className="text-xs">{f.label} ({f.unit})</Label>
+                        <Input
+                          type="number" inputMode="decimal" className="mt-1 h-9"
+                          value={measures[f.key] ?? ""}
+                          onChange={(e) => setMeasures((p) => ({ ...p, [f.key]: e.target.value }))}
+                        />
+                        {f.hint && <p className="mt-0.5 text-[11px] text-muted-foreground">{f.hint}</p>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {hasEvidence && (
+            <div className="grid gap-4 rounded-lg border border-primary/30 bg-primary/[0.03] p-3 md:grid-cols-[200px_minmax(0,1fr)]">
+              {metrics?.overlay && (
                 <div>
                   <img src={metrics.overlay} alt="Detected lesion region" className="w-full rounded-md" />
                   <p className="mt-1 text-center text-[11px] text-muted-foreground">Highlighted = measured region</p>
@@ -289,21 +367,31 @@ const LesionStagingPanel = ({
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge className="bg-primary text-primary-foreground">{staged.label}</Badge>
-                  <Badge variant="outline">
-                    <Ruler className="mr-1 h-3 w-3" />
-                    {metrics.areaMm2 != null
-                      ? `${(metrics.areaMm2 / 100).toFixed(1)} cm²`
-                      : `${(metrics.areaFraction * 100).toFixed(1)}% of frame`}
-                  </Badge>
-                  <Badge variant="outline">Confidence {Math.round(metrics.segmentationQuality * 100)}%</Badge>
+                  {metrics && (
+                    <Badge variant="outline">
+                      <Ruler className="mr-1 h-3 w-3" />
+                      {metrics.areaMm2 != null
+                        ? `${(metrics.areaMm2 / 100).toFixed(1)} cm²`
+                        : `${(metrics.areaFraction * 100).toFixed(1)}% of frame`}
+                    </Badge>
+                  )}
+                  <Badge variant="outline">Certainty {Math.round(staged.confidence * 100)}%</Badge>
                 </div>
+                <p className="text-xs font-medium text-muted-foreground">{staged.scale}</p>
                 <p className="text-sm text-muted-foreground">{staged.rationale}</p>
-                <div className="grid gap-x-6 gap-y-1 text-xs text-muted-foreground sm:grid-cols-2">
-                  <span>Redness index: {(metrics.rednessIndex * 100).toFixed(0)}%</span>
-                  <span>Edge irregularity: {(metrics.edgeIrregularity * 100).toFixed(0)}%</span>
-                  <span>Width across frame: {(metrics.widthFraction * 100).toFixed(0)}%</span>
-                  <span>Height across frame: {(metrics.heightFraction * 100).toFixed(0)}%</span>
-                </div>
+                {staged.inputs.length > 0 && (
+                  <ul className="list-inside list-disc space-y-0.5 text-xs text-muted-foreground">
+                    {staged.inputs.map((i) => <li key={i}>{i}</li>)}
+                  </ul>
+                )}
+                {metrics && (
+                  <div className="grid gap-x-6 gap-y-1 text-xs text-muted-foreground sm:grid-cols-2">
+                    <span>Redness index: {(metrics.rednessIndex * 100).toFixed(0)}%</span>
+                    <span>Edge irregularity: {(metrics.edgeIrregularity * 100).toFixed(0)}%</span>
+                    <span>Longest span: {metrics.longestMm != null ? `${(metrics.longestMm / 10).toFixed(1)} cm` : "add a reference object"}</span>
+                    <span>Picture quality: {(metrics.segmentationQuality * 100).toFixed(0)}%</span>
+                  </div>
+                )}
                 <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
                   <Info className="mt-0.5 h-3 w-3 shrink-0" />
                   A measurement aid for a trained clinician — it does not diagnose and never replaces examination.
@@ -320,7 +408,7 @@ const LesionStagingPanel = ({
             />
           </div>
 
-          <Button disabled={saving || analysing || !metrics} onClick={() => void save()}>
+          <Button disabled={saving || analysing || !hasEvidence} onClick={() => void save()}>
             {saving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />} Save assessment
           </Button>
         </Card>

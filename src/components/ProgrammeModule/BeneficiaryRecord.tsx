@@ -34,6 +34,7 @@ import LongitudinalOutcome from "./LongitudinalOutcome";
 import CareNetworkPanel from "./CareNetworkPanel";
 import LimbProgressPanel from "./LimbProgressPanel";
 import LesionStagingPanel from "./LesionStagingPanel";
+import BeneficiaryRiskCard from "./BeneficiaryRiskCard";
 import { recordAudit } from "./useProgrammeModule";
 import { requestBeneficiaryDeletion } from "@/lib/programmeModule/facilityOps";
 import {
@@ -228,9 +229,9 @@ const BeneficiaryRecord = ({
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-4">
           {/* Header + progress */}
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
+          <div className="grid gap-4 xl:grid-cols-[minmax(340px,1fr)_260px]">
             <Card className="p-4 sm:p-5">
-              <div className="flex flex-col gap-4 sm:flex-row">
+              <div className="flex flex-wrap items-start gap-4">
                 <div
                   className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted text-2xl font-semibold text-muted-foreground"
                 >
@@ -238,7 +239,8 @@ const BeneficiaryRecord = ({
                     ? <img src={portrait} alt={`${beneficiary.full_name} portrait`} className="h-full w-full object-cover" />
                     : beneficiary.full_name.slice(0, 2).toUpperCase()}
                 </div>
-                <div className="min-w-0 flex-1">
+                <div className="min-w-[200px] flex-1">
+
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="font-display text-2xl font-bold text-foreground">{beneficiary.full_name}</h2>
                     <Badge variant="outline" className={cn("border", toneClasses[toneFor(statuses, beneficiary.status)])}>
@@ -612,6 +614,14 @@ const BeneficiaryRecord = ({
               </div>
             </Card>
           )}
+
+          <BeneficiaryRiskCard
+            beneficiary={beneficiary}
+            services={services}
+            referrals={referrals}
+            projectId={projectId}
+            canDispatch={canManage}
+          />
 
           {config.layout.showNextFollowUp && (
             <Card className="p-4">
