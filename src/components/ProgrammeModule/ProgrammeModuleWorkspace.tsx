@@ -34,6 +34,7 @@ import SafeguardingOfficers from "./SafeguardingOfficers";
 import HouseholdsPanel from "./HouseholdsPanel";
 import KinshipGraphPanel from "./KinshipGraphPanel";
 import LtfuRiskPanel from "./LtfuRiskPanel";
+import ClusterDashboard from "./ClusterDashboard";
 import { useIsSafeguardingOfficer } from "@/lib/programmeModule/safeguarding";
 import { useMyFacilityAccess } from "@/lib/programmeModule/facilities";
 
@@ -71,7 +72,7 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
   const [officersOpen, setOfficersOpen] = useState(false);
   const { isOfficer, reload: reloadOfficerAccess } = useIsSafeguardingOfficer(projectId);
   const [view, setView] = useState<
-    | "records" | "journey" | "facility" | "followups" | "households" | "network"
+    | "records" | "journey" | "facility" | "followups" | "households" | "clusters" | "network"
     | "risk" | "safeguarding" | "safeguarding_dashboard"
   >("records");
 
@@ -232,6 +233,7 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
           { key: "facility", label: "Facility dashboard", icon: Hospital, show: true },
           { key: "followups", label: "Follow-ups & referrals", icon: CalendarClock, show: true },
           { key: "households", label: "Households & MDA", icon: Home, show: true },
+          { key: "clusters", label: "Community clusters", icon: Layers, show: true },
           { key: "network", label: "Transmission network", icon: Network, show: true },
           { key: "risk", label: "Follow-up risk & CHEW visits", icon: Activity, show: true },
           { key: "safeguarding", label: "Safeguarding", icon: ShieldCheck, show: isOfficer },
@@ -314,6 +316,15 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
           canManage={canConfigure || Object.values(facilityLevels).includes("manage") || Object.values(facilityLevels).includes("record")}
           onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }}
           onChanged={() => void reloadBeneficiaries()}
+        />
+      )}
+
+      {view === "clusters" && (
+        <ClusterDashboard
+          projectId={projectId}
+          moduleId={active?.id}
+          beneficiaries={scopedBeneficiaries}
+          allowedFacilityIds={isFocalPerson ? Object.keys(facilityLevels) : null}
         />
       )}
 
