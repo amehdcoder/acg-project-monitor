@@ -222,6 +222,11 @@ const ServiceEntryDialog = ({
               />
             ))}
 
+          <ServiceExperienceSections
+            answers={experience}
+            onChange={(name, value) => setExperience((p) => ({ ...p, [name]: value }))}
+          />
+
           <FollowUpFields
             value={followUp}
             onChange={setFollowUp}
