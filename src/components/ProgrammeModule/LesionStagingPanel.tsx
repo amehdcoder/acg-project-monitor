@@ -166,8 +166,10 @@ const LesionStagingPanel = ({
     try {
       const previous = sameCondition[0];
       const prevValue = Number(previous?.area_mm2 ?? previous?.area_fraction ?? 0);
-      const newValue = Number(metrics.areaMm2 ?? metrics.areaFraction);
-      const percentChange = prevValue > 0 ? +(((newValue - prevValue) / prevValue) * 100).toFixed(1) : null;
+      const newValue = Number(metrics?.areaMm2 ?? metrics?.areaFraction ?? 0);
+      const percentChange = prevValue > 0 && newValue > 0
+        ? +(((newValue - prevValue) / prevValue) * 100).toFixed(1) : null;
+
 
       const { data: auth } = await supabase.auth.getUser();
       const { error } = await db.from("beneficiary_lesion_assessments").insert({
@@ -180,25 +182,33 @@ const LesionStagingPanel = ({
         assessed_on: assessedOn,
         image_path: imagePath,
         reference_mm: Number(reference) || null,
-        area_fraction: metrics.areaFraction,
-        area_mm2: metrics.areaMm2,
-        width_fraction: metrics.widthFraction,
-        redness_index: metrics.rednessIndex,
-        stage: staged?.stage ?? null,
-        stage_label: staged?.label ?? null,
+        area_fraction: metrics?.areaFraction ?? null,
+        area_mm2: metrics?.areaMm2 ?? null,
+        width_fraction: metrics?.widthFraction ?? null,
+        redness_index: metrics?.rednessIndex ?? null,
+        stage: staged.stage,
+        stage_label: staged.label,
         percent_change: percentChange,
         analysis: {
-          edgeIrregularity: metrics.edgeIrregularity,
-          segmentationQuality: metrics.segmentationQuality,
-          box: metrics.box,
-          rationale: staged?.rationale,
+          scale: staged.scale,
+          source: staged.source,
+          confidence: staged.confidence,
+          inputs: staged.inputs,
+          criteria,
+          measures: numericMeasures,
+          longestMm: metrics?.longestMm ?? null,
+          edgeIrregularity: metrics?.edgeIrregularity ?? null,
+          segmentationQuality: metrics?.segmentationQuality ?? null,
+          box: metrics?.box ?? null,
+          rationale: staged.rationale,
         },
         notes: notes || null,
         created_by: auth.user?.id,
       });
       if (error) throw error;
-      toast({ title: "Assessment saved", description: staged?.label });
+      toast({ title: "Assessment saved", description: staged.label });
       setImagePath(null); setDataUrl(null); setMetrics(null); setNotes("");
+      setCriteria({}); setMeasures({});
       await load();
     } catch (e) {
       toast({ title: "Could not save the assessment", description: (e as Error).message, variant: "destructive" });
