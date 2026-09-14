@@ -142,9 +142,11 @@ export const CISKULA_PRESET: ProgrammeModuleConfig = {
       "PHC referral", "Facility supportive supervision",
     ]),
     {
-      ...component("documents", "Documents", "FileText", "340 65% 50%", 7, ["Consent form", "Identification"]),
+      ...component("documents", "Documents", "FileText", "340 65% 50%", 7, [
+        "Consent form", "Beneficiary photos", "Beneficiary videos", "Beneficiary audio clips",
+      ]),
       countsTowardsProgress: false,
-      questions: [q("document", "Attach document", "image")],
+      questions: [],
     },
   ],
   sections: [
