@@ -367,21 +367,31 @@ const LesionStagingPanel = ({
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge className="bg-primary text-primary-foreground">{staged.label}</Badge>
-                  <Badge variant="outline">
-                    <Ruler className="mr-1 h-3 w-3" />
-                    {metrics.areaMm2 != null
-                      ? `${(metrics.areaMm2 / 100).toFixed(1)} cm²`
-                      : `${(metrics.areaFraction * 100).toFixed(1)}% of frame`}
-                  </Badge>
-                  <Badge variant="outline">Confidence {Math.round(metrics.segmentationQuality * 100)}%</Badge>
+                  {metrics && (
+                    <Badge variant="outline">
+                      <Ruler className="mr-1 h-3 w-3" />
+                      {metrics.areaMm2 != null
+                        ? `${(metrics.areaMm2 / 100).toFixed(1)} cm²`
+                        : `${(metrics.areaFraction * 100).toFixed(1)}% of frame`}
+                    </Badge>
+                  )}
+                  <Badge variant="outline">Certainty {Math.round(staged.confidence * 100)}%</Badge>
                 </div>
+                <p className="text-xs font-medium text-muted-foreground">{staged.scale}</p>
                 <p className="text-sm text-muted-foreground">{staged.rationale}</p>
-                <div className="grid gap-x-6 gap-y-1 text-xs text-muted-foreground sm:grid-cols-2">
-                  <span>Redness index: {(metrics.rednessIndex * 100).toFixed(0)}%</span>
-                  <span>Edge irregularity: {(metrics.edgeIrregularity * 100).toFixed(0)}%</span>
-                  <span>Width across frame: {(metrics.widthFraction * 100).toFixed(0)}%</span>
-                  <span>Height across frame: {(metrics.heightFraction * 100).toFixed(0)}%</span>
-                </div>
+                {staged.inputs.length > 0 && (
+                  <ul className="list-inside list-disc space-y-0.5 text-xs text-muted-foreground">
+                    {staged.inputs.map((i) => <li key={i}>{i}</li>)}
+                  </ul>
+                )}
+                {metrics && (
+                  <div className="grid gap-x-6 gap-y-1 text-xs text-muted-foreground sm:grid-cols-2">
+                    <span>Redness index: {(metrics.rednessIndex * 100).toFixed(0)}%</span>
+                    <span>Edge irregularity: {(metrics.edgeIrregularity * 100).toFixed(0)}%</span>
+                    <span>Longest span: {metrics.longestMm != null ? `${(metrics.longestMm / 10).toFixed(1)} cm` : "add a reference object"}</span>
+                    <span>Picture quality: {(metrics.segmentationQuality * 100).toFixed(0)}%</span>
+                  </div>
+                )}
                 <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
                   <Info className="mt-0.5 h-3 w-3 shrink-0" />
                   A measurement aid for a trained clinician — it does not diagnose and never replaces examination.
