@@ -39,6 +39,7 @@ interface Props {
   projectId?: string;
   /** Only administrators may add or configure modules. */
   canConfigure?: boolean;
+  isOwner?: boolean;
 }
 
 /**
@@ -49,7 +50,7 @@ interface Props {
  * programme components, sections, questions, workflow, layout, branding and
  * Case ID format — comes from `programme_modules.config`, never from this code.
  */
-const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) => {
+const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = false }: Props) => {
   const { toast } = useToast();
   const { modules, loading, reload } = useProgrammeModules(projectId);
   const [activeId, setActiveId] = useState<string>("");
@@ -65,7 +66,7 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
   const [creating, setCreating] = useState(false);
   const [deleteRequestsOpen, setDeleteRequestsOpen] = useState(false);
   const [officersOpen, setOfficersOpen] = useState(false);
-  const { isOfficer } = useIsSafeguardingOfficer(projectId);
+  const { isOfficer, reload: reloadOfficerAccess } = useIsSafeguardingOfficer(projectId);
   const [view, setView] = useState<
     "records" | "journey" | "facility" | "followups" | "safeguarding" | "safeguarding_dashboard"
   >("records");
@@ -326,6 +327,8 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
         open={officersOpen}
         onOpenChange={setOfficersOpen}
         projectId={projectId}
+        isOwner={isOwner}
+        onChanged={reloadOfficerAccess}
       />
 
 

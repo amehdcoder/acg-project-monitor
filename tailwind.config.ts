@@ -19,6 +19,8 @@ export default {
       fontFamily: {
         display: ['Inter', 'system-ui', 'sans-serif'],
         sans: ['Inter', 'system-ui', 'sans-serif'],
+        report: ['Manrope', 'system-ui', 'sans-serif'],
+        "report-display": ['Sora', 'system-ui', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -91,6 +93,14 @@ export default {
           accent: "hsl(var(--chart-accent))",
           highlight: "hsl(var(--chart-highlight))",
           danger: "hsl(var(--chart-danger))",
+        },
+        health: {
+          blue: "hsl(var(--health-blue))",
+          teal: "hsl(var(--health-teal))",
+          amber: "hsl(var(--health-amber))",
+          red: "hsl(var(--health-red))",
+          surface: "hsl(var(--health-surface))",
+          ink: "hsl(var(--health-ink))",
         },
       },
       borderRadius: {
