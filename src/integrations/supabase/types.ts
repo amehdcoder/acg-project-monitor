@@ -1455,6 +1455,8 @@ export type Database = {
           created_by: string
           facility_id: string | null
           full_name: string
+          household_id: string | null
+          household_role: string | null
           id: string
           latitude: number | null
           lga: string | null
@@ -1479,6 +1481,8 @@ export type Database = {
           created_by?: string
           facility_id?: string | null
           full_name: string
+          household_id?: string | null
+          household_role?: string | null
           id?: string
           latitude?: number | null
           lga?: string | null
@@ -1503,6 +1507,8 @@ export type Database = {
           created_by?: string
           facility_id?: string | null
           full_name?: string
+          household_id?: string | null
+          household_role?: string | null
           id?: string
           latitude?: number | null
           lga?: string | null
@@ -1527,6 +1533,13 @@ export type Database = {
             columns: ["facility_id"]
             isOneToOne: false
             referencedRelation: "health_facilities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beneficiaries_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiary_households"
             referencedColumns: ["id"]
           },
           {
@@ -1648,6 +1661,280 @@ export type Database = {
             columns: ["beneficiary_id"]
             isOneToOne: false
             referencedRelation: "beneficiaries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      beneficiary_home_visits: {
+        Row: {
+          assigned_name: string | null
+          assigned_to: string | null
+          beneficiary_id: string
+          created_at: string
+          created_by: string
+          due_date: string | null
+          id: string
+          module_id: string | null
+          outcome: string | null
+          outcome_notes: string | null
+          project_id: string
+          reasons: Json
+          risk_band: string | null
+          risk_score: number | null
+          status: string
+          updated_at: string
+          visited_at: string | null
+        }
+        Insert: {
+          assigned_name?: string | null
+          assigned_to?: string | null
+          beneficiary_id: string
+          created_at?: string
+          created_by?: string
+          due_date?: string | null
+          id?: string
+          module_id?: string | null
+          outcome?: string | null
+          outcome_notes?: string | null
+          project_id: string
+          reasons?: Json
+          risk_band?: string | null
+          risk_score?: number | null
+          status?: string
+          updated_at?: string
+          visited_at?: string | null
+        }
+        Update: {
+          assigned_name?: string | null
+          assigned_to?: string | null
+          beneficiary_id?: string
+          created_at?: string
+          created_by?: string
+          due_date?: string | null
+          id?: string
+          module_id?: string | null
+          outcome?: string | null
+          outcome_notes?: string | null
+          project_id?: string
+          reasons?: Json
+          risk_band?: string | null
+          risk_score?: number | null
+          status?: string
+          updated_at?: string
+          visited_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "beneficiary_home_visits_beneficiary_id_fkey"
+            columns: ["beneficiary_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beneficiary_home_visits_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "programme_modules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beneficiary_home_visits_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      beneficiary_households: {
+        Row: {
+          created_at: string
+          created_by: string
+          head_name: string | null
+          household_code: string
+          household_size: number
+          id: string
+          latitude: number | null
+          lga: string | null
+          longitude: number | null
+          module_id: string | null
+          name: string | null
+          notes: string | null
+          project_id: string
+          state: string | null
+          updated_at: string
+          village: string | null
+          ward: string | null
+          wash_source_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string
+          head_name?: string | null
+          household_code: string
+          household_size?: number
+          id?: string
+          latitude?: number | null
+          lga?: string | null
+          longitude?: number | null
+          module_id?: string | null
+          name?: string | null
+          notes?: string | null
+          project_id: string
+          state?: string | null
+          updated_at?: string
+          village?: string | null
+          ward?: string | null
+          wash_source_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          head_name?: string | null
+          household_code?: string
+          household_size?: number
+          id?: string
+          latitude?: number | null
+          lga?: string | null
+          longitude?: number | null
+          module_id?: string | null
+          name?: string | null
+          notes?: string | null
+          project_id?: string
+          state?: string | null
+          updated_at?: string
+          village?: string | null
+          ward?: string | null
+          wash_source_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "beneficiary_households_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "programme_modules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beneficiary_households_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beneficiary_households_wash_source_id_fkey"
+            columns: ["wash_source_id"]
+            isOneToOne: false
+            referencedRelation: "community_wash_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      beneficiary_lesion_assessments: {
+        Row: {
+          analysis: Json
+          area_fraction: number | null
+          area_mm2: number | null
+          assessed_on: string
+          beneficiary_id: string
+          body_site: string | null
+          component_key: string | null
+          condition: string
+          created_at: string
+          created_by: string
+          id: string
+          image_path: string | null
+          module_id: string | null
+          notes: string | null
+          percent_change: number | null
+          project_id: string
+          redness_index: number | null
+          reference_mm: number | null
+          service_id: string | null
+          stage: number | null
+          stage_label: string | null
+          updated_at: string
+          width_fraction: number | null
+        }
+        Insert: {
+          analysis?: Json
+          area_fraction?: number | null
+          area_mm2?: number | null
+          assessed_on?: string
+          beneficiary_id: string
+          body_site?: string | null
+          component_key?: string | null
+          condition?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          image_path?: string | null
+          module_id?: string | null
+          notes?: string | null
+          percent_change?: number | null
+          project_id: string
+          redness_index?: number | null
+          reference_mm?: number | null
+          service_id?: string | null
+          stage?: number | null
+          stage_label?: string | null
+          updated_at?: string
+          width_fraction?: number | null
+        }
+        Update: {
+          analysis?: Json
+          area_fraction?: number | null
+          area_mm2?: number | null
+          assessed_on?: string
+          beneficiary_id?: string
+          body_site?: string | null
+          component_key?: string | null
+          condition?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          image_path?: string | null
+          module_id?: string | null
+          notes?: string | null
+          percent_change?: number | null
+          project_id?: string
+          redness_index?: number | null
+          reference_mm?: number | null
+          service_id?: string | null
+          stage?: number | null
+          stage_label?: string | null
+          updated_at?: string
+          width_fraction?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "beneficiary_lesion_assessments_beneficiary_id_fkey"
+            columns: ["beneficiary_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beneficiary_lesion_assessments_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "programme_modules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beneficiary_lesion_assessments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beneficiary_lesion_assessments_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiary_services"
             referencedColumns: ["id"]
           },
         ]
@@ -4195,6 +4482,71 @@ export type Database = {
         }
         Relationships: []
       }
+      community_wash_sources: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          is_improved: boolean
+          latitude: number | null
+          lga: string | null
+          longitude: number | null
+          name: string
+          notes: string | null
+          project_id: string
+          sanitation_type: string | null
+          source_type: string
+          state: string | null
+          updated_at: string
+          village: string | null
+          ward: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          is_improved?: boolean
+          latitude?: number | null
+          lga?: string | null
+          longitude?: number | null
+          name: string
+          notes?: string | null
+          project_id: string
+          sanitation_type?: string | null
+          source_type?: string
+          state?: string | null
+          updated_at?: string
+          village?: string | null
+          ward?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          is_improved?: boolean
+          latitude?: number | null
+          lga?: string | null
+          longitude?: number | null
+          name?: string
+          notes?: string | null
+          project_id?: string
+          sanitation_type?: string | null
+          source_type?: string
+          state?: string | null
+          updated_at?: string
+          village?: string | null
+          ward?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_wash_sources_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       custom_banks: {
         Row: {
           code: string | null
@@ -5552,6 +5904,88 @@ export type Database = {
           ward?: string | null
         }
         Relationships: []
+      }
+      household_mda_rounds: {
+        Row: {
+          created_at: string
+          created_by: string
+          directly_observed: boolean
+          disease: string
+          drug: string | null
+          household_id: string
+          id: string
+          module_id: string | null
+          notes: string | null
+          persons_absent: number
+          persons_eligible: number
+          persons_refused: number
+          persons_treated: number
+          project_id: string
+          round_date: string
+          round_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string
+          directly_observed?: boolean
+          disease?: string
+          drug?: string | null
+          household_id: string
+          id?: string
+          module_id?: string | null
+          notes?: string | null
+          persons_absent?: number
+          persons_eligible?: number
+          persons_refused?: number
+          persons_treated?: number
+          project_id: string
+          round_date?: string
+          round_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          directly_observed?: boolean
+          disease?: string
+          drug?: string | null
+          household_id?: string
+          id?: string
+          module_id?: string | null
+          notes?: string | null
+          persons_absent?: number
+          persons_eligible?: number
+          persons_refused?: number
+          persons_treated?: number
+          project_id?: string
+          round_date?: string
+          round_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "household_mda_rounds_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiary_households"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "household_mda_rounds_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "programme_modules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "household_mda_rounds_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inactive_login_attempts: {
         Row: {

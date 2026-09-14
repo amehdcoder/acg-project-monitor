@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/select";
 import {
   Plus, Settings2, CloudOff, RefreshCw, Layers, Users, Building2, ShieldAlert,
-  LayoutGrid, CalendarClock, Hospital, Route, ShieldCheck,
+  LayoutGrid, CalendarClock, Hospital, Route, ShieldCheck, Home, Network, Activity,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -31,6 +31,9 @@ import JourneyDashboard from "./JourneyDashboard";
 import SafeguardingPanel from "./SafeguardingPanel";
 import SafeguardingDashboard from "./SafeguardingDashboard";
 import SafeguardingOfficers from "./SafeguardingOfficers";
+import HouseholdsPanel from "./HouseholdsPanel";
+import KinshipGraphPanel from "./KinshipGraphPanel";
+import LtfuRiskPanel from "./LtfuRiskPanel";
 import { useIsSafeguardingOfficer } from "@/lib/programmeModule/safeguarding";
 import { useMyFacilityAccess } from "@/lib/programmeModule/facilities";
 
@@ -68,7 +71,8 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
   const [officersOpen, setOfficersOpen] = useState(false);
   const { isOfficer, reload: reloadOfficerAccess } = useIsSafeguardingOfficer(projectId);
   const [view, setView] = useState<
-    "records" | "journey" | "facility" | "followups" | "safeguarding" | "safeguarding_dashboard"
+    | "records" | "journey" | "facility" | "followups" | "households" | "network"
+    | "risk" | "safeguarding" | "safeguarding_dashboard"
   >("records");
 
 
@@ -227,6 +231,9 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
           { key: "journey", label: "Beneficiary journey", icon: Route, show: true },
           { key: "facility", label: "Facility dashboard", icon: Hospital, show: true },
           { key: "followups", label: "Follow-ups & referrals", icon: CalendarClock, show: true },
+          { key: "households", label: "Households & MDA", icon: Home, show: true },
+          { key: "network", label: "Transmission network", icon: Network, show: true },
+          { key: "risk", label: "Follow-up risk & CHEW visits", icon: Activity, show: true },
           { key: "safeguarding", label: "Safeguarding", icon: ShieldCheck, show: isOfficer },
           {
             key: "safeguarding_dashboard", label: "Safeguarding dashboard",
@@ -295,6 +302,36 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
       {view === "followups" && (
         <FollowUpsPanel
           projectId={projectId}
+          onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }}
+        />
+      )}
+
+      {view === "households" && (
+        <HouseholdsPanel
+          projectId={projectId}
+          moduleId={active?.id}
+          beneficiaries={scopedBeneficiaries}
+          canManage={canConfigure || Object.values(facilityLevels).includes("manage") || Object.values(facilityLevels).includes("record")}
+          onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }}
+          onChanged={() => void reloadBeneficiaries()}
+        />
+      )}
+
+      {view === "network" && (
+        <KinshipGraphPanel
+          projectId={projectId}
+          moduleId={active?.id}
+          beneficiaries={scopedBeneficiaries}
+          onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }}
+        />
+      )}
+
+      {view === "risk" && (
+        <LtfuRiskPanel
+          projectId={projectId}
+          moduleId={active?.id}
+          beneficiaries={scopedBeneficiaries}
+          canDispatch={canConfigure || Object.values(facilityLevels).some((l) => l !== "view")}
           onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }}
         />
       )}
