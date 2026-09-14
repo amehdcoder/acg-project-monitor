@@ -462,11 +462,55 @@ const LesionStagingPanel = ({
                     <span>Picture quality: {(metrics.segmentationQuality * 100).toFixed(0)}%</span>
                   </div>
                 )}
+                {learned && (
+                  <div className="rounded-md border border-teal-200 bg-teal-50/70 p-2.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge className="gap-1 bg-teal-700 text-white">
+                        <Brain className="h-3 w-3" /> Learned from real cases
+                      </Badge>
+                      <span className="text-sm font-medium text-teal-900">{learned.label}</span>
+                      <Badge variant="outline" className="border-teal-300 text-teal-800">
+                        {Math.round(learned.confidence * 100)}% likely
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-xs text-teal-900">
+                      Trained on {model?.samples ?? 0} stages confirmed by clinicians on this
+                      project, agreeing with them {Math.round((model?.accuracy ?? 0) * 100)}% of
+                      the time on cases it had not seen.
+                    </p>
+                    {learned.ranked.length > 1 && (
+                      <p className="mt-1 text-[11px] text-teal-800">
+                        Next most likely: {learned.ranked[1].label} ({Math.round(learned.ranked[1].probability * 100)}%).
+                      </p>
+                    )}
+                  </div>
+                )}
                 <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
                   <Info className="mt-0.5 h-3 w-3 shrink-0" />
                   A measurement aid for a trained clinician — it does not diagnose and never replaces examination.
                 </p>
               </div>
+            </div>
+          )}
+
+          {hasEvidence && stageOptions.length > 0 && (
+            <div className="rounded-lg border border-border p-3">
+              <Label className="flex items-center gap-1.5 text-sm">
+                <CheckCircle2 className="h-4 w-4 text-primary" /> Stage confirmed by the clinician
+              </Label>
+              <p className="mb-2 mt-0.5 text-xs text-muted-foreground">
+                Agree with the suggestion or correct it. Every confirmed stage teaches the model
+                how this condition really looks in your own patients.
+              </p>
+              <Select value={confirmStage} onValueChange={setConfirmStage}>
+                <SelectTrigger className="max-w-md"><SelectValue placeholder="Not confirmed" /></SelectTrigger>
+                <SelectContent className="z-[1200] max-h-72 bg-popover">
+                  <SelectItem value="none">Do not confirm yet</SelectItem>
+                  {stageOptions.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
 
