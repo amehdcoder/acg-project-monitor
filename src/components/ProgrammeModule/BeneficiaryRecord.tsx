@@ -88,6 +88,7 @@ const FieldRow = ({ label, value }: { label: string; value: string }) => (
 
 const BeneficiaryRecord = ({
   beneficiary, config, moduleId, projectId, onBack, onChanged, canManage = false,
+  componentsVisible = true,
 }: Props) => {
   const { services, referrals, audit, reload } = useBeneficiaryRecord(beneficiary.id);
   const { toast } = useToast();
@@ -119,7 +120,13 @@ const BeneficiaryRecord = ({
     }
   };
 
-  const components = useMemo(() => visibleComponents(config), [config]);
+  // Facility focal persons only see the programme components (MMDP/NTD, Eye
+  // Health, Mental Health & Psychosocial Support …) for beneficiaries inside a
+  // facility they have been granted access to.
+  const components = useMemo(
+    () => (componentsVisible ? visibleComponents(config) : []),
+    [config, componentsVisible],
+  );
   const progress = useMemo(() => computeProgress(config, services), [config, services]);
   const flags = useMemo(() => evaluateDataQuality(config, beneficiary), [config, beneficiary]);
   const accent = config.branding.accent;

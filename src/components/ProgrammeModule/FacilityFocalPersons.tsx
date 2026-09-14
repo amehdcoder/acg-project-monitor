@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -48,7 +49,8 @@ const FacilityFocalPersons = ({ open, onOpenChange, projectId, initialFacilityId
   const { facilities } = useFacilities(projectId);
   const [people, setPeople] = useState<PersonRow[]>([]);
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
-  const [facilityId, setFacilityId] = useState(initialFacilityId || "");
+  const [facilityIds, setFacilityIds] = useState<string[]>(initialFacilityId ? [initialFacilityId] : []);
+  const [facilitySearch, setFacilitySearch] = useState("");
   const [userId, setUserId] = useState("");
   const [role, setRole] = useState("focal_person");
   const [accessLevel, setAccessLevel] = useState<FacilityAccessLevel>("manage");
@@ -65,7 +67,9 @@ const FacilityFocalPersons = ({ open, onOpenChange, projectId, initialFacilityId
   }, []);
 
   useEffect(() => { if (open) void load(); }, [open, load]);
-  useEffect(() => { if (open && initialFacilityId) setFacilityId(initialFacilityId); }, [open, initialFacilityId]);
+  useEffect(() => {
+    if (open && initialFacilityId) setFacilityIds([initialFacilityId]);
+  }, [open, initialFacilityId]);
 
   const nameOf = useCallback(
     (uid: string) => {
@@ -83,22 +87,35 @@ const FacilityFocalPersons = ({ open, onOpenChange, projectId, initialFacilityId
       .slice(0, 50);
   }, [profiles, search]);
 
+  const visibleFacilities = useMemo(() => {
+    const q = facilitySearch.trim().toLowerCase();
+    if (!q) return facilities;
+    return facilities.filter((f) =>
+      `${f.name} ${f.lga || ""} ${f.state || ""}`.toLowerCase().includes(q));
+  }, [facilities, facilitySearch]);
+
+  const toggleFacility = (id: string) =>
+    setFacilityIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
   const assign = async () => {
-    if (!facilityId || !userId) return;
+    if (!facilityIds.length || !userId) return;
     setBusy(true);
     try {
       const { data: auth } = await supabase.auth.getUser();
       const { error } = await supabase
         .from("facility_focal_persons")
         .upsert(
-          {
-            facility_id: facilityId, user_id: userId, role, access_level: accessLevel,
+          facilityIds.map((fid) => ({
+            facility_id: fid, user_id: userId, role, access_level: accessLevel,
             is_active: true, created_by: auth.user?.id,
-          } as never,
+          })) as never,
           { onConflict: "facility_id,user_id" },
         );
       if (error) throw error;
-      toast({ title: "Team member assigned", description: ACCESS_LEVEL_LABEL[accessLevel] });
+      toast({
+        title: "Team member assigned",
+        description: `${facilityIds.length} facility record set${facilityIds.length === 1 ? "" : "s"} · ${ACCESS_LEVEL_LABEL[accessLevel]}`,
+      });
       setUserId("");
       await load();
     } catch (e) {
@@ -132,17 +149,39 @@ const FacilityFocalPersons = ({ open, onOpenChange, projectId, initialFacilityId
         <Card className="space-y-3 p-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label>Facility</Label>
-              <Select value={facilityId} onValueChange={setFacilityId}>
-                <SelectTrigger><SelectValue placeholder="Select facility…" /></SelectTrigger>
-                <SelectContent className="z-[1200] bg-popover">
-                  {facilities.map((f) => (
-                    <SelectItem key={f.id} value={f.id}>
-                      {f.name} — {FACILITY_TYPE_LABEL[f.facility_type]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Facilities whose records this person may see</Label>
+              <Input
+                value={facilitySearch}
+                onChange={(e) => setFacilitySearch(e.target.value)}
+                placeholder="Search facilities…"
+              />
+              <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
+                {visibleFacilities.length === 0 && (
+                  <p className="p-2 text-xs text-muted-foreground">No matching facility.</p>
+                )}
+                {visibleFacilities.map((f) => (
+                  <label
+                    key={f.id}
+                    className="flex cursor-pointer items-start gap-2 rounded-md p-1.5 hover:bg-muted"
+                  >
+                    <Checkbox
+                      checked={facilityIds.includes(f.id)}
+                      onCheckedChange={() => toggleFacility(f.id)}
+                      className="mt-0.5"
+                    />
+                    <span className="text-sm text-foreground">
+                      {f.name}
+                      <span className="block text-xs text-muted-foreground">
+                        {FACILITY_TYPE_LABEL[f.facility_type]}
+                        {f.lga ? ` · ${f.lga}` : ""}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {facilityIds.length} facility record set{facilityIds.length === 1 ? "" : "s"} selected.
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label>Role</Label>
@@ -182,8 +221,8 @@ const FacilityFocalPersons = ({ open, onOpenChange, projectId, initialFacilityId
               {ACCESS_LEVELS.find((a) => a.value === accessLevel)?.hint}
             </p>
           </div>
-          <Button className="gap-1" disabled={busy || !facilityId || !userId} onClick={assign}>
-            <UserPlus className="h-4 w-4" /> Assign to facility
+          <Button className="gap-1" disabled={busy || !facilityIds.length || !userId} onClick={assign}>
+            <UserPlus className="h-4 w-4" /> Assign to selected facilities
           </Button>
           <p className="text-xs text-muted-foreground">
             A facility can carry at most two active focal persons; other members are added as
