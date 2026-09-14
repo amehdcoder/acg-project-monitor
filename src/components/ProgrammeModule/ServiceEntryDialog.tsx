@@ -14,6 +14,7 @@ import { enqueue, flushQueue, newUuid } from "@/lib/programmeModule/offlineQueue
 import { visibleComponents } from "@/lib/programmeModule/defaults";
 import type { ProgrammeModuleConfig } from "@/lib/programmeModule/types";
 import ConfigFieldRenderer, { AnswerMap, isRelevant } from "./ConfigFieldRenderer";
+import ServiceExperienceSections from "./ServiceExperienceSections";
 import { recordAudit } from "./useProgrammeModule";
 import MentalHealthServiceForm, { mhFormForService } from "./MentalHealthServiceForm";
 import MmdpServiceForm, { isMmdpService } from "./MmdpServiceForm";
