@@ -88,7 +88,13 @@ const FacilityDashboard = ({ projectId, canSeeAllFacilities = false, onOpenBenef
       });
     })();
     return () => { cancelled = true; };
-  }, [incoming, beneficiaries, referredNames]);
+  }, [incoming, outgoing, beneficiaries, referredNames]);
+
+  /** Patients this facility referred away and who were accepted elsewhere. */
+  const archived = useMemo(
+    () => outgoing.filter((r) => r.status === "accepted" || r.status === "completed"),
+    [outgoing],
+  );
 
   const pendingIn = incoming.filter((r) => r.status === "initiated");
   const dueFollowUps = incoming.filter(
