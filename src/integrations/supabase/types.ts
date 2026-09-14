@@ -1654,6 +1654,8 @@ export type Database = {
       }
       beneficiary_referrals: {
         Row: {
+          accepted_at: string | null
+          accepted_by: string | null
           beneficiary_id: string
           clinical_summary: string | null
           component_key: string | null
@@ -1676,10 +1678,13 @@ export type Database = {
           status: string
           submission_uuid: string | null
           to_facility_id: string | null
+          transferred_at: string | null
           updated_at: string
           urgency: string
         }
         Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
           beneficiary_id: string
           clinical_summary?: string | null
           component_key?: string | null
@@ -1702,10 +1707,13 @@ export type Database = {
           status?: string
           submission_uuid?: string | null
           to_facility_id?: string | null
+          transferred_at?: string | null
           updated_at?: string
           urgency?: string
         }
         Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
           beneficiary_id?: string
           clinical_summary?: string | null
           component_key?: string | null
@@ -1728,6 +1736,7 @@ export type Database = {
           status?: string
           submission_uuid?: string | null
           to_facility_id?: string | null
+          transferred_at?: string | null
           updated_at?: string
           urgency?: string
         }
@@ -10913,6 +10922,10 @@ export type Database = {
         Returns: {
           uid: string
         }[]
+      }
+      accept_beneficiary_referral: {
+        Args: { _referral_id: string }
+        Returns: undefined
       }
       accessible_form_ids: { Args: { _user_id: string }; Returns: string[] }
       accessible_project_ids: { Args: { _user_id: string }; Returns: string[] }

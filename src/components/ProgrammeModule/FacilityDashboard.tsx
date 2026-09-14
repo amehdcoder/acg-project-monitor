@@ -6,7 +6,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, ArrowDownLeft, ArrowUpRight, Users, RefreshCw, CalendarClock, ClipboardCheck } from "lucide-react";
+import { Building2, ArrowDownLeft, ArrowUpRight, Users, RefreshCw, CalendarClock, ClipboardCheck, Archive } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
@@ -15,7 +15,7 @@ import {
   FACILITY_TYPE_LABEL, useFacilities, useMyFacilityAccess,
 } from "@/lib/programmeModule/facilities";
 import {
-  CLOSED_OUTCOMES, REFERRAL_OUTCOME_LABEL, setReferralStatus, useFacilityDashboard,
+  CLOSED_OUTCOMES, REFERRAL_OUTCOME_LABEL, acceptReferral, setReferralStatus, useFacilityDashboard,
 } from "@/lib/programmeModule/facilityOps";
 import ReferralOutcomeDialog from "./ReferralOutcomeDialog";
 
@@ -70,10 +70,10 @@ const FacilityDashboard = ({ projectId, canSeeAllFacilities = false, onOpenBenef
     return m;
   }, [beneficiaries, referredNames]);
 
-  // Names of patients referred in from other facilities (not on our own list).
+  // Names of patients referred in or transferred out (no longer on our own list).
   useEffect(() => {
     const own = new Set(beneficiaries.map((b) => b.id));
-    const missing = Array.from(new Set(incoming.map((r) => r.beneficiary_id)))
+    const missing = Array.from(new Set([...incoming, ...outgoing].map((r) => r.beneficiary_id)))
       .filter((id) => !own.has(id) && !referredNames[id]);
     if (missing.length === 0) return;
     let cancelled = false;
@@ -88,7 +88,13 @@ const FacilityDashboard = ({ projectId, canSeeAllFacilities = false, onOpenBenef
       });
     })();
     return () => { cancelled = true; };
-  }, [incoming, beneficiaries, referredNames]);
+  }, [incoming, outgoing, beneficiaries, referredNames]);
+
+  /** Patients this facility referred away and who were accepted elsewhere. */
+  const archived = useMemo(
+    () => outgoing.filter((r) => r.status === "accepted" || r.status === "completed"),
+    [outgoing],
+  );
 
   const pendingIn = incoming.filter((r) => r.status === "initiated");
   const dueFollowUps = incoming.filter(
@@ -101,8 +107,16 @@ const FacilityDashboard = ({ projectId, canSeeAllFacilities = false, onOpenBenef
 
   const decide = async (id: string, status: string) => {
     try {
-      await setReferralStatus(id, status);
-      toast({ title: `Referral ${status}` });
+      if (status === "accepted") {
+        await acceptReferral(id);
+        toast({
+          title: "Referral accepted",
+          description: "The patient now appears on this facility's beneficiary list.",
+        });
+      } else {
+        await setReferralStatus(id, status);
+        toast({ title: `Referral ${status}` });
+      }
       void reload();
     } catch (e) {
       toast({ title: "Could not update referral", description: (e as Error).message, variant: "destructive" });
@@ -158,7 +172,7 @@ const FacilityDashboard = ({ projectId, canSeeAllFacilities = false, onOpenBenef
         {stat("Awaiting response", pendingIn.length, "text-amber-600")}
         {stat("Follow-ups due", dueFollowUps.length, "text-purple-600")}
         {stat("Closed referrals", closedIn.length, "text-emerald-600")}
-        {stat("Referrals out", outgoing.length, "text-slate-600")}
+        {stat("Transferred out", archived.length, "text-slate-600")}
       </div>
 
       <Card className="p-4">
@@ -182,6 +196,10 @@ const FacilityDashboard = ({ projectId, canSeeAllFacilities = false, onOpenBenef
           </TabsTrigger>
           <TabsTrigger value="people" className="gap-1">
             <Users className="h-4 w-4" /> Beneficiaries
+          </TabsTrigger>
+          <TabsTrigger value="archive" className="gap-1">
+            <Archive className="h-4 w-4" /> Transferred archive
+            {archived.length > 0 && <Badge variant="secondary" className="ml-1">{archived.length}</Badge>}
           </TabsTrigger>
         </TabsList>
 
@@ -274,6 +292,41 @@ const FacilityDashboard = ({ projectId, canSeeAllFacilities = false, onOpenBenef
                 {[b.village, b.lga, b.state].filter(Boolean).join(" · ") || "Location not recorded"}
               </p>
               <Badge variant="outline" className="mt-2">{b.status}</Badge>
+            </Card>
+          ))}
+        </TabsContent>
+
+        <TabsContent value="archive" className="mt-3 space-y-2">
+          <p className="text-xs text-muted-foreground">
+            Patients transferred to another facility after their referral was accepted. Their record
+            stays here for history and audit, but active care now sits with the receiving facility.
+          </p>
+          {archived.length === 0 && (
+            <Card className="p-8 text-center text-muted-foreground">
+              No patients have been transferred out of this facility yet.
+            </Card>
+          )}
+          {archived.map((r) => (
+            <Card key={r.id} className="flex flex-wrap items-center gap-3 p-4">
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-semibold text-foreground">
+                  {nameById.get(r.beneficiary_id) || "Transferred beneficiary"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Transferred to {r.referred_to} · {(r.transferred_at || r.accepted_at || "").slice(0, 10) || r.referral_date}
+                </p>
+                {r.reason && <p className="mt-1 text-xs text-muted-foreground">Reason: {r.reason}</p>}
+                {r.followup_date && (
+                  <p className="mt-1 flex items-center gap-1 text-xs text-purple-700">
+                    <CalendarClock className="h-3.5 w-3.5" />
+                    Follow-up {[r.followup_date, r.followup_time, r.followup_location].filter(Boolean).join(" · ")}
+                  </p>
+                )}
+              </div>
+              <Badge variant="outline" className="gap-1">
+                <Archive className="h-3.5 w-3.5" /> Referred out
+              </Badge>
+              <Badge variant="outline">{REFERRAL_OUTCOME_LABEL[r.outcome || "pending"]}</Badge>
             </Card>
           ))}
         </TabsContent>

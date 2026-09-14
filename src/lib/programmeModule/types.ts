@@ -175,6 +175,9 @@ export interface BeneficiaryReferralRow {
   followup_time?: string | null;
   followup_location?: string | null;
   outcome_recorded_at?: string | null;
+  /** Set when a receiving facility accepted the referral and the patient moved. */
+  accepted_at?: string | null;
+  transferred_at?: string | null;
   __pending?: boolean;
 }
 
