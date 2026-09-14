@@ -8,6 +8,12 @@ import "@fontsource/libre-baskerville/700.css";
 import "@fontsource/ibm-plex-sans/400.css";
 import "@fontsource/ibm-plex-sans/500.css";
 import "@fontsource/ibm-plex-sans/600.css";
+import "@fontsource/manrope/400.css";
+import "@fontsource/manrope/500.css";
+import "@fontsource/manrope/600.css";
+import "@fontsource/manrope/700.css";
+import "@fontsource/sora/600.css";
+import "@fontsource/sora/700.css";
 installCompatPolyfills();
 // Guard the browser storage quota BEFORE the auth client writes its session,
 // otherwise a full cache makes every sign-in fail with a quota error.

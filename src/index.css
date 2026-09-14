@@ -88,6 +88,14 @@
     --chart-highlight: 38 80% 50%;
     --chart-danger: 0 70% 55%;
 
+    /* Global-health evidence report palette */
+    --health-blue: 209 100% 36%;
+    --health-teal: 176 100% 31%;
+    --health-amber: 45 87% 61%;
+    --health-red: 356 63% 56%;
+    --health-surface: 210 45% 98%;
+    --health-ink: 210 64% 22%;
+
     /* KPI card gradients - Power BI-inspired vibrant palette */
     --kpi-submissions: 160 70% 38%;     /* emerald */
     --kpi-sync: 195 80% 42%;            /* cyan */
@@ -187,6 +195,13 @@
     --chart-accent: 265 50% 55%;
     --chart-highlight: 38 80% 55%;
     --chart-danger: 0 70% 60%;
+
+    --health-blue: 205 88% 62%;
+    --health-teal: 172 58% 53%;
+    --health-amber: 45 87% 61%;
+    --health-red: 356 72% 65%;
+    --health-surface: 216 26% 13%;
+    --health-ink: 210 30% 95%;
 
     /* KPI card gradients (dark) */
     --kpi-submissions: 160 65% 42%;

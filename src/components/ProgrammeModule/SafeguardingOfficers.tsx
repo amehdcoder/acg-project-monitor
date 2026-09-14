@@ -22,6 +22,8 @@ interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   projectId: string;
+  isOwner?: boolean;
+  onChanged?: () => void;
 }
 
 interface OfficerRow {
@@ -34,7 +36,7 @@ const ROLES = [
   { value: "safeguarding_lead", label: "Safeguarding lead" },
 ];
 
-const SafeguardingOfficers = ({ open, onOpenChange, projectId }: Props) => {
+const SafeguardingOfficers = ({ open, onOpenChange, projectId, isOwner = false, onChanged }: Props) => {
   const { toast } = useToast();
   const [officers, setOfficers] = useState<OfficerRow[]>([]);
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
@@ -42,6 +44,7 @@ const SafeguardingOfficers = ({ open, onOpenChange, projectId }: Props) => {
   const [role, setRole] = useState("safeguarding_officer");
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState("");
 
   const load = useCallback(async () => {
     const [o, pr] = await Promise.all([
@@ -53,6 +56,10 @@ const SafeguardingOfficers = ({ open, onOpenChange, projectId }: Props) => {
   }, [projectId]);
 
   useEffect(() => { if (open) void load(); }, [open, load]);
+  useEffect(() => {
+    if (!open) return;
+    void supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id || ""));
+  }, [open]);
 
   const nameOf = (uid: string) => {
     const p = profiles.find((x) => x.user_id === uid);
@@ -72,7 +79,7 @@ const SafeguardingOfficers = ({ open, onOpenChange, projectId }: Props) => {
     setBusy(true);
     try {
       const { data: auth } = await supabase.auth.getUser();
-      if (auth.user?.id === userId) {
+      if (auth.user?.id === userId && !isOwner) {
         throw new Error("You cannot appoint yourself as a safeguarding officer.");
       }
       const { error } = await supabase
@@ -85,6 +92,7 @@ const SafeguardingOfficers = ({ open, onOpenChange, projectId }: Props) => {
       toast({ title: "Safeguarding officer appointed" });
       setUserId("");
       await load();
+      onChanged?.();
     } catch (e) {
       toast({ title: "Could not appoint", description: (e as Error).message, variant: "destructive" });
     } finally {
@@ -102,6 +110,7 @@ const SafeguardingOfficers = ({ open, onOpenChange, projectId }: Props) => {
       return;
     }
     await load();
+    onChanged?.();
   };
 
   return (
@@ -116,7 +125,9 @@ const SafeguardingOfficers = ({ open, onOpenChange, projectId }: Props) => {
         <Card className="space-y-3 p-4">
           <p className="text-xs text-muted-foreground">
             Only the people listed here can open safeguarding narratives, concerns and actions.
-            Appointing someone does not give you access yourself.
+            {isOwner
+              ? "Owners may appoint themselves or another trusted user. Access is restricted to this project."
+              : "Appointing someone does not give you access yourself."}
           </p>
           <div className="space-y-1.5">
             <Label>Find user</Label>
@@ -131,6 +142,11 @@ const SafeguardingOfficers = ({ open, onOpenChange, projectId }: Props) => {
                 ))}
               </SelectContent>
             </Select>
+            {isOwner && currentUserId && (
+              <Button type="button" variant="ghost" size="sm" className="h-9 gap-1 text-primary" onClick={() => setUserId(currentUserId)}>
+                <ShieldCheck className="h-4 w-4" /> Select my owner account
+              </Button>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label>Role</Label>

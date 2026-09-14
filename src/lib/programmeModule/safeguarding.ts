@@ -86,6 +86,7 @@ export const CONCERN_STATUS_LABEL: Record<string, string> =
 export const useIsSafeguardingOfficer = (projectId?: string) => {
   const [isOfficer, setIsOfficer] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [revision, setRevision] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -101,9 +102,9 @@ export const useIsSafeguardingOfficer = (projectId?: string) => {
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [projectId]);
+  }, [projectId, revision]);
 
-  return { isOfficer, loading };
+  return { isOfficer, loading, reload: () => setRevision((value) => value + 1) };
 };
 
 const asArray = (v: unknown): string[] =>
