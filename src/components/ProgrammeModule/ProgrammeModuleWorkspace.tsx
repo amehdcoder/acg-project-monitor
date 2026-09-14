@@ -68,6 +68,20 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
   const { beneficiaries, loading: loadingBeneficiaries, reload: reloadBeneficiaries } =
     useBeneficiaries(active?.id);
 
+  /**
+   * A facility focal person is a non-administrator who has been granted access
+   * to one or more registered health facilities. They only work with the
+   * records — and programme components — of those facilities. Everyone else
+   * keeps the full view.
+   */
+  const isFocalPerson = !canConfigure && Object.keys(facilityLevels).length > 0;
+
+  const scopedBeneficiaries = useMemo(() => {
+    if (!isFocalPerson) return beneficiaries;
+    return beneficiaries.filter((b) =>
+      Boolean(facilityLevels[(b as unknown as { facility_id?: string }).facility_id || ""]));
+  }, [beneficiaries, facilityLevels, isFocalPerson]);
+
   useEffect(() => {
     bindQueueAutoFlush();
     const onQueue = () => setPending(queueCount());
