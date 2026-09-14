@@ -207,6 +207,11 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
           </Button>
         )}
         {canConfigure && (
+          <Button variant="outline" size="sm" className="gap-1" onClick={() => setOfficersOpen(true)}>
+            <ShieldCheck className="h-4 w-4" /> Safeguarding officers
+          </Button>
+        )}
+        {canConfigure && (
           <Button size="sm" className="gap-1" onClick={() => setGalleryOpen(true)} aria-label="Add programme module">
             <Plus className="h-4 w-4" /> Add module
           </Button>
@@ -215,10 +220,12 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
 
       <div className="flex flex-wrap gap-2">
         {([
-          { key: "records", label: "Beneficiary records", icon: LayoutGrid },
-          { key: "facility", label: "Facility dashboard", icon: Hospital },
-          { key: "followups", label: "Follow-ups & referrals", icon: CalendarClock },
-        ] as const).map((t) => (
+          { key: "records", label: "Beneficiary records", icon: LayoutGrid, show: true },
+          { key: "journey", label: "Beneficiary journey", icon: Route, show: true },
+          { key: "facility", label: "Facility dashboard", icon: Hospital, show: true },
+          { key: "followups", label: "Follow-ups & referrals", icon: CalendarClock, show: true },
+          { key: "safeguarding", label: "Safeguarding", icon: ShieldCheck, show: isOfficer },
+        ] as const).filter((t) => t.show).map((t) => (
           <Button
             key={t.key}
             size="sm"
@@ -230,6 +237,7 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
           </Button>
         ))}
       </div>
+
 
 
       {!loading && modules.length === 0 && (
