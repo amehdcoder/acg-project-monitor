@@ -48,6 +48,7 @@ const ServiceEntryDialog = ({
   const [result, setResult] = useState("");
   const [status, setStatus] = useState(config.workflow.serviceStatuses[0]?.value || "on_track");
   const [answers, setAnswers] = useState<AnswerMap>({});
+  const [experience, setExperience] = useState<AnswerMap>({});
   const [followUp, setFollowUp] = useState<FollowUpValue>(emptyFollowUp);
   const [saving, setSaving] = useState(false);
 
