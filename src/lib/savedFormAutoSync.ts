@@ -4,6 +4,7 @@ import {
   setSavedEntryStatus,
   markSyncState,
   isBackingOff,
+  hasActiveSyncLease,
   type SavedFormEntry,
 } from "@/lib/savedForms";
 import { isSpecialBridgeEntry, syncSpecialSavedForm } from "@/lib/specialFormBridge";
