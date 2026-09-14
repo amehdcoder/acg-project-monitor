@@ -292,6 +292,19 @@ const FacilityRegistry = ({
                 <Input value={draft.name} onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} />
               </div>
               <div className="space-y-1.5">
+                <Label>Facility code</Label>
+                <Input
+                  value={draft.code}
+                  maxLength={8}
+                  placeholder="e.g. EEHK"
+                  onChange={(e) => setDraft((d) => ({ ...d, code: e.target.value.toUpperCase() }))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Used inside beneficiary case IDs, e.g. CiS2-EEHK-20260914-0000001. Left blank, it is
+                  built from the facility name.
+                </p>
+              </div>
+              <div className="space-y-1.5">
                 <Label>Facility type</Label>
                 <Select
                   value={draft.facility_type}
