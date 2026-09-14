@@ -132,6 +132,10 @@ export interface BeneficiaryRow {
   ward: string | null;
   village: string | null;
   next_follow_up_date: string | null;
+  /** Household / community cluster this person belongs to. */
+  household_id?: string | null;
+  /** Relationship to the head of that household. */
+  household_role?: string | null;
   created_at: string;
   updated_at: string;
   /** Client-only: true while the record is still queued offline. */
