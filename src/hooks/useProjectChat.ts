@@ -323,12 +323,11 @@ export function useProjectChat(projectId: string | null) {
 
       if (uploadError) throw uploadError;
 
-      const { data: urlData } = supabase.storage
-        .from("chat-attachments")
-        .getPublicUrl(fileName);
-
+      // Store the canonical relative object path (not a full URL) so the
+      // storage read policy can match it exactly and signed URLs are minted
+      // on demand at render time.
       return {
-        url: urlData.publicUrl,
+        url: fileName,
         type: file.type,
         name: file.name,
       };

@@ -38,6 +38,7 @@ import { parseSpecial } from "./specialMessages";
 import { PollMessage } from "./PollMessage";
 import { LocationMessage } from "./LocationMessage";
 import { EventMessage } from "./EventMessage";
+import { getChatAttachmentSignedUrl } from "@/lib/chatAttachmentUrl";
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -83,6 +84,22 @@ export function ChatMessage({
   const [menuOpen, setMenuOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // attachment_url stores the canonical relative object path; mint a
+  // short-lived signed URL for rendering (handles legacy full URLs too).
+  const [attachmentSrc, setAttachmentSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setAttachmentSrc(null);
+    if (message.attachment_url) {
+      void getChatAttachmentSignedUrl(message.attachment_url).then((url) => {
+        if (!cancelled) setAttachmentSrc(url);
+      });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [message.attachment_url]);
 
   const nameFor = (uid: string) => {
     if (uid === currentUserId) return "You";
@@ -207,11 +224,20 @@ export function ChatMessage({
     const isAudio = message.attachment_type?.startsWith("audio/");
     const isVideo = message.attachment_type?.startsWith("video/");
 
+    if (!attachmentSrc) {
+      return (
+        <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span>Loading attachment…</span>
+        </div>
+      );
+    }
+
     if (isImage) {
       return (
-        <a href={message.attachment_url} target="_blank" rel="noopener noreferrer" className="block mt-2">
+        <a href={attachmentSrc} target="_blank" rel="noopener noreferrer" className="block mt-2">
           <img
-            src={message.attachment_url}
+            src={attachmentSrc}
             alt={message.attachment_name || "Image"}
             className="max-w-full max-h-60 rounded-lg object-cover shadow-sm"
             loading="lazy"
@@ -222,7 +248,7 @@ export function ChatMessage({
     if (isAudio) {
       return (
         <div className="mt-2">
-          <audio src={message.attachment_url} controls className="w-full max-w-[260px]" preload="metadata" />
+          <audio src={attachmentSrc} controls className="w-full max-w-[260px]" preload="metadata" />
           {renderTranscribeBlock()}
         </div>
       );
@@ -230,14 +256,14 @@ export function ChatMessage({
     if (isVideo) {
       return (
         <div className="mt-2">
-          <video src={message.attachment_url} controls className="w-full max-h-60 rounded-lg" preload="metadata" />
+          <video src={attachmentSrc} controls className="w-full max-h-60 rounded-lg" preload="metadata" />
           {renderTranscribeBlock()}
         </div>
       );
     }
     return (
       <a
-        href={message.attachment_url}
+        href={attachmentSrc}
         target="_blank"
         rel="noopener noreferrer"
         className={cn(
