@@ -172,7 +172,7 @@ const FacilityDashboard = ({ projectId, canSeeAllFacilities = false, onOpenBenef
         {stat("Awaiting response", pendingIn.length, "text-amber-600")}
         {stat("Follow-ups due", dueFollowUps.length, "text-purple-600")}
         {stat("Closed referrals", closedIn.length, "text-emerald-600")}
-        {stat("Referrals out", outgoing.length, "text-slate-600")}
+        {stat("Transferred out", archived.length, "text-slate-600")}
       </div>
 
       <Card className="p-4">
@@ -196,6 +196,10 @@ const FacilityDashboard = ({ projectId, canSeeAllFacilities = false, onOpenBenef
           </TabsTrigger>
           <TabsTrigger value="people" className="gap-1">
             <Users className="h-4 w-4" /> Beneficiaries
+          </TabsTrigger>
+          <TabsTrigger value="archive" className="gap-1">
+            <Archive className="h-4 w-4" /> Transferred archive
+            {archived.length > 0 && <Badge variant="secondary" className="ml-1">{archived.length}</Badge>}
           </TabsTrigger>
         </TabsList>
 
