@@ -474,3 +474,328 @@ export const TREND_TONE: Record<LesionTrend, "success" | "warning" | "danger" | 
   deteriorating: "danger",
   insufficient: "warning",
 };
+
+/* ------------------------------------------------------------------ */
+/* Clinical staging model                                              */
+/* ------------------------------------------------------------------ */
+//
+// The photograph measures the lesion; the staging scale is clinical. This
+// model fuses the two: each condition carries the recognised grading ladder
+// (WHO/Dreyer lymphoedema, WHO simplified trachoma grading, WHO Buruli
+// categories, programme hydrocoele grades), the clinician ticks the signs
+// actually seen, and the measured size decides the grade whenever the ladder
+// is size-based or no sign has been ticked. Nothing is typed in as a stage.
+
+export interface ClinicalCriterion {
+  key: string;
+  label: string;
+  /** Stage this sign establishes when present. */
+  stage: number;
+  hint?: string;
+}
+
+export interface MeasurementField {
+  key: string;
+  label: string;
+  unit: string;
+  hint?: string;
+}
+
+/** Signs a clinician ticks off at the bedside, in ascending severity. */
+export const CLINICAL_CRITERIA: Record<LesionCondition, ClinicalCriterion[]> = {
+  lymphoedema: [
+    { key: "reversible", label: "Swelling goes down overnight", stage: 1 },
+    { key: "irreversible", label: "Swelling no longer goes down overnight", stage: 2 },
+    { key: "shallow_folds", label: "Shallow skin folds present", stage: 3 },
+    { key: "knobs", label: "Knobs, lumps or bumps on the skin", stage: 4 },
+    { key: "deep_folds", label: "Deep skin folds present", stage: 5 },
+    { key: "mossy", label: "Mossy lesions (small warty bumps)", stage: 6 },
+    { key: "dependent", label: "Cannot carry out daily activities unaided", stage: 7 },
+  ],
+  hydrocoele: [
+    { key: "penis_visible", label: "Scrotum enlarged, penis still clearly visible", stage: 1 },
+    { key: "penis_buried", label: "Penis buried in the scrotal skin", stage: 2 },
+    { key: "mid_thigh", label: "Swelling reaches mid-thigh when standing", stage: 3 },
+    { key: "below_knee", label: "Swelling reaches the knee, or walking is impaired", stage: 4 },
+  ],
+  trachoma_tt: [
+    { key: "tf", label: "TF — five or more follicles on the upper lid", stage: 1 },
+    { key: "ti", label: "TI — pronounced inflammatory thickening", stage: 2 },
+    { key: "ts", label: "TS — scarring of the lid conjunctiva", stage: 3 },
+    { key: "tt", label: "TT — at least one lash touching the eyeball, or evidence of epilation", stage: 4 },
+    { key: "co", label: "CO — corneal opacity over the pupil", stage: 5 },
+  ],
+  buruli_ulcer: [
+    { key: "single_small", label: "Single lesion, non-critical site", stage: 1 },
+    { key: "multiple", label: "More than one lesion", stage: 2 },
+    { key: "critical_site", label: "Lesion over a joint, face, breast or genitals", stage: 3 },
+    { key: "bone", label: "Bone involvement suspected (osteomyelitis)", stage: 3 },
+  ],
+  leprosy_ulcer: [
+    { key: "intact", label: "Skin intact, callus or pre-ulcer only", stage: 0 },
+    { key: "superficial", label: "Superficial ulcer, skin only", stage: 1 },
+    { key: "deep", label: "Deep ulcer reaching tendon, capsule or joint", stage: 2 },
+    { key: "abscess", label: "Abscess or bone infection", stage: 3 },
+    { key: "gangrene", label: "Gangrene present", stage: 4 },
+  ],
+  wound: [
+    { key: "clean", label: "Clean granulating wound", stage: 1 },
+    { key: "sloughy", label: "Slough or dead tissue in the wound bed", stage: 2 },
+    { key: "infected", label: "Signs of infection (pus, spreading redness, odour)", stage: 3 },
+  ],
+  other: [],
+};
+
+/** Bedside measurements that drive size-based grades. */
+export const MEASUREMENT_FIELDS: Record<LesionCondition, MeasurementField[]> = {
+  lymphoedema: [
+    { key: "circumference_cm", label: "Limb circumference at the marked point", unit: "cm", hint: "Measure at the same marked point every visit." },
+    { key: "opposite_cm", label: "Same point on the unaffected limb", unit: "cm" },
+    { key: "acute_attacks", label: "Acute attacks since the last visit", unit: "episodes" },
+  ],
+  hydrocoele: [
+    { key: "circumference_cm", label: "Scrotal circumference", unit: "cm" },
+    { key: "length_cm", label: "Scrotal length", unit: "cm" },
+  ],
+  trachoma_tt: [
+    { key: "lashes", label: "In-turned lashes touching the eyeball", unit: "lashes" },
+  ],
+  buruli_ulcer: [
+    { key: "longest_cm", label: "Longest diameter (leave blank to use the picture)", unit: "cm" },
+  ],
+  leprosy_ulcer: [
+    { key: "longest_cm", label: "Longest diameter (leave blank to use the picture)", unit: "cm" },
+    { key: "depth_mm", label: "Depth", unit: "mm" },
+  ],
+  wound: [
+    { key: "longest_cm", label: "Longest diameter (leave blank to use the picture)", unit: "cm" },
+  ],
+  other: [],
+};
+
+export interface StagingEvidence {
+  criteria: Record<string, boolean>;
+  measures: Record<string, number | null>;
+  metrics: LesionMetrics | null;
+}
+
+export interface AutoStageResult extends StageResult {
+  /** Which grading scale produced the stage. */
+  scale: string;
+  /** Where the evidence came from. */
+  source: "clinical" | "measurement" | "image" | "combined" | "none";
+  /** 0–1 — how well supported the stage is. */
+  confidence: number;
+  /** Human-readable list of the evidence used. */
+  inputs: string[];
+}
+
+const num = (v: number | null | undefined) => (Number.isFinite(Number(v)) ? Number(v) : null);
+
+const topCriterion = (condition: LesionCondition, criteria: Record<string, boolean>) => {
+  const ticked = CLINICAL_CRITERIA[condition].filter((c) => criteria[c.key]);
+  if (!ticked.length) return null;
+  return ticked.reduce((a, b) => (b.stage >= a.stage ? b : a));
+};
+
+/** Longest lesion diameter in centimetres, from the measurement or the picture. */
+const longestCm = (e: StagingEvidence) => {
+  const typed = num(e.measures.longest_cm);
+  if (typed && typed > 0) return { cm: typed, from: "measured at the bedside" };
+  const mm = e.metrics?.longestMm;
+  if (mm && mm > 0) return { cm: mm / 10, from: "measured from the photograph" };
+  return null;
+};
+
+const LYMPH_LABELS = [
+  "Not staged",
+  "Stage 1 — swelling reverses overnight",
+  "Stage 2 — swelling no longer reverses",
+  "Stage 3 — shallow skin folds",
+  "Stage 4 — knobs and bumps",
+  "Stage 5 — deep skin folds",
+  "Stage 6 — mossy lesions",
+  "Stage 7 — dependent on others for daily activities",
+];
+
+const TRACHOMA_LABELS = ["Normal lid — no trachoma sign", "TF — follicular trachoma", "TI — intense inflammation", "TS — conjunctival scarring", "TT — trichiasis", "CO — corneal opacity"];
+
+/**
+ * Calculates the stage automatically from the photograph, the bedside
+ * measurements and the signs the clinician ticked. Never a free-text grade.
+ */
+export const stageFromEvidence = (
+  condition: LesionCondition,
+  e: StagingEvidence,
+): AutoStageResult => {
+  const inputs: string[] = [];
+  const sign = topCriterion(condition, e.criteria);
+  if (sign) inputs.push(`Sign recorded: ${sign.label.toLowerCase()}.`);
+
+  const imageArea = e.metrics && e.metrics.areaFraction > 0
+    ? (e.metrics.areaMm2 != null
+      ? `${(e.metrics.areaMm2 / 100).toFixed(1)} cm² measured from the photograph`
+      : `${(e.metrics.areaFraction * 100).toFixed(0)}% of the frame`)
+    : null;
+  if (imageArea) inputs.push(`Photograph: ${imageArea}.`);
+
+  const none: AutoStageResult = {
+    stage: 0, label: "Not gradable yet", rationale: "Take a photograph or tick the signs seen and the stage is calculated here.",
+    scale: "—", source: "none", confidence: 0, inputs,
+  };
+
+  /* Lymphoedema — WHO/Dreyer seven-stage scale --------------------------- */
+  if (condition === "lymphoedema") {
+    const aff = num(e.measures.circumference_cm);
+    const opp = num(e.measures.opposite_cm);
+    let excess: number | null = null;
+    if (aff && opp && opp > 0) {
+      excess = +(((aff - opp) / opp) * 100).toFixed(0);
+      inputs.push(`Affected limb ${aff} cm against ${opp} cm on the other side — ${excess}% larger.`);
+    }
+    const attacks = num(e.measures.acute_attacks);
+    if (attacks && attacks > 0) inputs.push(`${attacks} acute attack${attacks === 1 ? "" : "s"} since the last visit.`);
+
+    let stage = sign?.stage ?? 0;
+    let source: AutoStageResult["source"] = sign ? "clinical" : "none";
+    if (!stage && excess != null) {
+      stage = excess >= 60 ? 4 : excess >= 30 ? 3 : excess >= 10 ? 2 : 1;
+      source = "measurement";
+    }
+    if (!stage && e.metrics && e.metrics.areaFraction > 0) {
+      const a = e.metrics.areaFraction;
+      stage = a >= 0.55 ? 5 : a >= 0.42 ? 4 : a >= 0.32 ? 3 : a >= 0.2 ? 2 : 1;
+      source = "image";
+    }
+    if (!stage) return none;
+    if (sign && (excess != null || e.metrics)) source = "combined";
+    const rationale = [
+      sign ? `Highest sign present is "${sign.label.toLowerCase()}", which defines stage ${sign.stage} on the seven-stage scale.` : "",
+      excess != null ? `The affected limb is ${excess}% larger than the unaffected side.` : "",
+      !sign && e.metrics ? "Staged from the measured swelling in the photograph until the signs are ticked." : "",
+      attacks && attacks > 0 ? "Acute attacks recorded — reinforce hygiene and skin care." : "",
+    ].filter(Boolean).join(" ");
+    return {
+      stage, label: LYMPH_LABELS[Math.min(7, stage)], rationale,
+      scale: "WHO / Dreyer lymphoedema staging (7 stages)",
+      source,
+      confidence: Math.min(0.95, (sign ? 0.7 : 0.4) + (excess != null ? 0.2 : 0) + (e.metrics ? 0.1 : 0)),
+      inputs,
+    };
+  }
+
+  /* Hydrocoele — clinical grade, corroborated by circumference ------------ */
+  if (condition === "hydrocoele") {
+    const circ = num(e.measures.circumference_cm);
+    if (circ) inputs.push(`Scrotal circumference ${circ} cm.`);
+    let stage = sign?.stage ?? 0;
+    let source: AutoStageResult["source"] = sign ? "clinical" : "none";
+    if (!stage && circ) {
+      stage = circ >= 35 ? 4 : circ >= 25 ? 3 : circ >= 15 ? 2 : 1;
+      source = "measurement";
+    }
+    if (!stage && e.metrics && e.metrics.areaFraction > 0) {
+      const a = e.metrics.areaFraction;
+      stage = a >= 0.5 ? 4 : a >= 0.35 ? 3 : a >= 0.2 ? 2 : 1;
+      source = "image";
+    }
+    if (!stage) return none;
+    if (sign && circ) source = "combined";
+    const labels = ["", "Grade 1 — mild", "Grade 2 — moderate", "Grade 3 — large", "Grade 4 — very large"];
+    return {
+      stage, label: labels[Math.min(4, stage)],
+      rationale: [
+        sign ? `${sign.label}.` : "",
+        circ ? `Scrotal circumference ${circ} cm.` : "",
+        stage >= 3 ? "Surgical review indicated." : "Track before and after surgery at the same landmark.",
+      ].filter(Boolean).join(" "),
+      scale: "Programme hydrocoele grading (4 grades)",
+      source,
+      confidence: Math.min(0.95, (sign ? 0.7 : 0.35) + (circ ? 0.2 : 0) + (e.metrics ? 0.08 : 0)),
+      inputs,
+    };
+  }
+
+  /* Trachoma — WHO simplified grading ------------------------------------ */
+  if (condition === "trachoma_tt") {
+    const lashes = num(e.measures.lashes);
+    if (lashes != null) inputs.push(`${lashes} in-turned lash${lashes === 1 ? "" : "es"} touching the eyeball.`);
+    let stage = sign?.stage ?? 0;
+    let source: AutoStageResult["source"] = sign ? "clinical" : "none";
+    if (lashes != null && lashes >= 1 && stage < 4) { stage = 4; source = sign ? "combined" : "measurement"; }
+    if (!stage && e.metrics && e.metrics.rednessIndex > 0) {
+      stage = e.metrics.rednessIndex >= 0.55 ? 2 : 1;
+      source = "image";
+    }
+    if (!stage) return none;
+    if (sign && e.metrics) source = "combined";
+    return {
+      stage, label: TRACHOMA_LABELS[Math.min(5, stage)],
+      rationale: [
+        sign ? `${sign.label}.` : "",
+        lashes != null && lashes >= 1 ? "At least one lash touches the eyeball — this is trichiasis and needs surgery." : "",
+        !sign && e.metrics ? `Lid inflammation from the photograph: ${(e.metrics.rednessIndex * 100).toFixed(0)}% redness against the surrounding skin.` : "",
+      ].filter(Boolean).join(" "),
+      scale: "WHO simplified trachoma grading (TF, TI, TS, TT, CO)",
+      source,
+      confidence: Math.min(0.95, (sign ? 0.75 : 0.35) + (lashes != null ? 0.15 : 0) + (e.metrics ? 0.08 : 0)),
+      inputs,
+    };
+  }
+
+  /* Buruli ulcer — WHO categories by longest diameter --------------------- */
+  if (condition === "buruli_ulcer") {
+    const size = longestCm(e);
+    if (size) inputs.push(`Longest diameter ${size.cm.toFixed(1)} cm, ${size.from}.`);
+    let stage = 0;
+    let source: AutoStageResult["source"] = "none";
+    if (size) { stage = size.cm > 15 ? 3 : size.cm >= 5 ? 2 : 1; source = size.from.includes("bedside") ? "measurement" : "image"; }
+    if (sign && sign.stage > stage) { stage = sign.stage; source = "clinical"; }
+    else if (sign && stage) source = "combined";
+    if (!stage) return none;
+    const labels = ["", "Category I — single lesion under 5 cm", "Category II — 5 to 15 cm", "Category III — over 15 cm, multiple or critical site"];
+    return {
+      stage, label: labels[Math.min(3, stage)],
+      rationale: [
+        size ? `Longest diameter ${size.cm.toFixed(1)} cm ${size.from}.` : "",
+        sign ? `${sign.label}.` : "",
+        stage === 3 ? "Category III — refer for specialist management." : "",
+      ].filter(Boolean).join(" "),
+      scale: "WHO Buruli ulcer categories (I–III)",
+      source,
+      confidence: Math.min(0.95, (size ? 0.6 : 0.25) + (sign ? 0.25 : 0)),
+      inputs,
+    };
+  }
+
+  /* Leprosy / plantar ulcer and other wounds ----------------------------- */
+  const size = longestCm(e);
+  if (size) inputs.push(`Longest diameter ${size.cm.toFixed(1)} cm, ${size.from}.`);
+  const depth = num(e.measures.depth_mm);
+  if (depth) inputs.push(`Depth ${depth} mm.`);
+
+  let stage = sign?.stage ?? 0;
+  let source: AutoStageResult["source"] = sign ? "clinical" : "none";
+  if (!stage && depth) { stage = depth >= 10 ? 2 : 1; source = "measurement"; }
+  if (!stage && size) { stage = size.cm >= 5 ? 2 : 1; source = size.from.includes("bedside") ? "measurement" : "image"; }
+  if (!stage && e.metrics && e.metrics.areaFraction > 0) { stage = e.metrics.areaFraction >= 0.3 ? 2 : 1; source = "image"; }
+  if (!stage) return none;
+  if (sign && (size || depth)) source = "combined";
+
+  const grade = condition === "leprosy_ulcer"
+    ? ["Grade 0 — skin intact", "Grade 1 — superficial ulcer", "Grade 2 — deep ulcer", "Grade 3 — abscess or bone infection", "Grade 4 — gangrene"][Math.min(4, stage)]
+    : ["Not gradable", "Clean wound", "Sloughy wound", "Infected wound"][Math.min(3, stage)];
+
+  return {
+    stage, label: grade,
+    rationale: [
+      sign ? `${sign.label}.` : "",
+      size ? `Longest diameter ${size.cm.toFixed(1)} cm ${size.from}.` : "",
+      depth ? `Depth ${depth} mm.` : "",
+    ].filter(Boolean).join(" ") || "Graded from the measured lesion.",
+    scale: condition === "leprosy_ulcer" ? "Wagner-style ulcer grading (0–4)" : "Wound bed grading",
+    source,
+    confidence: Math.min(0.92, (sign ? 0.65 : 0.3) + (size ? 0.18 : 0) + (depth ? 0.1 : 0)),
+    inputs,
+  };
+};
