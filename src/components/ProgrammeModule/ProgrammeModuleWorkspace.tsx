@@ -306,6 +306,36 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
         />
       )}
 
+      {view === "households" && (
+        <HouseholdsPanel
+          projectId={projectId}
+          moduleId={active?.id}
+          beneficiaries={scopedBeneficiaries}
+          canManage={canConfigure || Object.values(facilityLevels).includes("manage") || Object.values(facilityLevels).includes("record")}
+          onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }}
+          onChanged={() => void reloadBeneficiaries()}
+        />
+      )}
+
+      {view === "network" && (
+        <KinshipGraphPanel
+          projectId={projectId}
+          moduleId={active?.id}
+          beneficiaries={scopedBeneficiaries}
+          onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }}
+        />
+      )}
+
+      {view === "risk" && (
+        <LtfuRiskPanel
+          projectId={projectId}
+          moduleId={active?.id}
+          beneficiaries={scopedBeneficiaries}
+          canDispatch={canConfigure || Object.values(facilityLevels).some((l) => l !== "view")}
+          onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }}
+        />
+      )}
+
       {view === "safeguarding" && (
         <SafeguardingPanel
           projectId={projectId}
