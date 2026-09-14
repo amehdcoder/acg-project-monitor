@@ -44,6 +44,7 @@ const SafeguardingOfficers = ({ open, onOpenChange, projectId, isOwner = false, 
   const [role, setRole] = useState("safeguarding_officer");
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState("");
 
   const load = useCallback(async () => {
     const [o, pr] = await Promise.all([
@@ -55,6 +56,10 @@ const SafeguardingOfficers = ({ open, onOpenChange, projectId, isOwner = false, 
   }, [projectId]);
 
   useEffect(() => { if (open) void load(); }, [open, load]);
+  useEffect(() => {
+    if (!open) return;
+    void supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id || ""));
+  }, [open]);
 
   const nameOf = (uid: string) => {
     const p = profiles.find((x) => x.user_id === uid);
@@ -137,6 +142,11 @@ const SafeguardingOfficers = ({ open, onOpenChange, projectId, isOwner = false, 
                 ))}
               </SelectContent>
             </Select>
+            {isOwner && currentUserId && (
+              <Button type="button" variant="ghost" size="sm" className="h-9 gap-1 text-primary" onClick={() => setUserId(currentUserId)}>
+                <ShieldCheck className="h-4 w-4" /> Select my owner account
+              </Button>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label>Role</Label>
