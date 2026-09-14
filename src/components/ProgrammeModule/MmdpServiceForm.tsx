@@ -272,6 +272,11 @@ const MmdpServiceForm = ({
               placeholder="Skin condition, entry lesions, self-care adherence, surgery outcome…" />
           </div>
 
+          <ServiceExperienceSections
+            answers={experience}
+            onChange={(name, value) => setExperience((p) => ({ ...p, [name]: value }))}
+          />
+
           <FollowUpFields
             value={followUp} onChange={setFollowUp}
             locationSuggestion={beneficiary.village || beneficiary.lga || ""}
