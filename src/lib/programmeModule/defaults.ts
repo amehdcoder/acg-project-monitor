@@ -13,6 +13,7 @@ import {
   applyRegistrationChoices, choiceOptions, INCOME_SOURCE, OCCUPATION,
   PRIMARY_HEALTH_CONDITION, VULNERABILITY_STATUS,
 } from "./registrationChoices";
+import { withStandardProfileSections } from "./standardSections";
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
 
