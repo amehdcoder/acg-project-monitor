@@ -74,6 +74,7 @@ const MmdpServiceForm = ({
   const [signal, setSignal] = useState<ImageSignal | null>(null);
   const [note, setNote] = useState("");
   const [followUp, setFollowUp] = useState<FollowUpValue>(emptyFollowUp);
+  const [experience, setExperience] = useState<AnswerMap>({});
   const [saving, setSaving] = useState(false);
 
   const siteFields = site === "scrotum" ? SCROTUM_SITES : LIMB_SITES;
