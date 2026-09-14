@@ -63,7 +63,11 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
   const [pending, setPending] = useState(queueCount());
   const [creating, setCreating] = useState(false);
   const [deleteRequestsOpen, setDeleteRequestsOpen] = useState(false);
-  const [view, setView] = useState<"records" | "facility" | "followups">("records");
+  const [officersOpen, setOfficersOpen] = useState(false);
+  const { isOfficer } = useIsSafeguardingOfficer(projectId);
+  const [view, setView] =
+    useState<"records" | "journey" | "facility" | "followups" | "safeguarding">("records");
+
 
   const active: ProgrammeModuleRow | undefined = useMemo(
     () => modules.find((m) => m.id === activeId) || modules[0],
