@@ -99,6 +99,8 @@ export interface LesionMetrics {
   edgeIrregularity: number;
   /** Square millimetres when a reference width was supplied, otherwise null. */
   areaMm2: number | null;
+  /** Longest span of the region in millimetres, when a reference was supplied. */
+  longestMm: number | null;
   /** How confident the segmentation is that it found a real lesion, 0–1. */
   segmentationQuality: number;
   /** Working canvas size the metrics were computed on. */
