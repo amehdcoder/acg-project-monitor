@@ -458,5 +458,5 @@ export const normalizeConfig = (raw: unknown): ProgrammeModuleConfig => {
     workflow: { ...BLANK_PRESET.workflow, ...(cfg.workflow || {}) },
     layout: { ...BLANK_PRESET.layout, ...(cfg.layout || {}) },
     dataQuality: cfg.dataQuality || [],
-  });
+  }));
 };
