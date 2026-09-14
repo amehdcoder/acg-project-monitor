@@ -88,6 +88,7 @@ const MentalHealthServiceForm = ({
   const [responses, setResponses] = useState<Record<string, string>>({});
   const [serviceDate, setServiceDate] = useState(new Date().toISOString().slice(0, 10));
   const [result, setResult] = useState<ReturnType<typeof scoreAssessment> | null>(null);
+  const [experience, setExperience] = useState<AnswerMap>({});
   const [saving, setSaving] = useState(false);
 
   const answered = useMemo(
