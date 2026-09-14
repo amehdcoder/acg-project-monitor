@@ -61,6 +61,10 @@ interface AssessmentRow {
   stage_label: string | null;
   percent_change: number | null;
   notes: string | null;
+  confirmed_stage: number | null;
+  confirmed_stage_label: string | null;
+  model_stage: number | null;
+  model_confidence: number | null;
 }
 
 const db = supabase as unknown as { from: (t: string) => any };
