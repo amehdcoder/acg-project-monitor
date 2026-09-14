@@ -87,6 +87,16 @@ const FacilityFocalPersons = ({ open, onOpenChange, projectId, initialFacilityId
       .slice(0, 50);
   }, [profiles, search]);
 
+  const visibleFacilities = useMemo(() => {
+    const q = facilitySearch.trim().toLowerCase();
+    if (!q) return facilities;
+    return facilities.filter((f) =>
+      `${f.name} ${f.lga || ""} ${f.state || ""}`.toLowerCase().includes(q));
+  }, [facilities, facilitySearch]);
+
+  const toggleFacility = (id: string) =>
+    setFacilityIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
   const assign = async () => {
     if (!facilityIds.length || !userId) return;
     setBusy(true);
