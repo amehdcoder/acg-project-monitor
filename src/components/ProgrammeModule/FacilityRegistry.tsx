@@ -258,6 +258,29 @@ const FacilityRegistry = ({
           ))}
         </div>
 
+        <AlertDialog open={!!pendingDelete} onOpenChange={(v) => { if (!v) setPendingDelete(null); }}>
+          <AlertDialogContent className="z-[1300]">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Remove {pendingDelete?.name}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                The facility is removed from the register. Its{" "}
+                {pendingDelete ? counts[pendingDelete.id] || 0 : 0} beneficiary record(s) are kept and
+                become unassigned, so they can be attached to another facility later.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={deleting}
+                onClick={(e) => { e.preventDefault(); void confirmDelete(); }}
+              >
+                {deleting ? "Removing…" : "Delete facility"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+
         <Dialog open={formOpen} onOpenChange={setFormOpen}>
           <DialogContent className="max-h-[92dvh] max-w-lg overflow-y-auto">
             <DialogHeader>
