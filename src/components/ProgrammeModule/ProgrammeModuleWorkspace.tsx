@@ -240,7 +240,7 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
 
       {active && view === "records" && (
         <BeneficiaryList
-          beneficiaries={beneficiaries}
+          beneficiaries={scopedBeneficiaries}
           config={normalizeConfig(active.config)}
           loading={loadingBeneficiaries}
           projectId={projectId}
