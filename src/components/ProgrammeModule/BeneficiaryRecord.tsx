@@ -88,6 +88,7 @@ const FieldRow = ({ label, value }: { label: string; value: string }) => (
 
 const BeneficiaryRecord = ({
   beneficiary, config, moduleId, projectId, onBack, onChanged, canManage = false,
+  componentsVisible = true,
 }: Props) => {
   const { services, referrals, audit, reload } = useBeneficiaryRecord(beneficiary.id);
   const { toast } = useToast();
