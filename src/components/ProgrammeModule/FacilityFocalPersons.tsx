@@ -221,8 +221,8 @@ const FacilityFocalPersons = ({ open, onOpenChange, projectId, initialFacilityId
               {ACCESS_LEVELS.find((a) => a.value === accessLevel)?.hint}
             </p>
           </div>
-          <Button className="gap-1" disabled={busy || !facilityId || !userId} onClick={assign}>
-            <UserPlus className="h-4 w-4" /> Assign to facility
+          <Button className="gap-1" disabled={busy || !facilityIds.length || !userId} onClick={assign}>
+            <UserPlus className="h-4 w-4" /> Assign to selected facilities
           </Button>
           <p className="text-xs text-muted-foreground">
             A facility can carry at most two active focal persons; other members are added as
