@@ -96,6 +96,8 @@ const LesionStagingPanel = ({
   const [metrics, setMetrics] = useState<LesionMetrics | null>(null);
   const [analysing, setAnalysing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [criteria, setCriteria] = useState<Record<string, boolean>>({});
+  const [measures, setMeasures] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
