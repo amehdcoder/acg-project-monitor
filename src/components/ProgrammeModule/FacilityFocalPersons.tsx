@@ -138,17 +138,39 @@ const FacilityFocalPersons = ({ open, onOpenChange, projectId, initialFacilityId
         <Card className="space-y-3 p-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label>Facility</Label>
-              <Select value={facilityId} onValueChange={setFacilityId}>
-                <SelectTrigger><SelectValue placeholder="Select facility…" /></SelectTrigger>
-                <SelectContent className="z-[1200] bg-popover">
-                  {facilities.map((f) => (
-                    <SelectItem key={f.id} value={f.id}>
-                      {f.name} — {FACILITY_TYPE_LABEL[f.facility_type]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Facilities whose records this person may see</Label>
+              <Input
+                value={facilitySearch}
+                onChange={(e) => setFacilitySearch(e.target.value)}
+                placeholder="Search facilities…"
+              />
+              <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
+                {visibleFacilities.length === 0 && (
+                  <p className="p-2 text-xs text-muted-foreground">No matching facility.</p>
+                )}
+                {visibleFacilities.map((f) => (
+                  <label
+                    key={f.id}
+                    className="flex cursor-pointer items-start gap-2 rounded-md p-1.5 hover:bg-muted"
+                  >
+                    <Checkbox
+                      checked={facilityIds.includes(f.id)}
+                      onCheckedChange={() => toggleFacility(f.id)}
+                      className="mt-0.5"
+                    />
+                    <span className="text-sm text-foreground">
+                      {f.name}
+                      <span className="block text-xs text-muted-foreground">
+                        {FACILITY_TYPE_LABEL[f.facility_type]}
+                        {f.lga ? ` · ${f.lga}` : ""}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {facilityIds.length} facility record set{facilityIds.length === 1 ? "" : "s"} selected.
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label>Role</Label>
