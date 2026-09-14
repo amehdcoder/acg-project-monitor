@@ -107,8 +107,16 @@ const FacilityDashboard = ({ projectId, canSeeAllFacilities = false, onOpenBenef
 
   const decide = async (id: string, status: string) => {
     try {
-      await setReferralStatus(id, status);
-      toast({ title: `Referral ${status}` });
+      if (status === "accepted") {
+        await acceptReferral(id);
+        toast({
+          title: "Referral accepted",
+          description: "The patient now appears on this facility's beneficiary list.",
+        });
+      } else {
+        await setReferralStatus(id, status);
+        toast({ title: `Referral ${status}` });
+      }
       void reload();
     } catch (e) {
       toast({ title: "Could not update referral", description: (e as Error).message, variant: "destructive" });
