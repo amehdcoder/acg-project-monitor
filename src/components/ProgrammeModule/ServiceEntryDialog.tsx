@@ -17,6 +17,7 @@ import ConfigFieldRenderer, { AnswerMap, isRelevant } from "./ConfigFieldRendere
 import { recordAudit } from "./useProgrammeModule";
 import MentalHealthServiceForm, { mhFormForService } from "./MentalHealthServiceForm";
 import MmdpServiceForm, { isMmdpService } from "./MmdpServiceForm";
+import DocumentsServiceForm, { isDocumentsComponent } from "./DocumentsServiceForm";
 import FollowUpFields, { emptyFollowUp } from "./FollowUpFields";
 import type { FollowUpValue } from "./FollowUpFields";
 import type { BeneficiaryRow, BeneficiaryServiceRow } from "@/lib/programmeModule/types";
@@ -63,6 +64,24 @@ const ServiceEntryDialog = ({
         formKey={mhForm}
         serviceName={serviceName}
         componentKey={componentKey}
+        beneficiary={beneficiary}
+        moduleId={moduleId}
+        projectId={projectId}
+        onSaved={onSaved}
+      />
+    );
+  }
+
+  // Documents are records rather than clinical episodes: no result/outcome and
+  // no follow-up — attachments plus a signed informed-consent acknowledgement.
+  if (open && component && isDocumentsComponent(component)) {
+    return (
+      <DocumentsServiceForm
+        open={open}
+        onOpenChange={(v) => { if (!v) setServiceName(""); onOpenChange(v); }}
+        component={component}
+        serviceName={serviceName}
+        onServiceNameChange={setServiceName}
         beneficiary={beneficiary}
         moduleId={moduleId}
         projectId={projectId}

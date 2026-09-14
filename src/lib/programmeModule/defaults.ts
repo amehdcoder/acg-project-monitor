@@ -142,9 +142,11 @@ export const CISKULA_PRESET: ProgrammeModuleConfig = {
       "PHC referral", "Facility supportive supervision",
     ]),
     {
-      ...component("documents", "Documents", "FileText", "340 65% 50%", 7, ["Consent form", "Identification"]),
+      ...component("documents", "Documents", "FileText", "340 65% 50%", 7, [
+        "Consent form", "Beneficiary photos", "Beneficiary videos", "Beneficiary audio clips",
+      ]),
       countsTowardsProgress: false,
-      questions: [q("document", "Attach document", "image")],
+      questions: [],
     },
   ],
   sections: [
@@ -423,8 +425,18 @@ const STANDARD_SERVICES: Record<string, string[]> = {
   mental_health: ["GAD-7 assessment", "PHQ-9 assessment", "Counselling session"],
 };
 
+/**
+ * Components whose service list is fixed by the standard, replacing whatever an
+ * earlier template stored. Documents carry consent and media only.
+ */
+const FIXED_SERVICES: Record<string, string[]> = {
+  documents: ["Consent form", "Beneficiary photos", "Beneficiary videos", "Beneficiary audio clips"],
+};
+
 const upgradeServices = (components: ProgrammeComponent[]): ProgrammeComponent[] =>
   components.map((c) => {
+    const fixed = FIXED_SERVICES[c.key];
+    if (fixed) return { ...c, services: fixed, countsTowardsProgress: false };
     const extra = STANDARD_SERVICES[c.key];
     if (!extra) return c;
     const have = new Set((c.services || []).map((s) => s.toLowerCase()));
