@@ -164,6 +164,54 @@ const LesionStagingPanel = ({
     || Object.values(criteria).some(Boolean)
     || Object.values(numericMeasures).some((v) => v != null);
 
+  /* Learned staging — trained on the stages clinicians confirmed here. */
+  const {
+    model, confirmedCount, training, retrain, reload: reloadModel,
+  } = useLesionStageModel(projectId, condition);
+
+  const features = useMemo(
+    () => buildFeatures(condition, { criteria, measures: numericMeasures, metrics }),
+    [condition, criteria, numericMeasures, metrics],
+  );
+
+  const learned = useMemo(
+    () => (model && hasEvidence ? predictStage(model, features) : null),
+    [model, features, hasEvidence],
+  );
+
+  // The stage the clinician is asked to confirm — the learned one when the
+  // model is confident enough, otherwise the rule-based grade.
+  const suggestedStage = learned && learned.confidence >= 0.5 ? learned.stage : staged.stage;
+  const [confirmStage, setConfirmStage] = useState<string>("");
+  useEffect(() => { setConfirmStage(String(suggestedStage)); }, [suggestedStage]);
+
+  const stageOptions = useMemo(
+    () => (STAGE_LABELS[condition] || []).map((label, index) => ({ value: String(index), label })),
+    [condition],
+  );
+
+  const confirmRow = async (row: AssessmentRow, stage: number) => {
+    try {
+      await confirmAssessmentStage(row.id, row.condition as LesionCondition, stage);
+      toast({
+        title: "Stage confirmed",
+        description: "This case now trains the staging model for the project.",
+      });
+      await load();
+      await reloadModel();
+    } catch (e) {
+      toast({ title: "Could not confirm", description: (e as Error).message, variant: "destructive" });
+    }
+  };
+
+  const runTraining = async () => {
+    const result = await retrain();
+    toast({
+      title: result.trained ? "Model retrained" : "Not enough confirmed cases yet",
+      description: result.message,
+    });
+  };
+
   const save = async () => {
     if (!hasEvidence) {
       toast({
