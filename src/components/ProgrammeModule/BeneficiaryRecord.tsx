@@ -33,6 +33,7 @@ import BeneficiaryFormDialog from "./BeneficiaryFormDialog";
 import LongitudinalOutcome from "./LongitudinalOutcome";
 import CareNetworkPanel from "./CareNetworkPanel";
 import LimbProgressPanel from "./LimbProgressPanel";
+import LesionStagingPanel from "./LesionStagingPanel";
 import { recordAudit } from "./useProgrammeModule";
 import { requestBeneficiaryDeletion } from "@/lib/programmeModule/facilityOps";
 import {
@@ -343,6 +344,7 @@ const BeneficiaryRecord = ({
                 {components.map((c) => (
                   <TabsTrigger key={c.key} value={c.key}>{c.label}</TabsTrigger>
                 ))}
+                {componentsVisible && <TabsTrigger value="lesions">Lesion staging</TabsTrigger>}
                 <TabsTrigger value="outcomes">Outcomes</TabsTrigger>
                 <TabsTrigger value="care">Care network</TabsTrigger>
                 <TabsTrigger value="history">History</TabsTrigger>
@@ -533,6 +535,17 @@ const BeneficiaryRecord = ({
                 </TabsContent>
               );
             })}
+
+            {componentsVisible && (
+              <TabsContent value="lesions" className="mt-4">
+                <LesionStagingPanel
+                  beneficiaryId={beneficiary.id}
+                  projectId={projectId}
+                  moduleId={moduleId}
+                  canRecord
+                />
+              </TabsContent>
+            )}
 
             <TabsContent value="outcomes" className="mt-4 space-y-4">
               <LongitudinalOutcome services={services} />
