@@ -103,6 +103,7 @@ const FacilityRegistry = ({
     setDraft({
       id: f.id,
       name: f.name,
+      code: f.code || "",
       facility_type: f.facility_type,
       state: f.state || "",
       lga: f.lga || "",
@@ -125,6 +126,7 @@ const FacilityRegistry = ({
       const payload = {
         project_id: projectId,
         name: draft.name.trim(),
+        code: draft.code.trim().toUpperCase() || null,
         facility_type: draft.facility_type,
         state: draft.state || null,
         lga: draft.lga || null,
