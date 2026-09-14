@@ -32,6 +32,8 @@ import PhotoCaptureField from "./PhotoCaptureField";
 import FollowUpFields, { emptyFollowUp } from "./FollowUpFields";
 import type { FollowUpValue } from "./FollowUpFields";
 import { recordAudit } from "./useProgrammeModule";
+import ServiceExperienceSections from "./ServiceExperienceSections";
+import type { AnswerMap } from "./ConfigFieldRenderer";
 
 /** Services that open the MMDP visit form instead of the generic one. */
 export const isMmdpService = (componentKey: string, serviceName?: string | null) => {
