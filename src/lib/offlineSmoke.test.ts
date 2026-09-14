@@ -35,10 +35,20 @@ vi.mock("@/lib/savedForms", () => ({
   },
   markSyncState: async (id: string, syncState: string, patch: any = {}) => {
     const e = store.get(id);
-    if (e) store.set(id, { ...e, ...patch, syncState });
+    if (e)
+      store.set(id, {
+        ...e,
+        ...patch,
+        syncState,
+        syncStartedAt: syncState === "syncing" ? new Date().toISOString() : null,
+      });
   },
   isBackingOff: (entry: any) =>
     !!entry.nextAttemptAt && new Date(entry.nextAttemptAt).getTime() > Date.now(),
+  hasActiveSyncLease: (entry: any) =>
+    entry.syncState === "syncing" &&
+    !!entry.syncStartedAt &&
+    Date.now() - new Date(entry.syncStartedAt).getTime() < 120_000,
 }));
 
 vi.mock("@/lib/specialFormBridge", () => ({

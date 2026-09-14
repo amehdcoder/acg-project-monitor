@@ -4,6 +4,7 @@ import {
   setSavedEntryStatus,
   markSyncState,
   isBackingOff,
+  hasActiveSyncLease,
   type SavedFormEntry,
 } from "@/lib/savedForms";
 import { isSpecialBridgeEntry, syncSpecialSavedForm } from "@/lib/specialFormBridge";
@@ -81,7 +82,7 @@ async function drain(userId: string): Promise<{ synced: number; failed: number }
   let failed = 0;
   try {
     const entries = (await listAllSavedEntries("finalized")).filter(
-      (e) => e.userId === userId && e.syncState !== "syncing" && !isBackingOff(e),
+      (e) => e.userId === userId && !hasActiveSyncLease(e) && !isBackingOff(e),
     );
     // At most two uploads in flight so a large backlog drains steadily without
     // opening a burst of concurrent connections from every device at once.

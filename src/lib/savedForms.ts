@@ -49,6 +49,9 @@ export interface SavedFormEntry {
   // remains the user-facing lifecycle (draft/finalized/sent); these fields
   // track the transport attempt so retries are bounded and observable.
   syncState?: SyncState;
+  // When the current "syncing" lease started. Used to reclaim orphaned leases
+  // left behind when the tab/app died mid-upload.
+  syncStartedAt?: string | null;
   syncAttempts?: number;
   lastSyncError?: string | null;
   nextAttemptAt?: string | null;
@@ -297,7 +300,12 @@ export const markSyncState = async (
 ): Promise<void> => {
   const existing = await getSavedEntry(id);
   if (!existing) return;
-  const next: SavedFormEntry = { ...existing, ...patch, syncState };
+  const next: SavedFormEntry = {
+    ...existing,
+    ...patch,
+    syncState,
+    syncStartedAt: syncState === "syncing" ? new Date().toISOString() : null,
+  };
   const db = await initDB();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE, "readwrite");
@@ -310,6 +318,20 @@ export const markSyncState = async (
 /** True when a queued entry is still inside its backoff window. */
 export const isBackingOff = (entry: SavedFormEntry): boolean =>
   !!entry.nextAttemptAt && new Date(entry.nextAttemptAt).getTime() > Date.now();
+
+/**
+ * How long a "syncing" lease stays valid. If the app is killed mid-upload the
+ * persisted lease would otherwise block the record forever, so anything older
+ * than this is reclaimed and retried (uploads are idempotent by submission id).
+ */
+export const SYNC_LEASE_MS = 2 * 60_000;
+
+/** True when the entry is genuinely being uploaded right now (fresh lease). */
+export const hasActiveSyncLease = (entry: SavedFormEntry): boolean => {
+  if (entry.syncState !== "syncing") return false;
+  if (!entry.syncStartedAt) return false; // orphan from an older build — reclaim
+  return Date.now() - new Date(entry.syncStartedAt).getTime() < SYNC_LEASE_MS;
+};
 
 export const buildSavedEntryDisplayName = (entry: Pick<SavedFormEntry, "formName" | "respondentName" | "updatedAt" | "finalizedAt" | "createdAt">): string => {
   const name = entry.respondentName?.trim() || "Unnamed respondent";

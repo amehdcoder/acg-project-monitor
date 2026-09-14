@@ -16,6 +16,7 @@ import {
   setSavedEntryStatus,
   markSyncState,
   isBackingOff,
+  hasActiveSyncLease,
   type SavedFormEntry,
 } from "@/lib/savedForms";
 import {
@@ -71,7 +72,7 @@ async function drain(): Promise<{ synced: number; failed: number }> {
   let failed = 0;
   const owner = deviceUserId(session.deviceId);
   const entries = (await listAllSavedEntries("finalized")).filter(
-    (e) => e.userId === owner && e.syncState !== "syncing" && !isBackingOff(e),
+    (e) => e.userId === owner && !hasActiveSyncLease(e) && !isBackingOff(e),
   );
   if (entries.length === 0) return { synced: 0, failed: 0 };
 
