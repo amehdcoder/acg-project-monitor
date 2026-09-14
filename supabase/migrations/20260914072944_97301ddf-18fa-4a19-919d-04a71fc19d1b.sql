@@ -1,0 +1,1 @@
+revoke execute on function public.enforce_canonical_chat_attachment() from public, anon, authenticated;
