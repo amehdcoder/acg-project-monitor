@@ -295,6 +295,41 @@ const FacilityDashboard = ({ projectId, canSeeAllFacilities = false, onOpenBenef
             </Card>
           ))}
         </TabsContent>
+
+        <TabsContent value="archive" className="mt-3 space-y-2">
+          <p className="text-xs text-muted-foreground">
+            Patients transferred to another facility after their referral was accepted. Their record
+            stays here for history and audit, but active care now sits with the receiving facility.
+          </p>
+          {archived.length === 0 && (
+            <Card className="p-8 text-center text-muted-foreground">
+              No patients have been transferred out of this facility yet.
+            </Card>
+          )}
+          {archived.map((r) => (
+            <Card key={r.id} className="flex flex-wrap items-center gap-3 p-4">
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-semibold text-foreground">
+                  {nameById.get(r.beneficiary_id) || "Transferred beneficiary"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Transferred to {r.referred_to} · {(r.transferred_at || r.accepted_at || "").slice(0, 10) || r.referral_date}
+                </p>
+                {r.reason && <p className="mt-1 text-xs text-muted-foreground">Reason: {r.reason}</p>}
+                {r.followup_date && (
+                  <p className="mt-1 flex items-center gap-1 text-xs text-purple-700">
+                    <CalendarClock className="h-3.5 w-3.5" />
+                    Follow-up {[r.followup_date, r.followup_time, r.followup_location].filter(Boolean).join(" · ")}
+                  </p>
+                )}
+              </div>
+              <Badge variant="outline" className="gap-1">
+                <Archive className="h-3.5 w-3.5" /> Referred out
+              </Badge>
+              <Badge variant="outline">{REFERRAL_OUTCOME_LABEL[r.outcome || "pending"]}</Badge>
+            </Card>
+          ))}
+        </TabsContent>
       </Tabs>
 
       <ReferralOutcomeDialog
