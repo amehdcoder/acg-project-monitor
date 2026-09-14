@@ -9072,6 +9072,181 @@ export type Database = {
           },
         ]
       }
+      safeguarding_access_log: {
+        Row: {
+          action: string
+          concern_id: string | null
+          created_at: string
+          id: string
+          project_id: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          concern_id?: string | null
+          created_at?: string
+          id?: string
+          project_id: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          concern_id?: string | null
+          created_at?: string
+          id?: string
+          project_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      safeguarding_concerns: {
+        Row: {
+          action_taken: string | null
+          assigned_to: string | null
+          beneficiary_id: string | null
+          beneficiary_label: string | null
+          categories: Json
+          closed_at: string | null
+          concern_date: string
+          consent_obtained: string | null
+          created_at: string
+          facility_id: string | null
+          id: string
+          immediate_action: string | null
+          module_id: string | null
+          narrative: string
+          outcome: string | null
+          project_id: string
+          referral_made: Json
+          reported_by: string | null
+          severity: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          action_taken?: string | null
+          assigned_to?: string | null
+          beneficiary_id?: string | null
+          beneficiary_label?: string | null
+          categories?: Json
+          closed_at?: string | null
+          concern_date?: string
+          consent_obtained?: string | null
+          created_at?: string
+          facility_id?: string | null
+          id?: string
+          immediate_action?: string | null
+          module_id?: string | null
+          narrative: string
+          outcome?: string | null
+          project_id: string
+          referral_made?: Json
+          reported_by?: string | null
+          severity?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          action_taken?: string | null
+          assigned_to?: string | null
+          beneficiary_id?: string | null
+          beneficiary_label?: string | null
+          categories?: Json
+          closed_at?: string | null
+          concern_date?: string
+          consent_obtained?: string | null
+          created_at?: string
+          facility_id?: string | null
+          id?: string
+          immediate_action?: string | null
+          module_id?: string | null
+          narrative?: string
+          outcome?: string | null
+          project_id?: string
+          referral_made?: Json
+          reported_by?: string | null
+          severity?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "safeguarding_concerns_beneficiary_id_fkey"
+            columns: ["beneficiary_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiaries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      safeguarding_notes: {
+        Row: {
+          author_id: string | null
+          concern_id: string
+          created_at: string
+          id: string
+          note: string
+          project_id: string
+        }
+        Insert: {
+          author_id?: string | null
+          concern_id: string
+          created_at?: string
+          id?: string
+          note: string
+          project_id: string
+        }
+        Update: {
+          author_id?: string | null
+          concern_id?: string
+          created_at?: string
+          id?: string
+          note?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "safeguarding_notes_concern_id_fkey"
+            columns: ["concern_id"]
+            isOneToOne: false
+            referencedRelation: "safeguarding_concerns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      safeguarding_officers: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          project_id: string
+          role: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          project_id: string
+          role?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          project_id?: string
+          role?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       sarmaan_acsm_archived_submissions: {
         Row: {
           archived_at: string
@@ -11288,6 +11463,10 @@ export type Database = {
         Returns: boolean
       }
       is_proximity_participant: { Args: { _user_id: string }; Returns: boolean }
+      is_safeguarding_officer: {
+        Args: { _project_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_sarmaan_form_grantee: {
         Args: { _form_id: string; _user_id: string }
         Returns: boolean

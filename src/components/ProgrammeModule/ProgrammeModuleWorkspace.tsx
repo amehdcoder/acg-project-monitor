@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/select";
 import {
   Plus, Settings2, CloudOff, RefreshCw, Layers, Users, Building2, ShieldAlert,
-  LayoutGrid, CalendarClock, Hospital,
+  LayoutGrid, CalendarClock, Hospital, Route, ShieldCheck,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -27,7 +27,12 @@ import FacilityRegistry from "./FacilityRegistry";
 import FacilityDashboard from "./FacilityDashboard";
 import FollowUpsPanel from "./FollowUpsPanel";
 import DeleteRequestsPanel from "./DeleteRequestsPanel";
+import JourneyDashboard from "./JourneyDashboard";
+import SafeguardingPanel from "./SafeguardingPanel";
+import SafeguardingOfficers from "./SafeguardingOfficers";
+import { useIsSafeguardingOfficer } from "@/lib/programmeModule/safeguarding";
 import { useMyFacilityAccess } from "@/lib/programmeModule/facilities";
+
 
 interface Props {
   projectId?: string;
@@ -58,7 +63,11 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
   const [pending, setPending] = useState(queueCount());
   const [creating, setCreating] = useState(false);
   const [deleteRequestsOpen, setDeleteRequestsOpen] = useState(false);
-  const [view, setView] = useState<"records" | "facility" | "followups">("records");
+  const [officersOpen, setOfficersOpen] = useState(false);
+  const { isOfficer } = useIsSafeguardingOfficer(projectId);
+  const [view, setView] =
+    useState<"records" | "journey" | "facility" | "followups" | "safeguarding">("records");
+
 
   const active: ProgrammeModuleRow | undefined = useMemo(
     () => modules.find((m) => m.id === activeId) || modules[0],
@@ -198,6 +207,11 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
           </Button>
         )}
         {canConfigure && (
+          <Button variant="outline" size="sm" className="gap-1" onClick={() => setOfficersOpen(true)}>
+            <ShieldCheck className="h-4 w-4" /> Safeguarding officers
+          </Button>
+        )}
+        {canConfigure && (
           <Button size="sm" className="gap-1" onClick={() => setGalleryOpen(true)} aria-label="Add programme module">
             <Plus className="h-4 w-4" /> Add module
           </Button>
@@ -206,10 +220,12 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
 
       <div className="flex flex-wrap gap-2">
         {([
-          { key: "records", label: "Beneficiary records", icon: LayoutGrid },
-          { key: "facility", label: "Facility dashboard", icon: Hospital },
-          { key: "followups", label: "Follow-ups & referrals", icon: CalendarClock },
-        ] as const).map((t) => (
+          { key: "records", label: "Beneficiary records", icon: LayoutGrid, show: true },
+          { key: "journey", label: "Beneficiary journey", icon: Route, show: true },
+          { key: "facility", label: "Facility dashboard", icon: Hospital, show: true },
+          { key: "followups", label: "Follow-ups & referrals", icon: CalendarClock, show: true },
+          { key: "safeguarding", label: "Safeguarding", icon: ShieldCheck, show: isOfficer },
+        ] as const).filter((t) => t.show).map((t) => (
           <Button
             key={t.key}
             size="sm"
@@ -221,6 +237,7 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
           </Button>
         ))}
       </div>
+
 
 
       {!loading && modules.length === 0 && (
@@ -250,6 +267,16 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
         />
       )}
 
+      {view === "journey" && (
+        <JourneyDashboard
+          projectId={projectId}
+          moduleId={active?.id}
+          config={active ? normalizeConfig(active.config) : undefined}
+          allowedFacilityIds={isFocalPerson ? Object.keys(facilityLevels) : []}
+          onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }}
+        />
+      )}
+
       {view === "facility" && (
         <FacilityDashboard
           projectId={projectId}
@@ -265,12 +292,29 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
         />
       )}
 
+      {view === "safeguarding" && (
+        <SafeguardingPanel
+          projectId={projectId}
+          moduleId={active?.id}
+          beneficiaries={scopedBeneficiaries}
+          isOfficer={isOfficer}
+        />
+      )}
+
       <DeleteRequestsPanel
         open={deleteRequestsOpen}
         onOpenChange={setDeleteRequestsOpen}
         projectId={projectId}
         onDecided={() => void reloadBeneficiaries()}
       />
+
+      <SafeguardingOfficers
+        open={officersOpen}
+        onOpenChange={setOfficersOpen}
+        projectId={projectId}
+      />
+
+
 
 
       <FacilityFocalPersons
