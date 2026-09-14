@@ -16,6 +16,8 @@ import { enqueue, flushQueue, newUuid } from "@/lib/programmeModule/offlineQueue
 import { STANDARD_ASSESSMENTS, scoreAssessment } from "@/lib/standardAssessments/definitions";
 import type { BeneficiaryRow } from "@/lib/programmeModule/types";
 import { recordAudit } from "./useProgrammeModule";
+import ServiceExperienceSections from "./ServiceExperienceSections";
+import type { AnswerMap } from "./ConfigFieldRenderer";
 
 export type MhFormKey = "gad_7" | "phq_9";
 
