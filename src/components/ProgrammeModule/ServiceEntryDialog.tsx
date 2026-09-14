@@ -71,6 +71,24 @@ const ServiceEntryDialog = ({
     );
   }
 
+  // Documents are records rather than clinical episodes: no result/outcome and
+  // no follow-up — attachments plus a signed informed-consent acknowledgement.
+  if (open && component && isDocumentsComponent(component)) {
+    return (
+      <DocumentsServiceForm
+        open={open}
+        onOpenChange={(v) => { if (!v) setServiceName(""); onOpenChange(v); }}
+        component={component}
+        serviceName={serviceName}
+        onServiceNameChange={setServiceName}
+        beneficiary={beneficiary}
+        moduleId={moduleId}
+        projectId={projectId}
+        onSaved={onSaved}
+      />
+    );
+  }
+
   // Limb care, lymphoedema and hydrocoele visits open the MMDP visit form with
   // pictures, measurements and the on-device progress comparison.
   if (open && isMmdpService(componentKey, serviceName)) {
