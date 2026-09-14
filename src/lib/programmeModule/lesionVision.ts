@@ -151,7 +151,7 @@ export const analyseLesion = async (src: string, referenceMm = 0): Promise<Lesio
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   const empty: LesionMetrics = {
     areaFraction: 0, widthFraction: 0, heightFraction: 0, rednessIndex: 0,
-    edgeIrregularity: 0, areaMm2: null, segmentationQuality: 0,
+    edgeIrregularity: 0, areaMm2: null, longestMm: null, segmentationQuality: 0,
     frame: { width: W, height: H }, box: { x: 0, y: 0, w: 0, h: 0 }, overlay: "",
   };
   if (!ctx) return empty;
@@ -289,6 +289,9 @@ export const analyseLesion = async (src: string, referenceMm = 0): Promise<Lesio
   // Physical area when a reference width is known.
   const mmPerPx = referenceMm > 0 ? referenceMm / W : 0;
   const areaMm2 = mmPerPx > 0 ? +(area * mmPerPx * mmPerPx).toFixed(1) : null;
+  const longestMm = mmPerPx > 0
+    ? +(Math.max(maxX - minX + 1, maxY - minY + 1) * mmPerPx).toFixed(1)
+    : null;
 
   // Quality: penalise regions that fill nearly the whole frame (segmentation
   // failure), are tiny (noise), or touch every edge.
