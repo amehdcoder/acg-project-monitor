@@ -70,10 +70,10 @@ const FacilityDashboard = ({ projectId, canSeeAllFacilities = false, onOpenBenef
     return m;
   }, [beneficiaries, referredNames]);
 
-  // Names of patients referred in from other facilities (not on our own list).
+  // Names of patients referred in or transferred out (no longer on our own list).
   useEffect(() => {
     const own = new Set(beneficiaries.map((b) => b.id));
-    const missing = Array.from(new Set(incoming.map((r) => r.beneficiary_id)))
+    const missing = Array.from(new Set([...incoming, ...outgoing].map((r) => r.beneficiary_id)))
       .filter((id) => !own.has(id) && !referredNames[id]);
     if (missing.length === 0) return;
     let cancelled = false;
