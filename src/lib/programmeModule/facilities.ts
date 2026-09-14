@@ -15,6 +15,8 @@ export interface FacilityRow {
   ward: string | null;
   contact_person: string | null;
   contact_phone: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export type FacilityAccessLevel = "view" | "record" | "manage";
@@ -63,7 +65,7 @@ export const useFacilities = (projectId?: string) => {
     setLoading(true);
     let q = supabase
       .from("health_facilities")
-      .select("id,name,code,facility_type,state,lga,ward,contact_person,contact_phone")
+      .select("id,name,code,facility_type,state,lga,ward,contact_person,contact_phone,latitude,longitude")
       .order("name")
       .limit(2000);
     if (projectId) q = q.or(`project_id.eq.${projectId},project_id.is.null`);
