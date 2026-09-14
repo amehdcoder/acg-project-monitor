@@ -16,6 +16,7 @@ import {
   setSavedEntryStatus,
   markSyncState,
   isBackingOff,
+  hasActiveSyncLease,
   type SavedFormEntry,
 } from "@/lib/savedForms";
 import {
