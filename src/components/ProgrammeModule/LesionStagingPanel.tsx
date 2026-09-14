@@ -26,9 +26,10 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { toneClasses } from "@/lib/programmeModule/defaults";
 import { resolveMediaUrl } from "@/lib/programmeModule/media";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
-  LESION_CONDITIONS, SCALE_REFERENCES, analyseLesion, compareLesions, conditionLabel,
-  stageLesion, TREND_TONE,
+  CLINICAL_CRITERIA, LESION_CONDITIONS, MEASUREMENT_FIELDS, SCALE_REFERENCES,
+  analyseLesion, compareLesions, conditionLabel, stageFromEvidence, TREND_TONE,
   type LesionCondition, type LesionMetrics,
 } from "@/lib/programmeModule/lesionVision";
 import PhotoCaptureField from "./PhotoCaptureField";
