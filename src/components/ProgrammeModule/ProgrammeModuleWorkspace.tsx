@@ -267,6 +267,16 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
         />
       )}
 
+      {view === "journey" && (
+        <JourneyDashboard
+          projectId={projectId}
+          moduleId={active?.id}
+          config={active ? normalizeConfig(active.config) : undefined}
+          allowedFacilityIds={isFocalPerson ? Object.keys(facilityLevels) : []}
+          onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }}
+        />
+      )}
+
       {view === "facility" && (
         <FacilityDashboard
           projectId={projectId}
@@ -282,12 +292,29 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
         />
       )}
 
+      {view === "safeguarding" && (
+        <SafeguardingPanel
+          projectId={projectId}
+          moduleId={active?.id}
+          beneficiaries={scopedBeneficiaries}
+          isOfficer={isOfficer}
+        />
+      )}
+
       <DeleteRequestsPanel
         open={deleteRequestsOpen}
         onOpenChange={setDeleteRequestsOpen}
         projectId={projectId}
         onDecided={() => void reloadBeneficiaries()}
       />
+
+      <SafeguardingOfficers
+        open={officersOpen}
+        onOpenChange={setOfficersOpen}
+        projectId={projectId}
+      />
+
+
 
 
       <FacilityFocalPersons
