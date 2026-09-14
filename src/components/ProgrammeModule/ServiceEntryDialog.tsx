@@ -17,6 +17,7 @@ import ConfigFieldRenderer, { AnswerMap, isRelevant } from "./ConfigFieldRendere
 import { recordAudit } from "./useProgrammeModule";
 import MentalHealthServiceForm, { mhFormForService } from "./MentalHealthServiceForm";
 import MmdpServiceForm, { isMmdpService } from "./MmdpServiceForm";
+import DocumentsServiceForm, { isDocumentsComponent } from "./DocumentsServiceForm";
 import FollowUpFields, { emptyFollowUp } from "./FollowUpFields";
 import type { FollowUpValue } from "./FollowUpFields";
 import type { BeneficiaryRow, BeneficiaryServiceRow } from "@/lib/programmeModule/types";
