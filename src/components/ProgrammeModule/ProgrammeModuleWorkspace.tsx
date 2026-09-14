@@ -231,6 +231,9 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
           { key: "journey", label: "Beneficiary journey", icon: Route, show: true },
           { key: "facility", label: "Facility dashboard", icon: Hospital, show: true },
           { key: "followups", label: "Follow-ups & referrals", icon: CalendarClock, show: true },
+          { key: "households", label: "Households & MDA", icon: Home, show: true },
+          { key: "network", label: "Transmission network", icon: Network, show: true },
+          { key: "risk", label: "Follow-up risk & CHEW visits", icon: Activity, show: true },
           { key: "safeguarding", label: "Safeguarding", icon: ShieldCheck, show: isOfficer },
           {
             key: "safeguarding_dashboard", label: "Safeguarding dashboard",
