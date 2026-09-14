@@ -30,9 +30,14 @@ import { resolveMediaUrl } from "@/lib/programmeModule/media";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   CLINICAL_CRITERIA, LESION_CONDITIONS, MEASUREMENT_FIELDS, SCALE_REFERENCES,
-  analyseLesion, compareLesions, conditionLabel, stageFromEvidence, TREND_TONE,
+  STAGE_LABELS, analyseLesion, compareLesions, conditionLabel, stageFromEvidence,
+  stageLabelFor, TREND_TONE,
   type LesionCondition, type LesionMetrics,
 } from "@/lib/programmeModule/lesionVision";
+import {
+  MIN_TRAINING_CASES, buildFeatures, confirmAssessmentStage, predictStage,
+  useLesionStageModel,
+} from "@/lib/programmeModule/lesionModel";
 import PhotoCaptureField from "./PhotoCaptureField";
 
 interface Props {
