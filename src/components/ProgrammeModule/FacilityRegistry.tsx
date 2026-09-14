@@ -157,6 +157,26 @@ const FacilityRegistry = ({
     }
   };
 
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    try {
+      const { error } = await supabase.from("health_facilities").delete().eq("id", pendingDelete.id);
+      if (error) throw error;
+      toast({
+        title: "Facility removed",
+        description: "Its beneficiaries were kept and are now unassigned.",
+      });
+      setPendingDelete(null);
+      await reload();
+      await loadCounts();
+    } catch (e) {
+      toast({ title: "Could not delete facility", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92dvh] max-w-3xl overflow-y-auto">
@@ -192,7 +212,10 @@ const FacilityRegistry = ({
           {filtered.map((f) => (
             <Card key={f.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
               <div className="min-w-0">
-                <p className="font-semibold text-foreground">{f.name}</p>
+                <p className="font-semibold text-foreground">
+                  {f.name}
+                  {f.code ? <span className="ml-2 text-xs font-mono text-muted-foreground">{f.code}</span> : null}
+                </p>
                 <p className="text-xs text-muted-foreground">
                   {FACILITY_TYPE_LABEL[f.facility_type]}
                   {f.ward ? ` · ${f.ward} ward` : ""}
@@ -214,9 +237,19 @@ const FacilityRegistry = ({
                   </Button>
                 )}
                 {canManage && (
-                  <Button size="sm" variant="outline" className="gap-1" onClick={() => openEdit(f)}>
-                    <Pencil className="h-4 w-4" /> Edit
-                  </Button>
+                  <>
+                    <Button size="sm" variant="outline" className="gap-1" onClick={() => openEdit(f)}>
+                      <Pencil className="h-4 w-4" /> Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1 text-destructive hover:text-destructive"
+                      onClick={() => setPendingDelete(f)}
+                    >
+                      <Trash2 className="h-4 w-4" /> Delete
+                    </Button>
+                  </>
                 )}
               </div>
             </Card>
