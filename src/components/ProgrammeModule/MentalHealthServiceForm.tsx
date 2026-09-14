@@ -126,6 +126,7 @@ const MentalHealthServiceForm = ({
           score: scored.score,
           severity: scored.severity,
           interpretation: scored.interpretation,
+          ...(experience as Record<string, unknown>),
           patient: {
             case_id: beneficiary.case_id,
             full_name: beneficiary.full_name,
