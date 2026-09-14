@@ -126,6 +126,7 @@ const ServiceEntryDialog = ({
         status,
         data: {
           ...(answers as Record<string, unknown>),
+          ...(experience as Record<string, unknown>),
           follow_up_date: followUp.date || undefined,
           follow_up_time: followUp.time || undefined,
           follow_up_location: followUp.location || undefined,
