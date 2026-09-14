@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 export interface FacilityRow {
   id: string;
   name: string;
+  /** Short facility code used in beneficiary case IDs, e.g. EEHK. */
+  code?: string | null;
   facility_type: "phc" | "secondary" | "tertiary";
   state: string | null;
   lga: string | null;
