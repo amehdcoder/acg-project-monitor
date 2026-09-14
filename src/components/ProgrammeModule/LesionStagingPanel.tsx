@@ -408,7 +408,7 @@ const LesionStagingPanel = ({
             />
           </div>
 
-          <Button disabled={saving || analysing || !metrics} onClick={() => void save()}>
+          <Button disabled={saving || analysing || !hasEvidence} onClick={() => void save()}>
             {saving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />} Save assessment
           </Button>
         </Card>
