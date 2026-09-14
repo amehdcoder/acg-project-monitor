@@ -34,6 +34,7 @@ import LongitudinalOutcome from "./LongitudinalOutcome";
 import CareNetworkPanel from "./CareNetworkPanel";
 import LimbProgressPanel from "./LimbProgressPanel";
 import LesionStagingPanel from "./LesionStagingPanel";
+import BeneficiaryRiskCard from "./BeneficiaryRiskCard";
 import { recordAudit } from "./useProgrammeModule";
 import { requestBeneficiaryDeletion } from "@/lib/programmeModule/facilityOps";
 import {
@@ -612,6 +613,14 @@ const BeneficiaryRecord = ({
               </div>
             </Card>
           )}
+
+          <BeneficiaryRiskCard
+            beneficiary={beneficiary}
+            services={services}
+            referrals={referrals}
+            projectId={projectId}
+            canDispatch={canManage}
+          />
 
           {config.layout.showNextFollowUp && (
             <Card className="p-4">
