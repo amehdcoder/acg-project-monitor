@@ -71,6 +71,18 @@ export const setReferralStatus = async (referralId: string, status: string) => {
   if (error) throw error;
 };
 
+/**
+ * Accepting a referral transfers the beneficiary to the receiving facility:
+ * they leave the sending facility's active list and stay in its archive as
+ * "referred out", while appearing on the receiving facility's list.
+ */
+export const acceptReferral = async (referralId: string) => {
+  const { error } = await supabase.rpc("accept_beneficiary_referral" as never, {
+    _referral_id: referralId,
+  } as never);
+  if (error) throw error;
+};
+
 /** Outcomes a receiving facility can record against an assigned referral. */
 export const REFERRAL_OUTCOMES = [
   { value: "pending", label: "Awaiting visit" },
