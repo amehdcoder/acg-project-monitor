@@ -32,6 +32,8 @@ import PhotoCaptureField from "./PhotoCaptureField";
 import FollowUpFields, { emptyFollowUp } from "./FollowUpFields";
 import type { FollowUpValue } from "./FollowUpFields";
 import { recordAudit } from "./useProgrammeModule";
+import ServiceExperienceSections from "./ServiceExperienceSections";
+import type { AnswerMap } from "./ConfigFieldRenderer";
 
 /** Services that open the MMDP visit form instead of the generic one. */
 export const isMmdpService = (componentKey: string, serviceName?: string | null) => {
@@ -72,6 +74,7 @@ const MmdpServiceForm = ({
   const [signal, setSignal] = useState<ImageSignal | null>(null);
   const [note, setNote] = useState("");
   const [followUp, setFollowUp] = useState<FollowUpValue>(emptyFollowUp);
+  const [experience, setExperience] = useState<AnswerMap>({});
   const [saving, setSaving] = useState(false);
 
   const siteFields = site === "scrotum" ? SCROTUM_SITES : LIMB_SITES;
@@ -133,6 +136,7 @@ const MmdpServiceForm = ({
         follow_up_date: followUp.date || undefined,
         follow_up_time: followUp.time || undefined,
         follow_up_location: followUp.location || undefined,
+        ...(experience as Record<string, unknown>),
       };
       const payload = {
         beneficiary_id: beneficiary.id,
@@ -267,6 +271,11 @@ const MmdpServiceForm = ({
             <Textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)}
               placeholder="Skin condition, entry lesions, self-care adherence, surgery outcome…" />
           </div>
+
+          <ServiceExperienceSections
+            answers={experience}
+            onChange={(name, value) => setExperience((p) => ({ ...p, [name]: value }))}
+          />
 
           <FollowUpFields
             value={followUp} onChange={setFollowUp}

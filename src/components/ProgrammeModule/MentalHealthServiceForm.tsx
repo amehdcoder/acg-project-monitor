@@ -16,6 +16,8 @@ import { enqueue, flushQueue, newUuid } from "@/lib/programmeModule/offlineQueue
 import { STANDARD_ASSESSMENTS, scoreAssessment } from "@/lib/standardAssessments/definitions";
 import type { BeneficiaryRow } from "@/lib/programmeModule/types";
 import { recordAudit } from "./useProgrammeModule";
+import ServiceExperienceSections from "./ServiceExperienceSections";
+import type { AnswerMap } from "./ConfigFieldRenderer";
 
 export type MhFormKey = "gad_7" | "phq_9";
 
@@ -86,6 +88,7 @@ const MentalHealthServiceForm = ({
   const [responses, setResponses] = useState<Record<string, string>>({});
   const [serviceDate, setServiceDate] = useState(new Date().toISOString().slice(0, 10));
   const [result, setResult] = useState<ReturnType<typeof scoreAssessment> | null>(null);
+  const [experience, setExperience] = useState<AnswerMap>({});
   const [saving, setSaving] = useState(false);
 
   const answered = useMemo(
@@ -123,6 +126,7 @@ const MentalHealthServiceForm = ({
           score: scored.score,
           severity: scored.severity,
           interpretation: scored.interpretation,
+          ...(experience as Record<string, unknown>),
           patient: {
             case_id: beneficiary.case_id,
             full_name: beneficiary.full_name,
@@ -283,7 +287,13 @@ const MentalHealthServiceForm = ({
                   </div>
                 </div>
               )}
+
+              <ServiceExperienceSections
+                answers={experience}
+                onChange={(name, value) => setExperience((p) => ({ ...p, [name]: value }))}
+              />
             </div>
+
 
             <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white px-4 py-3">
               <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>

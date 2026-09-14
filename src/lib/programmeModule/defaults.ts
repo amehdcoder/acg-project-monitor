@@ -13,6 +13,7 @@ import {
   applyRegistrationChoices, choiceOptions, INCOME_SOURCE, OCCUPATION,
   PRIMARY_HEALTH_CONDITION, VULNERABILITY_STATUS,
 } from "./registrationChoices";
+import { withStandardProfileSections } from "./standardSections";
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -446,8 +447,10 @@ const upgradeServices = (components: ProgrammeComponent[]): ProgrammeComponent[]
 
 export const normalizeConfig = (raw: unknown): ProgrammeModuleConfig => {
   const cfg = (raw || {}) as Partial<ProgrammeModuleConfig>;
-  if (!cfg.components || !cfg.sections) return applyRegistrationChoices({ ...BLANK_PRESET });
-  return applyRegistrationChoices({
+  if (!cfg.components || !cfg.sections) {
+    return withStandardProfileSections(applyRegistrationChoices({ ...BLANK_PRESET }));
+  }
+  return withStandardProfileSections(applyRegistrationChoices({
     version: cfg.version ?? 1,
     branding: { ...BLANK_PRESET.branding, ...(cfg.branding || {}) },
     caseId: { ...BLANK_PRESET.caseId, ...(cfg.caseId || {}) },
@@ -456,5 +459,5 @@ export const normalizeConfig = (raw: unknown): ProgrammeModuleConfig => {
     workflow: { ...BLANK_PRESET.workflow, ...(cfg.workflow || {}) },
     layout: { ...BLANK_PRESET.layout, ...(cfg.layout || {}) },
     dataQuality: cfg.dataQuality || [],
-  });
+  }));
 };

@@ -14,6 +14,7 @@ import { enqueue, flushQueue, newUuid } from "@/lib/programmeModule/offlineQueue
 import { visibleComponents } from "@/lib/programmeModule/defaults";
 import type { ProgrammeModuleConfig } from "@/lib/programmeModule/types";
 import ConfigFieldRenderer, { AnswerMap, isRelevant } from "./ConfigFieldRenderer";
+import ServiceExperienceSections from "./ServiceExperienceSections";
 import { recordAudit } from "./useProgrammeModule";
 import MentalHealthServiceForm, { mhFormForService } from "./MentalHealthServiceForm";
 import MmdpServiceForm, { isMmdpService } from "./MmdpServiceForm";
@@ -48,6 +49,7 @@ const ServiceEntryDialog = ({
   const [result, setResult] = useState("");
   const [status, setStatus] = useState(config.workflow.serviceStatuses[0]?.value || "on_track");
   const [answers, setAnswers] = useState<AnswerMap>({});
+  const [experience, setExperience] = useState<AnswerMap>({});
   const [followUp, setFollowUp] = useState<FollowUpValue>(emptyFollowUp);
   const [saving, setSaving] = useState(false);
 
@@ -124,6 +126,7 @@ const ServiceEntryDialog = ({
         status,
         data: {
           ...(answers as Record<string, unknown>),
+          ...(experience as Record<string, unknown>),
           follow_up_date: followUp.date || undefined,
           follow_up_time: followUp.time || undefined,
           follow_up_location: followUp.location || undefined,
@@ -218,6 +221,11 @@ const ServiceEntryDialog = ({
                 onChange={(v) => q.name && setAnswers((p) => ({ ...p, [q.name as string]: v }))}
               />
             ))}
+
+          <ServiceExperienceSections
+            answers={experience}
+            onChange={(name, value) => setExperience((p) => ({ ...p, [name]: value }))}
+          />
 
           <FollowUpFields
             value={followUp}
