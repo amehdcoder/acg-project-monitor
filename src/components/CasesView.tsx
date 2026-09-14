@@ -59,6 +59,7 @@ import {
     ChevronLeft,
     Info,
     Maximize2,
+     BookOpen,
 
 
 } from "lucide-react";
@@ -155,6 +156,8 @@ const CasesView = () => {
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [projectFilter, setProjectFilter] = useState<string>("all");
+  const [beneficiaryProjectIds, setBeneficiaryProjectIds] = useState<Set<string>>(new Set());
+  const [programmeScopeLoading, setProgrammeScopeLoading] = useState(true);
   const [generatingCases, setGeneratingCases] = useState(false);
   const [caseTypeFilter, setCaseTypeFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
@@ -218,6 +221,30 @@ const CasesView = () => {
       fetchCaseTypes();
     }
   }, [user?.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      if (!projects.length) {
+        if (!cancelled) setProgrammeScopeLoading(false);
+        return;
+      }
+      setProgrammeScopeLoading(true);
+      const { data } = await supabase
+        .from("programme_modules")
+        .select("project_id")
+        .in("project_id", projects.map((project) => project.id))
+        .eq("is_active", true);
+      if (cancelled) return;
+      const configured = new Set((data || []).map((row) => row.project_id));
+      setBeneficiaryProjectIds(configured);
+      setProjectFilter((current) => current === "all"
+        ? projects.find((project) => configured.has(project.id))?.id || projects[0].id
+        : current);
+      setProgrammeScopeLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [projects]);
 
   useEffect(() => {
     if (user?.id) {
@@ -1488,6 +1515,59 @@ const CasesView = () => {
     toast({ title: "Export Complete", description: `${filteredCases.length} cases exported to ${fileName}.` });
   };
 
+  const selectedProject = projects.find((project) => project.id === projectFilter);
+  const isBeneficiaryProject = Boolean(selectedProject && beneficiaryProjectIds.has(selectedProject.id));
+
+  if (programmeScopeLoading) {
+    return (
+      <div className="mx-auto max-w-[1400px] p-4 lg:p-6">
+        <div className="flex min-h-[360px] items-center justify-center rounded-lg border bg-card text-sm text-muted-foreground">
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Opening project records…
+        </div>
+      </div>
+    );
+  }
+
+  if (isBeneficiaryProject && selectedProject) {
+    return (
+      <div className="mx-auto max-w-[1480px] space-y-4 p-3 font-report sm:p-5 lg:p-6">
+        <section className="overflow-hidden rounded-lg border bg-card shadow-card">
+          <div className="flex flex-col gap-5 bg-health-blue px-5 py-6 text-primary-foreground sm:px-7 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-4">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded border border-primary-foreground/30 bg-primary-foreground/10">
+                <BookOpen className="h-6 w-6" />
+              </span>
+              <div>
+                <p className="text-xs font-bold uppercase text-primary-foreground/75">Project beneficiary information system</p>
+                <h1 className="mt-1 font-report-display text-2xl font-bold sm:text-3xl">{selectedProject.name}</h1>
+                <p className="mt-1 text-sm text-primary-foreground/85">Longitudinal records, service history, outcomes and facility accountability</p>
+              </div>
+            </div>
+            <div className="w-full lg:w-[300px]">
+              <p className="mb-1.5 text-xs font-semibold text-primary-foreground/80">Viewing project</p>
+              <Select value={projectFilter} onValueChange={setProjectFilter}>
+                <SelectTrigger className="border-primary-foreground/30 bg-card text-foreground"><SelectValue /></SelectTrigger>
+                <SelectContent className="z-[1200] bg-popover">
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}{beneficiaryProjectIds.has(project.id) ? " · Beneficiary Records" : " · Cases"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid divide-y bg-health-surface px-5 py-3 text-xs text-muted-foreground sm:grid-cols-3 sm:divide-x sm:divide-y-0 sm:px-7">
+            <p className="py-2 sm:pr-4"><span className="font-bold text-health-ink">Single source of truth</span><br />One record across every service and visit</p>
+            <p className="py-2 sm:px-4"><span className="font-bold text-health-ink">Facility accountable</span><br />Local ownership with project-level oversight</p>
+            <p className="py-2 sm:pl-4"><span className="font-bold text-health-ink">Protection-aware</span><br />Sensitive narratives remain access-restricted</p>
+          </div>
+        </section>
+        <ProgrammeModuleWorkspace projectId={selectedProject.id} canConfigure={isAdmin} isOwner={isOwner} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5 p-4 lg:p-6 max-w-[1400px] mx-auto">
       {/* CommCare-style Header */}
@@ -1627,10 +1707,6 @@ const CasesView = () => {
           <TabsTrigger value="cases" className="gap-1.5 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-primary px-1 pb-2.5">
             <ClipboardList className="h-4 w-4" />
             Case List
-          </TabsTrigger>
-          <TabsTrigger value="records" className="gap-1.5 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-primary px-1 pb-2.5">
-            <Users className="h-4 w-4" />
-            Beneficiary Records
           </TabsTrigger>
           <TabsTrigger value="map" className="gap-1.5 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-primary px-1 pb-2.5">
             <MapIcon className="h-4 w-4" />
@@ -1853,13 +1929,6 @@ const CasesView = () => {
           </div>
         </TabsContent>
 
-
-        <TabsContent value="records" className="mt-4">
-          <ProgrammeModuleWorkspace
-            projectId={projectFilter !== "all" ? projectFilter : projects[0]?.id}
-            canConfigure={isAdmin}
-          />
-        </TabsContent>
 
         <TabsContent value="map" className="mt-4">
           <CaseLocationMap
