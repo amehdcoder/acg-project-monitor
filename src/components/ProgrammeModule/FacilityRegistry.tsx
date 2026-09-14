@@ -17,7 +17,11 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Building2, Plus, Pencil, Users, Search } from "lucide-react";
+import { Building2, Plus, Pencil, Users, Search, Trash2 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -42,6 +46,7 @@ interface CountRow { facility_id: string | null }
 const emptyDraft = {
   id: "",
   name: "",
+  code: "",
   facility_type: "phc" as FacilityRow["facility_type"],
   state: "",
   lga: "",
