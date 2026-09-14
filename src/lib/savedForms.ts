@@ -49,6 +49,9 @@ export interface SavedFormEntry {
   // remains the user-facing lifecycle (draft/finalized/sent); these fields
   // track the transport attempt so retries are bounded and observable.
   syncState?: SyncState;
+  // When the current "syncing" lease started. Used to reclaim orphaned leases
+  // left behind when the tab/app died mid-upload.
+  syncStartedAt?: string | null;
   syncAttempts?: number;
   lastSyncError?: string | null;
   nextAttemptAt?: string | null;
