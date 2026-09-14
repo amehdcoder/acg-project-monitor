@@ -248,7 +248,7 @@ const LesionStagingPanel = ({
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <Label className="text-sm">Condition</Label>
-              <Select value={condition} onValueChange={(v) => { setCondition(v as LesionCondition); setMetrics(null); }}>
+              <Select value={condition} onValueChange={(v) => { setCondition(v as LesionCondition); setMetrics(null); setCriteria({}); setMeasures({}); }}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent className="z-[1200] bg-popover">
                   {LESION_CONDITIONS.map((c) => (
