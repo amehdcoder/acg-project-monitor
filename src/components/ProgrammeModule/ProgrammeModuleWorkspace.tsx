@@ -125,6 +125,7 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
   }
 
   if (selected && active) {
+    const selectedFacility = (selected as unknown as { facility_id?: string }).facility_id || "";
     return (
       <BeneficiaryRecord
         beneficiary={selected}
@@ -132,10 +133,8 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
         moduleId={active.id}
         projectId={projectId}
         onBack={() => setSelected(null)}
-        canManage={
-          canConfigure ||
-          facilityLevels[(selected as unknown as { facility_id?: string }).facility_id || ""] === "manage"
-        }
+        canManage={canConfigure || facilityLevels[selectedFacility] === "manage"}
+        componentsVisible={!isFocalPerson || Boolean(facilityLevels[selectedFacility])}
         onChanged={() => void reloadBeneficiaries()}
       />
     );
