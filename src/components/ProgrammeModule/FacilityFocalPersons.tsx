@@ -66,7 +66,9 @@ const FacilityFocalPersons = ({ open, onOpenChange, projectId, initialFacilityId
   }, []);
 
   useEffect(() => { if (open) void load(); }, [open, load]);
-  useEffect(() => { if (open && initialFacilityId) setFacilityId(initialFacilityId); }, [open, initialFacilityId]);
+  useEffect(() => {
+    if (open && initialFacilityId) setFacilityIds([initialFacilityId]);
+  }, [open, initialFacilityId]);
 
   const nameOf = useCallback(
     (uid: string) => {
