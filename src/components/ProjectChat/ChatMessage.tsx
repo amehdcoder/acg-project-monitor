@@ -38,6 +38,7 @@ import { parseSpecial } from "./specialMessages";
 import { PollMessage } from "./PollMessage";
 import { LocationMessage } from "./LocationMessage";
 import { EventMessage } from "./EventMessage";
+import { getChatAttachmentSignedUrl } from "@/lib/chatAttachmentUrl";
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -83,6 +84,22 @@ export function ChatMessage({
   const [menuOpen, setMenuOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // attachment_url stores the canonical relative object path; mint a
+  // short-lived signed URL for rendering (handles legacy full URLs too).
+  const [attachmentSrc, setAttachmentSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setAttachmentSrc(null);
+    if (message.attachment_url) {
+      void getChatAttachmentSignedUrl(message.attachment_url).then((url) => {
+        if (!cancelled) setAttachmentSrc(url);
+      });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [message.attachment_url]);
 
   const nameFor = (uid: string) => {
     if (uid === currentUserId) return "You";
