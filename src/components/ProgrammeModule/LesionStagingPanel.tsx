@@ -136,11 +136,30 @@ const LesionStagingPanel = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reference]);
 
-  const staged = metrics ? stageLesion(condition, metrics) : null;
+  const numericMeasures = useMemo(() => {
+    const out: Record<string, number | null> = {};
+    for (const [k, v] of Object.entries(measures)) {
+      const n = Number(v);
+      out[k] = v !== "" && Number.isFinite(n) ? n : null;
+    }
+    return out;
+  }, [measures]);
+
+  const staged = useMemo(
+    () => stageFromEvidence(condition, { criteria, measures: numericMeasures, metrics }),
+    [condition, criteria, numericMeasures, metrics],
+  );
+
+  const hasEvidence = !!metrics
+    || Object.values(criteria).some(Boolean)
+    || Object.values(numericMeasures).some((v) => v != null);
 
   const save = async () => {
-    if (!metrics) {
-      toast({ title: "Take a picture first", description: "The measurement comes from the photograph." });
+    if (!hasEvidence) {
+      toast({
+        title: "Nothing to stage yet",
+        description: "Take a picture, tick the signs seen, or record a measurement.",
+      });
       return;
     }
     setSaving(true);
