@@ -1842,10 +1842,17 @@ export type Database = {
           body_site: string | null
           component_key: string | null
           condition: string
+          confirmed_at: string | null
+          confirmed_by: string | null
+          confirmed_stage: number | null
+          confirmed_stage_label: string | null
           created_at: string
           created_by: string
+          features: Json | null
           id: string
           image_path: string | null
+          model_confidence: number | null
+          model_stage: number | null
           module_id: string | null
           notes: string | null
           percent_change: number | null
@@ -1867,10 +1874,17 @@ export type Database = {
           body_site?: string | null
           component_key?: string | null
           condition?: string
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          confirmed_stage?: number | null
+          confirmed_stage_label?: string | null
           created_at?: string
           created_by?: string
+          features?: Json | null
           id?: string
           image_path?: string | null
+          model_confidence?: number | null
+          model_stage?: number | null
           module_id?: string | null
           notes?: string | null
           percent_change?: number | null
@@ -1892,10 +1906,17 @@ export type Database = {
           body_site?: string | null
           component_key?: string | null
           condition?: string
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          confirmed_stage?: number | null
+          confirmed_stage_label?: string | null
           created_at?: string
           created_by?: string
+          features?: Json | null
           id?: string
           image_path?: string | null
+          model_confidence?: number | null
+          model_stage?: number | null
           module_id?: string | null
           notes?: string | null
           percent_change?: number | null
@@ -6558,6 +6579,57 @@ export type Database = {
         }
         Relationships: []
       }
+      lesion_stage_models: {
+        Row: {
+          accuracy: number | null
+          classes: Json
+          condition: string
+          created_at: string
+          features: Json
+          id: string
+          means: Json
+          project_id: string
+          samples: number
+          scales: Json
+          trained_at: string
+          trained_by: string | null
+          updated_at: string
+          weights: Json
+        }
+        Insert: {
+          accuracy?: number | null
+          classes?: Json
+          condition: string
+          created_at?: string
+          features?: Json
+          id?: string
+          means?: Json
+          project_id: string
+          samples?: number
+          scales?: Json
+          trained_at?: string
+          trained_by?: string | null
+          updated_at?: string
+          weights?: Json
+        }
+        Update: {
+          accuracy?: number | null
+          classes?: Json
+          condition?: string
+          created_at?: string
+          features?: Json
+          id?: string
+          means?: Json
+          project_id?: string
+          samples?: number
+          scales?: Json
+          trained_at?: string
+          trained_by?: string | null
+          updated_at?: string
+          weights?: Json
+        }
+        Relationships: []
+      }
       locations: {
         Row: {
           accuracy: number | null
@@ -9536,6 +9608,44 @@ export type Database = {
         }
         Relationships: []
       }
+      safeguarding_case_keys: {
+        Row: {
+          concern_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          project_id: string
+          recipient_id: string
+          sealed_key: Json
+        }
+        Insert: {
+          concern_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          project_id: string
+          recipient_id: string
+          sealed_key: Json
+        }
+        Update: {
+          concern_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          project_id?: string
+          recipient_id?: string
+          sealed_key?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "safeguarding_case_keys_concern_id_fkey"
+            columns: ["concern_id"]
+            isOneToOne: false
+            referencedRelation: "safeguarding_concerns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       safeguarding_concerns: {
         Row: {
           action_taken: string | null
@@ -9550,6 +9660,7 @@ export type Database = {
           facility_id: string | null
           id: string
           immediate_action: string | null
+          is_encrypted: boolean
           module_id: string | null
           narrative: string
           outcome: string | null
@@ -9559,6 +9670,7 @@ export type Database = {
           severity: string
           status: string
           updated_at: string
+          vault_cipher: Json | null
         }
         Insert: {
           action_taken?: string | null
@@ -9573,6 +9685,7 @@ export type Database = {
           facility_id?: string | null
           id?: string
           immediate_action?: string | null
+          is_encrypted?: boolean
           module_id?: string | null
           narrative: string
           outcome?: string | null
@@ -9582,6 +9695,7 @@ export type Database = {
           severity?: string
           status?: string
           updated_at?: string
+          vault_cipher?: Json | null
         }
         Update: {
           action_taken?: string | null
@@ -9596,6 +9710,7 @@ export type Database = {
           facility_id?: string | null
           id?: string
           immediate_action?: string | null
+          is_encrypted?: boolean
           module_id?: string | null
           narrative?: string
           outcome?: string | null
@@ -9605,6 +9720,7 @@ export type Database = {
           severity?: string
           status?: string
           updated_at?: string
+          vault_cipher?: Json | null
         }
         Relationships: [
           {
@@ -9619,6 +9735,7 @@ export type Database = {
       safeguarding_notes: {
         Row: {
           author_id: string | null
+          cipher: Json | null
           concern_id: string
           created_at: string
           id: string
@@ -9627,6 +9744,7 @@ export type Database = {
         }
         Insert: {
           author_id?: string | null
+          cipher?: Json | null
           concern_id: string
           created_at?: string
           id?: string
@@ -9635,6 +9753,7 @@ export type Database = {
         }
         Update: {
           author_id?: string | null
+          cipher?: Json | null
           concern_id?: string
           created_at?: string
           id?: string
@@ -9681,6 +9800,39 @@ export type Database = {
           role?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      safeguarding_vault_keys: {
+        Row: {
+          created_at: string
+          fingerprint: string
+          id: string
+          project_id: string
+          public_jwk: Json
+          updated_at: string
+          user_id: string
+          wrapped_private_key: Json
+        }
+        Insert: {
+          created_at?: string
+          fingerprint: string
+          id?: string
+          project_id: string
+          public_jwk: Json
+          updated_at?: string
+          user_id: string
+          wrapped_private_key: Json
+        }
+        Update: {
+          created_at?: string
+          fingerprint?: string
+          id?: string
+          project_id?: string
+          public_jwk?: Json
+          updated_at?: string
+          user_id?: string
+          wrapped_private_key?: Json
         }
         Relationships: []
       }
