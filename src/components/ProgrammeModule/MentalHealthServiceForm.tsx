@@ -287,7 +287,13 @@ const MentalHealthServiceForm = ({
                   </div>
                 </div>
               )}
+
+              <ServiceExperienceSections
+                answers={experience}
+                onChange={(name, value) => setExperience((p) => ({ ...p, [name]: value }))}
+              />
             </div>
+
 
             <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white px-4 py-3">
               <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
