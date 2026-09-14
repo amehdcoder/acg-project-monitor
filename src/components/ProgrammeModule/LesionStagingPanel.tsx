@@ -112,7 +112,7 @@ const LesionStagingPanel = ({
   const load = useCallback(async () => {
     setLoading(true);
     const { data } = await db.from("beneficiary_lesion_assessments")
-      .select("id,condition,body_site,assessed_on,image_path,area_fraction,area_mm2,redness_index,stage,stage_label,percent_change,notes")
+      .select("id,condition,body_site,assessed_on,image_path,area_fraction,area_mm2,redness_index,stage,stage_label,percent_change,notes,confirmed_stage,confirmed_stage_label,model_stage,model_confidence")
       .eq("beneficiary_id", beneficiaryId)
       .order("assessed_on", { ascending: false })
       .limit(200);
