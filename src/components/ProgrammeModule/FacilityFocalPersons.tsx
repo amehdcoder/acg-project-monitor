@@ -87,21 +87,24 @@ const FacilityFocalPersons = ({ open, onOpenChange, projectId, initialFacilityId
   }, [profiles, search]);
 
   const assign = async () => {
-    if (!facilityId || !userId) return;
+    if (!facilityIds.length || !userId) return;
     setBusy(true);
     try {
       const { data: auth } = await supabase.auth.getUser();
       const { error } = await supabase
         .from("facility_focal_persons")
         .upsert(
-          {
-            facility_id: facilityId, user_id: userId, role, access_level: accessLevel,
+          facilityIds.map((fid) => ({
+            facility_id: fid, user_id: userId, role, access_level: accessLevel,
             is_active: true, created_by: auth.user?.id,
-          } as never,
+          })) as never,
           { onConflict: "facility_id,user_id" },
         );
       if (error) throw error;
-      toast({ title: "Team member assigned", description: ACCESS_LEVEL_LABEL[accessLevel] });
+      toast({
+        title: "Team member assigned",
+        description: `${facilityIds.length} facility record set${facilityIds.length === 1 ? "" : "s"} · ${ACCESS_LEVEL_LABEL[accessLevel]}`,
+      });
       setUserId("");
       await load();
     } catch (e) {
