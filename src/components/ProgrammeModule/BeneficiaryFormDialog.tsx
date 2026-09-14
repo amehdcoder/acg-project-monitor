@@ -100,7 +100,10 @@ const BeneficiaryFormDialog = ({
         const submission_uuid = newUuid();
         let caseId: string | null = null;
         if (navigator.onLine) {
-          const { data } = await supabase.rpc("next_beneficiary_case_id", { _module_id: moduleId });
+          const { data } = await supabase.rpc("next_beneficiary_case_id", {
+            _module_id: moduleId,
+            _facility_id: facilityId || null,
+          } as never);
           caseId = (data as unknown as string) || null;
         }
         const payload = {

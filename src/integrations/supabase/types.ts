@@ -5430,6 +5430,7 @@ export type Database = {
       health_facilities: {
         Row: {
           address: string | null
+          code: string | null
           contact_person: string | null
           contact_phone: string | null
           created_at: string
@@ -5448,6 +5449,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          code?: string | null
           contact_person?: string | null
           contact_phone?: string | null
           created_at?: string
@@ -5466,6 +5468,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          code?: string | null
           contact_person?: string | null
           contact_phone?: string | null
           created_at?: string
@@ -11254,6 +11257,7 @@ export type Database = {
         Args: { _approve: boolean; _note?: string; _request_id: string }
         Returns: undefined
       }
+      derive_facility_code: { Args: { _name: string }; Returns: string }
       ensure_ces_field_roles: {
         Args: { _project_id: string }
         Returns: undefined
@@ -11564,10 +11568,12 @@ export type Database = {
               ward: string
             }[]
           }
-      next_beneficiary_case_id: {
-        Args: { _module_id: string }
-        Returns: string
-      }
+      next_beneficiary_case_id:
+        | { Args: { _module_id: string }; Returns: string }
+        | {
+            Args: { _facility_id?: string; _module_id: string }
+            Returns: string
+          }
       office_form_approver_role: {
         Args: { _form_code: string }
         Returns: string

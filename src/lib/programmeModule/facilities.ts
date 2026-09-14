@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 export interface FacilityRow {
   id: string;
   name: string;
+  /** Short facility code used in beneficiary case IDs, e.g. EEHK. */
+  code?: string | null;
   facility_type: "phc" | "secondary" | "tertiary";
   state: string | null;
   lga: string | null;
@@ -61,7 +63,7 @@ export const useFacilities = (projectId?: string) => {
     setLoading(true);
     let q = supabase
       .from("health_facilities")
-      .select("id,name,facility_type,state,lga,ward,contact_person,contact_phone")
+      .select("id,name,code,facility_type,state,lga,ward,contact_person,contact_phone")
       .order("name")
       .limit(2000);
     if (projectId) q = q.or(`project_id.eq.${projectId},project_id.is.null`);

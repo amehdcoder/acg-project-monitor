@@ -17,7 +17,11 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Building2, Plus, Pencil, Users, Search } from "lucide-react";
+import { Building2, Plus, Pencil, Users, Search, Trash2 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -42,6 +46,7 @@ interface CountRow { facility_id: string | null }
 const emptyDraft = {
   id: "",
   name: "",
+  code: "",
   facility_type: "phc" as FacilityRow["facility_type"],
   state: "",
   lga: "",
@@ -62,6 +67,8 @@ const FacilityRegistry = ({
   const [draft, setDraft] = useState(emptyDraft);
   const [formOpen, setFormOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<FacilityRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadCounts = useCallback(async () => {
     const [b, t] = await Promise.all([
@@ -98,6 +105,7 @@ const FacilityRegistry = ({
     setDraft({
       id: f.id,
       name: f.name,
+      code: f.code || "",
       facility_type: f.facility_type,
       state: f.state || "",
       lga: f.lga || "",
@@ -120,6 +128,7 @@ const FacilityRegistry = ({
       const payload = {
         project_id: projectId,
         name: draft.name.trim(),
+        code: draft.code.trim().toUpperCase() || null,
         facility_type: draft.facility_type,
         state: draft.state || null,
         lga: draft.lga || null,
@@ -147,6 +156,26 @@ const FacilityRegistry = ({
       toast({ title: "Could not save facility", description: (e as Error).message, variant: "destructive" });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    try {
+      const { error } = await supabase.from("health_facilities").delete().eq("id", pendingDelete.id);
+      if (error) throw error;
+      toast({
+        title: "Facility removed",
+        description: "Its beneficiaries were kept and are now unassigned.",
+      });
+      setPendingDelete(null);
+      await reload();
+      await loadCounts();
+    } catch (e) {
+      toast({ title: "Could not delete facility", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -185,7 +214,10 @@ const FacilityRegistry = ({
           {filtered.map((f) => (
             <Card key={f.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
               <div className="min-w-0">
-                <p className="font-semibold text-foreground">{f.name}</p>
+                <p className="font-semibold text-foreground">
+                  {f.name}
+                  {f.code ? <span className="ml-2 text-xs font-mono text-muted-foreground">{f.code}</span> : null}
+                </p>
                 <p className="text-xs text-muted-foreground">
                   {FACILITY_TYPE_LABEL[f.facility_type]}
                   {f.ward ? ` · ${f.ward} ward` : ""}
@@ -207,14 +239,47 @@ const FacilityRegistry = ({
                   </Button>
                 )}
                 {canManage && (
-                  <Button size="sm" variant="outline" className="gap-1" onClick={() => openEdit(f)}>
-                    <Pencil className="h-4 w-4" /> Edit
-                  </Button>
+                  <>
+                    <Button size="sm" variant="outline" className="gap-1" onClick={() => openEdit(f)}>
+                      <Pencil className="h-4 w-4" /> Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1 text-destructive hover:text-destructive"
+                      onClick={() => setPendingDelete(f)}
+                    >
+                      <Trash2 className="h-4 w-4" /> Delete
+                    </Button>
+                  </>
                 )}
               </div>
             </Card>
           ))}
         </div>
+
+        <AlertDialog open={!!pendingDelete} onOpenChange={(v) => { if (!v) setPendingDelete(null); }}>
+          <AlertDialogContent className="z-[1300]">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Remove {pendingDelete?.name}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                The facility is removed from the register. Its{" "}
+                {pendingDelete ? counts[pendingDelete.id] || 0 : 0} beneficiary record(s) are kept and
+                become unassigned, so they can be attached to another facility later.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={deleting}
+                onClick={(e) => { e.preventDefault(); void confirmDelete(); }}
+              >
+                {deleting ? "Removing…" : "Delete facility"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
 
         <Dialog open={formOpen} onOpenChange={setFormOpen}>
           <DialogContent className="max-h-[92dvh] max-w-lg overflow-y-auto">
@@ -225,6 +290,19 @@ const FacilityRegistry = ({
               <div className="space-y-1.5">
                 <Label>Facility name</Label>
                 <Input value={draft.name} onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Facility code</Label>
+                <Input
+                  value={draft.code}
+                  maxLength={8}
+                  placeholder="e.g. EEHK"
+                  onChange={(e) => setDraft((d) => ({ ...d, code: e.target.value.toUpperCase() }))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Used inside beneficiary case IDs, e.g. CiS2-EEHK-20260914-0000001. Left blank, it is
+                  built from the facility name.
+                </p>
               </div>
               <div className="space-y-1.5">
                 <Label>Facility type</Label>
