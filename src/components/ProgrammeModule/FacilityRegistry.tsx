@@ -67,6 +67,8 @@ const FacilityRegistry = ({
   const [draft, setDraft] = useState(emptyDraft);
   const [formOpen, setFormOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<FacilityRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadCounts = useCallback(async () => {
     const [b, t] = await Promise.all([
