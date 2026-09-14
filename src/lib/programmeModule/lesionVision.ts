@@ -327,6 +327,7 @@ export const analyseLesion = async (src: string, referenceMm = 0): Promise<Lesio
     rednessIndex: +rednessIndex.toFixed(3),
     edgeIrregularity: +edgeIrregularity.toFixed(3),
     areaMm2,
+    longestMm,
     segmentationQuality: +quality.toFixed(2),
     frame: { width: W, height: H },
     box: { x: minX / W, y: minY / H, w: widthFraction, h: heightFraction },
