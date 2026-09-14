@@ -29,6 +29,7 @@ import FollowUpsPanel from "./FollowUpsPanel";
 import DeleteRequestsPanel from "./DeleteRequestsPanel";
 import JourneyDashboard from "./JourneyDashboard";
 import SafeguardingPanel from "./SafeguardingPanel";
+import SafeguardingDashboard from "./SafeguardingDashboard";
 import SafeguardingOfficers from "./SafeguardingOfficers";
 import { useIsSafeguardingOfficer } from "@/lib/programmeModule/safeguarding";
 import { useMyFacilityAccess } from "@/lib/programmeModule/facilities";
@@ -65,8 +66,9 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
   const [deleteRequestsOpen, setDeleteRequestsOpen] = useState(false);
   const [officersOpen, setOfficersOpen] = useState(false);
   const { isOfficer } = useIsSafeguardingOfficer(projectId);
-  const [view, setView] =
-    useState<"records" | "journey" | "facility" | "followups" | "safeguarding">("records");
+  const [view, setView] = useState<
+    "records" | "journey" | "facility" | "followups" | "safeguarding" | "safeguarding_dashboard"
+  >("records");
 
 
   const active: ProgrammeModuleRow | undefined = useMemo(
@@ -225,6 +227,10 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
           { key: "facility", label: "Facility dashboard", icon: Hospital, show: true },
           { key: "followups", label: "Follow-ups & referrals", icon: CalendarClock, show: true },
           { key: "safeguarding", label: "Safeguarding", icon: ShieldCheck, show: isOfficer },
+          {
+            key: "safeguarding_dashboard", label: "Safeguarding dashboard",
+            icon: ShieldAlert, show: isOfficer,
+          },
         ] as const).filter((t) => t.show).map((t) => (
           <Button
             key={t.key}
@@ -298,6 +304,14 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false }: Props) =>
           moduleId={active?.id}
           beneficiaries={scopedBeneficiaries}
           isOfficer={isOfficer}
+        />
+      )}
+
+      {view === "safeguarding_dashboard" && (
+        <SafeguardingDashboard
+          projectId={projectId}
+          isOfficer={isOfficer}
+          allowedFacilityIds={isFocalPerson ? Object.keys(facilityLevels) : []}
         />
       )}
 
