@@ -50,6 +50,12 @@ interface Props {
   onChanged: () => void;
   /** Administrators can change the beneficiary's status from the record. */
   canManage?: boolean;
+  /**
+   * Programme components (MMDP/NTD, Eye Health, Mental Health & Psychosocial
+   * Support ...) are only shown to facility focal persons for beneficiaries in
+   * a facility they have been granted access to.
+   */
+  componentsVisible?: boolean;
 }
 
 const fmtDate = (d?: string | null) =>
