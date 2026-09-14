@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/select";
 import {
   Plus, Settings2, CloudOff, RefreshCw, Layers, Users, Building2, ShieldAlert,
-  LayoutGrid, CalendarClock, Hospital,
+  LayoutGrid, CalendarClock, Hospital, Route, ShieldCheck,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -27,7 +27,12 @@ import FacilityRegistry from "./FacilityRegistry";
 import FacilityDashboard from "./FacilityDashboard";
 import FollowUpsPanel from "./FollowUpsPanel";
 import DeleteRequestsPanel from "./DeleteRequestsPanel";
+import JourneyDashboard from "./JourneyDashboard";
+import SafeguardingPanel from "./SafeguardingPanel";
+import SafeguardingOfficers from "./SafeguardingOfficers";
+import { useIsSafeguardingOfficer } from "@/lib/programmeModule/safeguarding";
 import { useMyFacilityAccess } from "@/lib/programmeModule/facilities";
+
 
 interface Props {
   projectId?: string;
