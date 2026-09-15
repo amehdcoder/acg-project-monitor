@@ -2,7 +2,7 @@
 // officers. Holds the detailed narrative, concern categories, actions taken and
 // case notes that must never sit in the general beneficiary record.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
