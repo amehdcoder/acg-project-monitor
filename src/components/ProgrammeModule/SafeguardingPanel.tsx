@@ -174,7 +174,14 @@ const SafeguardingPanel = ({ projectId, moduleId, beneficiaries, isOfficer }: Pr
     setSaving(true);
     try {
       const b = beneficiaries.find((x) => x.id === draft.beneficiary_id);
-      await saveConcern({
+      // When the vault is open, the narrative fields are encrypted on this
+      // device and only a placeholder is stored in the readable columns.
+      const seal = vault.unlocked && vault.officersWithKeys > 0;
+      const narrative = draft.narrative.trim();
+      const actionTaken = draft.action_taken.trim();
+      const outcome = draft.outcome.trim();
+
+      const concernId = await saveConcern({
         project_id: projectId,
         module_id: moduleId || null,
         beneficiary_id: draft.beneficiary_id || null,
@@ -184,14 +191,25 @@ const SafeguardingPanel = ({ projectId, moduleId, beneficiaries, isOfficer }: Pr
         categories: draft.categories,
         severity: draft.severity,
         immediate_action: draft.immediate_action,
-        narrative: draft.narrative.trim(),
-        action_taken: draft.action_taken.trim() || null,
+        narrative: seal ? SEALED_TEXT : narrative,
+        action_taken: seal ? (actionTaken ? SEALED_TEXT : null) : (actionTaken || null),
         referral_made: draft.referral_made,
         consent_obtained: draft.consent_obtained,
         status: draft.status,
-        outcome: draft.outcome.trim() || null,
+        outcome: seal ? (outcome ? SEALED_TEXT : null) : (outcome || null),
+        is_encrypted: seal,
       }, editing?.id);
-      toast({ title: editing ? "Safeguarding record updated" : "Safeguarding concern logged" });
+
+      if (seal) {
+        const cipher = await sealConcern(projectId, concernId, {
+          narrative, action_taken: actionTaken, outcome,
+        });
+        await setConcernCipher(concernId, cipher);
+      }
+      toast({
+        title: editing ? "Safeguarding record updated" : "Safeguarding concern logged",
+        description: seal ? "Sealed in the vault — only safeguarding officers can read it." : undefined,
+      });
       setOpen(false);
       await reload();
     } catch (e) {
