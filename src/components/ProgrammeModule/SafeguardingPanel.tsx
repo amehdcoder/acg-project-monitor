@@ -2,7 +2,7 @@
 // officers. Holds the detailed narrative, concern categories, actions taken and
 // case notes that must never sit in the general beneficiary record.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,10 +21,16 @@ import { Lock, Plus, ShieldAlert, MessageSquarePlus, RefreshCw } from "lucide-re
 import { useToast } from "@/hooks/use-toast";
 import {
   CONCERN_CATEGORIES, CONCERN_STATUSES, CONCERN_STATUS_LABEL, CONSENT_OPTIONS,
-  IMMEDIATE_ACTIONS, REFERRAL_ACTIONS, SEVERITIES, SEVERITY_LABEL,
-  addNote, logAccess, saveConcern, useSafeguardingConcerns, useSafeguardingNotes,
+  IMMEDIATE_ACTIONS, REFERRAL_ACTIONS, SEALED_TEXT, SEVERITIES, SEVERITY_LABEL,
+  addNote, logAccess, saveConcern, setConcernCipher,
+  useSafeguardingConcerns, useSafeguardingNotes,
   type SafeguardingConcernRow,
 } from "@/lib/programmeModule/safeguarding";
+import {
+  PROTECTED_PLACEHOLDER, openConcern, openNote, sealConcern, sealNote,
+  useSafeguardingVault, type CipherPayload, type ProtectedNarrative,
+} from "@/lib/programmeModule/safeguardingVault";
+import SafeguardingVaultCard from "./SafeguardingVaultCard";
 import type { BeneficiaryRow } from "@/lib/programmeModule/types";
 import { useFacilities } from "@/lib/programmeModule/facilities";
 
@@ -68,6 +74,34 @@ const SafeguardingPanel = ({ projectId, moduleId, beneficiaries, isOfficer }: Pr
   const [statusFilter, setStatusFilter] = useState("all");
   const [noteFor, setNoteFor] = useState<SafeguardingConcernRow | null>(null);
 
+  const vault = useSafeguardingVault(projectId, isOfficer);
+  const [opened, setOpened] = useState<Record<string, ProtectedNarrative>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      if (!vault.unlocked) { setOpened({}); return; }
+      const sealed = concerns.filter((c) => c.is_encrypted && c.vault_cipher);
+      const entries: [string, ProtectedNarrative][] = [];
+      for (const c of sealed) {
+        const value = await openConcern(c.id, c.vault_cipher as CipherPayload);
+        if (value) entries.push([c.id, value]);
+      }
+      if (!cancelled) setOpened(Object.fromEntries(entries));
+    })();
+    return () => { cancelled = true; };
+  }, [concerns, vault.unlocked]);
+
+  /** Readable text for a case: the decrypted version when the vault is open. */
+  const readable = (c: SafeguardingConcernRow): ProtectedNarrative => {
+    const plain = opened[c.id];
+    if (plain) return plain;
+    if (c.is_encrypted) {
+      return { narrative: PROTECTED_PLACEHOLDER, action_taken: "", outcome: "" };
+    }
+    return { narrative: c.narrative, action_taken: c.action_taken || "", outcome: c.outcome || "" };
+  };
+
   const facilityName = (id: string | null) =>
     facilities.find((f) => f.id === id)?.name || "Unassigned facility";
 
@@ -96,6 +130,17 @@ const SafeguardingPanel = ({ projectId, moduleId, beneficiaries, isOfficer }: Pr
   };
 
   const startEdit = (c: SafeguardingConcernRow) => {
+    if (c.is_encrypted && !opened[c.id]) {
+      toast({
+        title: "This record is sealed",
+        description: vault.unlocked
+          ? "Your key cannot open this case. Ask an officer who can to share it with you."
+          : "Open the safeguarding vault with your passphrase first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const text = readable(c);
     setEditing(c);
     setDraft({
       beneficiary_id: c.beneficiary_id || "",
@@ -104,12 +149,12 @@ const SafeguardingPanel = ({ projectId, moduleId, beneficiaries, isOfficer }: Pr
       categories: c.categories,
       severity: c.severity,
       immediate_action: c.immediate_action || "No",
-      narrative: c.narrative,
-      action_taken: c.action_taken || "",
+      narrative: text.narrative,
+      action_taken: text.action_taken,
       referral_made: c.referral_made,
       consent_obtained: c.consent_obtained || "Not applicable",
       status: c.status,
-      outcome: c.outcome || "",
+      outcome: text.outcome,
     });
     void logAccess(projectId, c.id, "opened");
     setOpen(true);
@@ -129,7 +174,14 @@ const SafeguardingPanel = ({ projectId, moduleId, beneficiaries, isOfficer }: Pr
     setSaving(true);
     try {
       const b = beneficiaries.find((x) => x.id === draft.beneficiary_id);
-      await saveConcern({
+      // When the vault is open, the narrative fields are encrypted on this
+      // device and only a placeholder is stored in the readable columns.
+      const seal = vault.unlocked && vault.officersWithKeys > 0;
+      const narrative = draft.narrative.trim();
+      const actionTaken = draft.action_taken.trim();
+      const outcome = draft.outcome.trim();
+
+      const concernId = await saveConcern({
         project_id: projectId,
         module_id: moduleId || null,
         beneficiary_id: draft.beneficiary_id || null,
@@ -139,14 +191,25 @@ const SafeguardingPanel = ({ projectId, moduleId, beneficiaries, isOfficer }: Pr
         categories: draft.categories,
         severity: draft.severity,
         immediate_action: draft.immediate_action,
-        narrative: draft.narrative.trim(),
-        action_taken: draft.action_taken.trim() || null,
+        narrative: seal ? SEALED_TEXT : narrative,
+        action_taken: seal ? (actionTaken ? SEALED_TEXT : null) : (actionTaken || null),
         referral_made: draft.referral_made,
         consent_obtained: draft.consent_obtained,
         status: draft.status,
-        outcome: draft.outcome.trim() || null,
+        outcome: seal ? (outcome ? SEALED_TEXT : null) : (outcome || null),
+        is_encrypted: seal,
       }, editing?.id);
-      toast({ title: editing ? "Safeguarding record updated" : "Safeguarding concern logged" });
+
+      if (seal) {
+        const cipher = await sealConcern(projectId, concernId, {
+          narrative, action_taken: actionTaken, outcome,
+        });
+        await setConcernCipher(concernId, cipher);
+      }
+      toast({
+        title: editing ? "Safeguarding record updated" : "Safeguarding concern logged",
+        description: seal ? "Sealed in the vault — only safeguarding officers can read it." : undefined,
+      });
       setOpen(false);
       await reload();
     } catch (e) {
@@ -184,6 +247,8 @@ const SafeguardingPanel = ({ projectId, moduleId, beneficiaries, isOfficer }: Pr
         </Button>
       </Card>
 
+      <SafeguardingVaultCard projectId={projectId} vault={vault} />
+
       {loading && <p className="text-sm text-muted-foreground">Loading safeguarding records…</p>}
       {!loading && visible.length === 0 && (
         <Card className="p-8 text-center text-muted-foreground">No safeguarding concerns recorded.</Card>
@@ -213,10 +278,15 @@ const SafeguardingPanel = ({ projectId, moduleId, beneficiaries, isOfficer }: Pr
                 {c.categories.map((x) => <Badge key={x} variant="secondary">{x}</Badge>)}
               </div>
             )}
-            <p className="whitespace-pre-wrap text-sm text-foreground">{c.narrative}</p>
-            {c.action_taken && (
+            <p className={`whitespace-pre-wrap text-sm ${
+              c.is_encrypted && !opened[c.id] ? "italic text-muted-foreground" : "text-foreground"
+            }`}>
+              {readable(c).narrative}
+            </p>
+            {!!readable(c).action_taken && (
               <p className="text-sm text-muted-foreground">
-                <span className="font-medium text-foreground">Action taken: </span>{c.action_taken}
+                <span className="font-medium text-foreground">Action taken: </span>
+                {readable(c).action_taken}
               </p>
             )}
             <div className="flex flex-wrap gap-2 pt-1">
@@ -382,6 +452,7 @@ const SafeguardingPanel = ({ projectId, moduleId, beneficiaries, isOfficer }: Pr
 
       <NotesDialog
         concern={noteFor}
+        vaultUnlocked={vault.unlocked}
         onOpenChange={(v) => { if (!v) setNoteFor(null); }}
       />
     </div>
@@ -389,18 +460,42 @@ const SafeguardingPanel = ({ projectId, moduleId, beneficiaries, isOfficer }: Pr
 };
 
 const NotesDialog = ({
-  concern, onOpenChange,
-}: { concern: SafeguardingConcernRow | null; onOpenChange: (v: boolean) => void }) => {
+  concern, vaultUnlocked, onOpenChange,
+}: {
+  concern: SafeguardingConcernRow | null;
+  vaultUnlocked: boolean;
+  onOpenChange: (v: boolean) => void;
+}) => {
   const { toast } = useToast();
   const { notes, reload } = useSafeguardingNotes(concern?.id);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  const [plain, setPlain] = useState<Record<string, string>>({});
+
+  // Sealed notes are opened on this device, one case key at a time.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      if (!concern || !vaultUnlocked) { setPlain({}); return; }
+      const entries: [string, string][] = [];
+      for (const n of notes) {
+        if (!n.cipher) continue;
+        const value = await openNote(concern.id, n.cipher as CipherPayload);
+        if (value) entries.push([n.id, value]);
+      }
+      if (!cancelled) setPlain(Object.fromEntries(entries));
+    })();
+    return () => { cancelled = true; };
+  }, [concern, notes, vaultUnlocked]);
+
+  const sealedCase = Boolean(concern?.is_encrypted);
 
   const submit = async () => {
     if (!concern || !text.trim()) return;
     setBusy(true);
     try {
-      await addNote(concern.id, concern.project_id, text.trim());
+      const cipher = sealedCase ? await sealNote(concern.id, text.trim()) : undefined;
+      await addNote(concern.id, concern.project_id, text.trim(), cipher);
       setText("");
       await reload();
     } catch (e) {
@@ -415,21 +510,39 @@ const NotesDialog = ({
       <DialogContent className="max-h-[92dvh] max-w-lg overflow-y-auto">
         <DialogHeader><DialogTitle>Safeguarding case notes</DialogTitle></DialogHeader>
         <div className="space-y-3">
+          {sealedCase && !vaultUnlocked && (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+              This case is sealed. Open the safeguarding vault with your passphrase to read or
+              add notes.
+            </p>
+          )}
           <Textarea
             rows={3} value={text} onChange={(e) => setText(e.target.value)}
+            disabled={sealedCase && !vaultUnlocked}
             placeholder="Add a follow-up note…"
           />
-          <Button size="sm" disabled={busy || !text.trim()} onClick={submit}>Add note</Button>
+          <Button
+            size="sm"
+            disabled={busy || !text.trim() || (sealedCase && !vaultUnlocked)}
+            onClick={submit}
+          >
+            Add note
+          </Button>
           <div className="space-y-2">
             {notes.length === 0 && <p className="text-sm text-muted-foreground">No notes yet.</p>}
-            {notes.map((n) => (
-              <div key={n.id} className="rounded-lg border border-border p-3">
-                <p className="whitespace-pre-wrap text-sm text-foreground">{n.note}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {new Date(n.created_at).toLocaleString()}
-                </p>
-              </div>
-            ))}
+            {notes.map((n) => {
+              const sealed = Boolean(n.cipher) && !plain[n.id];
+              return (
+                <div key={n.id} className="rounded-lg border border-border p-3">
+                  <p className={`whitespace-pre-wrap text-sm ${sealed ? "italic text-muted-foreground" : "text-foreground"}`}>
+                    {sealed ? PROTECTED_PLACEHOLDER : (plain[n.id] ?? n.note)}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {new Date(n.created_at).toLocaleString()}
+                  </p>
+                </div>
+              );
+            })}
           </div>
         </div>
       </DialogContent>

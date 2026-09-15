@@ -31,6 +31,9 @@ export interface SafeguardingConcernRow {
   assigned_to: string | null;
   created_at: string;
   updated_at: string;
+  /** True when the narrative fields live only inside the encrypted vault. */
+  is_encrypted?: boolean;
+  vault_cipher?: unknown;
 }
 
 export interface SafeguardingNoteRow {
@@ -40,6 +43,7 @@ export interface SafeguardingNoteRow {
   note: string;
   author_id: string | null;
   created_at: string;
+  cipher?: unknown;
 }
 
 export const CONCERN_CATEGORIES = [
@@ -155,6 +159,7 @@ export interface ConcernInput {
   consent_obtained?: string | null;
   status: string;
   outcome?: string | null;
+  is_encrypted?: boolean;
 }
 
 export const saveConcern = async (input: ConcernInput, existingId?: string) => {
@@ -212,11 +217,29 @@ export const useSafeguardingNotes = (concernId?: string) => {
   return { notes, reload: load };
 };
 
-export const addNote = async (concernId: string, projectId: string, note: string) => {
+export const addNote = async (
+  concernId: string, projectId: string, note: string, cipher?: unknown,
+) => {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) throw new Error("You must be signed in.");
   const { error } = await supabase.from("safeguarding_notes" as never).insert({
-    concern_id: concernId, project_id: projectId, note, author_id: auth.user.id,
+    concern_id: concernId,
+    project_id: projectId,
+    note: cipher ? SEALED_TEXT : note,
+    cipher: cipher ?? null,
+    author_id: auth.user.id,
   } as never);
+  if (error) throw error;
+};
+
+/** Placeholder written into the readable columns of an encrypted record. */
+export const SEALED_TEXT = "[Sealed in the safeguarding vault]";
+
+/** Stores the encrypted narrative for a case and marks it sealed. */
+export const setConcernCipher = async (concernId: string, cipher: unknown) => {
+  const { error } = await supabase
+    .from("safeguarding_concerns" as never)
+    .update({ vault_cipher: cipher, is_encrypted: true } as never)
+    .eq("id", concernId);
   if (error) throw error;
 };
