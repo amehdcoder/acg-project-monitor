@@ -74,6 +74,34 @@ const SafeguardingPanel = ({ projectId, moduleId, beneficiaries, isOfficer }: Pr
   const [statusFilter, setStatusFilter] = useState("all");
   const [noteFor, setNoteFor] = useState<SafeguardingConcernRow | null>(null);
 
+  const vault = useSafeguardingVault(projectId, isOfficer);
+  const [opened, setOpened] = useState<Record<string, ProtectedNarrative>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      if (!vault.unlocked) { setOpened({}); return; }
+      const sealed = concerns.filter((c) => c.is_encrypted && c.vault_cipher);
+      const entries: [string, ProtectedNarrative][] = [];
+      for (const c of sealed) {
+        const value = await openConcern(c.id, c.vault_cipher as CipherPayload);
+        if (value) entries.push([c.id, value]);
+      }
+      if (!cancelled) setOpened(Object.fromEntries(entries));
+    })();
+    return () => { cancelled = true; };
+  }, [concerns, vault.unlocked]);
+
+  /** Readable text for a case: the decrypted version when the vault is open. */
+  const readable = (c: SafeguardingConcernRow): ProtectedNarrative => {
+    const plain = opened[c.id];
+    if (plain) return plain;
+    if (c.is_encrypted) {
+      return { narrative: PROTECTED_PLACEHOLDER, action_taken: "", outcome: "" };
+    }
+    return { narrative: c.narrative, action_taken: c.action_taken || "", outcome: c.outcome || "" };
+  };
+
   const facilityName = (id: string | null) =>
     facilities.find((f) => f.id === id)?.name || "Unassigned facility";
 
