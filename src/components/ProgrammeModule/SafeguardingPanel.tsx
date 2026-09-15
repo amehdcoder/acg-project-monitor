@@ -278,10 +278,15 @@ const SafeguardingPanel = ({ projectId, moduleId, beneficiaries, isOfficer }: Pr
                 {c.categories.map((x) => <Badge key={x} variant="secondary">{x}</Badge>)}
               </div>
             )}
-            <p className="whitespace-pre-wrap text-sm text-foreground">{c.narrative}</p>
-            {c.action_taken && (
+            <p className={`whitespace-pre-wrap text-sm ${
+              c.is_encrypted && !opened[c.id] ? "italic text-muted-foreground" : "text-foreground"
+            }`}>
+              {readable(c).narrative}
+            </p>
+            {!!readable(c).action_taken && (
               <p className="text-sm text-muted-foreground">
-                <span className="font-medium text-foreground">Action taken: </span>{c.action_taken}
+                <span className="font-medium text-foreground">Action taken: </span>
+                {readable(c).action_taken}
               </p>
             )}
             <div className="flex flex-wrap gap-2 pt-1">
