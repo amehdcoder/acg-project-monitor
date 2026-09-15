@@ -159,6 +159,7 @@ export interface ConcernInput {
   consent_obtained?: string | null;
   status: string;
   outcome?: string | null;
+  is_encrypted?: boolean;
 }
 
 export const saveConcern = async (input: ConcernInput, existingId?: string) => {
