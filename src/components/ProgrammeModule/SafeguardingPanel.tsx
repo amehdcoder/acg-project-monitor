@@ -452,6 +452,7 @@ const SafeguardingPanel = ({ projectId, moduleId, beneficiaries, isOfficer }: Pr
 
       <NotesDialog
         concern={noteFor}
+        vaultUnlocked={vault.unlocked}
         onOpenChange={(v) => { if (!v) setNoteFor(null); }}
       />
     </div>
@@ -459,18 +460,42 @@ const SafeguardingPanel = ({ projectId, moduleId, beneficiaries, isOfficer }: Pr
 };
 
 const NotesDialog = ({
-  concern, onOpenChange,
-}: { concern: SafeguardingConcernRow | null; onOpenChange: (v: boolean) => void }) => {
+  concern, vaultUnlocked, onOpenChange,
+}: {
+  concern: SafeguardingConcernRow | null;
+  vaultUnlocked: boolean;
+  onOpenChange: (v: boolean) => void;
+}) => {
   const { toast } = useToast();
   const { notes, reload } = useSafeguardingNotes(concern?.id);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  const [plain, setPlain] = useState<Record<string, string>>({});
+
+  // Sealed notes are opened on this device, one case key at a time.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      if (!concern || !vaultUnlocked) { setPlain({}); return; }
+      const entries: [string, string][] = [];
+      for (const n of notes) {
+        if (!n.cipher) continue;
+        const value = await openNote(concern.id, n.cipher as CipherPayload);
+        if (value) entries.push([n.id, value]);
+      }
+      if (!cancelled) setPlain(Object.fromEntries(entries));
+    })();
+    return () => { cancelled = true; };
+  }, [concern, notes, vaultUnlocked]);
+
+  const sealedCase = Boolean(concern?.is_encrypted);
 
   const submit = async () => {
     if (!concern || !text.trim()) return;
     setBusy(true);
     try {
-      await addNote(concern.id, concern.project_id, text.trim());
+      const cipher = sealedCase ? await sealNote(concern.id, text.trim()) : undefined;
+      await addNote(concern.id, concern.project_id, text.trim(), cipher);
       setText("");
       await reload();
     } catch (e) {
@@ -485,21 +510,39 @@ const NotesDialog = ({
       <DialogContent className="max-h-[92dvh] max-w-lg overflow-y-auto">
         <DialogHeader><DialogTitle>Safeguarding case notes</DialogTitle></DialogHeader>
         <div className="space-y-3">
+          {sealedCase && !vaultUnlocked && (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+              This case is sealed. Open the safeguarding vault with your passphrase to read or
+              add notes.
+            </p>
+          )}
           <Textarea
             rows={3} value={text} onChange={(e) => setText(e.target.value)}
+            disabled={sealedCase && !vaultUnlocked}
             placeholder="Add a follow-up note…"
           />
-          <Button size="sm" disabled={busy || !text.trim()} onClick={submit}>Add note</Button>
+          <Button
+            size="sm"
+            disabled={busy || !text.trim() || (sealedCase && !vaultUnlocked)}
+            onClick={submit}
+          >
+            Add note
+          </Button>
           <div className="space-y-2">
             {notes.length === 0 && <p className="text-sm text-muted-foreground">No notes yet.</p>}
-            {notes.map((n) => (
-              <div key={n.id} className="rounded-lg border border-border p-3">
-                <p className="whitespace-pre-wrap text-sm text-foreground">{n.note}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {new Date(n.created_at).toLocaleString()}
-                </p>
-              </div>
-            ))}
+            {notes.map((n) => {
+              const sealed = Boolean(n.cipher) && !plain[n.id];
+              return (
+                <div key={n.id} className="rounded-lg border border-border p-3">
+                  <p className={`whitespace-pre-wrap text-sm ${sealed ? "italic text-muted-foreground" : "text-foreground"}`}>
+                    {sealed ? PROTECTED_PLACEHOLDER : (plain[n.id] ?? n.note)}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {new Date(n.created_at).toLocaleString()}
+                  </p>
+                </div>
+              );
+            })}
           </div>
         </div>
       </DialogContent>
