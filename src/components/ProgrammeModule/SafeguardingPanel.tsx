@@ -130,6 +130,17 @@ const SafeguardingPanel = ({ projectId, moduleId, beneficiaries, isOfficer }: Pr
   };
 
   const startEdit = (c: SafeguardingConcernRow) => {
+    if (c.is_encrypted && !opened[c.id]) {
+      toast({
+        title: "This record is sealed",
+        description: vault.unlocked
+          ? "Your key cannot open this case. Ask an officer who can to share it with you."
+          : "Open the safeguarding vault with your passphrase first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const text = readable(c);
     setEditing(c);
     setDraft({
       beneficiary_id: c.beneficiary_id || "",
@@ -138,12 +149,12 @@ const SafeguardingPanel = ({ projectId, moduleId, beneficiaries, isOfficer }: Pr
       categories: c.categories,
       severity: c.severity,
       immediate_action: c.immediate_action || "No",
-      narrative: c.narrative,
-      action_taken: c.action_taken || "",
+      narrative: text.narrative,
+      action_taken: text.action_taken,
       referral_made: c.referral_made,
       consent_obtained: c.consent_obtained || "Not applicable",
       status: c.status,
-      outcome: c.outcome || "",
+      outcome: text.outcome,
     });
     void logAccess(projectId, c.id, "opened");
     setOpen(true);
