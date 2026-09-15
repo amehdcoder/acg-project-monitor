@@ -247,6 +247,8 @@ const SafeguardingPanel = ({ projectId, moduleId, beneficiaries, isOfficer }: Pr
         </Button>
       </Card>
 
+      <SafeguardingVaultCard projectId={projectId} vault={vault} />
+
       {loading && <p className="text-sm text-muted-foreground">Loading safeguarding records…</p>}
       {!loading && visible.length === 0 && (
         <Card className="p-8 text-center text-muted-foreground">No safeguarding concerns recorded.</Card>
