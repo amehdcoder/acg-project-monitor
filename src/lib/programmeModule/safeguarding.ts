@@ -31,6 +31,9 @@ export interface SafeguardingConcernRow {
   assigned_to: string | null;
   created_at: string;
   updated_at: string;
+  /** True when the narrative fields live only inside the encrypted vault. */
+  is_encrypted?: boolean;
+  vault_cipher?: unknown;
 }
 
 export interface SafeguardingNoteRow {
@@ -40,6 +43,7 @@ export interface SafeguardingNoteRow {
   note: string;
   author_id: string | null;
   created_at: string;
+  cipher?: unknown;
 }
 
 export const CONCERN_CATEGORIES = [
