@@ -21,10 +21,16 @@ import { Lock, Plus, ShieldAlert, MessageSquarePlus, RefreshCw } from "lucide-re
 import { useToast } from "@/hooks/use-toast";
 import {
   CONCERN_CATEGORIES, CONCERN_STATUSES, CONCERN_STATUS_LABEL, CONSENT_OPTIONS,
-  IMMEDIATE_ACTIONS, REFERRAL_ACTIONS, SEVERITIES, SEVERITY_LABEL,
-  addNote, logAccess, saveConcern, useSafeguardingConcerns, useSafeguardingNotes,
+  IMMEDIATE_ACTIONS, REFERRAL_ACTIONS, SEALED_TEXT, SEVERITIES, SEVERITY_LABEL,
+  addNote, logAccess, saveConcern, setConcernCipher,
+  useSafeguardingConcerns, useSafeguardingNotes,
   type SafeguardingConcernRow,
 } from "@/lib/programmeModule/safeguarding";
+import {
+  PROTECTED_PLACEHOLDER, openConcern, openNote, sealConcern, sealNote,
+  useSafeguardingVault, type CipherPayload, type ProtectedNarrative,
+} from "@/lib/programmeModule/safeguardingVault";
+import SafeguardingVaultCard from "./SafeguardingVaultCard";
 import type { BeneficiaryRow } from "@/lib/programmeModule/types";
 import { useFacilities } from "@/lib/programmeModule/facilities";
 
