@@ -54,6 +54,52 @@ export const INCOME_SOURCE = [
   "No Regular Income",
 ];
 
+export const MARITAL_STATUS = [
+  "Single (Never Married)",
+  "Married (Monogamous)",
+  "Married (Polygamous)",
+  "Widowed",
+  "Divorced",
+  "Separated",
+];
+
+export const RELIGION = [
+  "Christianity",
+  "Islam",
+  "Traditional / African Religion",
+  "Other",
+  "Prefer Not to Say",
+];
+
+export const PRIMARY_LANGUAGE = [
+  "Hausa",
+  "Yoruba",
+  "Igbo",
+  "Fulfulde",
+  "Kanuri",
+  "Ibibio",
+  "Tiv",
+  "Nigerian Pidgin",
+  "English",
+  "Other",
+];
+
+export const LIVING_ARRANGEMENT = [
+  "Lives Alone",
+  "Lives with Spouse / Partner",
+  "Lives with Children / Extended Family",
+  "Lives with Caregiver (Non-Family)",
+  "Institutional / Care Home",
+  "No Fixed Shelter",
+];
+
+export const CAREGIVER_AVAILABILITY = [
+  "Dedicated Caregiver Available",
+  "Part-time / Shared Caregiving",
+  "Occasional Support Only",
+  "No Caregiver",
+];
+
 export const choiceOptions = (values: string[]) =>
   values.map((v) => ({ id: uid(), label: v, value: v }));
 
@@ -64,6 +110,11 @@ export const REGISTRATION_CHOICES: Record<string, string[]> = {
   primary_health_condition: PRIMARY_HEALTH_CONDITION,
   occupation: OCCUPATION,
   income_source: INCOME_SOURCE,
+  marital_status: MARITAL_STATUS,
+  religion: RELIGION,
+  primary_language: PRIMARY_LANGUAGE,
+  living_arrangement: LIVING_ARRANGEMENT,
+  caregiver_availability: CAREGIVER_AVAILABILITY,
 };
 
 /** Location fields rendered as a cascading State → LGA → Ward → Community set. */
