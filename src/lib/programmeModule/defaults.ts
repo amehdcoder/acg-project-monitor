@@ -10,8 +10,9 @@ import type {
 } from "./types";
 
 import {
-  applyRegistrationChoices, choiceOptions, INCOME_SOURCE, OCCUPATION,
-  PRIMARY_HEALTH_CONDITION, VULNERABILITY_STATUS,
+  applyRegistrationChoices, choiceOptions, CAREGIVER_AVAILABILITY,
+  INCOME_SOURCE, LIVING_ARRANGEMENT, MARITAL_STATUS, OCCUPATION,
+  PRIMARY_HEALTH_CONDITION, PRIMARY_LANGUAGE, RELIGION, VULNERABILITY_STATUS,
 } from "./registrationChoices";
 import { withStandardProfileSections } from "./standardSections";
 
@@ -160,6 +161,19 @@ export const CISKULA_PRESET: ProgrammeModuleConfig = {
         q("full_name", "Full Name", "text", { required: true }),
         q("date_of_birth", "Date of Birth", "date"),
         q("gender", "Gender", "select_one", { options: opts(["Male", "Female"]) }),
+        q("marital_status", "Marital Status", "select_one", {
+          options: choiceOptions(MARITAL_STATUS),
+        }),
+        q("religion", "Religion", "select_one", { options: choiceOptions(RELIGION) }),
+        q("primary_language", "Primary Language", "select_one", {
+          options: choiceOptions(PRIMARY_LANGUAGE),
+        }),
+        q("living_arrangement", "Living Arrangement", "select_one", {
+          options: choiceOptions(LIVING_ARRANGEMENT),
+        }),
+        q("caregiver_availability", "Caregiver Availability", "select_one", {
+          options: choiceOptions(CAREGIVER_AVAILABILITY),
+        }),
         q("phone", "Phone Number", "text"),
         q("address", "Address", "text"),
         q("household_size", "Household Size", "number"),
