@@ -77,6 +77,28 @@ const SafeguardingPanel = ({ projectId, moduleId, beneficiaries, isOfficer }: Pr
 
   const vault = useSafeguardingVault(projectId, isOfficer);
   const [opened, setOpened] = useState<Record<string, ProtectedNarrative>>({});
+  const [sharing, setSharing] = useState<string | null>(null);
+
+  /** Seals this case's key for every other officer who has a vault key. */
+  const share = async (c: SafeguardingConcernRow) => {
+    setSharing(c.id);
+    try {
+      const added = await shareConcernWithNewOfficers(projectId, c.id);
+      await logAccess(projectId, c.id, "shared");
+      toast({
+        title: added
+          ? `Shared with ${added} officer${added === 1 ? "" : "s"}`
+          : "Every officer with a vault key can already open this case",
+        description: added
+          ? "They can now open this sealed narrative with their own passphrase."
+          : undefined,
+      });
+    } catch (e) {
+      toast({ title: "Could not share", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setSharing(null);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
