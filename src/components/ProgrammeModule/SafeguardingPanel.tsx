@@ -17,7 +17,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Lock, Plus, ShieldAlert, MessageSquarePlus, RefreshCw } from "lucide-react";
+import { Lock, Plus, ShieldAlert, MessageSquarePlus, RefreshCw, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   CONCERN_CATEGORIES, CONCERN_STATUSES, CONCERN_STATUS_LABEL, CONSENT_OPTIONS,
@@ -28,7 +28,8 @@ import {
 } from "@/lib/programmeModule/safeguarding";
 import {
   PROTECTED_PLACEHOLDER, openConcern, openNote, sealConcern, sealNote,
-  useSafeguardingVault, type CipherPayload, type ProtectedNarrative,
+  shareConcernWithNewOfficers, useSafeguardingVault,
+  type CipherPayload, type ProtectedNarrative,
 } from "@/lib/programmeModule/safeguardingVault";
 import SafeguardingVaultCard from "./SafeguardingVaultCard";
 import type { BeneficiaryRow } from "@/lib/programmeModule/types";
@@ -76,6 +77,28 @@ const SafeguardingPanel = ({ projectId, moduleId, beneficiaries, isOfficer }: Pr
 
   const vault = useSafeguardingVault(projectId, isOfficer);
   const [opened, setOpened] = useState<Record<string, ProtectedNarrative>>({});
+  const [sharing, setSharing] = useState<string | null>(null);
+
+  /** Seals this case's key for every other officer who has a vault key. */
+  const share = async (c: SafeguardingConcernRow) => {
+    setSharing(c.id);
+    try {
+      const added = await shareConcernWithNewOfficers(projectId, c.id);
+      await logAccess(projectId, c.id, "shared");
+      toast({
+        title: added
+          ? `Shared with ${added} officer${added === 1 ? "" : "s"}`
+          : "Every officer with a vault key can already open this case",
+        description: added
+          ? "They can now open this sealed narrative with their own passphrase."
+          : undefined,
+      });
+    } catch (e) {
+      toast({ title: "Could not share", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setSharing(null);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -294,6 +317,19 @@ const SafeguardingPanel = ({ projectId, moduleId, beneficiaries, isOfficer }: Pr
               <Button size="sm" variant="ghost" className="gap-1" onClick={() => setNoteFor(c)}>
                 <MessageSquarePlus className="h-4 w-4" /> Case notes
               </Button>
+              {c.is_encrypted && (
+                <Button
+                  size="sm" variant="ghost" className="gap-1"
+                  disabled={sharing === c.id || !opened[c.id]}
+                  title={opened[c.id]
+                    ? "Let every other safeguarding officer open this sealed narrative"
+                    : "Open the vault with your passphrase first"}
+                  onClick={() => void share(c)}
+                >
+                  <UserPlus className="h-4 w-4" />
+                  {sharing === c.id ? "Sharing…" : "Share with officers"}
+                </Button>
+              )}
             </div>
           </Card>
         ))}
