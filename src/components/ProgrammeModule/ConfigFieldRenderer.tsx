@@ -155,15 +155,27 @@ const ConfigFieldRenderer = ({ question, value, onChange, error, answers, onPatc
     );
   };
 
+  /**
+   * Coordinates appear instantly from the pre-warmed fix the app keeps in the
+   * background, then quietly sharpen when a more accurate reading arrives.
+   */
   const captureGps = () => {
+    const warm = getFreshWarmFix() || getBestWarmFix();
+    if (warm) onChange(`${warm.lat.toFixed(6)}, ${warm.lng.toFixed(6)}`);
+    if (!navigator.geolocation) return;
     setLocating(true);
+    let settled = false;
+    const finish = () => { if (!settled) { settled = true; setLocating(false); } };
+    // Never leave the button spinning — a warm fix is already in the box.
+    const guard = window.setTimeout(finish, warm ? 4000 : 12000);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        window.clearTimeout(guard);
         onChange(`${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`);
-        setLocating(false);
+        finish();
       },
-      () => setLocating(false),
-      { enableHighAccuracy: true, timeout: 15000 },
+      () => { window.clearTimeout(guard); finish(); },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 },
     );
   };
 
