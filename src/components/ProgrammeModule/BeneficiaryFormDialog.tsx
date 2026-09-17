@@ -30,10 +30,14 @@ interface Props {
   existing?: BeneficiaryRow | null;
   /** Receives the saved row so the register updates without a refetch. */
   onSaved: (row?: BeneficiaryRow) => void;
+  /** Overrides the dialog heading, e.g. when completing a case-search record. */
+  title?: string;
+  /** Explanatory banner shown above the questions. */
+  notice?: string;
 }
 
 const BeneficiaryFormDialog = ({
-  open, onOpenChange, moduleId, projectId, config, existing, onSaved,
+  open, onOpenChange, moduleId, projectId, config, existing, onSaved, title, notice,
 }: Props) => {
   const { toast } = useToast();
   const [answers, setAnswers] = useState<AnswerMap>(() => ({ ...(existing?.profile || {}) }));
