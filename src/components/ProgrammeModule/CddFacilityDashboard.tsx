@@ -177,7 +177,7 @@ const CddFacilityDashboard = ({ cdds, cases, facilities, ledger }: Props) => {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline">{tierFor(r.points).name}</Badge>
+                            <Badge variant="outline">{tierFor(r.points).label}</Badge>
                           </TableCell>
                         </TableRow>
                       ))}

@@ -33,7 +33,7 @@ const Metric = ({ label, value, hint }: { label: string; value: string | number;
 const outcomeTone = (o: string) =>
   o === "treated" ? toneClasses.success
     : o === "refused" || o === "absent" ? toneClasses.warning
-      : toneClasses.muted;
+      : toneClasses.neutral;
 
 const BeneficiaryMdaPanel = ({ beneficiaryId, householdId }: Props) => {
   const { rounds, mine, household, loading } = useBeneficiaryMda(beneficiaryId, householdId);
