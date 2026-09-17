@@ -63,6 +63,15 @@ const BeneficiaryFormDialog = ({
 
   const allQuestions = useMemo(() => sections.flatMap((s) => s.questions || []), [sections]);
 
+  /** How much of the record is still unanswered — shown when completing a case. */
+  const outstanding = useMemo(
+    () => allQuestions.filter((q) => {
+      const v = q.name ? answers[q.name] : undefined;
+      return v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0);
+    }).length,
+    [allQuestions, answers],
+  );
+
   const setValue = (name: string, value: unknown) => {
     setAnswers((prev) => applyCalculations(allQuestions, { ...prev, [name]: value }));
   };
