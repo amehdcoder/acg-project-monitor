@@ -241,19 +241,54 @@ const HouseholdsPanel = ({
   };
 
 
+  /**
+   * Indicators a programme actually acts on: this year's epidemiological
+   * coverage, the households nobody reached this round, the people who keep
+   * being missed, and exposure to unsafe water — not counts that simply
+   * restate the register.
+   */
   const totals = useMemo(() => {
-    const cov = householdCoverage(rounds);
-    const unimproved = households.filter((h) => {
+    const year = new Date().getFullYear();
+    const thisYear = rounds.filter((r) => new Date(r.round_date).getFullYear() === year);
+    const eligible = thisYear.reduce((a, r) => a + (r.persons_eligible || 0), 0);
+    const treated = thisYear.reduce((a, r) => a + (r.persons_treated || 0), 0);
+    const visited = new Set(thisYear.map((r) => r.household_id));
+    const notVisited = households.filter((h) => !visited.has(h.id)).length;
+
+    // People who missed two or more consecutive rounds offered to them.
+    const byPerson = new Map<string, MdaTreatmentRow[]>();
+    for (const t of treatments) {
+      const key = t.beneficiary_id || t.member_id || "";
+      if (!key) continue;
+      byPerson.set(key, [...(byPerson.get(key) || []), t]);
+    }
+    let persistent = 0;
+    byPerson.forEach((rows, key) => {
+      const hid = rows[0]?.household_id;
+      const hhRounds = rounds.filter((r) => r.household_id === hid);
+      if (buildPassport(rows, hhRounds).persistentMisses.length > 0) persistent += 1;
+      void key;
+    });
+
+    // Household members exposed to an unimproved or unknown water source.
+    const unsafeHouseholds = new Set(households.filter((h) => {
       const w = washSources.find((s) => s.id === h.wash_source_id);
-      return w && !w.is_improved;
-    }).length;
+      return !w || !w.is_improved;
+    }).map((h) => h.id));
+    const exposed = memberRows.filter((m) => unsafeHouseholds.has(m.household_id)).length;
+
     return {
-      households: households.length,
-      people: beneficiaries.filter((b) => householdOf(b)).length,
-      coverage: cov.percent,
-      unimproved,
+      coverage: eligible > 0 ? Math.round((treated / eligible) * 100) : 0,
+      coverageHint: eligible > 0
+        ? `${treated} of ${eligible} eligible treated in ${year}`
+        : `No round recorded in ${year} yet`,
+      notVisited,
+      notVisitedHint: `of ${households.length} household${households.length === 1 ? "" : "s"} with no ${year} round`,
+      persistent,
+      exposed,
+      exposedHint: `${unsafeHouseholds.size} household${unsafeHouseholds.size === 1 ? "" : "s"} on unimproved or unlinked water`,
     };
-  }, [households, rounds, washSources, beneficiaries]);
+  }, [households, rounds, treatments, washSources, memberRows]);
 
   const communities = useMemo(() => {
     const set = new Set<string>();
