@@ -38,7 +38,7 @@ import GeoCascadeFields from "./GeoCascadeFields";
 import HouseholdMemberDialog from "./HouseholdMemberDialog";
 import PersonNtdPassport from "./PersonNtdPassport";
 import {
-  deleteHouseholdMember, relationshipLabel, saveHouseholdMember, useHouseholdMembers,
+  buildPassport, deleteHouseholdMember, relationshipLabel, saveHouseholdMember, useHouseholdMembers,
   type HouseholdMemberRow, type RosterPerson,
 } from "@/lib/programmeModule/householdMembers";
 import {
@@ -81,7 +81,8 @@ const HouseholdsPanel = ({
   const [hhDraft, setHhDraft] = useState<Partial<HouseholdRow>>({});
   const [washOpen, setWashOpen] = useState(false);
   const [washDraft, setWashDraft] = useState<Record<string, string | boolean>>({
-    name: "", source_type: "borehole", sanitation_type: "pit_slab", is_improved: true, village: "",
+    name: "", source_type: "borehole", sanitation_type: "pit_slab", is_improved: true,
+    village: "", ward: "",
   });
   const [mdaOpen, setMdaOpen] = useState(false);
   const [editingRound, setEditingRound] = useState<MdaRoundRow | null>(null);
@@ -241,19 +242,54 @@ const HouseholdsPanel = ({
   };
 
 
+  /**
+   * Indicators a programme actually acts on: this year's epidemiological
+   * coverage, the households nobody reached this round, the people who keep
+   * being missed, and exposure to unsafe water — not counts that simply
+   * restate the register.
+   */
   const totals = useMemo(() => {
-    const cov = householdCoverage(rounds);
-    const unimproved = households.filter((h) => {
+    const year = new Date().getFullYear();
+    const thisYear = rounds.filter((r) => new Date(r.round_date).getFullYear() === year);
+    const eligible = thisYear.reduce((a, r) => a + (r.persons_eligible || 0), 0);
+    const treated = thisYear.reduce((a, r) => a + (r.persons_treated || 0), 0);
+    const visited = new Set(thisYear.map((r) => r.household_id));
+    const notVisited = households.filter((h) => !visited.has(h.id)).length;
+
+    // People who missed two or more consecutive rounds offered to them.
+    const byPerson = new Map<string, MdaTreatmentRow[]>();
+    for (const t of treatments) {
+      const key = t.beneficiary_id || t.member_id || "";
+      if (!key) continue;
+      byPerson.set(key, [...(byPerson.get(key) || []), t]);
+    }
+    let persistent = 0;
+    byPerson.forEach((rows, key) => {
+      const hid = rows[0]?.household_id;
+      const hhRounds = rounds.filter((r) => r.household_id === hid);
+      if (buildPassport(rows, hhRounds).persistentMisses.length > 0) persistent += 1;
+      void key;
+    });
+
+    // Household members exposed to an unimproved or unknown water source.
+    const unsafeHouseholds = new Set(households.filter((h) => {
       const w = washSources.find((s) => s.id === h.wash_source_id);
-      return w && !w.is_improved;
-    }).length;
+      return !w || !w.is_improved;
+    }).map((h) => h.id));
+    const exposed = memberRows.filter((m) => unsafeHouseholds.has(m.household_id)).length;
+
     return {
-      households: households.length,
-      people: beneficiaries.filter((b) => householdOf(b)).length,
-      coverage: cov.percent,
-      unimproved,
+      coverage: eligible > 0 ? Math.round((treated / eligible) * 100) : 0,
+      coverageHint: eligible > 0
+        ? `${treated} of ${eligible} eligible treated in ${year}`
+        : `No round recorded in ${year} yet`,
+      notVisited,
+      notVisitedHint: `of ${households.length} household${households.length === 1 ? "" : "s"} with no ${year} round`,
+      persistent,
+      exposed,
+      exposedHint: `${unsafeHouseholds.size} household${unsafeHouseholds.size === 1 ? "" : "s"} on unimproved or unlinked water`,
     };
-  }, [households, rounds, washSources, beneficiaries]);
+  }, [households, rounds, treatments, washSources, memberRows]);
 
   const communities = useMemo(() => {
     const set = new Set<string>();
@@ -314,10 +350,14 @@ const HouseholdsPanel = ({
         sanitation_type: String(washDraft.sanitation_type),
         is_improved: Boolean(washDraft.is_improved),
         village: String(washDraft.village || "") || null,
+        ward: String(washDraft.ward || "") || null,
       } as never);
       toast({ title: "Water point added" });
       setWashOpen(false);
-      setWashDraft({ name: "", source_type: "borehole", sanitation_type: "pit_slab", is_improved: true, village: "" });
+      setWashDraft({
+        name: "", source_type: "borehole", sanitation_type: "pit_slab", is_improved: true,
+        village: "", ward: "",
+      });
       await reload();
     } catch (e) {
       toast({ title: "Could not save the water point", description: (e as Error).message, variant: "destructive" });
@@ -401,10 +441,10 @@ const HouseholdsPanel = ({
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Metric label="Households" value={String(totals.households)} hint="Registered clusters on this project" tone="var(--health-blue, 209 100% 36%)" />
-        <Metric label="People grouped" value={String(totals.people)} hint="Beneficiaries attached to a household" tone="var(--health-teal, 176 100% 31%)" />
-        <Metric label="MDA coverage" value={`${totals.coverage}%`} hint="Treated against eligible, all rounds" tone="var(--health-blue, 209 100% 36%)" />
-        <Metric label="Unimproved water" value={String(totals.unimproved)} hint="Households on an unimproved source" tone="var(--health-red, 356 63% 56%)" />
+        <Metric label="Coverage this year" value={`${totals.coverage}%`} hint={totals.coverageHint} tone="var(--health-blue, 209 100% 36%)" />
+        <Metric label="Households not reached" value={String(totals.notVisited)} hint={totals.notVisitedHint} tone="var(--health-amber, 45 87% 61%)" />
+        <Metric label="Persistently missed people" value={String(totals.persistent)} hint="Missed two or more rounds in a row" tone="var(--health-red, 356 63% 56%)" />
+        <Metric label="Exposed to unsafe water" value={String(totals.exposed)} hint={totals.exposedHint} tone="var(--health-teal, 176 100% 31%)" />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
@@ -925,6 +965,18 @@ const HouseholdsPanel = ({
             <div>
               <Label className="text-sm">Village / settlement</Label>
               <Input className="mt-1" value={String(washDraft.village)} onChange={(e) => setWashDraft({ ...washDraft, village: e.target.value })} />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Every household in this village — and so every beneficiary in them — is linked to
+                this water point automatically.
+              </p>
+            </div>
+            <div>
+              <Label className="text-sm">Ward</Label>
+              <Input
+                className="mt-1" placeholder="Used when a village name is not recorded"
+                value={String(washDraft.ward || "")}
+                onChange={(e) => setWashDraft({ ...washDraft, ward: e.target.value })}
+              />
             </div>
             <div className="flex items-center justify-between rounded-md border border-border p-3">
               <div>
@@ -1089,6 +1141,7 @@ const HouseholdsPanel = ({
           rounds={selectedRounds}
           treatments={treatments}
           morbidity={morbidityFor(passportPerson)}
+          washSource={washSources.find((w) => w.id === selected.wash_source_id) || null}
           canManage={canManage}
           saving={busy}
           onSaveMorbidity={submitMorbidity}

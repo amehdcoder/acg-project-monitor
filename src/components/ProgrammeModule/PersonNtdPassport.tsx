@@ -24,7 +24,8 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, Loader2, Pill, Plus, ShieldCheck, Stethoscope,
+  Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, Droplets, Loader2, Pill, Plus,
+  ShieldCheck, Stethoscope,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -49,6 +50,8 @@ interface Props {
   rounds: MdaRoundRow[];
   treatments: MdaTreatmentRow[];
   morbidity: MorbidityRow[];
+  /** The community water point this person's household drinks from. */
+  washSource?: { name: string; is_improved: boolean; source_type: string } | null;
   canManage?: boolean;
   saving?: boolean;
   onSaveMorbidity: (draft: Partial<MorbidityRow>) => Promise<void> | void;
@@ -59,7 +62,7 @@ const fmt = (d?: string | null) =>
   d ? new Date(d).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" }) : "—";
 
 const PersonNtdPassport = ({
-  open, onOpenChange, person, householdLabel, rounds, treatments, morbidity,
+  open, onOpenChange, person, householdLabel, rounds, treatments, morbidity, washSource,
   canManage = true, saving, onSaveMorbidity, onOpenRecord,
 }: Props) => {
   const [morbOpen, setMorbOpen] = useState(false);
@@ -119,6 +122,26 @@ const PersonNtdPassport = ({
             {person.age != null ? `${person.age} years` : "Age not recorded"}
             {person.heightCm ? ` · ${person.heightCm} cm` : ""}
           </p>
+
+          <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/40 p-2 text-sm">
+            <Droplets className="h-4 w-4 text-primary" />
+            {washSource ? (
+              <>
+                <span className="font-medium text-foreground">{washSource.name}</span>
+                <Badge variant="outline" className={cn(!washSource.is_improved && "border-destructive/40 text-destructive")}>
+                  {washSource.is_improved ? "Improved source" : "Unimproved source"}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  Shared water is how schistosomiasis and trachoma keep coming back to this household.
+                </span>
+              </>
+            ) : (
+              <span className="text-muted-foreground">
+                No community water point linked to this household yet — register the village water
+                point and it attaches to everyone here automatically.
+              </span>
+            )}
+          </div>
 
           {/* Passport matrix */}
           <Card className="p-4">
