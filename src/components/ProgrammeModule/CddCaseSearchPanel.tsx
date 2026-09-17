@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/table";
 import {
   UserPlus, Plus, Search, Stethoscope, Send, CheckCircle2, Trash2, Pencil,
-  Users, ClipboardList, Hospital, BadgeCheck,
+  Users, ClipboardList, Hospital, BadgeCheck, Award,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
