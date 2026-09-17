@@ -132,6 +132,7 @@ const CddRewardsPanel = ({ cdds, cases, facilityName, ledger = [] }: Props) => {
                   <TableHead className="text-right">Confirmed</TableHead>
                   <TableHead className="text-right">Registered</TableHead>
                   <TableHead className="text-right">Accuracy</TableHead>
+                  <TableHead className="text-right">Awarded per case</TableHead>
                   <TableHead className="text-right">Points</TableHead>
                   <TableHead>Tier &amp; progress</TableHead>
                 </TableRow>
