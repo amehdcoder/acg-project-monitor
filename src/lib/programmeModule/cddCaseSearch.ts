@@ -391,6 +391,53 @@ export const useCaseFilter = (cases: PotentialCaseRow[], term: string, status: s
     });
   }, [cases, term, status]);
 
+/**
+ * Everything the case search already knows about the person, expressed in the
+ * registration form's own field names. Used to pre-fill the full beneficiary
+ * record straight after confirmation so the longitudinal system holds the same
+ * fields for a case-search beneficiary as for one registered at the desk.
+ */
+export const caseProfileSeed = (c: PotentialCaseRow): Record<string, unknown> => {
+  const seed: Record<string, unknown> = {
+    full_name: c.full_name,
+    gender: c.sex || undefined,
+    phone: c.phone || undefined,
+    address: c.address || undefined,
+    state: c.state || undefined,
+    lga: c.lga || undefined,
+    ward: c.ward || undefined,
+    village: c.community || undefined,
+    primary_condition: "Lymphatic Filariasis (Lymphedema / Hydrocele)",
+    mmdp_manifestation: c.confirmed_condition || c.condition,
+    mmdp_affected_side: c.affected_side || undefined,
+    mmdp_duration_years: c.duration_years ?? undefined,
+    mmdp_acute_attacks_last_year: c.acute_attacks_last_year ?? undefined,
+    mmdp_confirmed_stage: c.confirmed_stage ?? undefined,
+    mmdp_confirmed_stage_label: c.confirmed_stage_label || undefined,
+    case_source: "CDD case search",
+  };
+  if (c.latitude != null && c.longitude != null) seed.gps = `${c.latitude}, ${c.longitude}`;
+  if (c.age != null) seed.age = c.age;
+  for (const k of Object.keys(seed)) if (seed[k] === undefined) delete seed[k];
+  return seed;
+};
+
+/** Registration fields still blank on a record — what remains to be completed. */
+export const missingProfileFields = (
+  profile: Record<string, unknown>,
+  fields: { name?: string; label?: string }[],
+) => fields.filter((q) => {
+  if (!q.name) return false;
+  const v = profile[q.name];
+  return v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0);
+});
+
+/** Loads one beneficiary row, e.g. the record just created from a case. */
+export const fetchBeneficiary = async (id: string) => {
+  const { data } = await db.from("beneficiaries").select("*").eq("id", id).maybeSingle();
+  return (data as Record<string, unknown> | null) || null;
+};
+
 /** One step in a case's journey from community finding to registered record. */
 export interface CaseJourneyStep {
   key: "submitted" | "review" | "staging" | "referral" | "acceptance" | "registration";

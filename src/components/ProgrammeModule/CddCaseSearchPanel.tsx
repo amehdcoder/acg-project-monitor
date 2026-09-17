@@ -30,11 +30,12 @@ import { cn } from "@/lib/utils";
 import { toneClasses } from "@/lib/programmeModule/defaults";
 import { URGENCY_OPTIONS, useFacilities, useMyFacilityAccess } from "@/lib/programmeModule/facilities";
 import {
-  CASE_STATUS_LABEL, CASE_STATUS_TONE, cddPerformance, caseSearchTotals,
-  deleteCdd, deletePotentialCase, referPotentialCase, registerConfirmedCase,
+  CASE_STATUS_LABEL, CASE_STATUS_TONE, caseProfileSeed, cddPerformance, caseSearchTotals,
+  deleteCdd, deletePotentialCase, fetchBeneficiary, referPotentialCase, registerConfirmedCase,
   useCaseFilter, useCdds, usePotentialCases, withdrawCaseReferral,
   type CddRow, type PotentialCaseRow,
 } from "@/lib/programmeModule/cddCaseSearch";
+import type { BeneficiaryRow } from "@/lib/programmeModule/types";
 import { conditionLabel } from "@/lib/programmeModule/lesionVision";
 import CddDialog from "./CddDialog";
 import PotentialCaseDialog from "./PotentialCaseDialog";
@@ -52,6 +53,12 @@ interface Props {
   /** Empty for administrators — otherwise the facilities the user belongs to. */
   allowedFacilityIds?: string[] | null;
   onBeneficiaryRegistered?: () => void;
+  /**
+   * Hands the freshly created record — pre-filled with everything the case
+   * search already knows — to the workspace so the remaining registration
+   * questions can be completed straight away.
+   */
+  onCompleteRecord?: (row: BeneficiaryRow) => void;
 }
 
 const fmtDate = (d?: string | null) =>
@@ -67,6 +74,7 @@ const Metric = ({ label, value, hint }: { label: string; value: number | string;
 
 const CddCaseSearchPanel = ({
   projectId, moduleId, canRecord = false, allowedFacilityIds = null, onBeneficiaryRegistered,
+  onCompleteRecord,
 }: Props) => {
   const { toast } = useToast();
   const { facilities } = useFacilities(projectId);
@@ -139,16 +147,34 @@ const CddCaseSearchPanel = ({
       || (c.referred_to_facility_id
         && ["record", "manage"].includes(levels[c.referred_to_facility_id] || "")));
 
+  /**
+   * Opens the full registration form on a record created from case search,
+   * pre-filled with everything already known, so the rest of the longitudinal
+   * questions are answered while the person is still at the facility.
+   */
+  const completeRecord = async (c: PotentialCaseRow, beneficiaryId: string) => {
+    if (!onCompleteRecord) return;
+    const row = await fetchBeneficiary(beneficiaryId);
+    if (!row) return;
+    const profile = { ...(row.profile as Record<string, unknown> || {}) };
+    for (const [k, v] of Object.entries(caseProfileSeed(c))) {
+      const cur = profile[k];
+      if (cur === undefined || cur === null || cur === "") profile[k] = v;
+    }
+    onCompleteRecord({ ...(row as unknown as BeneficiaryRow), profile });
+  };
+
   const register = async (c: PotentialCaseRow, facilityId: string) => {
     setBusyId(c.id);
     try {
-      await registerConfirmedCase(c.id, facilityId);
+      const beneficiaryId = await registerConfirmedCase(c.id, facilityId);
       toast({
         title: "Beneficiary registered",
-        description: `Case ID issued at ${facilityName(facilityId)}.`,
+        description: `Case ID issued at ${facilityName(facilityId)}. Complete the remaining details next.`,
       });
       await reloadCases();
       onBeneficiaryRegistered?.();
+      if (beneficiaryId) await completeRecord(c, beneficiaryId);
     } catch (e) {
       toast({ title: "Could not register", description: (e as Error).message, variant: "destructive" });
     } finally {
@@ -502,6 +528,14 @@ const CddCaseSearchPanel = ({
                           onClick={() => void withdraw(c)}
                         >
                           Withdraw referral
+                        </Button>
+                      )}
+                      {actable && c.status === "registered" && c.beneficiary_id && onCompleteRecord && (
+                        <Button
+                          variant="outline" size="sm" className="gap-1"
+                          onClick={() => void completeRecord(c, c.beneficiary_id as string)}
+                        >
+                          <ClipboardList className="h-4 w-4" /> Complete record
                         </Button>
                       )}
                       {actable && c.status !== "registered" && (

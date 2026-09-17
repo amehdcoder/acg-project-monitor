@@ -30,10 +30,14 @@ interface Props {
   existing?: BeneficiaryRow | null;
   /** Receives the saved row so the register updates without a refetch. */
   onSaved: (row?: BeneficiaryRow) => void;
+  /** Overrides the dialog heading, e.g. when completing a case-search record. */
+  title?: string;
+  /** Explanatory banner shown above the questions. */
+  notice?: string;
 }
 
 const BeneficiaryFormDialog = ({
-  open, onOpenChange, moduleId, projectId, config, existing, onSaved,
+  open, onOpenChange, moduleId, projectId, config, existing, onSaved, title, notice,
 }: Props) => {
   const { toast } = useToast();
   const [answers, setAnswers] = useState<AnswerMap>(() => ({ ...(existing?.profile || {}) }));
@@ -58,6 +62,15 @@ const BeneficiaryFormDialog = ({
   );
 
   const allQuestions = useMemo(() => sections.flatMap((s) => s.questions || []), [sections]);
+
+  /** How much of the record is still unanswered — shown when completing a case. */
+  const outstanding = useMemo(
+    () => allQuestions.filter((q) => {
+      const v = q.name ? answers[q.name] : undefined;
+      return v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0);
+    }).length,
+    [allQuestions, answers],
+  );
 
   const setValue = (name: string, value: unknown) => {
     setAnswers((prev) => applyCalculations(allQuestions, { ...prev, [name]: value }));
@@ -160,10 +173,22 @@ const BeneficiaryFormDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92dvh] max-w-3xl overflow-hidden p-0">
         <DialogHeader className="border-b border-border px-5 py-4">
-          <DialogTitle>{existing ? "Edit beneficiary" : "Register beneficiary"}</DialogTitle>
+          <DialogTitle>
+            {title || (existing ? "Edit beneficiary" : "Register beneficiary")}
+          </DialogTitle>
         </DialogHeader>
         <ScrollArea className="max-h-[70dvh] px-5 py-4">
           <div className="space-y-6">
+            {notice && (
+              <div className="rounded-md border border-border bg-muted/50 p-3">
+                <p className="text-sm text-foreground">{notice}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {outstanding} of {allQuestions.length} question
+                  {allQuestions.length === 1 ? "" : "s"} still blank — completing them keeps this
+                  record comparable with every other beneficiary on the programme.
+                </p>
+              </div>
+            )}
             <PhotoCaptureField
               label="Patient photograph"
               hint="Helps field teams recognise the beneficiary at follow-up visits."

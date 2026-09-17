@@ -70,6 +70,8 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
   const [focalFacilityId, setFocalFacilityId] = useState<string | undefined>(undefined);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [selected, setSelected] = useState<BeneficiaryRow | null>(null);
+  /** Record created from a confirmed case-search case, awaiting full details. */
+  const [completing, setCompleting] = useState<BeneficiaryRow | null>(null);
   const [pending, setPending] = useState(queueCount());
   const [creating, setCreating] = useState(false);
   const [deleteRequestsOpen, setDeleteRequestsOpen] = useState(false);
@@ -383,6 +385,7 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
             && (can("manage_cdds") || can("confirm_cases"))}
           allowedFacilityIds={isFocalPerson ? Object.keys(facilityLevels) : null}
           onBeneficiaryRegistered={() => void reloadBeneficiaries()}
+          onCompleteRecord={(row) => setCompleting(row)}
         />
       )}
 
@@ -471,6 +474,22 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
               else void reloadBeneficiaries();
             }}
           />
+          {completing && (
+            <BeneficiaryFormDialog
+              key={completing.id}
+              open onOpenChange={(v) => { if (!v) setCompleting(null); }}
+              moduleId={active.id} projectId={projectId}
+              config={normalizeConfig(active.config)}
+              existing={completing}
+              title="Complete this beneficiary's record"
+              notice={`${completing.full_name} now has a Case ID. What the CDD and clinician recorded has been carried over — finish the rest of the registration so this person's data matches every other beneficiary.`}
+              onSaved={(row) => {
+                setCompleting(null);
+                if (row) upsertBeneficiary(row);
+                else void reloadBeneficiaries();
+              }}
+            />
+          )}
           <ModuleConfigurator
             open={configOpen} onOpenChange={setConfigOpen}
             moduleId={active.id} moduleName={active.name}
