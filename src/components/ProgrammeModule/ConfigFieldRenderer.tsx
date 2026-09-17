@@ -8,7 +8,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { MapPin, Loader2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { getBestWarmFix, getFreshWarmFix, startGpsWarmer } from "@/lib/gps/gpsWarmer";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
 import { getCommunities, getCommunitiesByWard } from "@/lib/grid3NigeriaData";
 import { GEO_FIELDS } from "@/lib/programmeModule/registrationChoices";
@@ -159,6 +160,12 @@ const ConfigFieldRenderer = ({ question, value, onChange, error, answers, onPatc
    * Coordinates appear instantly from the pre-warmed fix the app keeps in the
    * background, then quietly sharpen when a more accurate reading arrives.
    */
+  // Keep a fix warming in the background while a location question is on screen.
+  useEffect(() => {
+    if (question.type !== "geopoint") return;
+    return startGpsWarmer();
+  }, [question.type]);
+
   const captureGps = () => {
     const warm = getFreshWarmFix() || getBestWarmFix();
     if (warm) onChange(`${warm.lat.toFixed(6)}, ${warm.lng.toFixed(6)}`);
