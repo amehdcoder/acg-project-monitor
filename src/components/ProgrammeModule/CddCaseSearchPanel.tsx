@@ -30,11 +30,12 @@ import { cn } from "@/lib/utils";
 import { toneClasses } from "@/lib/programmeModule/defaults";
 import { URGENCY_OPTIONS, useFacilities, useMyFacilityAccess } from "@/lib/programmeModule/facilities";
 import {
-  CASE_STATUS_LABEL, CASE_STATUS_TONE, cddPerformance, caseSearchTotals,
-  deleteCdd, deletePotentialCase, referPotentialCase, registerConfirmedCase,
+  CASE_STATUS_LABEL, CASE_STATUS_TONE, caseProfileSeed, cddPerformance, caseSearchTotals,
+  deleteCdd, deletePotentialCase, fetchBeneficiary, referPotentialCase, registerConfirmedCase,
   useCaseFilter, useCdds, usePotentialCases, withdrawCaseReferral,
   type CddRow, type PotentialCaseRow,
 } from "@/lib/programmeModule/cddCaseSearch";
+import type { BeneficiaryRow } from "@/lib/programmeModule/types";
 import { conditionLabel } from "@/lib/programmeModule/lesionVision";
 import CddDialog from "./CddDialog";
 import PotentialCaseDialog from "./PotentialCaseDialog";
@@ -52,6 +53,12 @@ interface Props {
   /** Empty for administrators — otherwise the facilities the user belongs to. */
   allowedFacilityIds?: string[] | null;
   onBeneficiaryRegistered?: () => void;
+  /**
+   * Hands the freshly created record — pre-filled with everything the case
+   * search already knows — to the workspace so the remaining registration
+   * questions can be completed straight away.
+   */
+  onCompleteRecord?: (row: BeneficiaryRow) => void;
 }
 
 const fmtDate = (d?: string | null) =>
