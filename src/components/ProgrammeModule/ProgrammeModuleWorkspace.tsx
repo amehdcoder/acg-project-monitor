@@ -350,6 +350,16 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
         />
       )}
 
+      {view === "casesearch" && (
+        <CddCaseSearchPanel
+          projectId={projectId}
+          moduleId={active?.id}
+          canRecord={canConfigure || Object.values(facilityLevels).some((l) => l !== "view")}
+          allowedFacilityIds={isFocalPerson ? Object.keys(facilityLevels) : null}
+          onBeneficiaryRegistered={() => void reloadBeneficiaries()}
+        />
+      )}
+
       {view === "safeguarding" && (
         <SafeguardingPanel
           projectId={projectId}
