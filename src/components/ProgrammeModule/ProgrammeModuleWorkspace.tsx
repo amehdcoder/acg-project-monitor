@@ -474,6 +474,22 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
               else void reloadBeneficiaries();
             }}
           />
+          {completing && (
+            <BeneficiaryFormDialog
+              key={completing.id}
+              open onOpenChange={(v) => { if (!v) setCompleting(null); }}
+              moduleId={active.id} projectId={projectId}
+              config={normalizeConfig(active.config)}
+              existing={completing}
+              title="Complete this beneficiary's record"
+              notice={`${completing.full_name} now has a Case ID. What the CDD and clinician recorded has been carried over — finish the rest of the registration so this person's data matches every other beneficiary.`}
+              onSaved={(row) => {
+                setCompleting(null);
+                if (row) upsertBeneficiary(row);
+                else void reloadBeneficiaries();
+              }}
+            />
+          )}
           <ModuleConfigurator
             open={configOpen} onOpenChange={setConfigOpen}
             moduleId={active.id} moduleName={active.name}
