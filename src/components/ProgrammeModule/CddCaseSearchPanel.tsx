@@ -112,7 +112,7 @@ const CddCaseSearchPanel = ({
   /** Cases a CDD has submitted that no clinician has reviewed yet. */
   const pendingQueue = useMemo(
     () => scoped.filter((c) => c.status === "pending")
-      .sort((a, b) => String(a.case_date).localeCompare(String(b.case_date))),
+      .sort((a, b) => String(a.search_date).localeCompare(String(b.search_date))),
     [scoped],
   );
   const decisionCase = useMemo(
@@ -283,7 +283,7 @@ const CddCaseSearchPanel = ({
                     </span>
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Found by {cddName(c.cdd_id)} · {fmtDate(c.case_date)} · {facilityName(c.facility_id)}
+                    Found by {cddName(c.cdd_id)} · {fmtDate(c.search_date)} · {facilityName(c.facility_id)}
                   </p>
                 </div>
                 {canActOn(c) && (
