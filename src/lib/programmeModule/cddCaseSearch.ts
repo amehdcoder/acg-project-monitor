@@ -390,3 +390,32 @@ export const useCaseFilter = (cases: PotentialCaseRow[], term: string, status: s
         .filter(Boolean).some((v) => String(v).toLowerCase().includes(q));
     });
   }, [cases, term, status]);
+
+/**
+ * Resolves the CDD who found a beneficiary, and the facility they were first
+ * identified at, for display on the beneficiary record.
+ */
+export const useCddSource = (cddId?: string | null, facilityId?: string | null) => {
+  const [cdd, setCdd] = useState<{ full_name: string; cdd_code: string | null; community: string | null } | null>(null);
+  const [facility, setFacility] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (cddId) {
+        const { data } = await db.from("mmdp_cdds")
+          .select("full_name, cdd_code, community").eq("id", cddId).maybeSingle();
+        if (alive) setCdd((data as never) || null);
+      } else if (alive) setCdd(null);
+
+      if (facilityId) {
+        const { data } = await db.from("health_facilities")
+          .select("name").eq("id", facilityId).maybeSingle();
+        if (alive) setFacility((data as { name?: string } | null)?.name || null);
+      } else if (alive) setFacility(null);
+    })();
+    return () => { alive = false; };
+  }, [cddId, facilityId]);
+
+  return { cdd, facility };
+};
