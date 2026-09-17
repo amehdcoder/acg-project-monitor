@@ -5928,11 +5928,16 @@ export type Database = {
       }
       household_mda_rounds: {
         Row: {
+          community: string | null
           created_at: string
           created_by: string
           directly_observed: boolean
           disease: string
+          distributor_name: string | null
           drug: string | null
+          drug_batch: string | null
+          drug_expiry: string | null
+          facility_id: string | null
           household_id: string
           id: string
           module_id: string | null
@@ -5942,16 +5947,26 @@ export type Database = {
           persons_refused: number
           persons_treated: number
           project_id: string
+          revisit_done: boolean
           round_date: string
           round_name: string
+          round_type: string
+          supervisor_name: string | null
+          unregistered_eligible: number
+          unregistered_treated: number
           updated_at: string
         }
         Insert: {
+          community?: string | null
           created_at?: string
           created_by?: string
           directly_observed?: boolean
           disease?: string
+          distributor_name?: string | null
           drug?: string | null
+          drug_batch?: string | null
+          drug_expiry?: string | null
+          facility_id?: string | null
           household_id: string
           id?: string
           module_id?: string | null
@@ -5961,16 +5976,26 @@ export type Database = {
           persons_refused?: number
           persons_treated?: number
           project_id: string
+          revisit_done?: boolean
           round_date?: string
           round_name: string
+          round_type?: string
+          supervisor_name?: string | null
+          unregistered_eligible?: number
+          unregistered_treated?: number
           updated_at?: string
         }
         Update: {
+          community?: string | null
           created_at?: string
           created_by?: string
           directly_observed?: boolean
           disease?: string
+          distributor_name?: string | null
           drug?: string | null
+          drug_batch?: string | null
+          drug_expiry?: string | null
+          facility_id?: string | null
           household_id?: string
           id?: string
           module_id?: string | null
@@ -5980,8 +6005,13 @@ export type Database = {
           persons_refused?: number
           persons_treated?: number
           project_id?: string
+          revisit_done?: boolean
           round_date?: string
           round_name?: string
+          round_type?: string
+          supervisor_name?: string | null
+          unregistered_eligible?: number
+          unregistered_treated?: number
           updated_at?: string
         }
         Relationships: [
@@ -6004,6 +6034,89 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      household_mda_treatments: {
+        Row: {
+          adverse_event: string | null
+          adverse_event_serious: boolean
+          age_years: number | null
+          beneficiary_id: string | null
+          created_at: string
+          created_by: string
+          directly_observed: boolean
+          dose_basis: string | null
+          dose_value: number | null
+          drug: string | null
+          household_id: string
+          id: string
+          module_id: string | null
+          not_eligible_reason: string | null
+          notes: string | null
+          outcome: string
+          person_name: string
+          project_id: string
+          round_id: string
+          sex: string | null
+          tablets: number | null
+          updated_at: string
+        }
+        Insert: {
+          adverse_event?: string | null
+          adverse_event_serious?: boolean
+          age_years?: number | null
+          beneficiary_id?: string | null
+          created_at?: string
+          created_by?: string
+          directly_observed?: boolean
+          dose_basis?: string | null
+          dose_value?: number | null
+          drug?: string | null
+          household_id: string
+          id?: string
+          module_id?: string | null
+          not_eligible_reason?: string | null
+          notes?: string | null
+          outcome?: string
+          person_name: string
+          project_id: string
+          round_id: string
+          sex?: string | null
+          tablets?: number | null
+          updated_at?: string
+        }
+        Update: {
+          adverse_event?: string | null
+          adverse_event_serious?: boolean
+          age_years?: number | null
+          beneficiary_id?: string | null
+          created_at?: string
+          created_by?: string
+          directly_observed?: boolean
+          dose_basis?: string | null
+          dose_value?: number | null
+          drug?: string | null
+          household_id?: string
+          id?: string
+          module_id?: string | null
+          not_eligible_reason?: string | null
+          notes?: string | null
+          outcome?: string
+          person_name?: string
+          project_id?: string
+          round_id?: string
+          sex?: string | null
+          tablets?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "household_mda_treatments_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "household_mda_rounds"
             referencedColumns: ["id"]
           },
         ]
