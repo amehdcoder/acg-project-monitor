@@ -22,6 +22,8 @@ import { useBeneficiaries, useProgrammeModules } from "./useProgrammeModule";
 import BeneficiaryList from "./BeneficiaryList";
 import BeneficiaryRecord from "./BeneficiaryRecord";
 import BeneficiaryFormDialog from "./BeneficiaryFormDialog";
+import ProjectTeamPanel from "./ProjectTeamPanel";
+import { useMyTeamPermissions } from "@/lib/programmeModule/projectTeam";
 import ModuleConfigurator from "./ModuleConfigurator";
 import FacilityFocalPersons from "./FacilityFocalPersons";
 import FacilityRegistry from "./FacilityRegistry";
@@ -75,8 +77,12 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
   const { isOfficer, reload: reloadOfficerAccess } = useIsSafeguardingOfficer(projectId);
   const [view, setView] = useState<
     | "records" | "journey" | "facility" | "followups" | "households" | "clusters" | "network"
-    | "risk" | "casesearch" | "safeguarding" | "safeguarding_dashboard"
+    | "risk" | "casesearch" | "safeguarding" | "safeguarding_dashboard" | "team"
   >("records");
+
+  // What this person is allowed to see and do, from the project team register.
+  // People who are not listed keep the access they already had.
+  const { can, listed: onTeamRegister } = useMyTeamPermissions(projectId, canConfigure);
 
 
   const active: ProgrammeModuleRow | undefined = useMemo(
@@ -84,8 +90,10 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
     [modules, activeId],
   );
 
-  const { beneficiaries, loading: loadingBeneficiaries, reload: reloadBeneficiaries } =
-    useBeneficiaries(active?.id);
+  const {
+    beneficiaries, loading: loadingBeneficiaries, reload: reloadBeneficiaries,
+    upsert: upsertBeneficiary,
+  } = useBeneficiaries(active?.id);
 
   /**
    * A facility focal person is a non-administrator who has been granted access
@@ -230,19 +238,26 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
 
       <div className="flex flex-wrap gap-2">
         {([
-          { key: "records", label: "Beneficiary records", icon: LayoutGrid, show: true },
-          { key: "journey", label: "Beneficiary journey", icon: Route, show: true },
-          { key: "facility", label: "Facility dashboard", icon: Hospital, show: true },
-          { key: "followups", label: "Follow-ups & referrals", icon: CalendarClock, show: true },
-          { key: "households", label: "Households & MDA", icon: Home, show: true },
-          { key: "clusters", label: "Community clusters", icon: Layers, show: true },
-          { key: "network", label: "Transmission network", icon: Network, show: true },
-          { key: "risk", label: "Follow-up risk & CHEW visits", icon: Activity, show: true },
-          { key: "casesearch", label: "CDD case search (MMDP)", icon: Search, show: true },
-          { key: "safeguarding", label: "Safeguarding", icon: ShieldCheck, show: isOfficer },
+          { key: "records", label: "Beneficiary records", icon: LayoutGrid, show: can("view_records") },
+          { key: "journey", label: "Beneficiary journey", icon: Route, show: can("view_dashboards") },
+          { key: "facility", label: "Facility dashboard", icon: Hospital, show: can("view_dashboards") },
+          { key: "followups", label: "Follow-ups & referrals", icon: CalendarClock, show: can("view_records") },
+          { key: "households", label: "Households & MDA", icon: Home, show: can("manage_households") || can("view_dashboards") },
+          { key: "clusters", label: "Community clusters", icon: Layers, show: can("view_dashboards") },
+          { key: "network", label: "Transmission network", icon: Network, show: can("view_dashboards") },
+          { key: "risk", label: "Follow-up risk & CHEW visits", icon: Activity, show: can("view_dashboards") },
+          {
+            key: "casesearch", label: "CDD case search (MMDP)", icon: Search,
+            show: can("manage_cdds") || can("confirm_cases") || can("view_records"),
+          },
+          {
+            key: "team", label: "Project team", icon: Users,
+            show: canConfigure || can("manage_team") || onTeamRegister,
+          },
+          { key: "safeguarding", label: "Safeguarding", icon: ShieldCheck, show: isOfficer && can("view_safeguarding") },
           {
             key: "safeguarding_dashboard", label: "Safeguarding dashboard",
-            icon: ShieldAlert, show: isOfficer,
+            icon: ShieldAlert, show: isOfficer && can("view_safeguarding"),
           },
         ] as const).filter((t) => t.show).map((t) => (
           <Button
@@ -282,7 +297,16 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
           projectId={projectId}
           onOpen={setSelected}
           onRegister={() => setRegisterOpen(true)}
+          canRegister={can("edit_records")}
           onRefresh={() => void reloadBeneficiaries()}
+        />
+      )}
+
+      {view === "team" && (
+        <ProjectTeamPanel
+          projectId={projectId}
+          moduleId={active?.id}
+          canManage={canConfigure || can("manage_team")}
         />
       )}
 
@@ -354,7 +378,9 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
         <CddCaseSearchPanel
           projectId={projectId}
           moduleId={active?.id}
-          canRecord={canConfigure || Object.values(facilityLevels).some((l) => l !== "view")}
+          canRecord={(canConfigure || Object.values(facilityLevels).some((l) => l !== "view")
+            || can("manage_cdds") || can("confirm_cases"))
+            && (can("manage_cdds") || can("confirm_cases"))}
           allowedFacilityIds={isFocalPerson ? Object.keys(facilityLevels) : null}
           onBeneficiaryRegistered={() => void reloadBeneficiaries()}
         />
@@ -440,7 +466,10 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
             open={registerOpen} onOpenChange={setRegisterOpen}
             moduleId={active.id} projectId={projectId}
             config={normalizeConfig(active.config)}
-            onSaved={() => void reloadBeneficiaries()}
+            onSaved={(row) => {
+              if (row) upsertBeneficiary(row);
+              else void reloadBeneficiaries();
+            }}
           />
           <ModuleConfigurator
             open={configOpen} onOpenChange={setConfigOpen}

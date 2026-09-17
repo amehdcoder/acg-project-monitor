@@ -28,7 +28,8 @@ interface Props {
   projectId: string;
   config: ProgrammeModuleConfig;
   existing?: BeneficiaryRow | null;
-  onSaved: () => void;
+  /** Receives the saved row so the register updates without a refetch. */
+  onSaved: (row?: BeneficiaryRow) => void;
 }
 
 const BeneficiaryFormDialog = ({
@@ -96,13 +97,17 @@ const BeneficiaryFormDialog = ({
         photo_url: photoUrl,
       };
 
+      let savedRow: BeneficiaryRow | undefined;
+
       if (existing) {
-        const { error } = await supabase.from("beneficiaries").update(base as never).eq("id", existing.id);
+        const { data, error } = await supabase.from("beneficiaries")
+          .update(base as never).eq("id", existing.id).select("*").single();
         if (error) throw error;
-        await recordAudit({
+        savedRow = (data as unknown as BeneficiaryRow) || { ...existing, ...base } as BeneficiaryRow;
+        toast({ title: "Record updated" });
+        void recordAudit({
           beneficiary_id: existing.id, project_id: projectId, action: "profile_updated",
         });
-        toast({ title: "Record updated" });
       } else {
         const { data: auth } = await supabase.auth.getUser();
         const submission_uuid = newUuid();
@@ -121,17 +126,25 @@ const BeneficiaryFormDialog = ({
           created_by: auth.user?.id,
         };
         if (navigator.onLine) {
-          const { error } = await supabase.from("beneficiaries").insert(payload as never);
+          const { data, error } = await supabase.from("beneficiaries")
+            .insert(payload as never).select("*").single();
           if (error) throw error;
+          savedRow = data as unknown as BeneficiaryRow;
           toast({ title: "Beneficiary registered", description: payload.case_id });
         } else {
           enqueue("beneficiary", payload as unknown as Record<string, unknown>);
+          // Show it in the register straight away, flagged as still to send.
+          savedRow = {
+            ...(payload as unknown as BeneficiaryRow),
+            id: submission_uuid,
+            __pending: true,
+          } as BeneficiaryRow;
           toast({ title: "Saved offline", description: "It will sync automatically when you are back online." });
         }
       }
-      void flushQueue();
-      onSaved();
+      onSaved(savedRow);
       onOpenChange(false);
+      void flushQueue();
     } catch (e) {
       toast({ title: "Save failed", description: (e as Error).message, variant: "destructive" });
     } finally {

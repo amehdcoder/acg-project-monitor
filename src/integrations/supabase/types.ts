@@ -8979,6 +8979,93 @@ export type Database = {
           },
         ]
       }
+      programme_team_members: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          designation: string | null
+          email: string | null
+          facility_id: string | null
+          full_name: string
+          id: string
+          is_active: boolean
+          lga: string | null
+          module_id: string | null
+          notes: string | null
+          organisation: string | null
+          permissions: Json
+          phone: string | null
+          project_id: string
+          state: string | null
+          team_type: string
+          unit: string | null
+          updated_at: string
+          user_id: string | null
+          ward: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          designation?: string | null
+          email?: string | null
+          facility_id?: string | null
+          full_name: string
+          id?: string
+          is_active?: boolean
+          lga?: string | null
+          module_id?: string | null
+          notes?: string | null
+          organisation?: string | null
+          permissions?: Json
+          phone?: string | null
+          project_id: string
+          state?: string | null
+          team_type?: string
+          unit?: string | null
+          updated_at?: string
+          user_id?: string | null
+          ward?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          designation?: string | null
+          email?: string | null
+          facility_id?: string | null
+          full_name?: string
+          id?: string
+          is_active?: boolean
+          lga?: string | null
+          module_id?: string | null
+          notes?: string | null
+          organisation?: string | null
+          permissions?: Json
+          phone?: string | null
+          project_id?: string
+          state?: string | null
+          team_type?: string
+          unit?: string | null
+          updated_at?: string
+          user_id?: string | null
+          ward?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "programme_team_members_facility_id_fkey"
+            columns: ["facility_id"]
+            isOneToOne: false
+            referencedRelation: "health_facilities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "programme_team_members_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "programme_modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_access_configs: {
         Row: {
           allow_cases: boolean
