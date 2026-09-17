@@ -91,6 +91,8 @@ const BeneficiaryFormDialog = ({
         ward: (answers.ward as string) || null,
         village: (answers.village as string) || null,
         facility_id: facilityId || null,
+        cdd_id: cddId || null,
+        referring_facility_id: referringFacilityId || null,
         photo_url: photoUrl,
       };
 
