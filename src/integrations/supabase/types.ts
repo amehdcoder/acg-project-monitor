@@ -6072,6 +6072,7 @@ export type Database = {
           drug: string | null
           household_id: string
           id: string
+          member_id: string | null
           module_id: string | null
           not_eligible_reason: string | null
           notes: string | null
@@ -6096,6 +6097,7 @@ export type Database = {
           drug?: string | null
           household_id: string
           id?: string
+          member_id?: string | null
           module_id?: string | null
           not_eligible_reason?: string | null
           notes?: string | null
@@ -6120,6 +6122,7 @@ export type Database = {
           drug?: string | null
           household_id?: string
           id?: string
+          member_id?: string | null
           module_id?: string | null
           not_eligible_reason?: string | null
           notes?: string | null
@@ -6133,10 +6136,95 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "household_mda_treatments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "household_members"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "household_mda_treatments_round_id_fkey"
             columns: ["round_id"]
             isOneToOne: false
             referencedRelation: "household_mda_rounds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      household_members: {
+        Row: {
+          age_years: number | null
+          beneficiary_id: string | null
+          created_at: string
+          created_by: string | null
+          date_of_birth: string | null
+          full_name: string
+          height_cm: number | null
+          household_id: string
+          id: string
+          is_alive: boolean
+          is_breastfeeding: boolean
+          is_pregnant: boolean
+          module_id: string | null
+          notes: string | null
+          project_id: string
+          relationship: string | null
+          sex: string | null
+          updated_at: string
+        }
+        Insert: {
+          age_years?: number | null
+          beneficiary_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          date_of_birth?: string | null
+          full_name: string
+          height_cm?: number | null
+          household_id: string
+          id?: string
+          is_alive?: boolean
+          is_breastfeeding?: boolean
+          is_pregnant?: boolean
+          module_id?: string | null
+          notes?: string | null
+          project_id: string
+          relationship?: string | null
+          sex?: string | null
+          updated_at?: string
+        }
+        Update: {
+          age_years?: number | null
+          beneficiary_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          date_of_birth?: string | null
+          full_name?: string
+          height_cm?: number | null
+          household_id?: string
+          id?: string
+          is_alive?: boolean
+          is_breastfeeding?: boolean
+          is_pregnant?: boolean
+          module_id?: string | null
+          notes?: string | null
+          project_id?: string
+          relationship?: string | null
+          sex?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "household_members_beneficiary_id_fkey"
+            columns: ["beneficiary_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "household_members_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiary_households"
             referencedColumns: ["id"]
           },
         ]
@@ -8563,6 +8651,100 @@ export type Database = {
           ward?: string | null
         }
         Relationships: []
+      }
+      ntd_morbidity_records: {
+        Row: {
+          acute_attacks_last_year: number | null
+          affected_side: string | null
+          beneficiary_id: string | null
+          condition: string
+          created_at: string
+          created_by: string | null
+          household_id: string | null
+          id: string
+          limb_circumference_cm: number | null
+          member_id: string | null
+          module_id: string | null
+          next_review_date: string | null
+          notes: string | null
+          project_id: string
+          recorded_on: string
+          self_care_kit_issued: boolean
+          self_care_trained: boolean
+          stage: string | null
+          surgery_date: string | null
+          surgery_status: string | null
+          updated_at: string
+        }
+        Insert: {
+          acute_attacks_last_year?: number | null
+          affected_side?: string | null
+          beneficiary_id?: string | null
+          condition: string
+          created_at?: string
+          created_by?: string | null
+          household_id?: string | null
+          id?: string
+          limb_circumference_cm?: number | null
+          member_id?: string | null
+          module_id?: string | null
+          next_review_date?: string | null
+          notes?: string | null
+          project_id: string
+          recorded_on?: string
+          self_care_kit_issued?: boolean
+          self_care_trained?: boolean
+          stage?: string | null
+          surgery_date?: string | null
+          surgery_status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          acute_attacks_last_year?: number | null
+          affected_side?: string | null
+          beneficiary_id?: string | null
+          condition?: string
+          created_at?: string
+          created_by?: string | null
+          household_id?: string | null
+          id?: string
+          limb_circumference_cm?: number | null
+          member_id?: string | null
+          module_id?: string | null
+          next_review_date?: string | null
+          notes?: string | null
+          project_id?: string
+          recorded_on?: string
+          self_care_kit_issued?: boolean
+          self_care_trained?: boolean
+          stage?: string | null
+          surgery_date?: string | null
+          surgery_status?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ntd_morbidity_records_beneficiary_id_fkey"
+            columns: ["beneficiary_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ntd_morbidity_records_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiary_households"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ntd_morbidity_records_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "household_members"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       oauth_state_nonces: {
         Row: {

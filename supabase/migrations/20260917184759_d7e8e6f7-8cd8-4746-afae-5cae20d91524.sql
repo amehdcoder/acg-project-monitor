@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.auto_place_beneficiary_household() FROM PUBLIC, anon, authenticated;

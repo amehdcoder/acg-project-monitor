@@ -35,6 +35,15 @@ import { cn } from "@/lib/utils";
 import type { BeneficiaryRow } from "@/lib/programmeModule/types";
 import MdaRoundDialog from "./MdaRoundDialog";
 import GeoCascadeFields from "./GeoCascadeFields";
+import HouseholdMemberDialog from "./HouseholdMemberDialog";
+import PersonNtdPassport from "./PersonNtdPassport";
+import {
+  deleteHouseholdMember, relationshipLabel, saveHouseholdMember, useHouseholdMembers,
+  type HouseholdMemberRow, type RosterPerson,
+} from "@/lib/programmeModule/householdMembers";
+import {
+  saveMorbidityRecord, useMorbidityRecords, type MorbidityRow,
+} from "@/lib/programmeModule/morbidity";
 import { downloadCsv } from "@/lib/mda/csvExport";
 import {
   HOUSEHOLD_ROLES, NTD_DISEASES, SANITATION_TYPES, WASH_SOURCE_TYPES,
@@ -84,6 +93,12 @@ const HouseholdsPanel = ({
   const [memberId, setMemberId] = useState("");
   const [memberRole, setMemberRole] = useState("head");
 
+  const { members: memberRows, reload: reloadMembers } = useHouseholdMembers(projectId);
+  const { records: morbidityRows, reload: reloadMorbidity } = useMorbidityRecords(projectId);
+  const [rosterOpen, setRosterOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState<HouseholdMemberRow | null>(null);
+  const [passportPerson, setPassportPerson] = useState<RosterPerson | null>(null);
+
   const membersByHousehold = useMemo(() => {
     const map = new Map<string, BeneficiaryRow[]>();
     for (const b of beneficiaries) {
@@ -107,6 +122,124 @@ const HouseholdsPanel = ({
   const selectedRounds = selected ? rounds.filter((r) => r.household_id === selected.id) : [];
   const coverage = householdCoverage(selectedRounds);
   const unassigned = beneficiaries.filter((b) => !householdOf(b));
+
+  const rosterMembers = useMemo(
+    () => (selected ? memberRows.filter((m) => m.household_id === selected.id) : []),
+    [memberRows, selected],
+  );
+
+  /** Everyone who sleeps here — registered beneficiaries and other members. */
+  const roster = useMemo<RosterPerson[]>(() => {
+    const out: RosterPerson[] = [];
+    const claimed = new Set<string>();
+    const ageFrom = (b?: BeneficiaryRow) => {
+      const p = (b?.profile || {}) as Record<string, unknown>;
+      const n = Number(p.age ?? p.age_years);
+      if (Number.isFinite(n) && n > 0) return n;
+      const dob = String(p.date_of_birth || "");
+      if (dob) {
+        const d = new Date(dob);
+        if (!Number.isNaN(d.getTime())) return Math.floor((Date.now() - d.getTime()) / 31557600000);
+      }
+      return null;
+    };
+    const sexFrom = (b?: BeneficiaryRow) => {
+      const p = (b?.profile || {}) as Record<string, unknown>;
+      const v = p.sex ?? p.gender;
+      return v ? String(v) : null;
+    };
+
+    for (const m of rosterMembers) {
+      const b = m.beneficiary_id ? beneficiaries.find((x) => x.id === m.beneficiary_id) : undefined;
+      if (b) claimed.add(b.id);
+      out.push({
+        key: `m:${m.id}`,
+        memberId: m.id,
+        beneficiaryId: m.beneficiary_id,
+        name: b?.full_name || m.full_name,
+        sex: m.sex || sexFrom(b),
+        age: m.age_years ?? ageFrom(b),
+        heightCm: m.height_cm,
+        relationship: m.relationship || (b ? roleOf(b) : null),
+        isPregnant: m.is_pregnant,
+        isBreastfeeding: m.is_breastfeeding,
+        registered: !!b,
+      });
+    }
+    for (const b of selectedMembers) {
+      if (claimed.has(b.id)) continue;
+      out.push({
+        key: `b:${b.id}`,
+        memberId: null,
+        beneficiaryId: b.id,
+        name: b.full_name,
+        sex: sexFrom(b),
+        age: ageFrom(b),
+        heightCm: null,
+        relationship: roleOf(b),
+        isPregnant: false,
+        isBreastfeeding: false,
+        registered: true,
+      });
+    }
+    return out;
+  }, [rosterMembers, selectedMembers, beneficiaries]);
+
+  const morbidityFor = (p: RosterPerson): MorbidityRow[] =>
+    morbidityRows.filter((m) =>
+      (p.beneficiaryId && m.beneficiary_id === p.beneficiaryId) ||
+      (p.memberId && m.member_id === p.memberId));
+
+  const submitMember = async (draft: Partial<HouseholdMemberRow>) => {
+    if (!selected) return;
+    setBusy(true);
+    try {
+      await saveHouseholdMember({
+        ...draft,
+        project_id: projectId,
+        module_id: moduleId || null,
+        household_id: selected.id,
+        full_name: String(draft.full_name || "").trim(),
+      });
+      toast({ title: draft.id ? "Member updated" : "Member added to the household" });
+      setRosterOpen(false);
+      setEditingMember(null);
+      await reloadMembers();
+    } catch (e) {
+      toast({ title: "Could not save the member", description: (e as Error).message, variant: "destructive" });
+    } finally { setBusy(false); }
+  };
+
+  const removeMember = async (id: string) => {
+    setBusy(true);
+    try {
+      await deleteHouseholdMember(id);
+      await reloadMembers();
+    } catch (e) {
+      toast({ title: "Could not remove the member", description: (e as Error).message, variant: "destructive" });
+    } finally { setBusy(false); }
+  };
+
+  const submitMorbidity = async (draft: Partial<MorbidityRow>) => {
+    if (!passportPerson || !selected) return;
+    setBusy(true);
+    try {
+      await saveMorbidityRecord({
+        ...draft,
+        project_id: projectId,
+        module_id: moduleId || null,
+        household_id: selected.id,
+        beneficiary_id: passportPerson.beneficiaryId,
+        member_id: passportPerson.memberId,
+        condition: String(draft.condition || "lymphoedema"),
+      });
+      toast({ title: "Morbidity care recorded" });
+      await reloadMorbidity();
+    } catch (e) {
+      toast({ title: "Could not save the care record", description: (e as Error).message, variant: "destructive" });
+    } finally { setBusy(false); }
+  };
+
 
   const totals = useMemo(() => {
     const cov = householdCoverage(rounds);
@@ -392,45 +525,110 @@ const HouseholdsPanel = ({
               </Card>
 
               <Card className="p-4">
-                <div className="mb-2 flex items-center gap-2">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
                   <Users className="h-4 w-4 text-primary" />
-                  <h4 className="font-semibold text-foreground">Members ({selectedMembers.length})</h4>
+                  <h4 className="font-semibold text-foreground">Everyone in this household ({roster.length})</h4>
+                  <div className="flex-1" />
+                  {canManage && (
+                    <Button
+                      size="sm" variant="outline" className="gap-1"
+                      onClick={() => { setEditingMember(null); setRosterOpen(true); }}
+                    >
+                      <UserPlus className="h-4 w-4" /> Add household member
+                    </Button>
+                  )}
                 </div>
+                <p className="mb-2 text-xs text-muted-foreground">
+                  Tap a name to open their treatment passport — every round of the five
+                  preventive-chemotherapy diseases, plus their morbidity care.
+                </p>
                 <div className="overflow-x-auto">
-                  <Table>
+                  <Table className="min-w-[680px]">
                     <TableHeader>
                       <TableRow>
                         <TableHead>Name</TableHead>
-                        <TableHead>Case ID</TableHead>
                         <TableHead>Relationship</TableHead>
-                        <TableHead>Status</TableHead>
+                        <TableHead>Sex / age</TableHead>
+                        <TableHead>On the register</TableHead>
+                        <TableHead>Flags</TableHead>
                         <TableHead />
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {selectedMembers.map((b) => (
-                        <TableRow key={b.id}>
-                          <TableCell>
-                            <button className="font-medium text-primary hover:underline" onClick={() => onOpenBeneficiary?.(b)}>
-                              {b.full_name}
-                            </button>
-                          </TableCell>
-                          <TableCell>{b.case_id}</TableCell>
-                          <TableCell>{roleLabel(roleOf(b))}</TableCell>
-                          <TableCell><Badge variant="outline">{b.status}</Badge></TableCell>
-                          <TableCell className="text-right">
-                            {canManage && (
-                              <Button size="sm" variant="ghost" disabled={busy} onClick={() => void detach(b)}>
-                                Remove
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                      {selectedMembers.length === 0 && (
+                      {roster.map((p) => {
+                        const b = p.beneficiaryId
+                          ? beneficiaries.find((x) => x.id === p.beneficiaryId)
+                          : undefined;
+                        const care = morbidityFor(p);
+                        return (
+                          <TableRow key={p.key}>
+                            <TableCell>
+                              <button
+                                className="font-medium text-primary hover:underline"
+                                onClick={() => setPassportPerson(p)}
+                              >
+                                {p.name}
+                              </button>
+                              {b && <p className="text-xs text-muted-foreground">{b.case_id}</p>}
+                            </TableCell>
+                            <TableCell>{relationshipLabel(p.relationship)}</TableCell>
+                            <TableCell>
+                              {[p.sex, p.age != null ? `${p.age} yrs` : null].filter(Boolean).join(" · ") || "—"}
+                            </TableCell>
+                            <TableCell>
+                              {p.registered
+                                ? <Badge variant="outline" className="border-primary/40 text-primary">Beneficiary</Badge>
+                                : <Badge variant="outline">Member only</Badge>}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1">
+                                {p.isPregnant && <Badge variant="outline">Pregnant</Badge>}
+                                {p.isBreastfeeding && <Badge variant="outline">Breastfeeding</Badge>}
+                                {care.length > 0 && (
+                                  <Badge variant="outline" className="border-amber-500/40 text-amber-700">
+                                    {care.length} morbidity record{care.length > 1 ? "s" : ""}
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {canManage && (
+                                <div className="flex justify-end gap-1">
+                                  {p.memberId && (
+                                    <Button
+                                      size="sm" variant="ghost"
+                                      onClick={() => {
+                                        const row = rosterMembers.find((m) => m.id === p.memberId) || null;
+                                        setEditingMember(row);
+                                        setRosterOpen(true);
+                                      }}
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                  {p.memberId && !p.registered && (
+                                    <Button
+                                      size="sm" variant="ghost" className="text-destructive" disabled={busy}
+                                      onClick={() => void removeMember(p.memberId as string)}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                  {b && (
+                                    <Button size="sm" variant="ghost" disabled={busy} onClick={() => void detach(b)}>
+                                      Remove
+                                    </Button>
+                                  )}
+                                </div>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                      {roster.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center text-muted-foreground">
-                            No beneficiaries attached to this household yet.
+                          <TableCell colSpan={6} className="text-center text-muted-foreground">
+                            Nobody listed in this household yet.
                           </TableCell>
                         </TableRow>
                       )}
@@ -438,6 +636,7 @@ const HouseholdsPanel = ({
                   </Table>
                 </div>
               </Card>
+
 
               <Card className="p-4">
                 <div className="mb-2 flex items-center gap-2">
@@ -754,6 +953,9 @@ const HouseholdsPanel = ({
           moduleId={moduleId}
           household={selected}
           members={selectedMembers}
+          otherMembers={roster.filter((p) => !p.registered && p.memberId).map((p) => ({
+            id: p.memberId as string, name: p.name, sex: p.sex, age: p.age,
+          }))}
           existingRounds={rounds}
           round={editingRound}
           roundTreatments={editingRound ? treatments.filter((t) => t.round_id === editingRound.id) : []}
@@ -867,6 +1069,35 @@ const HouseholdsPanel = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Household member (not a registered beneficiary) */}
+      <HouseholdMemberDialog
+        open={rosterOpen}
+        onOpenChange={(v) => { setRosterOpen(v); if (!v) setEditingMember(null); }}
+        member={editingMember}
+        saving={busy}
+        onSave={submitMember}
+      />
+
+      {/* One person's NTD treatment passport */}
+      {passportPerson && selected && (
+        <PersonNtdPassport
+          open={!!passportPerson}
+          onOpenChange={(v) => !v && setPassportPerson(null)}
+          person={passportPerson}
+          householdLabel={selected.name || selected.household_code}
+          rounds={selectedRounds}
+          treatments={treatments}
+          morbidity={morbidityFor(passportPerson)}
+          canManage={canManage}
+          saving={busy}
+          onSaveMorbidity={submitMorbidity}
+          onOpenRecord={() => {
+            const b = beneficiaries.find((x) => x.id === passportPerson.beneficiaryId);
+            if (b) { setPassportPerson(null); onOpenBeneficiary?.(b); }
+          }}
+        />
+      )}
     </div>
   );
 };
