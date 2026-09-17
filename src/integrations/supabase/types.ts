@@ -12816,6 +12816,10 @@ export type Database = {
           title: string
         }[]
       }
+      match_wash_source: {
+        Args: { _project_id: string; _village: string; _ward: string }
+        Returns: string
+      }
       mda_lens_allows_project: {
         Args: { _project_id: string; _user_id: string }
         Returns: boolean
