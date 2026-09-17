@@ -270,6 +270,150 @@ export const saveMdaRound = async (
   if (error) throw error;
 };
 
+/** Totals derived from the person-level register, never typed by hand. */
+export const tallyTreatments = (
+  rows: MdaTreatmentRow[],
+  extra?: { unregistered_eligible?: number; unregistered_treated?: number },
+) => {
+  const count = (o: string) => rows.filter((r) => r.outcome === o).length;
+  const treated = count("treated") + (extra?.unregistered_treated || 0);
+  const notEligible = count("not_eligible");
+  const eligible = rows.length - notEligible + (extra?.unregistered_eligible || 0);
+  return {
+    eligible,
+    treated,
+    absent: count("absent"),
+    refused: count("refused"),
+    notEligible,
+    observed: rows.filter((r) => r.outcome === "treated" && r.directly_observed).length,
+    adverse: rows.filter((r) => r.adverse_event).length,
+    serious: rows.filter((r) => r.adverse_event_serious).length,
+    percent: eligible > 0 ? Math.round((treated / eligible) * 100) : 0,
+  };
+};
+
+/** Blocking problems that must be resolved before a round can be saved. */
+export const validateRound = (
+  draft: Partial<MdaRoundRow>,
+  rows: MdaTreatmentRow[],
+  existing: MdaRoundRow[],
+  editingId?: string,
+) => {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const t = tallyTreatments(rows, draft);
+  if (!String(draft.round_name || "").trim()) errors.push("Give the round a name, e.g. 2026 Round 1.");
+  if (!draft.round_date) errors.push("Choose the date the household was visited.");
+  if (t.treated > t.eligible) errors.push("More people are marked treated than are eligible.");
+  if (rows.length === 0 && !(draft.unregistered_eligible || 0)) {
+    errors.push("Record at least one person, or enter unregistered household members.");
+  }
+  for (const r of rows) {
+    if (r.outcome === "not_eligible" && !r.not_eligible_reason) {
+      errors.push(`Give a reason why ${r.person_name} is not eligible.`);
+    }
+  }
+  if (draft.round_date && new Date(draft.round_date) > new Date()) {
+    warnings.push("The visit date is in the future.");
+  }
+  const dup = existing.find((r) =>
+    r.id !== editingId &&
+    r.household_id === draft.household_id &&
+    r.disease === draft.disease &&
+    r.round_name.trim().toLowerCase() === String(draft.round_name || "").trim().toLowerCase());
+  if (dup) warnings.push("A round with this name and disease already exists for this household.");
+  if (!draft.drug_batch) warnings.push("Medicine batch number is missing.");
+  if (!draft.distributor_name) warnings.push("Distributor (CDD) name is missing.");
+  if (draft.drug_expiry && new Date(draft.drug_expiry) < new Date(String(draft.round_date))) {
+    errors.push("The medicine expired before the visit date.");
+  }
+  if (t.serious > 0) warnings.push(`${t.serious} serious side effect(s) recorded — follow up.`);
+  return { errors, warnings, tally: t };
+};
+
+/** True when key accountability fields were left blank on a saved round. */
+export const roundIsIncomplete = (r: MdaRoundRow) =>
+  !r.drug || !r.drug_batch || !r.distributor_name;
+
+/** Saves a round together with its person-level register (replacing old rows). */
+export const saveMdaRoundWithTreatments = async (
+  round: Partial<MdaRoundRow> & { project_id: string; household_id: string; round_name: string },
+  rows: MdaTreatmentRow[],
+): Promise<string> => {
+  const { data: auth } = await supabase.auth.getUser();
+  const tally = tallyTreatments(rows, round);
+  const payload = {
+    ...round,
+    persons_eligible: tally.eligible,
+    persons_treated: tally.treated,
+    persons_absent: tally.absent,
+    persons_refused: tally.refused,
+    directly_observed: tally.observed > 0,
+  };
+
+  let roundId = round.id;
+  if (roundId) {
+    const { id, ...rest } = payload as Record<string, unknown> & { id?: string };
+    const { error } = await db.from("household_mda_rounds").update(rest).eq("id", roundId);
+    if (error) throw error;
+    const { error: delErr } = await db.from("household_mda_treatments").delete().eq("round_id", roundId);
+    if (delErr) throw delErr;
+  } else {
+    const { data, error } = await db.from("household_mda_rounds")
+      .insert({ ...payload, created_by: auth.user?.id }).select("id").single();
+    if (error) throw error;
+    roundId = (data as { id: string }).id;
+  }
+
+  if (rows.length) {
+    const { error } = await db.from("household_mda_treatments").insert(
+      rows.map(({ id: _ignored, ...r }) => ({
+        ...r,
+        round_id: roundId,
+        project_id: round.project_id,
+        module_id: round.module_id ?? null,
+        household_id: round.household_id,
+        created_by: auth.user?.id,
+      })),
+    );
+    if (error) throw error;
+  }
+  return roundId as string;
+};
+
+export const deleteMdaRound = async (id: string) => {
+  const { error } = await db.from("household_mda_rounds").delete().eq("id", id);
+  if (error) throw error;
+};
+
+/** CSV of every treatment round with its coverage, for offline analysis. */
+export const roundsCsv = (
+  rounds: MdaRoundRow[],
+  households: HouseholdRow[],
+  treatments: MdaTreatmentRow[],
+) => {
+  const head = [
+    "Round", "Date", "Type", "Disease", "Medicine", "Batch", "Expiry", "Distributor",
+    "Supervisor", "Household", "Community", "Ward", "LGA", "Eligible", "Treated",
+    "Absent", "Refused", "Coverage %", "Side effects", "Serious",
+  ];
+  const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const lines = rounds.map((r) => {
+    const h = households.find((x) => x.id === r.household_id);
+    const rows = treatments.filter((t) => t.round_id === r.id);
+    const t = tallyTreatments(rows, r);
+    return [
+      r.round_name, r.round_date, r.round_type || "annual", diseaseLabel(r.disease), r.drug,
+      r.drug_batch, r.drug_expiry, r.distributor_name, r.supervisor_name,
+      h?.household_code, r.community || h?.village, h?.ward, h?.lga,
+      r.persons_eligible, r.persons_treated, r.persons_absent, r.persons_refused,
+      r.persons_eligible ? Math.round((r.persons_treated / r.persons_eligible) * 100) : 0,
+      t.adverse, t.serious,
+    ].map(esc).join(",");
+  });
+  return [head.map(esc).join(","), ...lines].join("\n");
+};
+
 /** Attaches (or detaches) a beneficiary to a household. */
 export const setBeneficiaryHousehold = async (
   beneficiaryId: string,
