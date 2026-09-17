@@ -1,7 +1,7 @@
 // CDD case search for MMDP — CDD register, potential cases, clinician
 // confirmation, and registration or referral of confirmed cases.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -313,7 +313,9 @@ const CddCaseSearchPanel = ({
         )}
       </Card>
 
-      <CddRewardsPanel cdds={scopedCdds} cases={scoped} facilityName={facilityName} />
+      <CddRewardsPanel
+        cdds={scopedCdds} cases={scoped} facilityName={facilityName} ledger={ledger}
+      />
 
       {/* Potential cases */}
       <Card className="p-4">
