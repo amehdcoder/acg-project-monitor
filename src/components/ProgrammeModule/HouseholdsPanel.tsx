@@ -1124,6 +1124,7 @@ const HouseholdsPanel = ({
           rounds={selectedRounds}
           treatments={treatments}
           morbidity={morbidityFor(passportPerson)}
+          washSource={washSources.find((w) => w.id === selected.wash_source_id) || null}
           canManage={canManage}
           saving={busy}
           onSaveMorbidity={submitMorbidity}
