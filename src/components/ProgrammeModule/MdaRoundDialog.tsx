@@ -33,6 +33,8 @@ interface Props {
   moduleId?: string;
   household: HouseholdRow;
   members: BeneficiaryRow[];
+  /** Household members who are not registered beneficiaries. */
+  otherMembers?: { id: string; name: string; sex: string | null; age: number | null }[];
   existingRounds: MdaRoundRow[];
   /** Round being edited, if any. */
   round?: MdaRoundRow | null;
@@ -86,7 +88,7 @@ const blankRow = (
 });
 
 const MdaRoundDialog = ({
-  open, onOpenChange, projectId, moduleId, household, members, existingRounds,
+  open, onOpenChange, projectId, moduleId, household, members, otherMembers, existingRounds,
   round, roundTreatments, saving, onSave,
 }: Props) => {
   const [draft, setDraft] = useState<Partial<MdaRoundRow>>({});
@@ -116,12 +118,22 @@ const MdaRoundDialog = ({
         unregistered_treated: 0,
         notes: null,
       });
-      setRows(members.map((b) => ({
-        ...blankRow(projectId, moduleId, household.id, b),
-        drug: d.drug,
-      })));
+      setRows([
+        ...members.map((b) => ({
+          ...blankRow(projectId, moduleId, household.id, b),
+          drug: d.drug,
+        })),
+        ...(otherMembers || []).map((m) => ({
+          ...blankRow(projectId, moduleId, household.id),
+          member_id: m.id,
+          person_name: m.name,
+          sex: m.sex,
+          age_years: m.age,
+          drug: d.drug,
+        })),
+      ]);
     }
-  }, [open, round, roundTreatments, members, household, projectId, moduleId]);
+  }, [open, round, roundTreatments, members, otherMembers, household, projectId, moduleId]);
 
   const { errors, warnings, tally } = useMemo(
     () => validateRound(draft, rows, existingRounds, round?.id),

@@ -80,6 +80,8 @@ export interface MdaTreatmentRow {
   round_id?: string;
   household_id: string;
   beneficiary_id: string | null;
+  /** Roster member this dose belongs to when the person is not registered. */
+  member_id?: string | null;
   person_name: string;
   age_years: number | null;
   sex: string | null;
