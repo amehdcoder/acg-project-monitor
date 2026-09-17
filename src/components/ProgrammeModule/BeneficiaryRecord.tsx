@@ -37,6 +37,7 @@ import LesionStagingPanel from "./LesionStagingPanel";
 import BeneficiaryRiskCard from "./BeneficiaryRiskCard";
 import { recordAudit } from "./useProgrammeModule";
 import { requestBeneficiaryDeletion } from "@/lib/programmeModule/facilityOps";
+import { useCddSource } from "@/lib/programmeModule/cddCaseSearch";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -133,6 +134,11 @@ const BeneficiaryRecord = ({
   const flags = useMemo(() => evaluateDataQuality(config, beneficiary), [config, beneficiary]);
   const accent = config.branding.accent;
   const profile = beneficiary.profile || {};
+  // Who found this person during community case search, and from where.
+  const cddSource = useCddSource(
+    beneficiary.cdd_id || (profile.identified_by_cdd as string | undefined) || null,
+    beneficiary.referring_facility_id || null,
+  );
 
   const questionLabel = (name: string) =>
     config.sections.flatMap((s) => s.questions || []).find((q) => q.name === name)?.label || name;
