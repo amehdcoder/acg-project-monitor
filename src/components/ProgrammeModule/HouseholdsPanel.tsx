@@ -34,6 +34,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { BeneficiaryRow } from "@/lib/programmeModule/types";
 import MdaRoundDialog from "./MdaRoundDialog";
+import GeoCascadeFields from "./GeoCascadeFields";
 import { downloadCsv } from "@/lib/mda/csvExport";
 import {
   HOUSEHOLD_ROLES, NTD_DISEASES, SANITATION_TYPES, WASH_SOURCE_TYPES,
@@ -635,21 +636,19 @@ const HouseholdsPanel = ({
                 onChange={(e) => setHhDraft({ ...hhDraft, household_size: Number(e.target.value) })}
               />
             </div>
-            <div>
-              <Label className="text-sm">Village / settlement</Label>
-              <Input className="mt-1" value={hhDraft.village || ""} onChange={(e) => setHhDraft({ ...hhDraft, village: e.target.value })} />
-            </div>
-            <div>
-              <Label className="text-sm">Ward</Label>
-              <Input className="mt-1" value={hhDraft.ward || ""} onChange={(e) => setHhDraft({ ...hhDraft, ward: e.target.value })} />
-            </div>
-            <div>
-              <Label className="text-sm">LGA</Label>
-              <Input className="mt-1" value={hhDraft.lga || ""} onChange={(e) => setHhDraft({ ...hhDraft, lga: e.target.value })} />
-            </div>
-            <div>
-              <Label className="text-sm">State</Label>
-              <Input className="mt-1" value={hhDraft.state || ""} onChange={(e) => setHhDraft({ ...hhDraft, state: e.target.value })} />
+            <div className="sm:col-span-2">
+              <GeoCascadeFields
+                value={{
+                  state: hhDraft.state || "", lga: hhDraft.lga || "",
+                  ward: hhDraft.ward || "", community: hhDraft.village || "",
+                }}
+                communityLabel="Village / settlement"
+                onChange={(p) => setHhDraft({
+                  ...hhDraft,
+                  state: p.state ?? "", lga: p.lga ?? "",
+                  ward: p.ward ?? "", village: p.community ?? "",
+                })}
+              />
             </div>
             <div className="sm:col-span-2">
               <Label className="text-sm">Community water point</Label>

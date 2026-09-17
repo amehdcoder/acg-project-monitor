@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import GeoCascadeFields from "./GeoCascadeFields";
 import { Switch } from "@/components/ui/switch";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -156,24 +157,12 @@ const CddDialog = ({
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-4">
-            <div>
-              <Label className="text-sm">State</Label>
-              <Input className="mt-1" value={form.state} onChange={(e) => set("state", e.target.value)} />
-            </div>
-            <div>
-              <Label className="text-sm">LGA</Label>
-              <Input className="mt-1" value={form.lga} onChange={(e) => set("lga", e.target.value)} />
-            </div>
-            <div>
-              <Label className="text-sm">Ward</Label>
-              <Input className="mt-1" value={form.ward} onChange={(e) => set("ward", e.target.value)} />
-            </div>
-            <div>
-              <Label className="text-sm">Community</Label>
-              <Input className="mt-1" value={form.community} onChange={(e) => set("community", e.target.value)} />
-            </div>
-          </div>
+          <GeoCascadeFields
+            value={{ state: form.state, lga: form.lga, ward: form.ward, community: form.community }}
+            onChange={(p) => setForm((f) => ({
+              ...f, state: p.state ?? "", lga: p.lga ?? "", ward: p.ward ?? "", community: p.community ?? "",
+            }))}
+          />
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div>

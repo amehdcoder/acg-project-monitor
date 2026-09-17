@@ -13,6 +13,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import GeoCascadeFields from "./GeoCascadeFields";
 import PhotoCaptureField from "./PhotoCaptureField";
 import {
   AFFECTED_SIDES, MMDP_CONDITIONS, SEX_OPTIONS, savePotentialCase,
@@ -214,35 +215,23 @@ const PotentialCaseDialog = ({
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <Label className="text-sm">Phone</Label>
               <Input className="mt-1" value={form.phone} onChange={(e) => set("phone", e.target.value)} />
-            </div>
-            <div>
-              <Label className="text-sm">State</Label>
-              <Input className="mt-1" value={form.state} onChange={(e) => set("state", e.target.value)} />
-            </div>
-            <div>
-              <Label className="text-sm">LGA</Label>
-              <Input className="mt-1" value={form.lga} onChange={(e) => set("lga", e.target.value)} />
-            </div>
-            <div>
-              <Label className="text-sm">Ward</Label>
-              <Input className="mt-1" value={form.ward} onChange={(e) => set("ward", e.target.value)} />
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <Label className="text-sm">Community / village</Label>
-              <Input className="mt-1" value={form.community} onChange={(e) => set("community", e.target.value)} />
             </div>
             <div>
               <Label className="text-sm">House address / landmark</Label>
               <Input className="mt-1" value={form.address} onChange={(e) => set("address", e.target.value)} />
             </div>
           </div>
+
+          <GeoCascadeFields
+            value={{ state: form.state, lga: form.lga, ward: form.ward, community: form.community }}
+            onChange={(p) => setForm((f) => ({
+              ...f, state: p.state ?? "", lga: p.lga ?? "", ward: p.ward ?? "", community: p.community ?? "",
+            }))}
+          />
 
           <div className="grid gap-3 sm:grid-cols-4">
             <div>
