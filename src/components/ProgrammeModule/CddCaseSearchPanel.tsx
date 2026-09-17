@@ -39,6 +39,7 @@ import { conditionLabel } from "@/lib/programmeModule/lesionVision";
 import CddDialog from "./CddDialog";
 import PotentialCaseDialog from "./PotentialCaseDialog";
 import CaseConfirmationDialog from "./CaseConfirmationDialog";
+import CddRewardsPanel from "./CddRewardsPanel";
 
 interface Props {
   projectId: string;
@@ -308,6 +309,8 @@ const CddCaseSearchPanel = ({
           </div>
         )}
       </Card>
+
+      <CddRewardsPanel cdds={scopedCdds} cases={scoped} facilityName={facilityName} />
 
       {/* Potential cases */}
       <Card className="p-4">
