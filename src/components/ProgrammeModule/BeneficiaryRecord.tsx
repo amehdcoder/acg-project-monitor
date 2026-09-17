@@ -255,6 +255,16 @@ const BeneficiaryRecord = ({
                   <p className="mt-0.5 text-sm font-medium" style={{ color: `hsl(${accent})` }}>
                     Case ID: {beneficiary.case_id}
                   </p>
+                  {(cddSource.cdd || cddSource.facility) && (
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Found by CDD:{" "}
+                      <span className="font-medium text-foreground">
+                        {cddSource.cdd?.full_name || "—"}
+                      </span>
+                      {cddSource.cdd?.cdd_code ? ` (${cddSource.cdd.cdd_code})` : ""}
+                      {cddSource.facility ? ` · Referred from ${cddSource.facility}` : ""}
+                    </p>
+                  )}
                   <div className="mt-3 grid gap-x-6 gap-y-1 sm:grid-cols-2">
                     {headerFacts.map((f) => (
                       <div key={f.label} className="flex gap-2 text-sm">

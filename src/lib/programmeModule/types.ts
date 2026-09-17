@@ -136,6 +136,12 @@ export interface BeneficiaryRow {
   household_id?: string | null;
   /** Relationship to the head of that household. */
   household_role?: string | null;
+  /** Community-directed distributor who found and referred this person. */
+  cdd_id?: string | null;
+  /** Facility the person was first identified at, before registration. */
+  referring_facility_id?: string | null;
+  /** Facility currently holding the case. */
+  facility_id?: string | null;
   created_at: string;
   updated_at: string;
   /** Client-only: true while the record is still queued offline. */
