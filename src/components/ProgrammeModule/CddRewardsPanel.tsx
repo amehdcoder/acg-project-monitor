@@ -164,6 +164,9 @@ const CddRewardsPanel = ({ cdds, cases, facilityName, ledger = [] }: Props) => {
                         </Badge>
                       )}
                     </TableCell>
+                    <TableCell className="text-right font-medium text-foreground">
+                      {awarded.get(r.cddId) || 0}
+                    </TableCell>
                     <TableCell className="text-right text-base font-semibold text-foreground">
                       {r.points}
                     </TableCell>
