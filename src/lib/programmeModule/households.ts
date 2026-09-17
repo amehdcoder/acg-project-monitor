@@ -185,27 +185,31 @@ export const useHouseholds = (projectId?: string, moduleId?: string) => {
   const [households, setHouseholds] = useState<HouseholdRow[]>([]);
   const [washSources, setWashSources] = useState<WashSourceRow[]>([]);
   const [rounds, setRounds] = useState<MdaRoundRow[]>([]);
+  const [treatments, setTreatments] = useState<MdaTreatmentRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     if (!projectId) { setHouseholds([]); setLoading(false); return; }
     setLoading(true);
-    const [h, w, r] = await Promise.all([
+    const [h, w, r, t] = await Promise.all([
       db.from("beneficiary_households").select("*").eq("project_id", projectId)
         .order("created_at", { ascending: false }).limit(2000),
       db.from("community_wash_sources").select("*").eq("project_id", projectId).order("name").limit(1000),
       db.from("household_mda_rounds").select("*").eq("project_id", projectId)
         .order("round_date", { ascending: false }).limit(4000),
+      db.from("household_mda_treatments").select("*").eq("project_id", projectId)
+        .order("created_at", { ascending: false }).limit(20000),
     ]);
     setHouseholds((h.data as HouseholdRow[]) || []);
     setWashSources((w.data as WashSourceRow[]) || []);
     setRounds((r.data as MdaRoundRow[]) || []);
+    setTreatments((t.data as MdaTreatmentRow[]) || []);
     setLoading(false);
   }, [projectId]);
 
   useEffect(() => { void load(); }, [load, moduleId]);
 
-  return { households, washSources, rounds, loading, reload: load };
+  return { households, washSources, rounds, treatments, loading, reload: load };
 };
 
 /** Next household code for a project — HH-0001, HH-0002 … restarting at 1. */
