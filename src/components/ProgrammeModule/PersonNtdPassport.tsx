@@ -24,7 +24,8 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, Loader2, Pill, Plus, ShieldCheck, Stethoscope,
+  Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, Droplets, Loader2, Pill, Plus,
+  ShieldCheck, Stethoscope,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
