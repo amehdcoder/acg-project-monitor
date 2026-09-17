@@ -33,6 +33,7 @@ import BeneficiaryFormDialog from "./BeneficiaryFormDialog";
 import LongitudinalOutcome from "./LongitudinalOutcome";
 import CareNetworkPanel from "./CareNetworkPanel";
 import LimbProgressPanel from "./LimbProgressPanel";
+import BeneficiaryMdaPanel from "./BeneficiaryMdaPanel";
 import LesionStagingPanel from "./LesionStagingPanel";
 import BeneficiaryRiskCard from "./BeneficiaryRiskCard";
 import { recordAudit } from "./useProgrammeModule";
@@ -365,6 +366,7 @@ const BeneficiaryRecord = ({
                 {componentsVisible && <TabsTrigger value="lesions">Lesion staging</TabsTrigger>}
                 <TabsTrigger value="outcomes">Outcomes</TabsTrigger>
                 <TabsTrigger value="care">Care network</TabsTrigger>
+                <TabsTrigger value="mda">MDA rounds</TabsTrigger>
                 <TabsTrigger value="history">History</TabsTrigger>
               </TabsList>
             </div>
@@ -577,6 +579,13 @@ const BeneficiaryRecord = ({
                 referrals={referrals}
                 onRefer={() => setReferralOpen(true)}
                 onChanged={() => { void reload(); onChanged(); }}
+              />
+            </TabsContent>
+
+            <TabsContent value="mda" className="mt-4">
+              <BeneficiaryMdaPanel
+                beneficiaryId={beneficiary.id}
+                householdId={beneficiary.household_id}
               />
             </TabsContent>
 
