@@ -310,6 +310,8 @@ const CddCaseSearchPanel = ({
         )}
       </Card>
 
+      <CddRewardsPanel cdds={scopedCdds} cases={scoped} facilityName={facilityName} />
+
       {/* Potential cases */}
       <Card className="p-4">
         <div className="mb-3 flex flex-wrap items-center gap-2">
