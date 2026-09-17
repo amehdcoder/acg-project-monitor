@@ -85,6 +85,8 @@ const CddCaseSearchPanel = ({
   const [editingCase, setEditingCase] = useState<PotentialCaseRow | null>(null);
   const [deleteCaseRow, setDeleteCaseRow] = useState<PotentialCaseRow | null>(null);
   const [confirmCase, setConfirmCase] = useState<PotentialCaseRow | null>(null);
+  /** Case just confirmed by a clinician, awaiting the keep-or-refer decision. */
+  const [decisionCaseId, setDecisionCaseId] = useState("");
   const [referCase, setReferCase] = useState<PotentialCaseRow | null>(null);
   const [referTo, setReferTo] = useState("");
   const [referUrgency, setReferUrgency] = useState("routine");
@@ -107,6 +109,16 @@ const CddCaseSearchPanel = ({
   }, [cdds, allowedFacilityIds]);
 
   const visible = useCaseFilter(scoped, term, status);
+  /** Cases a CDD has submitted that no clinician has reviewed yet. */
+  const pendingQueue = useMemo(
+    () => scoped.filter((c) => c.status === "pending")
+      .sort((a, b) => String(a.case_date).localeCompare(String(b.case_date))),
+    [scoped],
+  );
+  const decisionCase = useMemo(
+    () => cases.find((c) => c.id === decisionCaseId) || null,
+    [cases, decisionCaseId],
+  );
   const totals = caseSearchTotals(scoped);
 
   const facilityName = (id?: string | null) =>
@@ -239,6 +251,51 @@ const CddCaseSearchPanel = ({
         <Metric label="Confirmed" value={totals.confirmed + totals.referred} hint="Not yet registered" />
         <Metric label="Registered" value={totals.registered} hint="Case ID issued" />
       </div>
+
+      {/* Clinician review queue — the step between a CDD finding a case and it
+          becoming a registered beneficiary. */}
+      <Card className="p-4">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <Stethoscope className="h-4 w-4 text-primary" />
+          <h4 className="font-semibold text-foreground">Clinician review queue</h4>
+          <Badge variant="outline">{pendingQueue.length} waiting</Badge>
+          <div className="flex-1" />
+          <p className="text-xs text-muted-foreground">
+            Review the CDD's pictures, stage the lesion, then confirm or rule the case out.
+          </p>
+        </div>
+        {pendingQueue.length === 0 ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">
+            Nothing waiting for a clinician. New case-search findings appear here automatically.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {pendingQueue.map((c) => (
+              <div
+                key={c.id}
+                className="flex flex-wrap items-center gap-3 rounded-lg border border-border p-3"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-foreground">
+                    {c.full_name}
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">
+                      {conditionLabel(c.condition)} · {c.community || "—"}
+                    </span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Found by {cddName(c.cdd_id)} · {fmtDate(c.case_date)} · {facilityName(c.facility_id)}
+                  </p>
+                </div>
+                {canActOn(c) && (
+                  <Button size="sm" className="gap-1" onClick={() => setConfirmCase(c)}>
+                    <Stethoscope className="h-4 w-4" /> Review &amp; stage
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
 
       {/* CDD register */}
       <Card className="p-4">
@@ -491,8 +548,57 @@ const CddCaseSearchPanel = ({
         onOpenChange={(v) => { if (!v) setConfirmCase(null); }}
         projectId={projectId}
         caseRow={confirmCase}
-        onSaved={() => void reloadCases()}
+        onSaved={(confirmed) => {
+          const id = confirmCase?.id || "";
+          void reloadCases();
+          if (confirmed && id) setDecisionCaseId(id);
+        }}
       />
+
+      {/* Straight after confirmation: keep the person here, or refer them on */}
+      <Dialog open={!!decisionCase} onOpenChange={(v) => { if (!v) setDecisionCaseId(""); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Case confirmed — what happens next?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className={cn("rounded-md border p-3 text-sm", toneClasses.success)}>
+              <p className="font-medium">{decisionCase?.full_name}</p>
+              <p className="text-xs">
+                {conditionLabel(decisionCase?.confirmed_condition || decisionCase?.condition)}
+                {decisionCase?.confirmed_stage != null && ` · stage ${decisionCase.confirmed_stage}`}
+                {" · found by "}{cddName(decisionCase?.cdd_id)}
+              </p>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Keep them at {facilityName(decisionCase?.facility_id)} and a Case ID is issued now, or refer
+              them to another facility — the Case ID is then issued when that facility accepts.
+            </p>
+          </div>
+          <DialogFooter className="flex-col gap-2 sm:flex-row">
+            <Button
+              variant="outline"
+              onClick={() => {
+                const c = decisionCase;
+                setDecisionCaseId("");
+                if (c) { setReferCase(c); setReferTo(""); setReferSummary(""); setReferUrgency("routine"); }
+              }}
+            >
+              <Send className="mr-1 h-4 w-4" /> Refer to another facility
+            </Button>
+            <Button
+              disabled={!!busyId}
+              onClick={async () => {
+                const c = decisionCase;
+                setDecisionCaseId("");
+                if (c) await register(c, c.facility_id);
+              }}
+            >
+              <BadgeCheck className="mr-1 h-4 w-4" /> Register here &amp; issue Case ID
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Refer a confirmed case to another facility */}
       <Dialog open={!!referCase} onOpenChange={(v) => { if (!v) setReferCase(null); }}>

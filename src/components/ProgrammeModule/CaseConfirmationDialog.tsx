@@ -38,7 +38,8 @@ interface Props {
   onOpenChange: (v: boolean) => void;
   projectId: string;
   caseRow: PotentialCaseRow | null;
-  onSaved: () => void;
+  /** true when the clinician confirmed it as an MMDP case. */
+  onSaved: (confirmed: boolean) => void;
 }
 
 const CaseConfirmationDialog = ({ open, onOpenChange, projectId, caseRow, onSaved }: Props) => {
@@ -163,7 +164,7 @@ const CaseConfirmationDialog = ({ open, onOpenChange, projectId, caseRow, onSave
           ? "It can now be kept at this facility or referred on."
           : "It stays in the register for reporting.",
       });
-      onSaved();
+      onSaved(confirmed);
       onOpenChange(false);
     } catch (e) {
       toast({ title: "Could not save", description: (e as Error).message, variant: "destructive" });

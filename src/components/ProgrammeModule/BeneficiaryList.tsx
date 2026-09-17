@@ -20,6 +20,8 @@ interface Props {
   loading: boolean;
   onOpen: (b: BeneficiaryRow) => void;
   onRegister: () => void;
+  /** Hidden when the person may not add or edit beneficiaries. */
+  canRegister?: boolean;
   onRefresh: () => void;
   projectId?: string;
 }
@@ -36,7 +38,9 @@ const ACCENTS = [
 const facilityIdOf = (b: BeneficiaryRow) =>
   (b as unknown as { facility_id?: string | null }).facility_id || null;
 
-const BeneficiaryList = ({ beneficiaries, config, loading, onOpen, onRegister, onRefresh, projectId }: Props) => {
+const BeneficiaryList = ({
+  beneficiaries, config, loading, onOpen, onRegister, onRefresh, projectId, canRegister = true,
+}: Props) => {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [lga, setLga] = useState("all");
@@ -149,9 +153,9 @@ const BeneficiaryList = ({ beneficiaries, config, loading, onOpen, onRegister, o
           <Button variant="outline" size="icon" onClick={onRefresh} aria-label="Refresh list">
             <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
           </Button>
-          <Button onClick={onRegister} className="gap-1">
+          {canRegister && <Button onClick={onRegister} className="gap-1">
             <UserPlus className="h-4 w-4" /> Register beneficiary
-          </Button>
+          </Button>}
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -214,9 +218,9 @@ const BeneficiaryList = ({ beneficiaries, config, loading, onOpen, onRegister, o
         <Button variant="outline" size="icon" onClick={onRefresh} aria-label="Refresh list">
           <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
         </Button>
-        <Button onClick={onRegister} className="gap-1">
+        {canRegister && <Button onClick={onRegister} className="gap-1">
           <UserPlus className="h-4 w-4" /> Register beneficiary
-        </Button>
+        </Button>}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

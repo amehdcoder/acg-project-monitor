@@ -63,6 +63,19 @@ export const useBeneficiaries = (moduleId?: string) => {
     setLoading(false);
   }, [moduleId]);
 
+  /**
+   * Put a row straight into the list without waiting for a refetch — the
+   * register reflects a new or edited beneficiary the moment it is saved.
+   */
+  const upsert = useCallback((row: BeneficiaryRow) => {
+    setRows((prev) => {
+      const without = prev.filter((r) =>
+        r.id !== row.id
+        && !(row.submission_uuid && r.submission_uuid === row.submission_uuid));
+      return [row, ...without];
+    });
+  }, []);
+
   useEffect(() => {
     bindQueueAutoFlush();
     void load();
@@ -71,7 +84,29 @@ export const useBeneficiaries = (moduleId?: string) => {
     return () => window.removeEventListener("programme-module-queue", onQueue);
   }, [load]);
 
-  return { beneficiaries: rows, loading, reload: load };
+  // Anything saved on another device or by a colleague appears without a reload.
+  useEffect(() => {
+    if (!moduleId) return;
+    const channel = supabase
+      .channel(`beneficiaries-${moduleId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "beneficiaries", filter: `module_id=eq.${moduleId}` },
+        (payload) => {
+          const row = payload.new as unknown as BeneficiaryRow;
+          if (payload.eventType === "DELETE") {
+            const gone = payload.old as unknown as { id?: string };
+            setRows((prev) => prev.filter((r) => r.id !== gone?.id));
+            return;
+          }
+          if (row?.id) upsert(row);
+        },
+      )
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [moduleId, upsert]);
+
+  return { beneficiaries: rows, loading, reload: load, upsert };
 };
 
 /** Everything attached to one beneficiary: services, referrals and history. */
