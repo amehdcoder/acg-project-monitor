@@ -70,6 +70,8 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
   const [focalFacilityId, setFocalFacilityId] = useState<string | undefined>(undefined);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [selected, setSelected] = useState<BeneficiaryRow | null>(null);
+  /** Record created from a confirmed case-search case, awaiting full details. */
+  const [completing, setCompleting] = useState<BeneficiaryRow | null>(null);
   const [pending, setPending] = useState(queueCount());
   const [creating, setCreating] = useState(false);
   const [deleteRequestsOpen, setDeleteRequestsOpen] = useState(false);
@@ -383,6 +385,7 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
             && (can("manage_cdds") || can("confirm_cases"))}
           allowedFacilityIds={isFocalPerson ? Object.keys(facilityLevels) : null}
           onBeneficiaryRegistered={() => void reloadBeneficiaries()}
+          onCompleteRecord={(row) => setCompleting(row)}
         />
       )}
 
