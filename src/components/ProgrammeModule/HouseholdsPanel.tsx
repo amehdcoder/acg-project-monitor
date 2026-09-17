@@ -38,7 +38,7 @@ import GeoCascadeFields from "./GeoCascadeFields";
 import HouseholdMemberDialog from "./HouseholdMemberDialog";
 import PersonNtdPassport from "./PersonNtdPassport";
 import {
-  deleteHouseholdMember, relationshipLabel, saveHouseholdMember, useHouseholdMembers,
+  buildPassport, deleteHouseholdMember, relationshipLabel, saveHouseholdMember, useHouseholdMembers,
   type HouseholdMemberRow, type RosterPerson,
 } from "@/lib/programmeModule/householdMembers";
 import {
@@ -436,10 +436,10 @@ const HouseholdsPanel = ({
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Metric label="Households" value={String(totals.households)} hint="Registered clusters on this project" tone="var(--health-blue, 209 100% 36%)" />
-        <Metric label="People grouped" value={String(totals.people)} hint="Beneficiaries attached to a household" tone="var(--health-teal, 176 100% 31%)" />
-        <Metric label="MDA coverage" value={`${totals.coverage}%`} hint="Treated against eligible, all rounds" tone="var(--health-blue, 209 100% 36%)" />
-        <Metric label="Unimproved water" value={String(totals.unimproved)} hint="Households on an unimproved source" tone="var(--health-red, 356 63% 56%)" />
+        <Metric label="Coverage this year" value={`${totals.coverage}%`} hint={totals.coverageHint} tone="var(--health-blue, 209 100% 36%)" />
+        <Metric label="Households not reached" value={String(totals.notVisited)} hint={totals.notVisitedHint} tone="var(--health-amber, 45 87% 61%)" />
+        <Metric label="Persistently missed people" value={String(totals.persistent)} hint="Missed two or more rounds in a row" tone="var(--health-red, 356 63% 56%)" />
+        <Metric label="Exposed to unsafe water" value={String(totals.exposed)} hint={totals.exposedHint} tone="var(--health-teal, 176 100% 31%)" />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
