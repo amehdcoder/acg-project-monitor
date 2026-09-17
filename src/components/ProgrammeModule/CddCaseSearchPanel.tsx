@@ -71,6 +71,8 @@ const CddCaseSearchPanel = ({
   const { levels } = useMyFacilityAccess();
   const { cdds, reload: reloadCdds } = useCdds(projectId);
   const { cases, loading, reload: reloadCases } = usePotentialCases(projectId);
+  const { ledger, reload: reloadLedger } = useCddPointsLedger(projectId);
+  const casePoints = pointsByCase(ledger);
 
   const [cddOpen, setCddOpen] = useState(false);
   const [editingCdd, setEditingCdd] = useState<CddRow | null>(null);
