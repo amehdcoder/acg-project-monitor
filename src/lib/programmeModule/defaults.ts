@@ -233,7 +233,7 @@ export const CISKULA_PRESET: ProgrammeModuleConfig = {
     followUpIntervalDays: 30,
   },
   layout: {
-    headerFields: ["date_of_birth", "gender", "phone", "village", "lga", "state", "disability"],
+    headerFields: ["date_of_birth", "gender", "marital_status", "phone", "village", "lga", "state", "disability"],
     clinicalFields: [
       "primary_condition", "disability", "mental_health_status", "nutrition_status",
       "education_level", "occupation", "income_source", "consent_obtained",
@@ -309,7 +309,7 @@ export const BLANK_PRESET: ProgrammeModuleConfig = {
     followUpIntervalDays: 30,
   },
   layout: {
-    headerFields: ["date_of_birth", "gender", "phone", "village", "lga", "state"],
+    headerFields: ["date_of_birth", "gender", "marital_status", "phone", "village", "lga", "state"],
     clinicalFields: [],
     quickActions: [
       { key: "add_service", label: "Add New Service", icon: "PlusCircle" },
