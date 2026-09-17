@@ -69,9 +69,7 @@ export const useBeneficiaries = (moduleId?: string) => {
    */
   const upsert = useCallback((row: BeneficiaryRow) => {
     setRows((prev) => {
-      const without = prev.filter((r) =>
-        r.id !== row.id
-        && !(row.submission_uuid && r.submission_uuid === row.submission_uuid));
+      const without = prev.filter((r) => r.id !== row.id);
       return [row, ...without];
     });
   }, []);
