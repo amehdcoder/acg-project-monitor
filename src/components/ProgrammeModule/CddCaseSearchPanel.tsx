@@ -74,6 +74,7 @@ const Metric = ({ label, value, hint }: { label: string; value: number | string;
 
 const CddCaseSearchPanel = ({
   projectId, moduleId, canRecord = false, allowedFacilityIds = null, onBeneficiaryRegistered,
+  onCompleteRecord,
 }: Props) => {
   const { toast } = useToast();
   const { facilities } = useFacilities(projectId);
