@@ -187,3 +187,73 @@ export const rewardSummary = (rows: CddReward[]) => ({
   confirmed: rows.reduce((s, r) => s + r.confirmed, 0),
   topTier: rows.filter((r) => r.tier.key === "gold" || r.tier.key === "champion").length,
 });
+
+// ---------------------------------------------------------------------------
+// Awarded points ledger
+//
+// The database awards points automatically as each case moves (found →
+// confirmed → registered) and rewrites them if a clinician decision is
+// corrected, so the ledger below is an audit trail of what was actually
+// credited per case. The leaderboard above stays the scoring view (it adds the
+// accuracy bonus, which is earned across cases rather than on one case).
+// ---------------------------------------------------------------------------
+
+import { useCallback, useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+
+export interface CddPointRow {
+  id: string;
+  cdd_id: string;
+  case_id: string;
+  points: number;
+  reason: string;
+  awarded_on: string;
+}
+
+export const POINT_REASON_LABEL: Record<string, string> = {
+  case_found: "Case found — awaiting clinician",
+  case_confirmed: "Clinician confirmed the case",
+  case_registered: "Registered at a facility with a Case ID",
+};
+
+export const useCddPointsLedger = (projectId?: string) => {
+  const [rows, setRows] = useState<CddPointRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    if (!projectId) { setRows([]); setLoading(false); return; }
+    setLoading(true);
+    const { data } = await (supabase as unknown as { from: (t: string) => any })
+      .from("mmdp_cdd_points")
+      .select("id, cdd_id, case_id, points, reason, awarded_on")
+      .eq("project_id", projectId)
+      .order("awarded_on", { ascending: false });
+    setRows((data as CddPointRow[]) || []);
+    setLoading(false);
+  }, [projectId]);
+
+  useEffect(() => { void load(); }, [load]);
+  return { ledger: rows, loading, reload: load };
+};
+
+/** Total points credited per CDD, optionally from a date. */
+export const pointsByCdd = (ledger: CddPointRow[], fromISO?: string) => {
+  const map = new Map<string, number>();
+  ledger.forEach((r) => {
+    if (fromISO && r.awarded_on < fromISO) return;
+    map.set(r.cdd_id, (map.get(r.cdd_id) || 0) + r.points);
+  });
+  return map;
+};
+
+/** Points credited for one case, with the reasons behind them. */
+export const pointsByCase = (ledger: CddPointRow[]) => {
+  const map = new Map<string, { points: number; reasons: string[] }>();
+  ledger.forEach((r) => {
+    const cur = map.get(r.case_id) || { points: 0, reasons: [] };
+    cur.points += r.points;
+    cur.reasons.push(POINT_REASON_LABEL[r.reason] || r.reason);
+    map.set(r.case_id, cur);
+  });
+  return map;
+};

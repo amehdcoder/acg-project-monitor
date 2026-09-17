@@ -22,13 +22,16 @@ import { toneClasses } from "@/lib/programmeModule/defaults";
 import type { CddRow, PotentialCaseRow } from "@/lib/programmeModule/cddCaseSearch";
 import {
   CYCLE_OPTIONS, DEFAULT_REWARD_RULES, REWARD_TIERS, currentCycleStart,
-  rewardBreakdown, rewardSummary, useCddRewards,
+  rewardBreakdown, rewardSummary, useCddRewards, pointsByCdd,
+  type CddPointRow,
 } from "@/lib/programmeModule/cddRewards";
 
 interface Props {
   cdds: CddRow[];
   cases: PotentialCaseRow[];
   facilityName: (id?: string | null) => string;
+  /** Points the database credited automatically, case by case. */
+  ledger?: CddPointRow[];
 }
 
 const rankIcon = (rank: number) => {
@@ -37,21 +40,24 @@ const rankIcon = (rank: number) => {
   return null;
 };
 
-const CddRewardsPanel = ({ cdds, cases, facilityName }: Props) => {
+const CddRewardsPanel = ({ cdds, cases, facilityName, ledger = [] }: Props) => {
   const [period, setPeriod] = useState("cycle");
   const [rulesOpen, setRulesOpen] = useState(false);
   const rows = useCddRewards(cdds, cases, period);
+  const awarded = pointsByCdd(ledger, period === "cycle" ? currentCycleStart() : undefined);
   const totals = rewardSummary(rows);
   const top = rows[0];
 
   const exportCsv = () => {
     const head = [
       "Rank", "CDD", "Facility", "Community", "Cases found", "Confirmed",
-      "Registered", "Not a case", "Accuracy %", "Points", "Tier", "Recognition",
+      "Registered", "Not a case", "Accuracy %", "Auto-awarded per case", "Points",
+      "Tier", "Recognition",
     ];
     const lines = rows.map((r) => [
       r.rank, r.name, facilityName(r.facilityId), r.community, r.found, r.confirmed,
-      r.registered, r.notACase, r.precision, r.points, r.tier.label, r.tier.recognition,
+      r.registered, r.notACase, r.precision, awarded.get(r.cddId) || 0, r.points,
+      r.tier.label, r.tier.recognition,
     ]);
     const csv = [head, ...lines]
       .map((l) => l.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","))
@@ -126,6 +132,7 @@ const CddRewardsPanel = ({ cdds, cases, facilityName }: Props) => {
                   <TableHead className="text-right">Confirmed</TableHead>
                   <TableHead className="text-right">Registered</TableHead>
                   <TableHead className="text-right">Accuracy</TableHead>
+                  <TableHead className="text-right">Awarded per case</TableHead>
                   <TableHead className="text-right">Points</TableHead>
                   <TableHead>Tier &amp; progress</TableHead>
                 </TableRow>
@@ -156,6 +163,9 @@ const CddRewardsPanel = ({ cdds, cases, facilityName }: Props) => {
                           bonus
                         </Badge>
                       )}
+                    </TableCell>
+                    <TableCell className="text-right font-medium text-foreground">
+                      {awarded.get(r.cddId) || 0}
                     </TableCell>
                     <TableCell className="text-right text-base font-semibold text-foreground">
                       {r.points}

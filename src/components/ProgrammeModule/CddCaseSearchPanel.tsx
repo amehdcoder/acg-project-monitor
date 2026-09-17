@@ -1,7 +1,7 @@
 // CDD case search for MMDP — CDD register, potential cases, clinician
 // confirmation, and registration or referral of confirmed cases.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/table";
 import {
   UserPlus, Plus, Search, Stethoscope, Send, CheckCircle2, Trash2, Pencil,
-  Users, ClipboardList, Hospital, BadgeCheck,
+  Users, ClipboardList, Hospital, BadgeCheck, Award,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -40,6 +40,7 @@ import CddDialog from "./CddDialog";
 import PotentialCaseDialog from "./PotentialCaseDialog";
 import CaseConfirmationDialog from "./CaseConfirmationDialog";
 import CddRewardsPanel from "./CddRewardsPanel";
+import { pointsByCase, useCddPointsLedger } from "@/lib/programmeModule/cddRewards";
 
 interface Props {
   projectId: string;
@@ -70,6 +71,11 @@ const CddCaseSearchPanel = ({
   const { levels } = useMyFacilityAccess();
   const { cdds, reload: reloadCdds } = useCdds(projectId);
   const { cases, loading, reload: reloadCases } = usePotentialCases(projectId);
+  const { ledger, reload: reloadLedger } = useCddPointsLedger(projectId);
+  const casePoints = pointsByCase(ledger);
+  // Points are credited by the database as a case moves, so refresh the ledger
+  // whenever the case register changes.
+  useEffect(() => { void reloadLedger(); }, [cases, reloadLedger]);
 
   const [cddOpen, setCddOpen] = useState(false);
   const [editingCdd, setEditingCdd] = useState<CddRow | null>(null);
@@ -310,7 +316,9 @@ const CddCaseSearchPanel = ({
         )}
       </Card>
 
-      <CddRewardsPanel cdds={scopedCdds} cases={scoped} facilityName={facilityName} />
+      <CddRewardsPanel
+        cdds={scopedCdds} cases={scoped} facilityName={facilityName} ledger={ledger}
+      />
 
       {/* Potential cases */}
       <Card className="p-4">
@@ -361,6 +369,16 @@ const CddCaseSearchPanel = ({
                           </Badge>
                         )}
                         {incoming && <Badge variant="outline">Referred to your facility</Badge>}
+                        {!!casePoints.get(c.id)?.points && (
+                          <Badge
+                            variant="outline"
+                            className={cn("gap-1 border", toneClasses.success)}
+                            title={casePoints.get(c.id)?.reasons.join(" · ")}
+                          >
+                            <Award className="h-3 w-3" />
+                            {casePoints.get(c.id)?.points} pts to {cddName(c.cdd_id)}
+                          </Badge>
+                        )}
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">
                         {c.sex || "—"}{c.age != null ? `, ${c.age} yrs` : ""} ·{" "}

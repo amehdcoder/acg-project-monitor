@@ -18,6 +18,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useFacilities, FACILITY_TYPE_LABEL } from "@/lib/programmeModule/facilities";
+import { useCdds } from "@/lib/programmeModule/cddCaseSearch";
 import PhotoCaptureField from "./PhotoCaptureField";
 
 interface Props {
@@ -42,6 +43,11 @@ const BeneficiaryFormDialog = ({
     ((existing as unknown as { facility_id?: string | null })?.facility_id) || "",
   );
   const [photoUrl, setPhotoUrl] = useState<string | null>(existing?.photo_url || null);
+  const { cdds } = useCdds(projectId);
+  const [cddId, setCddId] = useState<string>(existing?.cdd_id || "");
+  const [referringFacilityId, setReferringFacilityId] = useState<string>(
+    existing?.referring_facility_id || "",
+  );
 
 
   const sections = useMemo(
@@ -85,6 +91,8 @@ const BeneficiaryFormDialog = ({
         ward: (answers.ward as string) || null,
         village: (answers.village as string) || null,
         facility_id: facilityId || null,
+        cdd_id: cddId || null,
+        referring_facility_id: referringFacilityId || null,
         photo_url: photoUrl,
       };
 
@@ -162,6 +170,38 @@ const BeneficiaryFormDialog = ({
               <p className="text-xs text-muted-foreground">
                 Focal persons of this facility manage the case and see its full history.
               </p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Found by CDD (community case search)</Label>
+                <Select value={cddId || "none"} onValueChange={(v) => setCddId(v === "none" ? "" : v)}>
+                  <SelectTrigger><SelectValue placeholder="Not found through case search" /></SelectTrigger>
+                  <SelectContent className="z-[1200] max-h-72 bg-popover">
+                    <SelectItem value="none">Not found through case search</SelectItem>
+                    {cdds.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.full_name}{c.cdd_code ? ` — ${c.cdd_code}` : ""}
+                        {c.community ? ` (${c.community})` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Referred from facility</Label>
+                <Select
+                  value={referringFacilityId || "none"}
+                  onValueChange={(v) => setReferringFacilityId(v === "none" ? "" : v)}
+                >
+                  <SelectTrigger><SelectValue placeholder="No referring facility" /></SelectTrigger>
+                  <SelectContent className="z-[1200] max-h-72 bg-popover">
+                    <SelectItem value="none">No referring facility</SelectItem>
+                    {facilities.map((f) => (
+                      <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             {sections.map((section) => (
               <div key={section.id} className="space-y-4">
