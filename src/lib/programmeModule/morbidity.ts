@@ -91,6 +91,25 @@ export const useMorbidityRecords = (projectId?: string) => {
   return { records, loading, reload: load };
 };
 
+/** Morbidity care recorded for one person, for their own record page. */
+export const useMorbidityForPerson = (beneficiaryId?: string | null) => {
+  const [records, setRecords] = useState<MorbidityRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    if (!beneficiaryId) { setRecords([]); setLoading(false); return; }
+    setLoading(true);
+    const { data } = await db.from("ntd_morbidity_records").select("*")
+      .eq("beneficiary_id", beneficiaryId).order("recorded_on", { ascending: false }).limit(200);
+    setRecords((data as MorbidityRow[]) || []);
+    setLoading(false);
+  }, [beneficiaryId]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  return { records, loading, reload: load };
+};
+
 export const saveMorbidityRecord = async (
   row: Partial<MorbidityRow> & { project_id: string; condition: string },
 ): Promise<string> => {

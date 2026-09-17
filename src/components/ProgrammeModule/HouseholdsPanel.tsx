@@ -46,7 +46,8 @@ import {
 } from "@/lib/programmeModule/morbidity";
 import { downloadCsv } from "@/lib/mda/csvExport";
 import {
-  HOUSEHOLD_ROLES, NTD_DISEASES, SANITATION_TYPES, WASH_SOURCE_TYPES,
+  HOUSEHOLD_ROLES, NTD_DISEASES, SANITATION_TYPES, WASH_FUNCTIONAL_STATUS, WASH_SOURCE_TYPES,
+  washIsUsable, washStatusLabel,
   deleteMdaRound, diseaseLabel, householdCoverage, nextHouseholdCode, outcomeLabel,
   roleLabel, roundIsIncomplete, roundsCsv, saveHousehold, saveMdaRoundWithTreatments,
   saveWashSource, setBeneficiaryHousehold, tallyTreatments, useHouseholds, washTypeLabel,
@@ -68,6 +69,11 @@ const householdOf = (b: BeneficiaryRow) =>
 const roleOf = (b: BeneficiaryRow) =>
   (b as unknown as { household_role?: string | null }).household_role || "";
 
+const blankWash: Record<string, string | boolean> = {
+  id: "", name: "", source_type: "borehole", sanitation_type: "pit_slab", is_improved: true,
+  functional_status: "functional", state: "", lga: "", ward: "", village: "",
+};
+
 const HouseholdsPanel = ({
   projectId, moduleId, beneficiaries, canManage = true, onOpenBeneficiary, onChanged,
 }: Props) => {
@@ -80,10 +86,7 @@ const HouseholdsPanel = ({
   const [hhOpen, setHhOpen] = useState(false);
   const [hhDraft, setHhDraft] = useState<Partial<HouseholdRow>>({});
   const [washOpen, setWashOpen] = useState(false);
-  const [washDraft, setWashDraft] = useState<Record<string, string | boolean>>({
-    name: "", source_type: "borehole", sanitation_type: "pit_slab", is_improved: true,
-    village: "", ward: "",
-  });
+  const [washDraft, setWashDraft] = useState<Record<string, string | boolean>>({ ...blankWash });
   const [mdaOpen, setMdaOpen] = useState(false);
   const [editingRound, setEditingRound] = useState<MdaRoundRow | null>(null);
   const [deleteRound, setDeleteRound] = useState<MdaRoundRow | null>(null);
@@ -123,6 +126,50 @@ const HouseholdsPanel = ({
   const selectedRounds = selected ? rounds.filter((r) => r.household_id === selected.id) : [];
   const coverage = householdCoverage(selectedRounds);
   const unassigned = beneficiaries.filter((b) => !householdOf(b));
+
+  /**
+   * The places registered beneficiaries actually live, cascading state → LGA →
+   * ward → village, so a water point can only be attached to a real location.
+   */
+  const geoOptions = useMemo(() => {
+    const uniq = (xs: (string | null | undefined)[]) =>
+      Array.from(new Set(xs.map((x) => String(x || "").trim()).filter(Boolean))).sort();
+    const inState = beneficiaries.filter((b) => !washDraft.state || b.state === washDraft.state);
+    const inLga = inState.filter((b) => !washDraft.lga || b.lga === washDraft.lga);
+    const inWard = inLga.filter((b) => !washDraft.ward || b.ward === washDraft.ward);
+    return {
+      states: uniq(beneficiaries.map((b) => b.state)),
+      lgas: uniq(inState.map((b) => b.lga)),
+      wards: uniq(inLga.map((b) => b.ward)),
+      villages: uniq(inWard.map((b) => b.village)),
+    };
+  }, [beneficiaries, washDraft.state, washDraft.lga, washDraft.ward]);
+
+  /** Beneficiary communities with no working water point registered. */
+  const uncoveredPlaces = useMemo(() => {
+    const usable = washSources.filter((w) => washIsUsable(w.functional_status));
+    const map = new Map<string, { state: string; lga: string; ward: string; village: string; people: number; broken: string | null }>();
+    for (const b of beneficiaries) {
+      const village = String(b.village || "").trim();
+      const ward = String(b.ward || "").trim();
+      if (!village && !ward) continue;
+      const covered = usable.some((w) =>
+        (village && String(w.village || "").trim().toLowerCase() === village.toLowerCase()) ||
+        (ward && String(w.ward || "").trim().toLowerCase() === ward.toLowerCase()));
+      if (covered) continue;
+      const key = `${b.state || ""}|${b.lga || ""}|${ward}|${village}`;
+      const broken = washSources.find((w) =>
+        !washIsUsable(w.functional_status) &&
+        village && String(w.village || "").trim().toLowerCase() === village.toLowerCase());
+      const prev = map.get(key);
+      map.set(key, {
+        state: b.state || "", lga: b.lga || "", ward, village,
+        people: (prev?.people || 0) + 1,
+        broken: broken ? `${broken.name} — ${washStatusLabel(broken.functional_status)}` : null,
+      });
+    }
+    return Array.from(map.values()).sort((a, b) => b.people - a.people);
+  }, [beneficiaries, washSources]);
 
   const rosterMembers = useMemo(
     () => (selected ? memberRows.filter((m) => m.household_id === selected.id) : []),
@@ -344,20 +391,21 @@ const HouseholdsPanel = ({
     setBusy(true);
     try {
       await saveWashSource({
+        id: (washDraft.id as string) || undefined,
         project_id: projectId,
         name: String(washDraft.name),
         source_type: String(washDraft.source_type),
         sanitation_type: String(washDraft.sanitation_type),
         is_improved: Boolean(washDraft.is_improved),
+        functional_status: String(washDraft.functional_status || "functional"),
+        state: String(washDraft.state || "") || null,
+        lga: String(washDraft.lga || "") || null,
         village: String(washDraft.village || "") || null,
         ward: String(washDraft.ward || "") || null,
       } as never);
-      toast({ title: "Water point added" });
+      toast({ title: washDraft.id ? "Water point updated" : "Water point added" });
       setWashOpen(false);
-      setWashDraft({
-        name: "", source_type: "borehole", sanitation_type: "pit_slab", is_improved: true,
-        village: "", ward: "",
-      });
+      setWashDraft(blankWash);
       await reload();
     } catch (e) {
       toast({ title: "Could not save the water point", description: (e as Error).message, variant: "destructive" });
@@ -760,6 +808,136 @@ const HouseholdsPanel = ({
             </>
           )}
 
+          {/* Water points and the places that have none */}
+          <Card className="p-4">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <Droplets className="h-4 w-4 text-primary" />
+              <h4 className="font-semibold text-foreground">Community water points</h4>
+              <Badge variant="outline">{washSources.length}</Badge>
+              <div className="flex-1" />
+              {canManage && (
+                <Button
+                  size="sm" variant="outline" className="gap-1"
+                  onClick={() => { setWashDraft({ ...blankWash }); setWashOpen(true); }}
+                >
+                  <Plus className="h-4 w-4" /> Add water point
+                </Button>
+              )}
+            </div>
+            <div className="overflow-x-auto">
+              <Table className="min-w-[640px]">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Water point</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Where</TableHead>
+                    <TableHead>Condition</TableHead>
+                    <TableHead className="text-right">Households served</TableHead>
+                    <TableHead />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {washSources.map((w) => (
+                    <TableRow key={w.id}>
+                      <TableCell className="font-medium text-foreground">
+                        {w.name}
+                        {!w.is_improved && (
+                          <Badge variant="outline" className="ml-2 border-destructive/40 text-destructive">
+                            Unimproved
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>{washTypeLabel(w.source_type)}</TableCell>
+                      <TableCell>{[w.village, w.ward, w.lga].filter(Boolean).join(" · ") || "—"}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={cn(!washIsUsable(w.functional_status) && "border-destructive/40 text-destructive")}
+                        >
+                          {washStatusLabel(w.functional_status)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {households.filter((h) => h.wash_source_id === w.id).length}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {canManage && (
+                          <Button
+                            size="sm" variant="ghost"
+                            onClick={() => {
+                              setWashDraft({
+                                id: w.id, name: w.name, source_type: w.source_type,
+                                sanitation_type: w.sanitation_type || "pit_slab",
+                                is_improved: w.is_improved,
+                                functional_status: w.functional_status || "functional",
+                                state: w.state || "", lga: w.lga || "",
+                                ward: w.ward || "", village: w.village || "",
+                              });
+                              setWashOpen(true);
+                            }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {washSources.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-muted-foreground">
+                        No water point registered yet.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {uncoveredPlaces.length > 0 && (
+              <div className="mt-4">
+                <div className="mb-2 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-destructive" />
+                  <h5 className="text-sm font-semibold text-foreground">
+                    Beneficiary locations with no working water point
+                  </h5>
+                  <Badge variant="outline">{uncoveredPlaces.length}</Badge>
+                </div>
+                <div className="space-y-2">
+                  {uncoveredPlaces.map((p) => (
+                    <div
+                      key={`${p.ward}-${p.village}`}
+                      className="flex flex-wrap items-center gap-2 rounded-md border border-border p-2 text-sm"
+                    >
+                      <span className="font-medium text-foreground">{p.village || p.ward}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {[p.ward, p.lga, p.state].filter(Boolean).join(" · ")} · {p.people} beneficiar
+                        {p.people === 1 ? "y" : "ies"}
+                      </span>
+                      {p.broken
+                        ? <Badge variant="outline" className="border-destructive/40 text-destructive">{p.broken}</Badge>
+                        : <Badge variant="outline">No water point</Badge>}
+                      <div className="flex-1" />
+                      {canManage && (
+                        <Button
+                          size="sm" variant="outline"
+                          onClick={() => {
+                            setWashDraft({
+                              ...blankWash,
+                              state: p.state, lga: p.lga, ward: p.ward, village: p.village,
+                            });
+                            setWashOpen(true);
+                          }}
+                        >
+                          Register one here
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Card>
+
           {/* Project-wide rounds */}
           <Card className="p-4">
             <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -926,7 +1104,11 @@ const HouseholdsPanel = ({
       {/* Water point */}
       <Dialog open={washOpen} onOpenChange={setWashOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Add a community water point</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>
+              {washDraft.id ? "Edit community water point" : "Add a community water point"}
+            </DialogTitle>
+          </DialogHeader>
           <div className="space-y-3">
             <div>
               <Label className="text-sm">Name</Label>
@@ -963,21 +1145,57 @@ const HouseholdsPanel = ({
               </Select>
             </div>
             <div>
-              <Label className="text-sm">Village / settlement</Label>
-              <Input className="mt-1" value={String(washDraft.village)} onChange={(e) => setWashDraft({ ...washDraft, village: e.target.value })} />
+              <Label className="text-sm">Working condition</Label>
+              <Select
+                value={String(washDraft.functional_status || "functional")}
+                onValueChange={(v) => setWashDraft({ ...washDraft, functional_status: v })}
+              >
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent className="z-[1200] bg-popover">
+                  {WASH_FUNCTIONAL_STATUS.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <p className="mt-1 text-xs text-muted-foreground">
-                Every household in this village — and so every beneficiary in them — is linked to
-                this water point automatically.
+                Households are only linked to a water point that works. A broken or abandoned one
+                leaves its village recorded as having no water point.
               </p>
             </div>
-            <div>
-              <Label className="text-sm">Ward</Label>
-              <Input
-                className="mt-1" placeholder="Used when a village name is not recorded"
-                value={String(washDraft.ward || "")}
-                onChange={(e) => setWashDraft({ ...washDraft, ward: e.target.value })}
-              />
+            <Separator />
+            <div className="grid gap-3 sm:grid-cols-2">
+              {([
+                ["state", "State", geoOptions.states],
+                ["lga", "LGA", geoOptions.lgas],
+                ["ward", "Ward", geoOptions.wards],
+                ["village", "Community / village", geoOptions.villages],
+              ] as const).map(([key, label, options]) => (
+                <div key={key}>
+                  <Label className="text-sm">{label}</Label>
+                  <Select
+                    value={String(washDraft[key] || "none")}
+                    onValueChange={(v) => setWashDraft({
+                      ...washDraft,
+                      [key]: v === "none" ? "" : v,
+                      ...(key === "state" ? { lga: "", ward: "", village: "" } : {}),
+                      ...(key === "lga" ? { ward: "", village: "" } : {}),
+                      ...(key === "ward" ? { village: "" } : {}),
+                    })}
+                  >
+                    <SelectTrigger className="mt-1"><SelectValue placeholder="Not specified" /></SelectTrigger>
+                    <SelectContent className="z-[1200] max-h-72 bg-popover">
+                      <SelectItem value="none">Not specified</SelectItem>
+                      {options.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
             </div>
+            <p className="text-xs text-muted-foreground">
+              These are the places your registered beneficiaries actually live. Every household in
+              the chosen village — and so every beneficiary in it — is linked to this water point
+              automatically.
+            </p>
             <div className="flex items-center justify-between rounded-md border border-border p-3">
               <div>
                 <p className="text-sm font-medium text-foreground">Improved source</p>

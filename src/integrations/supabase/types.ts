@@ -4527,6 +4527,7 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string
+          functional_status: string
           id: string
           is_improved: boolean
           latitude: number | null
@@ -4545,6 +4546,7 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string
+          functional_status?: string
           id?: string
           is_improved?: boolean
           latitude?: number | null
@@ -4563,6 +4565,7 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string
+          functional_status?: string
           id?: string
           is_improved?: boolean
           latitude?: number | null

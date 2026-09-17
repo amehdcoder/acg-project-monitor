@@ -64,6 +64,25 @@ export const useHouseholdMembers = (projectId?: string) => {
   return { members, loading, reload: load };
 };
 
+/** The roster of one household — used on a person's own record page. */
+export const useMembersOfHousehold = (householdId?: string | null) => {
+  const [members, setMembers] = useState<HouseholdMemberRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    if (!householdId) { setMembers([]); setLoading(false); return; }
+    setLoading(true);
+    const { data } = await db.from("household_members").select("*")
+      .eq("household_id", householdId).order("created_at", { ascending: true }).limit(200);
+    setMembers((data as HouseholdMemberRow[]) || []);
+    setLoading(false);
+  }, [householdId]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  return { members, loading, reload: load };
+};
+
 export const saveHouseholdMember = async (
   row: Partial<HouseholdMemberRow> & { project_id: string; household_id: string; full_name: string },
 ): Promise<string> => {
