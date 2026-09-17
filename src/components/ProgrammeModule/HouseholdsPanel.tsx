@@ -81,7 +81,8 @@ const HouseholdsPanel = ({
   const [hhDraft, setHhDraft] = useState<Partial<HouseholdRow>>({});
   const [washOpen, setWashOpen] = useState(false);
   const [washDraft, setWashDraft] = useState<Record<string, string | boolean>>({
-    name: "", source_type: "borehole", sanitation_type: "pit_slab", is_improved: true, village: "",
+    name: "", source_type: "borehole", sanitation_type: "pit_slab", is_improved: true,
+    village: "", ward: "",
   });
   const [mdaOpen, setMdaOpen] = useState(false);
   const [editingRound, setEditingRound] = useState<MdaRoundRow | null>(null);
@@ -349,6 +350,7 @@ const HouseholdsPanel = ({
         sanitation_type: String(washDraft.sanitation_type),
         is_improved: Boolean(washDraft.is_improved),
         village: String(washDraft.village || "") || null,
+        ward: String(washDraft.ward || "") || null,
       } as never);
       toast({ title: "Water point added" });
       setWashOpen(false);
