@@ -40,6 +40,7 @@ import CddDialog from "./CddDialog";
 import PotentialCaseDialog from "./PotentialCaseDialog";
 import CaseConfirmationDialog from "./CaseConfirmationDialog";
 import CddRewardsPanel from "./CddRewardsPanel";
+import { pointsByCase, useCddPointsLedger } from "@/lib/programmeModule/cddRewards";
 
 interface Props {
   projectId: string;
