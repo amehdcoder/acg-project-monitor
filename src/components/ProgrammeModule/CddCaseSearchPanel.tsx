@@ -530,6 +530,14 @@ const CddCaseSearchPanel = ({
                           Withdraw referral
                         </Button>
                       )}
+                      {actable && c.status === "registered" && c.beneficiary_id && onCompleteRecord && (
+                        <Button
+                          variant="outline" size="sm" className="gap-1"
+                          onClick={() => void completeRecord(c, c.beneficiary_id as string)}
+                        >
+                          <ClipboardList className="h-4 w-4" /> Complete record
+                        </Button>
+                      )}
                       {actable && c.status !== "registered" && (
                         <>
                           <Button
