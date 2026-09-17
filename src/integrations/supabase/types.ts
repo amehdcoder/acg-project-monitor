@@ -1451,6 +1451,7 @@ export type Database = {
       beneficiaries: {
         Row: {
           case_id: string
+          cdd_id: string | null
           created_at: string
           created_by: string
           facility_id: string | null
@@ -1466,6 +1467,7 @@ export type Database = {
           photo_url: string | null
           profile: Json
           project_id: string
+          referring_facility_id: string | null
           risk_level: string | null
           state: string | null
           status: string
@@ -1477,6 +1479,7 @@ export type Database = {
         }
         Insert: {
           case_id: string
+          cdd_id?: string | null
           created_at?: string
           created_by?: string
           facility_id?: string | null
@@ -1492,6 +1495,7 @@ export type Database = {
           photo_url?: string | null
           profile?: Json
           project_id: string
+          referring_facility_id?: string | null
           risk_level?: string | null
           state?: string | null
           status?: string
@@ -1503,6 +1507,7 @@ export type Database = {
         }
         Update: {
           case_id?: string
+          cdd_id?: string | null
           created_at?: string
           created_by?: string
           facility_id?: string | null
@@ -1518,6 +1523,7 @@ export type Database = {
           photo_url?: string | null
           profile?: Json
           project_id?: string
+          referring_facility_id?: string | null
           risk_level?: string | null
           state?: string | null
           status?: string
@@ -1528,6 +1534,13 @@ export type Database = {
           ward?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "beneficiaries_cdd_id_fkey"
+            columns: ["cdd_id"]
+            isOneToOne: false
+            referencedRelation: "mmdp_cdds"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "beneficiaries_facility_id_fkey"
             columns: ["facility_id"]
@@ -1554,6 +1567,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beneficiaries_referring_facility_id_fkey"
+            columns: ["referring_facility_id"]
+            isOneToOne: false
+            referencedRelation: "health_facilities"
             referencedColumns: ["id"]
           },
         ]
@@ -8140,6 +8160,57 @@ export type Database = {
           xlsx_base64?: string
         }
         Relationships: []
+      }
+      mmdp_cdd_points: {
+        Row: {
+          awarded_on: string
+          case_id: string
+          cdd_id: string
+          created_at: string
+          id: string
+          points: number
+          project_id: string
+          reason: string
+          updated_at: string
+        }
+        Insert: {
+          awarded_on?: string
+          case_id: string
+          cdd_id: string
+          created_at?: string
+          id?: string
+          points?: number
+          project_id: string
+          reason: string
+          updated_at?: string
+        }
+        Update: {
+          awarded_on?: string
+          case_id?: string
+          cdd_id?: string
+          created_at?: string
+          id?: string
+          points?: number
+          project_id?: string
+          reason?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mmdp_cdd_points_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "mmdp_potential_cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mmdp_cdd_points_cdd_id_fkey"
+            columns: ["cdd_id"]
+            isOneToOne: false
+            referencedRelation: "mmdp_cdds"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       mmdp_cdds: {
         Row: {
