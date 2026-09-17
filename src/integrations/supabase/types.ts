@@ -8141,6 +8141,256 @@ export type Database = {
         }
         Relationships: []
       }
+      mmdp_cdds: {
+        Row: {
+          cdd_code: string | null
+          community: string | null
+          created_at: string
+          created_by: string
+          facility_id: string
+          full_name: string
+          id: string
+          is_active: boolean
+          lga: string | null
+          module_id: string | null
+          notes: string | null
+          phone: string | null
+          project_id: string
+          sex: string | null
+          state: string | null
+          supervisor_name: string | null
+          trained_on: string | null
+          training_status: string
+          updated_at: string
+          ward: string | null
+        }
+        Insert: {
+          cdd_code?: string | null
+          community?: string | null
+          created_at?: string
+          created_by?: string
+          facility_id: string
+          full_name: string
+          id?: string
+          is_active?: boolean
+          lga?: string | null
+          module_id?: string | null
+          notes?: string | null
+          phone?: string | null
+          project_id: string
+          sex?: string | null
+          state?: string | null
+          supervisor_name?: string | null
+          trained_on?: string | null
+          training_status?: string
+          updated_at?: string
+          ward?: string | null
+        }
+        Update: {
+          cdd_code?: string | null
+          community?: string | null
+          created_at?: string
+          created_by?: string
+          facility_id?: string
+          full_name?: string
+          id?: string
+          is_active?: boolean
+          lga?: string | null
+          module_id?: string | null
+          notes?: string | null
+          phone?: string | null
+          project_id?: string
+          sex?: string | null
+          state?: string | null
+          supervisor_name?: string | null
+          trained_on?: string | null
+          training_status?: string
+          updated_at?: string
+          ward?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mmdp_cdds_facility_id_fkey"
+            columns: ["facility_id"]
+            isOneToOne: false
+            referencedRelation: "health_facilities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mmdp_potential_cases: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          acute_attacks_last_year: number | null
+          address: string | null
+          affected_side: string | null
+          age: number | null
+          analysis: Json
+          beneficiary_id: string | null
+          cdd_id: string | null
+          clinical_criteria: Json
+          clinician_notes: string | null
+          community: string | null
+          condition: string
+          confirmed_at: string | null
+          confirmed_by: string | null
+          confirmed_condition: string | null
+          confirmed_stage: number | null
+          confirmed_stage_label: string | null
+          created_at: string
+          created_by: string
+          duration_years: number | null
+          facility_id: string
+          full_name: string
+          id: string
+          latitude: number | null
+          lga: string | null
+          longitude: number | null
+          measurements: Json
+          module_id: string | null
+          notes: string | null
+          phone: string | null
+          photos: Json
+          project_id: string
+          referral_summary: string | null
+          referral_urgency: string | null
+          referred_at: string | null
+          referred_to_facility_id: string | null
+          rejection_reason: string | null
+          search_date: string
+          sex: string | null
+          state: string | null
+          status: string
+          submission_uuid: string | null
+          updated_at: string
+          ward: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          acute_attacks_last_year?: number | null
+          address?: string | null
+          affected_side?: string | null
+          age?: number | null
+          analysis?: Json
+          beneficiary_id?: string | null
+          cdd_id?: string | null
+          clinical_criteria?: Json
+          clinician_notes?: string | null
+          community?: string | null
+          condition?: string
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          confirmed_condition?: string | null
+          confirmed_stage?: number | null
+          confirmed_stage_label?: string | null
+          created_at?: string
+          created_by?: string
+          duration_years?: number | null
+          facility_id: string
+          full_name: string
+          id?: string
+          latitude?: number | null
+          lga?: string | null
+          longitude?: number | null
+          measurements?: Json
+          module_id?: string | null
+          notes?: string | null
+          phone?: string | null
+          photos?: Json
+          project_id: string
+          referral_summary?: string | null
+          referral_urgency?: string | null
+          referred_at?: string | null
+          referred_to_facility_id?: string | null
+          rejection_reason?: string | null
+          search_date?: string
+          sex?: string | null
+          state?: string | null
+          status?: string
+          submission_uuid?: string | null
+          updated_at?: string
+          ward?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          acute_attacks_last_year?: number | null
+          address?: string | null
+          affected_side?: string | null
+          age?: number | null
+          analysis?: Json
+          beneficiary_id?: string | null
+          cdd_id?: string | null
+          clinical_criteria?: Json
+          clinician_notes?: string | null
+          community?: string | null
+          condition?: string
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          confirmed_condition?: string | null
+          confirmed_stage?: number | null
+          confirmed_stage_label?: string | null
+          created_at?: string
+          created_by?: string
+          duration_years?: number | null
+          facility_id?: string
+          full_name?: string
+          id?: string
+          latitude?: number | null
+          lga?: string | null
+          longitude?: number | null
+          measurements?: Json
+          module_id?: string | null
+          notes?: string | null
+          phone?: string | null
+          photos?: Json
+          project_id?: string
+          referral_summary?: string | null
+          referral_urgency?: string | null
+          referred_at?: string | null
+          referred_to_facility_id?: string | null
+          rejection_reason?: string | null
+          search_date?: string
+          sex?: string | null
+          state?: string | null
+          status?: string
+          submission_uuid?: string | null
+          updated_at?: string
+          ward?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mmdp_potential_cases_beneficiary_id_fkey"
+            columns: ["beneficiary_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mmdp_potential_cases_cdd_id_fkey"
+            columns: ["cdd_id"]
+            isOneToOne: false
+            referencedRelation: "mmdp_cdds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mmdp_potential_cases_facility_id_fkey"
+            columns: ["facility_id"]
+            isOneToOne: false
+            referencedRelation: "health_facilities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mmdp_potential_cases_referred_to_facility_id_fkey"
+            columns: ["referred_to_facility_id"]
+            isOneToOne: false
+            referencedRelation: "health_facilities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           category: string
@@ -12361,6 +12611,10 @@ export type Database = {
           _reason: string
           _user_agent?: string
         }
+        Returns: string
+      }
+      register_confirmed_mmdp_case: {
+        Args: { _case_id: string; _facility_id: string }
         Returns: string
       }
       reject_after_hours_request: {
