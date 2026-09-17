@@ -36,6 +36,7 @@ import HouseholdsPanel from "./HouseholdsPanel";
 import KinshipGraphPanel from "./KinshipGraphPanel";
 import LtfuRiskPanel from "./LtfuRiskPanel";
 import ClusterDashboard from "./ClusterDashboard";
+import CddCaseSearchPanel from "./CddCaseSearchPanel";
 import { useIsSafeguardingOfficer } from "@/lib/programmeModule/safeguarding";
 import { useMyFacilityAccess } from "@/lib/programmeModule/facilities";
 
@@ -74,7 +75,7 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
   const { isOfficer, reload: reloadOfficerAccess } = useIsSafeguardingOfficer(projectId);
   const [view, setView] = useState<
     | "records" | "journey" | "facility" | "followups" | "households" | "clusters" | "network"
-    | "risk" | "safeguarding" | "safeguarding_dashboard"
+    | "risk" | "casesearch" | "safeguarding" | "safeguarding_dashboard"
   >("records");
 
 
