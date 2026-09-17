@@ -354,7 +354,10 @@ const HouseholdsPanel = ({
       } as never);
       toast({ title: "Water point added" });
       setWashOpen(false);
-      setWashDraft({ name: "", source_type: "borehole", sanitation_type: "pit_slab", is_improved: true, village: "" });
+      setWashDraft({
+        name: "", source_type: "borehole", sanitation_type: "pit_slab", is_improved: true,
+        village: "", ward: "",
+      });
       await reload();
     } catch (e) {
       toast({ title: "Could not save the water point", description: (e as Error).message, variant: "destructive" });
@@ -962,6 +965,18 @@ const HouseholdsPanel = ({
             <div>
               <Label className="text-sm">Village / settlement</Label>
               <Input className="mt-1" value={String(washDraft.village)} onChange={(e) => setWashDraft({ ...washDraft, village: e.target.value })} />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Every household in this village — and so every beneficiary in them — is linked to
+                this water point automatically.
+              </p>
+            </div>
+            <div>
+              <Label className="text-sm">Ward</Label>
+              <Input
+                className="mt-1" placeholder="Used when a village name is not recorded"
+                value={String(washDraft.ward || "")}
+                onChange={(e) => setWashDraft({ ...washDraft, ward: e.target.value })}
+              />
             </div>
             <div className="flex items-center justify-between rounded-md border border-border p-3">
               <div>
