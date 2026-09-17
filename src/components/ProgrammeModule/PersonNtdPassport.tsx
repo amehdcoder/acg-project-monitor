@@ -49,6 +49,8 @@ interface Props {
   rounds: MdaRoundRow[];
   treatments: MdaTreatmentRow[];
   morbidity: MorbidityRow[];
+  /** The community water point this person's household drinks from. */
+  washSource?: { name: string; is_improved: boolean; source_type: string } | null;
   canManage?: boolean;
   saving?: boolean;
   onSaveMorbidity: (draft: Partial<MorbidityRow>) => Promise<void> | void;
