@@ -34,6 +34,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { BeneficiaryRow } from "@/lib/programmeModule/types";
 import MdaRoundDialog from "./MdaRoundDialog";
+import GeoCascadeFields from "./GeoCascadeFields";
 import { downloadCsv } from "@/lib/mda/csvExport";
 import {
   HOUSEHOLD_ROLES, NTD_DISEASES, SANITATION_TYPES, WASH_SOURCE_TYPES,
