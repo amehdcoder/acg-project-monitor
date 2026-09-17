@@ -41,6 +41,7 @@ import PotentialCaseDialog from "./PotentialCaseDialog";
 import CaseConfirmationDialog from "./CaseConfirmationDialog";
 import CddRewardsPanel from "./CddRewardsPanel";
 import CddFacilityDashboard from "./CddFacilityDashboard";
+import CaseTrackingPanel from "./CaseTrackingPanel";
 import { pointsByCase, useCddPointsLedger } from "@/lib/programmeModule/cddRewards";
 
 interface Props {
@@ -373,6 +374,8 @@ const CddCaseSearchPanel = ({
           </div>
         )}
       </Card>
+
+      <CaseTrackingPanel cases={scoped} facilityName={facilityName} cddName={cddName} />
 
       <CddFacilityDashboard
         cdds={scopedCdds} cases={scoped} facilities={facilities} ledger={ledger}
