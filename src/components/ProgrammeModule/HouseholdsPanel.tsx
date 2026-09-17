@@ -23,17 +23,26 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Home, Plus, Droplets, Pill, Users, Search, Loader2, MapPin, UserPlus,
+  Download, Pencil, Trash2, AlertTriangle,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { BeneficiaryRow } from "@/lib/programmeModule/types";
+import MdaRoundDialog from "./MdaRoundDialog";
+import { downloadCsv } from "@/lib/mda/csvExport";
 import {
   HOUSEHOLD_ROLES, NTD_DISEASES, SANITATION_TYPES, WASH_SOURCE_TYPES,
-  diseaseLabel, householdCoverage, nextHouseholdCode, roleLabel, saveHousehold,
-  saveMdaRound, saveWashSource, setBeneficiaryHousehold, useHouseholds, washTypeLabel,
-  type HouseholdRow,
+  deleteMdaRound, diseaseLabel, householdCoverage, nextHouseholdCode, outcomeLabel,
+  roleLabel, roundIsIncomplete, roundsCsv, saveHousehold, saveMdaRoundWithTreatments,
+  saveWashSource, setBeneficiaryHousehold, tallyTreatments, useHouseholds, washTypeLabel,
+  type HouseholdRow, type MdaRoundRow, type MdaTreatmentRow,
 } from "@/lib/programmeModule/households";
+
 
 interface Props {
   projectId: string;
@@ -53,7 +62,7 @@ const HouseholdsPanel = ({
   projectId, moduleId, beneficiaries, canManage = true, onOpenBeneficiary, onChanged,
 }: Props) => {
   const { toast } = useToast();
-  const { households, washSources, rounds, loading, reload } = useHouseholds(projectId, moduleId);
+  const { households, washSources, rounds, treatments, loading, reload } = useHouseholds(projectId, moduleId);
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string>("");
   const [busy, setBusy] = useState(false);
@@ -65,11 +74,11 @@ const HouseholdsPanel = ({
     name: "", source_type: "borehole", sanitation_type: "pit_slab", is_improved: true, village: "",
   });
   const [mdaOpen, setMdaOpen] = useState(false);
-  const [mdaDraft, setMdaDraft] = useState<Record<string, string>>({
-    round_name: "", disease: "lymphatic_filariasis", drug: "Ivermectin + Albendazole",
-    round_date: new Date().toISOString().slice(0, 10),
-    persons_eligible: "", persons_treated: "", persons_absent: "", persons_refused: "", notes: "",
-  });
+  const [editingRound, setEditingRound] = useState<MdaRoundRow | null>(null);
+  const [deleteRound, setDeleteRound] = useState<MdaRoundRow | null>(null);
+  const [detailRound, setDetailRound] = useState<MdaRoundRow | null>(null);
+  const [roundFilters, setRoundFilters] = useState({ disease: "all", community: "all", from: "", to: "" });
+
   const [memberOpen, setMemberOpen] = useState(false);
   const [memberId, setMemberId] = useState("");
   const [memberRole, setMemberRole] = useState("head");
@@ -111,6 +120,26 @@ const HouseholdsPanel = ({
       unimproved,
     };
   }, [households, rounds, washSources, beneficiaries]);
+
+  const communities = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of rounds) {
+      const h = households.find((x) => x.id === r.household_id);
+      const c = r.community || h?.village;
+      if (c) set.add(c);
+    }
+    return Array.from(set).sort();
+  }, [rounds, households]);
+
+  const filteredRounds = useMemo(() => rounds.filter((r) => {
+    const h = households.find((x) => x.id === r.household_id);
+    if (roundFilters.disease !== "all" && r.disease !== roundFilters.disease) return false;
+    if (roundFilters.community !== "all" && (r.community || h?.village) !== roundFilters.community) return false;
+    if (roundFilters.from && r.round_date < roundFilters.from) return false;
+    if (roundFilters.to && r.round_date > roundFilters.to) return false;
+    return true;
+  }), [rounds, households, roundFilters]);
+
 
   const openNewHousehold = () => {
     setHhDraft({
@@ -161,30 +190,47 @@ const HouseholdsPanel = ({
     } finally { setBusy(false); }
   };
 
-  const submitMda = async () => {
-    if (!selected || !mdaDraft.round_name.trim()) return;
+  const submitMda = async (draft: Partial<MdaRoundRow>, rows: MdaTreatmentRow[]) => {
+    if (!selected) return;
     setBusy(true);
     try {
-      await saveMdaRound({
+      await saveMdaRoundWithTreatments({
+        ...draft,
         project_id: projectId,
         module_id: moduleId || null,
         household_id: selected.id,
-        round_name: mdaDraft.round_name,
-        round_date: mdaDraft.round_date,
-        disease: mdaDraft.disease,
-        drug: mdaDraft.drug || null,
-        persons_eligible: Number(mdaDraft.persons_eligible) || 0,
-        persons_treated: Number(mdaDraft.persons_treated) || 0,
-        persons_absent: Number(mdaDraft.persons_absent) || 0,
-        persons_refused: Number(mdaDraft.persons_refused) || 0,
-      } as never);
-      toast({ title: "Treatment round recorded" });
+        round_name: String(draft.round_name || ""),
+      } as never, rows);
+      toast({ title: editingRound ? "Treatment round updated" : "Treatment round recorded" });
       setMdaOpen(false);
+      setEditingRound(null);
       await reload();
     } catch (e) {
       toast({ title: "Could not save the round", description: (e as Error).message, variant: "destructive" });
     } finally { setBusy(false); }
   };
+
+  const confirmDeleteRound = async () => {
+    if (!deleteRound) return;
+    setBusy(true);
+    try {
+      await deleteMdaRound(deleteRound.id);
+      toast({ title: "Treatment round deleted" });
+      setDeleteRound(null);
+      if (detailRound?.id === deleteRound.id) setDetailRound(null);
+      await reload();
+    } catch (e) {
+      toast({ title: "Could not delete the round", description: (e as Error).message, variant: "destructive" });
+    } finally { setBusy(false); }
+  };
+
+  const exportRounds = () => {
+    downloadCsv(
+      `mda-rounds-${new Date().toISOString().slice(0, 10)}.csv`,
+      roundsCsv(filteredRounds, households, treatments),
+    );
+  };
+
 
   const attachMember = async () => {
     if (!selected || !memberId) return;
@@ -317,7 +363,7 @@ const HouseholdsPanel = ({
                       <Button size="sm" variant="outline" className="gap-1" onClick={() => setMemberOpen(true)}>
                         <UserPlus className="h-4 w-4" /> Add member
                       </Button>
-                      <Button size="sm" className="gap-1" onClick={() => setMdaOpen(true)}>
+                      <Button size="sm" className="gap-1" onClick={() => { setEditingRound(null); setMdaOpen(true); }}>
                         <Pill className="h-4 w-4" /> Record MDA round
                       </Button>
                     </div>
@@ -398,7 +444,8 @@ const HouseholdsPanel = ({
                   <h4 className="font-semibold text-foreground">Mass drug administration rounds</h4>
                 </div>
                 <div className="overflow-x-auto">
-                  <Table>
+                  <Table className="min-w-[760px]">
+
                     <TableHeader>
                       <TableRow>
                         <TableHead>Round</TableHead>
@@ -407,14 +454,32 @@ const HouseholdsPanel = ({
                         <TableHead>Medicine</TableHead>
                         <TableHead>Treated / eligible</TableHead>
                         <TableHead>Coverage</TableHead>
+                        <TableHead />
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {selectedRounds.map((r) => {
                         const pct = r.persons_eligible ? Math.round((r.persons_treated / r.persons_eligible) * 100) : 0;
+                        const t = tallyTreatments(treatments.filter((x) => x.round_id === r.id), r);
                         return (
                           <TableRow key={r.id}>
-                            <TableCell className="font-medium text-foreground">{r.round_name}</TableCell>
+                            <TableCell className="font-medium text-foreground">
+                              <button className="text-primary hover:underline" onClick={() => setDetailRound(r)}>
+                                {r.round_name}
+                              </button>
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {roundIsIncomplete(r) && (
+                                  <Badge variant="outline" className="gap-1 border-amber-500/40 text-amber-700">
+                                    <AlertTriangle className="h-3 w-3" /> Incomplete
+                                  </Badge>
+                                )}
+                                {t.serious > 0 && (
+                                  <Badge variant="outline" className="gap-1 border-destructive/40 text-destructive">
+                                    <AlertTriangle className="h-3 w-3" /> {t.serious} serious
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
                             <TableCell>{new Date(r.round_date).toLocaleDateString()}</TableCell>
                             <TableCell>{diseaseLabel(r.disease)}</TableCell>
                             <TableCell>{r.drug || "—"}</TableCell>
@@ -424,12 +489,26 @@ const HouseholdsPanel = ({
                                 {pct}%
                               </Badge>
                             </TableCell>
+                            <TableCell className="text-right">
+                              {canManage && (
+                                <div className="flex justify-end gap-1">
+                                  <Button size="sm" variant="ghost" className="gap-1"
+                                    onClick={() => { setEditingRound(r); setMdaOpen(true); }}>
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button size="sm" variant="ghost" className="gap-1 text-destructive"
+                                    onClick={() => setDeleteRound(r)}>
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              )}
+                            </TableCell>
                           </TableRow>
                         );
                       })}
                       {selectedRounds.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center text-muted-foreground">
+                          <TableCell colSpan={7} className="text-center text-muted-foreground">
                             No treatment round recorded for this household yet.
                           </TableCell>
                         </TableRow>
@@ -440,6 +519,83 @@ const HouseholdsPanel = ({
               </Card>
             </>
           )}
+
+          {/* Project-wide rounds */}
+          <Card className="p-4">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <Pill className="h-4 w-4 text-primary" />
+              <h4 className="font-semibold text-foreground">All treatment rounds on this project</h4>
+              <Badge variant="outline">{filteredRounds.length}</Badge>
+              <div className="flex-1" />
+              <Button size="sm" variant="outline" className="gap-1" disabled={!filteredRounds.length} onClick={exportRounds}>
+                <Download className="h-4 w-4" /> Export CSV
+              </Button>
+            </div>
+            <div className="mb-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <Select value={roundFilters.disease} onValueChange={(v) => setRoundFilters({ ...roundFilters, disease: v })}>
+                <SelectTrigger><SelectValue placeholder="All diseases" /></SelectTrigger>
+                <SelectContent className="z-[1200] bg-popover">
+                  <SelectItem value="all">All diseases</SelectItem>
+                  {NTD_DISEASES.map((d) => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select value={roundFilters.community} onValueChange={(v) => setRoundFilters({ ...roundFilters, community: v })}>
+                <SelectTrigger><SelectValue placeholder="All communities" /></SelectTrigger>
+                <SelectContent className="z-[1200] bg-popover">
+                  <SelectItem value="all">All communities</SelectItem>
+                  {communities.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Input type="date" value={roundFilters.from} onChange={(e) => setRoundFilters({ ...roundFilters, from: e.target.value })} />
+              <Input type="date" value={roundFilters.to} onChange={(e) => setRoundFilters({ ...roundFilters, to: e.target.value })} />
+            </div>
+            <div className="max-h-[420px] overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Round</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Household</TableHead>
+                    <TableHead>Community</TableHead>
+                    <TableHead>Disease</TableHead>
+                    <TableHead>Coverage</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredRounds.map((r) => {
+                    const h = households.find((x) => x.id === r.household_id);
+                    const pct = r.persons_eligible ? Math.round((r.persons_treated / r.persons_eligible) * 100) : 0;
+                    return (
+                      <TableRow key={r.id}>
+                        <TableCell className="font-medium text-foreground">
+                          <button className="text-primary hover:underline" onClick={() => setDetailRound(r)}>
+                            {r.round_name}
+                          </button>
+                        </TableCell>
+                        <TableCell>{new Date(r.round_date).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          <button className="hover:underline" onClick={() => setSelectedId(r.household_id)}>
+                            {h?.household_code || "—"}
+                          </button>
+                        </TableCell>
+                        <TableCell>{r.community || h?.village || "—"}</TableCell>
+                        <TableCell>{diseaseLabel(r.disease)}</TableCell>
+                        <TableCell>{r.persons_treated}/{r.persons_eligible} ({pct}%)</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {filteredRounds.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-muted-foreground">
+                        No rounds match these filters.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+
         </div>
       </div>
 
@@ -590,65 +746,92 @@ const HouseholdsPanel = ({
         </DialogContent>
       </Dialog>
 
-      {/* MDA round */}
-      <Dialog open={mdaOpen} onOpenChange={setMdaOpen}>
-        <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
-          <DialogHeader><DialogTitle>Record a treatment round</DialogTitle></DialogHeader>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <Label className="text-sm">Round name</Label>
-              <Input
-                className="mt-1" placeholder="e.g. 2026 Round 1"
-                value={mdaDraft.round_name} onChange={(e) => setMdaDraft({ ...mdaDraft, round_name: e.target.value })}
-              />
+      {/* MDA round — person-level register */}
+      {selected && (
+        <MdaRoundDialog
+          open={mdaOpen}
+          onOpenChange={(v) => { setMdaOpen(v); if (!v) setEditingRound(null); }}
+          projectId={projectId}
+          moduleId={moduleId}
+          household={selected}
+          members={selectedMembers}
+          existingRounds={rounds}
+          round={editingRound}
+          roundTreatments={editingRound ? treatments.filter((t) => t.round_id === editingRound.id) : []}
+          saving={busy}
+          onSave={submitMda}
+        />
+      )}
+
+      {/* Round detail */}
+      <Dialog open={!!detailRound} onOpenChange={(v) => !v && setDetailRound(null)}>
+        <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{detailRound?.round_name} — who was treated</DialogTitle>
+          </DialogHeader>
+          {detailRound && (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                {new Date(detailRound.round_date).toLocaleDateString()} · {diseaseLabel(detailRound.disease)} ·{" "}
+                {detailRound.drug || "Medicine not recorded"}
+                {detailRound.drug_batch ? ` · Batch ${detailRound.drug_batch}` : ""}
+                {detailRound.distributor_name ? ` · Distributor ${detailRound.distributor_name}` : ""}
+              </p>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Person</TableHead>
+                    <TableHead>Age</TableHead>
+                    <TableHead>Outcome</TableHead>
+                    <TableHead>Tablets</TableHead>
+                    <TableHead>Observed</TableHead>
+                    <TableHead>Side effect</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {treatments.filter((t) => t.round_id === detailRound.id).map((t, i) => (
+                    <TableRow key={t.id || i}>
+                      <TableCell className="font-medium text-foreground">{t.person_name}</TableCell>
+                      <TableCell>{t.age_years ?? "—"}</TableCell>
+                      <TableCell>{outcomeLabel(t.outcome)}</TableCell>
+                      <TableCell>{t.tablets ?? "—"}</TableCell>
+                      <TableCell>{t.outcome === "treated" ? (t.directly_observed ? "Yes" : "No") : "—"}</TableCell>
+                      <TableCell className={cn(t.adverse_event_serious && "font-semibold text-destructive")}>
+                        {t.adverse_event || "None"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {treatments.filter((t) => t.round_id === detailRound.id).length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-muted-foreground">
+                        This round has no person-level entries.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
             </div>
-            <div>
-              <Label className="text-sm">Date</Label>
-              <Input
-                type="date" className="mt-1" value={mdaDraft.round_date}
-                onChange={(e) => setMdaDraft({ ...mdaDraft, round_date: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label className="text-sm">Disease</Label>
-              <Select
-                value={mdaDraft.disease}
-                onValueChange={(v) => {
-                  const d = NTD_DISEASES.find((x) => x.value === v);
-                  setMdaDraft({ ...mdaDraft, disease: v, drug: d?.drug || mdaDraft.drug });
-                }}
-              >
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent className="z-[1200] bg-popover">
-                  {NTD_DISEASES.map((d) => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="sm:col-span-2">
-              <Label className="text-sm">Medicine given</Label>
-              <Input className="mt-1" value={mdaDraft.drug} onChange={(e) => setMdaDraft({ ...mdaDraft, drug: e.target.value })} />
-            </div>
-            {([
-              ["persons_eligible", "People eligible"],
-              ["persons_treated", "People treated"],
-              ["persons_absent", "Absent"],
-              ["persons_refused", "Refused"],
-            ] as const).map(([key, label]) => (
-              <div key={key}>
-                <Label className="text-sm">{label}</Label>
-                <Input
-                  type="number" min={0} className="mt-1" value={mdaDraft[key]}
-                  onChange={(e) => setMdaDraft({ ...mdaDraft, [key]: e.target.value })}
-                />
-              </div>
-            ))}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setMdaOpen(false)}>Cancel</Button>
-            <Button disabled={busy} onClick={() => void submitMda()}>Save round</Button>
-          </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete a round */}
+      <AlertDialog open={!!deleteRound} onOpenChange={(v) => !v && setDeleteRound(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this treatment round?</AlertDialogTitle>
+            <AlertDialogDescription>
+              “{deleteRound?.round_name}” and every person entry recorded under it will be removed.
+              This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction disabled={busy} onClick={() => void confirmDeleteRound()}>Delete round</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
 
       {/* Attach member */}
       <Dialog open={memberOpen} onOpenChange={setMemberOpen}>
