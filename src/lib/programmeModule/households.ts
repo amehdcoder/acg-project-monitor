@@ -24,7 +24,22 @@ export interface WashSourceRow {
   latitude: number | null;
   longitude: number | null;
   notes: string | null;
+  /** functional | not_functional | seasonal | abandoned */
+  functional_status?: string | null;
 }
+
+export const WASH_FUNCTIONAL_STATUS = [
+  { value: "functional", label: "Functional — in use today", usable: true },
+  { value: "seasonal", label: "Seasonal — dries up part of the year", usable: true },
+  { value: "not_functional", label: "Not functional — broken", usable: false },
+  { value: "abandoned", label: "Abandoned / condemned", usable: false },
+];
+
+export const washStatusLabel = (v?: string | null) =>
+  WASH_FUNCTIONAL_STATUS.find((s) => s.value === (v || "functional"))?.label || "Functional";
+
+export const washIsUsable = (v?: string | null) =>
+  WASH_FUNCTIONAL_STATUS.find((s) => s.value === (v || "functional"))?.usable ?? true;
 
 export interface HouseholdRow {
   id: string;

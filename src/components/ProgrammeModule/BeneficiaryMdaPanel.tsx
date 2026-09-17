@@ -1,18 +1,29 @@
-// Mass drug administration history for one beneficiary — what they received in
-// each household round, how it was given, and any side effect recorded.
+// Mass drug administration history for one beneficiary — their own treatment
+// passport across the five preventive-chemotherapy diseases, the household they
+// belong to, the water they drink, and the morbidity care they receive.
 
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { AlertTriangle, Home, Pill, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Droplets, Home, Pill, ShieldCheck, Stethoscope, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toneClasses } from "@/lib/programmeModule/defaults";
 import {
   diseaseLabel, householdCoverage, notEligibleLabel, outcomeLabel,
-  personalMdaSummary, useBeneficiaryMda,
+  personalMdaSummary, useBeneficiaryMda, washStatusLabel, washTypeLabel, washIsUsable,
+  type WashSourceRow,
 } from "@/lib/programmeModule/households";
+import {
+  relationshipLabel, useMembersOfHousehold,
+} from "@/lib/programmeModule/householdMembers";
+import {
+  careGaps, conditionLabel, measurementTrend, stageLabel, surgeryLabel, useMorbidityForPerson,
+} from "@/lib/programmeModule/morbidity";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import PassportMatrix from "./PassportMatrix";
 
 interface Props {
   beneficiaryId: string;
@@ -35,17 +46,41 @@ const outcomeTone = (o: string) =>
     : o === "refused" || o === "absent" ? toneClasses.warning
       : toneClasses.neutral;
 
+/** The community water point linked to this household, if any. */
+const useWashSource = (id?: string | null) => {
+  const [source, setSource] = useState<WashSourceRow | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      if (!id) { setSource(null); return; }
+      const { data } = await (supabase as unknown as { from: (t: string) => any })
+        .from("community_wash_sources").select("*").eq("id", id).maybeSingle();
+      if (!cancelled) setSource((data as WashSourceRow) || null);
+    };
+    void run();
+    return () => { cancelled = true; };
+  }, [id]);
+  return source;
+};
+
 const BeneficiaryMdaPanel = ({ beneficiaryId, householdId }: Props) => {
-  const { rounds, mine, household, loading } = useBeneficiaryMda(beneficiaryId, householdId);
+  const { rounds, treatments, mine, household, loading } = useBeneficiaryMda(beneficiaryId, householdId);
+  const { members } = useMembersOfHousehold(household?.id || householdId);
+  const { records: morbidity } = useMorbidityForPerson(beneficiaryId);
+  const washSource = useWashSource(household?.wash_source_id);
+
   const summary = personalMdaSummary(mine);
   const coverage = householdCoverage(rounds);
   const roundFor = (id?: string) => rounds.find((r) => r.id === id);
+  const me = members.find((m) => m.beneficiary_id === beneficiaryId);
+  const gaps = careGaps(morbidity);
+  const trend = measurementTrend(morbidity);
 
   if (loading) {
     return <p className="py-8 text-center text-sm text-muted-foreground">Loading treatment history…</p>;
   }
 
-  if (!householdId && mine.length === 0) {
+  if (!householdId && !household && mine.length === 0) {
     return (
       <Card className="p-6 text-center">
         <Home className="mx-auto h-6 w-6 text-muted-foreground" />
@@ -78,6 +113,23 @@ const BeneficiaryMdaPanel = ({ beneficiaryId, householdId }: Props) => {
           <span className="text-muted-foreground">
             {[household.name, household.village, household.ward, household.lga].filter(Boolean).join(" · ") || "—"}
           </span>
+          <div className="flex-1" />
+          <Droplets className="h-4 w-4 text-primary" />
+          {washSource ? (
+            <>
+              <span className="font-medium text-foreground">{washSource.name}</span>
+              <Badge variant="outline">{washTypeLabel(washSource.source_type)}</Badge>
+              <Badge
+                variant="outline"
+                className={cn((!washSource.is_improved || !washIsUsable(washSource.functional_status))
+                  && "border-destructive/40 text-destructive")}
+              >
+                {washSource.is_improved ? "Improved" : "Unimproved"} · {washStatusLabel(washSource.functional_status)}
+              </Badge>
+            </>
+          ) : (
+            <span className="text-muted-foreground">No working water point recorded for this community</span>
+          )}
         </Card>
       )}
 
@@ -88,6 +140,25 @@ const BeneficiaryMdaPanel = ({ beneficiaryId, householdId }: Props) => {
           {summary.serious > 0 && ` — ${summary.serious} marked serious, follow up`}.
         </Card>
       )}
+
+      {/* Passport */}
+      <Card className="p-4">
+        <div className="mb-3 flex items-center gap-2">
+          <ShieldCheck className="h-4 w-4 text-primary" />
+          <h4 className="font-semibold text-foreground">Preventive chemotherapy passport</h4>
+        </div>
+        <PassportMatrix
+          treatments={mine}
+          rounds={rounds}
+          person={me ? {
+            age: me.age_years,
+            heightCm: me.height_cm,
+            isPregnant: me.is_pregnant,
+            isBreastfeeding: me.is_breastfeeding,
+          } : undefined}
+          showEligibility={!!me}
+        />
+      </Card>
 
       <Card className="p-4">
         <div className="mb-3 flex items-center gap-2">
@@ -157,6 +228,119 @@ const BeneficiaryMdaPanel = ({ beneficiaryId, householdId }: Props) => {
           </div>
         )}
       </Card>
+
+      {/* Morbidity care */}
+      <Card className="p-4">
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <Stethoscope className="h-4 w-4 text-primary" />
+          <h4 className="font-semibold text-foreground">Morbidity management &amp; disability prevention</h4>
+          <Badge variant="outline">{morbidity.length}</Badge>
+          {trend && (
+            <Badge variant="outline" className={cn(trend.improving
+              ? "border-emerald-500/40 text-emerald-700"
+              : "border-amber-500/40 text-amber-700")}>
+              {Math.abs(trend.delta)} cm {trend.improving ? "smaller" : "larger"} since {fmtDate(trend.from)}
+            </Badge>
+          )}
+          {gaps.map((g) => (
+            <Badge key={g} variant="outline" className="border-destructive/40 text-destructive">{g}</Badge>
+          ))}
+        </div>
+        {morbidity.length === 0 ? (
+          <p className="py-4 text-center text-sm text-muted-foreground">
+            No morbidity care recorded. Record it from this person's household on the Households &amp;
+            MDA screen.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table className="min-w-[720px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Recorded</TableHead>
+                  <TableHead>Condition</TableHead>
+                  <TableHead>Stage</TableHead>
+                  <TableHead>Side</TableHead>
+                  <TableHead className="text-right">Limb (cm)</TableHead>
+                  <TableHead className="text-right">Attacks/yr</TableHead>
+                  <TableHead>Self-care</TableHead>
+                  <TableHead>Surgery</TableHead>
+                  <TableHead>Next review</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {morbidity.map((m) => (
+                  <TableRow key={m.id}>
+                    <TableCell>{fmtDate(m.recorded_on)}</TableCell>
+                    <TableCell className="font-medium text-foreground">{conditionLabel(m.condition)}</TableCell>
+                    <TableCell>{stageLabel(m.stage)}</TableCell>
+                    <TableCell>{m.affected_side || "—"}</TableCell>
+                    <TableCell className="text-right">{m.limb_circumference_cm ?? "—"}</TableCell>
+                    <TableCell className="text-right">{m.acute_attacks_last_year ?? "—"}</TableCell>
+                    <TableCell>
+                      {m.self_care_kit_issued ? "Kit issued" : "No kit"}{m.self_care_trained ? " · trained" : ""}
+                    </TableCell>
+                    <TableCell>{surgeryLabel(m.surgery_status)}</TableCell>
+                    <TableCell>{fmtDate(m.next_review_date)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </Card>
+
+      {/* The rest of the household */}
+      {members.length > 0 && (
+        <Card className="p-4">
+          <div className="mb-2 flex items-center gap-2">
+            <Users className="h-4 w-4 text-primary" />
+            <h4 className="font-semibold text-foreground">Others in this household</h4>
+            <Badge variant="outline">{members.length - (me ? 1 : 0)}</Badge>
+          </div>
+          <div className="overflow-x-auto">
+            <Table className="min-w-[560px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Relationship</TableHead>
+                  <TableHead>Sex / age</TableHead>
+                  <TableHead className="text-right">Doses swallowed</TableHead>
+                  <TableHead className="text-right">Missed</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {members.filter((m) => m.id !== me?.id).map((m) => {
+                  const theirs = treatments.filter((t) =>
+                    t.member_id === m.id ||
+                    (m.beneficiary_id && t.beneficiary_id === m.beneficiary_id));
+                  const s = personalMdaSummary(theirs);
+                  return (
+                    <TableRow key={m.id}>
+                      <TableCell className="font-medium text-foreground">{m.full_name}</TableCell>
+                      <TableCell>{relationshipLabel(m.relationship)}</TableCell>
+                      <TableCell>
+                        {[m.sex, m.age_years != null ? `${m.age_years} yrs` : null]
+                          .filter(Boolean).join(" · ") || "—"}
+                      </TableCell>
+                      <TableCell className="text-right">{s.treated}</TableCell>
+                      <TableCell className={cn("text-right", s.missed > 0 && "text-destructive")}>
+                        {s.missed}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {members.filter((m) => m.id !== me?.id).length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                      Nobody else listed in this household yet.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
+      )}
     </div>
   );
 };
