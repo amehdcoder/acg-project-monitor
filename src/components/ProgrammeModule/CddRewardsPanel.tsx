@@ -51,11 +51,13 @@ const CddRewardsPanel = ({ cdds, cases, facilityName, ledger = [] }: Props) => {
   const exportCsv = () => {
     const head = [
       "Rank", "CDD", "Facility", "Community", "Cases found", "Confirmed",
-      "Registered", "Not a case", "Accuracy %", "Points", "Tier", "Recognition",
+      "Registered", "Not a case", "Accuracy %", "Auto-awarded per case", "Points",
+      "Tier", "Recognition",
     ];
     const lines = rows.map((r) => [
       r.rank, r.name, facilityName(r.facilityId), r.community, r.found, r.confirmed,
-      r.registered, r.notACase, r.precision, r.points, r.tier.label, r.tier.recognition,
+      r.registered, r.notACase, r.precision, awarded.get(r.cddId) || 0, r.points,
+      r.tier.label, r.tier.recognition,
     ]);
     const csv = [head, ...lines]
       .map((l) => l.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","))
