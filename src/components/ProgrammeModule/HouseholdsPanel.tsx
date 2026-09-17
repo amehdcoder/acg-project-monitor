@@ -635,21 +635,19 @@ const HouseholdsPanel = ({
                 onChange={(e) => setHhDraft({ ...hhDraft, household_size: Number(e.target.value) })}
               />
             </div>
-            <div>
-              <Label className="text-sm">Village / settlement</Label>
-              <Input className="mt-1" value={hhDraft.village || ""} onChange={(e) => setHhDraft({ ...hhDraft, village: e.target.value })} />
-            </div>
-            <div>
-              <Label className="text-sm">Ward</Label>
-              <Input className="mt-1" value={hhDraft.ward || ""} onChange={(e) => setHhDraft({ ...hhDraft, ward: e.target.value })} />
-            </div>
-            <div>
-              <Label className="text-sm">LGA</Label>
-              <Input className="mt-1" value={hhDraft.lga || ""} onChange={(e) => setHhDraft({ ...hhDraft, lga: e.target.value })} />
-            </div>
-            <div>
-              <Label className="text-sm">State</Label>
-              <Input className="mt-1" value={hhDraft.state || ""} onChange={(e) => setHhDraft({ ...hhDraft, state: e.target.value })} />
+            <div className="sm:col-span-2">
+              <GeoCascadeFields
+                value={{
+                  state: hhDraft.state || "", lga: hhDraft.lga || "",
+                  ward: hhDraft.ward || "", community: hhDraft.village || "",
+                }}
+                communityLabel="Village / settlement"
+                onChange={(p) => setHhDraft({
+                  ...hhDraft,
+                  state: p.state ?? "", lga: p.lga ?? "",
+                  ward: p.ward ?? "", village: p.community ?? "",
+                })}
+              />
             </div>
             <div className="sm:col-span-2">
               <Label className="text-sm">Community water point</Label>
