@@ -11,6 +11,7 @@ import {
 import {
   Plus, Settings2, CloudOff, RefreshCw, Layers, Users, Building2, ShieldAlert,
   LayoutGrid, CalendarClock, Hospital, Route, ShieldCheck, Home, Network, Activity,
+  Search,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -35,6 +36,7 @@ import HouseholdsPanel from "./HouseholdsPanel";
 import KinshipGraphPanel from "./KinshipGraphPanel";
 import LtfuRiskPanel from "./LtfuRiskPanel";
 import ClusterDashboard from "./ClusterDashboard";
+import CddCaseSearchPanel from "./CddCaseSearchPanel";
 import { useIsSafeguardingOfficer } from "@/lib/programmeModule/safeguarding";
 import { useMyFacilityAccess } from "@/lib/programmeModule/facilities";
 
@@ -73,7 +75,7 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
   const { isOfficer, reload: reloadOfficerAccess } = useIsSafeguardingOfficer(projectId);
   const [view, setView] = useState<
     | "records" | "journey" | "facility" | "followups" | "households" | "clusters" | "network"
-    | "risk" | "safeguarding" | "safeguarding_dashboard"
+    | "risk" | "casesearch" | "safeguarding" | "safeguarding_dashboard"
   >("records");
 
 
@@ -236,6 +238,7 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
           { key: "clusters", label: "Community clusters", icon: Layers, show: true },
           { key: "network", label: "Transmission network", icon: Network, show: true },
           { key: "risk", label: "Follow-up risk & CHEW visits", icon: Activity, show: true },
+          { key: "casesearch", label: "CDD case search (MMDP)", icon: Search, show: true },
           { key: "safeguarding", label: "Safeguarding", icon: ShieldCheck, show: isOfficer },
           {
             key: "safeguarding_dashboard", label: "Safeguarding dashboard",
@@ -344,6 +347,16 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
           beneficiaries={scopedBeneficiaries}
           canDispatch={canConfigure || Object.values(facilityLevels).some((l) => l !== "view")}
           onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }}
+        />
+      )}
+
+      {view === "casesearch" && (
+        <CddCaseSearchPanel
+          projectId={projectId}
+          moduleId={active?.id}
+          canRecord={canConfigure || Object.values(facilityLevels).some((l) => l !== "view")}
+          allowedFacilityIds={isFocalPerson ? Object.keys(facilityLevels) : null}
+          onBeneficiaryRegistered={() => void reloadBeneficiaries()}
         />
       )}
 
