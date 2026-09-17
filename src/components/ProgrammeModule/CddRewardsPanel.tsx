@@ -22,13 +22,16 @@ import { toneClasses } from "@/lib/programmeModule/defaults";
 import type { CddRow, PotentialCaseRow } from "@/lib/programmeModule/cddCaseSearch";
 import {
   CYCLE_OPTIONS, DEFAULT_REWARD_RULES, REWARD_TIERS, currentCycleStart,
-  rewardBreakdown, rewardSummary, useCddRewards,
+  rewardBreakdown, rewardSummary, useCddRewards, pointsByCdd,
+  type CddPointRow,
 } from "@/lib/programmeModule/cddRewards";
 
 interface Props {
   cdds: CddRow[];
   cases: PotentialCaseRow[];
   facilityName: (id?: string | null) => string;
+  /** Points the database credited automatically, case by case. */
+  ledger?: CddPointRow[];
 }
 
 const rankIcon = (rank: number) => {
