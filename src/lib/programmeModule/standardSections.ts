@@ -145,9 +145,10 @@ export const withStandardProfileSections = (
     sections: [...sections, ...missing],
     layout: {
       ...config.layout,
-      headerFields: headerFields.includes("disability_status")
-        ? headerFields
-        : [...headerFields, "disability_status"],
+      headerFields: ["disability_status", "marital_status"].reduce(
+        (list, field) => (list.includes(field) ? list : [...list, field]),
+        headerFields,
+      ),
       clinicalFields: clinicalFields.includes("programme_status")
         ? clinicalFields
         : [...clinicalFields, "disability_status", "programme_status"],
