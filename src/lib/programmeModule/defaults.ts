@@ -309,7 +309,7 @@ export const BLANK_PRESET: ProgrammeModuleConfig = {
     followUpIntervalDays: 30,
   },
   layout: {
-    headerFields: ["date_of_birth", "gender", "phone", "village", "lga", "state"],
+    headerFields: ["date_of_birth", "gender", "marital_status", "phone", "village", "lga", "state"],
     clinicalFields: [],
     quickActions: [
       { key: "add_service", label: "Add New Service", icon: "PlusCircle" },
