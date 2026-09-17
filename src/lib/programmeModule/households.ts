@@ -60,7 +60,75 @@ export interface MdaRoundRow {
   persons_refused: number;
   directly_observed: boolean;
   notes: string | null;
+  round_type?: string;
+  drug_batch?: string | null;
+  drug_expiry?: string | null;
+  distributor_name?: string | null;
+  supervisor_name?: string | null;
+  facility_id?: string | null;
+  community?: string | null;
+  revisit_done?: boolean;
+  unregistered_eligible?: number;
+  unregistered_treated?: number;
 }
+
+/** One person's treatment entry inside a round — the auditable unit of coverage. */
+export interface MdaTreatmentRow {
+  id?: string;
+  project_id: string;
+  module_id: string | null;
+  round_id?: string;
+  household_id: string;
+  beneficiary_id: string | null;
+  person_name: string;
+  age_years: number | null;
+  sex: string | null;
+  outcome: string;
+  not_eligible_reason: string | null;
+  drug: string | null;
+  tablets: number | null;
+  dose_basis: string | null;
+  dose_value: number | null;
+  directly_observed: boolean;
+  adverse_event: string | null;
+  adverse_event_serious: boolean;
+  notes: string | null;
+}
+
+export const MDA_OUTCOMES = [
+  { value: "treated", label: "Treated" },
+  { value: "absent", label: "Absent" },
+  { value: "refused", label: "Refused" },
+  { value: "not_eligible", label: "Not eligible" },
+];
+
+export const NOT_ELIGIBLE_REASONS = [
+  { value: "too_young", label: "Below age / height cut-off" },
+  { value: "pregnant", label: "Pregnant" },
+  { value: "breastfeeding", label: "Breastfeeding (first week)" },
+  { value: "severely_ill", label: "Severely ill" },
+  { value: "treated_elsewhere", label: "Already treated elsewhere" },
+  { value: "other", label: "Other reason" },
+];
+
+export const DOSE_BASIS = [
+  { value: "height_pole", label: "Height pole band" },
+  { value: "weight", label: "Weight (kg)" },
+  { value: "age", label: "Age band" },
+];
+
+export const MDA_ROUND_TYPES = [
+  { value: "annual", label: "Annual round" },
+  { value: "mop_up", label: "Mop-up round" },
+  { value: "retreatment", label: "Re-treatment" },
+  { value: "catch_up", label: "Catch-up visit" },
+];
+
+export const outcomeLabel = (v?: string | null) =>
+  MDA_OUTCOMES.find((o) => o.value === v)?.label || v || "—";
+
+export const notEligibleLabel = (v?: string | null) =>
+  NOT_ELIGIBLE_REASONS.find((o) => o.value === v)?.label || v || "—";
 
 export const WASH_SOURCE_TYPES = [
   { value: "borehole", label: "Borehole / hand pump", improved: true },
