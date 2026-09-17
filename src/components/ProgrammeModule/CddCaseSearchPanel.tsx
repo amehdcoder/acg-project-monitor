@@ -147,16 +147,34 @@ const CddCaseSearchPanel = ({
       || (c.referred_to_facility_id
         && ["record", "manage"].includes(levels[c.referred_to_facility_id] || "")));
 
+  /**
+   * Opens the full registration form on a record created from case search,
+   * pre-filled with everything already known, so the rest of the longitudinal
+   * questions are answered while the person is still at the facility.
+   */
+  const completeRecord = async (c: PotentialCaseRow, beneficiaryId: string) => {
+    if (!onCompleteRecord) return;
+    const row = await fetchBeneficiary(beneficiaryId);
+    if (!row) return;
+    const profile = { ...(row.profile as Record<string, unknown> || {}) };
+    for (const [k, v] of Object.entries(caseProfileSeed(c))) {
+      const cur = profile[k];
+      if (cur === undefined || cur === null || cur === "") profile[k] = v;
+    }
+    onCompleteRecord({ ...(row as unknown as BeneficiaryRow), profile });
+  };
+
   const register = async (c: PotentialCaseRow, facilityId: string) => {
     setBusyId(c.id);
     try {
-      await registerConfirmedCase(c.id, facilityId);
+      const beneficiaryId = await registerConfirmedCase(c.id, facilityId);
       toast({
         title: "Beneficiary registered",
-        description: `Case ID issued at ${facilityName(facilityId)}.`,
+        description: `Case ID issued at ${facilityName(facilityId)}. Complete the remaining details next.`,
       });
       await reloadCases();
       onBeneficiaryRegistered?.();
+      if (beneficiaryId) await completeRecord(c, beneficiaryId);
     } catch (e) {
       toast({ title: "Could not register", description: (e as Error).message, variant: "destructive" });
     } finally {
