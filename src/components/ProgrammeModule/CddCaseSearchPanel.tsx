@@ -73,6 +73,9 @@ const CddCaseSearchPanel = ({
   const { cases, loading, reload: reloadCases } = usePotentialCases(projectId);
   const { ledger, reload: reloadLedger } = useCddPointsLedger(projectId);
   const casePoints = pointsByCase(ledger);
+  // Points are credited by the database as a case moves, so refresh the ledger
+  // whenever the case register changes.
+  useEffect(() => { void reloadLedger(); }, [cases, reloadLedger]);
 
   const [cddOpen, setCddOpen] = useState(false);
   const [editingCdd, setEditingCdd] = useState<CddRow | null>(null);
