@@ -238,6 +238,7 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
           { key: "clusters", label: "Community clusters", icon: Layers, show: true },
           { key: "network", label: "Transmission network", icon: Network, show: true },
           { key: "risk", label: "Follow-up risk & CHEW visits", icon: Activity, show: true },
+          { key: "casesearch", label: "CDD case search (MMDP)", icon: Search, show: true },
           { key: "safeguarding", label: "Safeguarding", icon: ShieldCheck, show: isOfficer },
           {
             key: "safeguarding_dashboard", label: "Safeguarding dashboard",
