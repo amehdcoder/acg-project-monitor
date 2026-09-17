@@ -444,7 +444,8 @@ const HouseholdsPanel = ({
                   <h4 className="font-semibold text-foreground">Mass drug administration rounds</h4>
                 </div>
                 <div className="overflow-x-auto">
-                  <Table>
+                  <Table className="min-w-[760px]">
+
                     <TableHeader>
                       <TableRow>
                         <TableHead>Round</TableHead>
