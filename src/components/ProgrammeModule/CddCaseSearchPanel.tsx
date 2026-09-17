@@ -39,6 +39,7 @@ import { conditionLabel } from "@/lib/programmeModule/lesionVision";
 import CddDialog from "./CddDialog";
 import PotentialCaseDialog from "./PotentialCaseDialog";
 import CaseConfirmationDialog from "./CaseConfirmationDialog";
+import CddRewardsPanel from "./CddRewardsPanel";
 
 interface Props {
   projectId: string;
