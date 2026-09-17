@@ -40,10 +40,11 @@ const rankIcon = (rank: number) => {
   return null;
 };
 
-const CddRewardsPanel = ({ cdds, cases, facilityName }: Props) => {
+const CddRewardsPanel = ({ cdds, cases, facilityName, ledger = [] }: Props) => {
   const [period, setPeriod] = useState("cycle");
   const [rulesOpen, setRulesOpen] = useState(false);
   const rows = useCddRewards(cdds, cases, period);
+  const awarded = pointsByCdd(ledger, period === "cycle" ? currentCycleStart() : undefined);
   const totals = rewardSummary(rows);
   const top = rows[0];
 
