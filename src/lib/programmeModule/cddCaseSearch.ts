@@ -391,6 +391,131 @@ export const useCaseFilter = (cases: PotentialCaseRow[], term: string, status: s
     });
   }, [cases, term, status]);
 
+/** One step in a case's journey from community finding to registered record. */
+export interface CaseJourneyStep {
+  key: "submitted" | "review" | "staging" | "referral" | "acceptance" | "registration";
+  label: string;
+  detail: string;
+  at: string | null;
+  state: "done" | "current" | "blocked" | "waiting";
+}
+
+/**
+ * The full journey of one potential case. Every step is derived from the case
+ * record itself, so the trail can never drift from what actually happened.
+ */
+export const caseJourney = (
+  c: PotentialCaseRow,
+  opts: {
+    cddName?: (id?: string | null) => string;
+    facilityName?: (id?: string | null) => string;
+    caseCode?: string | null;
+  } = {},
+): CaseJourneyStep[] => {
+  const cdd = opts.cddName?.(c.cdd_id) || "a CDD";
+  const facility = opts.facilityName?.(c.facility_id) || "the facility";
+  const target = c.referred_to_facility_id ? opts.facilityName?.(c.referred_to_facility_id) : null;
+  const rejected = c.status === "not_a_case";
+  const reviewed = !!c.confirmed_at;
+  const steps: CaseJourneyStep[] = [];
+
+  steps.push({
+    key: "submitted",
+    label: "Found during case search",
+    detail: `${cdd} recorded this ${c.condition === "hydrocoele" ? "hydrocoele" : "lymphoedema"} case`
+      + `${c.community ? ` in ${c.community}` : ""} under ${facility}.`,
+    at: c.search_date || c.created_at,
+    state: "done",
+  });
+
+  steps.push({
+    key: "review",
+    label: rejected ? "Ruled out by clinician" : "Clinician review",
+    detail: rejected
+      ? c.rejection_reason || "The clinician judged this not to be an MMDP case."
+      : reviewed
+        ? "A clinician reviewed the pictures and confirmed the case."
+        : "Waiting for a clinician to review the pictures.",
+    at: c.confirmed_at,
+    state: rejected ? "blocked" : reviewed ? "done" : "current",
+  });
+
+  if (!rejected) {
+    steps.push({
+      key: "staging",
+      label: "Lesion staging",
+      detail: c.confirmed_stage_label
+        ? `Confirmed as ${c.confirmed_stage_label}`
+          + (c.confirmed_stage != null ? ` (stage ${c.confirmed_stage})` : "")
+          + (c.clinician_notes ? ` — ${c.clinician_notes}` : "")
+        : reviewed ? "Confirmed without a recorded stage." : "Staged during clinician review.",
+      at: c.confirmed_at,
+      state: reviewed ? "done" : "waiting",
+    });
+
+    if (c.referred_to_facility_id) {
+      steps.push({
+        key: "referral",
+        label: "Referred on",
+        detail: `Sent to ${target || "another facility"}`
+          + (c.referral_urgency ? ` · ${c.referral_urgency}` : "")
+          + (c.referral_summary ? ` — ${c.referral_summary}` : ""),
+        at: c.referred_at,
+        state: "done",
+      });
+      steps.push({
+        key: "acceptance",
+        label: "Accepted by receiving facility",
+        detail: c.status === "registered"
+          ? `${target || "The receiving facility"} accepted the case.`
+          : `Waiting for ${target || "the receiving facility"} to accept.`,
+        at: c.accepted_at,
+        state: c.status === "registered" ? "done" : "current",
+      });
+    }
+
+    steps.push({
+      key: "registration",
+      label: "Registered at a facility",
+      detail: c.status === "registered"
+        ? `Case ID ${opts.caseCode || "issued"} at ${target || facility}.`
+        : reviewed
+          ? "No Case ID yet — the facility must keep the case or accept the referral."
+          : "A Case ID is issued once the case is confirmed and kept or accepted.",
+      at: c.status === "registered" ? c.accepted_at || c.confirmed_at : null,
+      state: c.status === "registered" ? "done" : reviewed ? "current" : "waiting",
+    });
+  }
+
+  return steps;
+};
+
+/** Case IDs of the beneficiaries created from confirmed case-search cases. */
+export const useCaseBeneficiaries = (cases: PotentialCaseRow[]) => {
+  const [codes, setCodes] = useState<Record<string, string>>({});
+  const ids = useMemo(
+    () => Array.from(new Set(cases.map((c) => c.beneficiary_id).filter(Boolean) as string[])).sort(),
+    [cases],
+  );
+  const key = ids.join(",");
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (!ids.length) { setCodes({}); return; }
+      const { data } = await db.from("beneficiaries").select("id,case_id").in("id", ids);
+      if (!alive) return;
+      const map: Record<string, string> = {};
+      for (const r of (data as { id: string; case_id: string }[]) || []) map[r.id] = r.case_id;
+      setCodes(map);
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  return codes;
+};
+
 /**
  * Resolves the CDD who found a beneficiary, and the facility they were first
  * identified at, for display on the beneficiary record.
