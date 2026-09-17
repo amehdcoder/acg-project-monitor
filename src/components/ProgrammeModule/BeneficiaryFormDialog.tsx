@@ -109,16 +109,20 @@ const BeneficiaryFormDialog = ({
           beneficiary_id: existing.id, project_id: projectId, action: "profile_updated",
         });
       } else {
-        const { data: auth } = await supabase.auth.getUser();
         const submission_uuid = newUuid();
-        let caseId: string | null = null;
-        if (navigator.onLine) {
-          const { data } = await supabase.rpc("next_beneficiary_case_id", {
-            _module_id: moduleId,
-            _facility_id: facilityId || null,
-          } as never);
-          caseId = (data as unknown as string) || null;
-        }
+        // Read the signed-in user from the local session and ask for the Case ID
+        // at the same time — neither waits on the other.
+        const [sessionRes, caseIdRes] = await Promise.all([
+          supabase.auth.getSession(),
+          navigator.onLine
+            ? supabase.rpc("next_beneficiary_case_id", {
+              _module_id: moduleId,
+              _facility_id: facilityId || null,
+            } as never)
+            : Promise.resolve({ data: null }),
+        ]);
+        const auth = { user: sessionRes.data.session?.user };
+        const caseId = (caseIdRes.data as unknown as string) || null;
         const payload = {
           ...base,
           case_id: caseId || `PENDING-${submission_uuid.slice(0, 8).toUpperCase()}`,
