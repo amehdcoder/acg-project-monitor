@@ -369,6 +369,16 @@ const CddCaseSearchPanel = ({
                           </Badge>
                         )}
                         {incoming && <Badge variant="outline">Referred to your facility</Badge>}
+                        {!!casePoints.get(c.id)?.points && (
+                          <Badge
+                            variant="outline"
+                            className={cn("gap-1 border", toneClasses.success)}
+                            title={casePoints.get(c.id)?.reasons.join(" · ")}
+                          >
+                            <Award className="h-3 w-3" />
+                            {casePoints.get(c.id)?.points} pts to {cddName(c.cdd_id)}
+                          </Badge>
+                        )}
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">
                         {c.sex || "—"}{c.age != null ? `, ${c.age} yrs` : ""} ·{" "}
