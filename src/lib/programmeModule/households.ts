@@ -437,3 +437,71 @@ export const householdCoverage = (rounds: MdaRoundRow[]) => {
     rounds: rounds.length,
   };
 };
+
+/**
+ * Every MDA treatment recorded for one beneficiary, plus the rounds run in
+ * their household — so the person's Longitudinal page shows the coverage and
+ * side effects that were captured against them in the field.
+ */
+export const useBeneficiaryMda = (beneficiaryId?: string, householdId?: string | null) => {
+  const [rounds, setRounds] = useState<MdaRoundRow[]>([]);
+  const [treatments, setTreatments] = useState<MdaTreatmentRow[]>([]);
+  const [household, setHousehold] = useState<HouseholdRow | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    if (!beneficiaryId) { setLoading(false); return; }
+    setLoading(true);
+    const mine = await db.from("household_mda_treatments").select("*")
+      .eq("beneficiary_id", beneficiaryId).order("created_at", { ascending: false }).limit(500);
+    const mineRows = (mine.data as MdaTreatmentRow[]) || [];
+
+    const roundIds = Array.from(new Set(mineRows.map((t) => t.round_id).filter(Boolean))) as string[];
+    const [r, h, hhRows] = await Promise.all([
+      householdId
+        ? db.from("household_mda_rounds").select("*").eq("household_id", householdId)
+            .order("round_date", { ascending: false }).limit(500)
+        : roundIds.length
+          ? db.from("household_mda_rounds").select("*").in("id", roundIds)
+              .order("round_date", { ascending: false }).limit(500)
+          : Promise.resolve({ data: [] as unknown }),
+      householdId
+        ? db.from("beneficiary_households").select("*").eq("id", householdId).maybeSingle()
+        : Promise.resolve({ data: null as unknown }),
+      householdId
+        ? db.from("household_mda_treatments").select("*").eq("household_id", householdId).limit(5000)
+        : Promise.resolve({ data: [] as unknown }),
+    ]);
+
+    setRounds(((r as { data: unknown }).data as MdaRoundRow[]) || []);
+    setHousehold(((h as { data: unknown }).data as HouseholdRow) || null);
+    const all = ((hhRows as { data: unknown }).data as MdaTreatmentRow[]) || [];
+    // Prefer the household register (richer) but always keep this person's rows.
+    const byId = new Map<string, MdaTreatmentRow>();
+    [...all, ...mineRows].forEach((t) => byId.set(String(t.id), t));
+    setTreatments(Array.from(byId.values()));
+    setLoading(false);
+  }, [beneficiaryId, householdId]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const mine = treatments
+    .filter((t) => t.beneficiary_id === beneficiaryId)
+    .sort((a, b) => String(b.round_id).localeCompare(String(a.round_id)));
+
+  return { rounds, treatments, mine, household, loading, reload: load };
+};
+
+/** Personal MDA summary for a beneficiary — what they received and tolerated. */
+export const personalMdaSummary = (mine: MdaTreatmentRow[]) => ({
+  rounds: mine.length,
+  treated: mine.filter((t) => t.outcome === "treated").length,
+  missed: mine.filter((t) => t.outcome === "absent" || t.outcome === "refused").length,
+  notEligible: mine.filter((t) => t.outcome === "not_eligible").length,
+  observed: mine.filter((t) => t.directly_observed && t.outcome === "treated").length,
+  adverse: mine.filter((t) => !!t.adverse_event).length,
+  serious: mine.filter((t) => t.adverse_event_serious).length,
+  adherence: mine.length
+    ? Math.round((mine.filter((t) => t.outcome === "treated").length / mine.length) * 100)
+    : 0,
+});
