@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.match_wash_source(uuid, text, text) FROM authenticated;
