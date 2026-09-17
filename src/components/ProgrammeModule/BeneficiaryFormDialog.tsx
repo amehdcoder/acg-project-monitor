@@ -18,6 +18,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useFacilities, FACILITY_TYPE_LABEL } from "@/lib/programmeModule/facilities";
+import { useCdds } from "@/lib/programmeModule/cddCaseSearch";
 import PhotoCaptureField from "./PhotoCaptureField";
 
 interface Props {
@@ -42,6 +43,11 @@ const BeneficiaryFormDialog = ({
     ((existing as unknown as { facility_id?: string | null })?.facility_id) || "",
   );
   const [photoUrl, setPhotoUrl] = useState<string | null>(existing?.photo_url || null);
+  const { cdds } = useCdds(projectId);
+  const [cddId, setCddId] = useState<string>(existing?.cdd_id || "");
+  const [referringFacilityId, setReferringFacilityId] = useState<string>(
+    existing?.referring_facility_id || "",
+  );
 
 
   const sections = useMemo(
