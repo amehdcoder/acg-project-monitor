@@ -1069,6 +1069,35 @@ const HouseholdsPanel = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Household member (not a registered beneficiary) */}
+      <HouseholdMemberDialog
+        open={rosterOpen}
+        onOpenChange={(v) => { setRosterOpen(v); if (!v) setEditingMember(null); }}
+        member={editingMember}
+        saving={busy}
+        onSave={submitMember}
+      />
+
+      {/* One person's NTD treatment passport */}
+      {passportPerson && selected && (
+        <PersonNtdPassport
+          open={!!passportPerson}
+          onOpenChange={(v) => !v && setPassportPerson(null)}
+          person={passportPerson}
+          householdLabel={selected.name || selected.household_code}
+          rounds={selectedRounds}
+          treatments={treatments}
+          morbidity={morbidityFor(passportPerson)}
+          canManage={canManage}
+          saving={busy}
+          onSaveMorbidity={submitMorbidity}
+          onOpenRecord={() => {
+            const b = beneficiaries.find((x) => x.id === passportPerson.beneficiaryId);
+            if (b) { setPassportPerson(null); onOpenBeneficiary?.(b); }
+          }}
+        />
+      )}
     </div>
   );
 };
