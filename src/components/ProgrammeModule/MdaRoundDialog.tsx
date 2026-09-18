@@ -25,6 +25,8 @@ import {
   tallyTreatments, validateRound,
   type HouseholdRow, type MdaRoundRow, type MdaTreatmentRow,
 } from "@/lib/programmeModule/households";
+import { useCdds } from "@/lib/programmeModule/cddCaseSearch";
+import LocationCombobox from "@/components/MdaChecklist/LocationCombobox";
 
 interface Props {
   open: boolean;
