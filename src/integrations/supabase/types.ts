@@ -1687,61 +1687,91 @@ export type Database = {
       }
       beneficiary_home_visits: {
         Row: {
+          action_taken: string | null
           assigned_name: string | null
           assigned_to: string | null
           beneficiary_id: string
+          cdd_id: string | null
           created_at: string
           created_by: string
           due_date: string | null
+          found_at_home: boolean | null
           id: string
+          latitude: number | null
+          longitude: number | null
           module_id: string | null
+          next_appointment_date: string | null
           outcome: string | null
           outcome_notes: string | null
           project_id: string
           reasons: Json
+          reported_by: string | null
           risk_band: string | null
           risk_score: number | null
           status: string
           updated_at: string
           visited_at: string | null
+          visited_on: string | null
+          visitor_name: string | null
+          visitor_role: string | null
         }
         Insert: {
+          action_taken?: string | null
           assigned_name?: string | null
           assigned_to?: string | null
           beneficiary_id: string
+          cdd_id?: string | null
           created_at?: string
           created_by?: string
           due_date?: string | null
+          found_at_home?: boolean | null
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           module_id?: string | null
+          next_appointment_date?: string | null
           outcome?: string | null
           outcome_notes?: string | null
           project_id: string
           reasons?: Json
+          reported_by?: string | null
           risk_band?: string | null
           risk_score?: number | null
           status?: string
           updated_at?: string
           visited_at?: string | null
+          visited_on?: string | null
+          visitor_name?: string | null
+          visitor_role?: string | null
         }
         Update: {
+          action_taken?: string | null
           assigned_name?: string | null
           assigned_to?: string | null
           beneficiary_id?: string
+          cdd_id?: string | null
           created_at?: string
           created_by?: string
           due_date?: string | null
+          found_at_home?: boolean | null
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           module_id?: string | null
+          next_appointment_date?: string | null
           outcome?: string | null
           outcome_notes?: string | null
           project_id?: string
           reasons?: Json
+          reported_by?: string | null
           risk_band?: string | null
           risk_score?: number | null
           status?: string
           updated_at?: string
           visited_at?: string | null
+          visited_on?: string | null
+          visitor_name?: string | null
+          visitor_role?: string | null
         }
         Relationships: [
           {
@@ -1749,6 +1779,13 @@ export type Database = {
             columns: ["beneficiary_id"]
             isOneToOne: false
             referencedRelation: "beneficiaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beneficiary_home_visits_cdd_id_fkey"
+            columns: ["cdd_id"]
+            isOneToOne: false
+            referencedRelation: "mmdp_cdds"
             referencedColumns: ["id"]
           },
           {
