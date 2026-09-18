@@ -135,6 +135,23 @@ const MdaRoundDialog = ({
     }
   }, [open, round, roundTreatments, members, otherMembers, household, projectId, moduleId]);
 
+  /**
+   * CDDs registered on the system. Those attached to the facilities where the
+   * household's beneficiaries were registered come first; the rest stay
+   * available so a distributor is never blocked.
+   */
+  const cddNames = useMemo(() => {
+    const facilityIds = new Set(
+      [
+        (household as { facility_id?: string | null }).facility_id,
+        ...members.map((m) => m.facility_id),
+      ].filter(Boolean) as string[],
+    );
+    const mine = cdds.filter((c) => c.facility_id && facilityIds.has(c.facility_id));
+    const others = cdds.filter((c) => !c.facility_id || !facilityIds.has(c.facility_id));
+    return [...new Set([...mine, ...others].map((c) => c.full_name).filter(Boolean))];
+  }, [cdds, members, household]);
+
   const { errors, warnings, tally } = useMemo(
     () => validateRound(draft, rows, existingRounds, round?.id),
     [draft, rows, existingRounds, round?.id],
