@@ -215,7 +215,13 @@ const MdaRoundDialog = ({
               />
             ))}
             {field("Distributor (CDD)", (
-              <Input value={draft.distributor_name || ""} onChange={(e) => setDraft({ ...draft, distributor_name: e.target.value })} />
+              <LocationCombobox
+                value={draft.distributor_name || ""}
+                options={cddNames}
+                placeholder={cddNames.length ? "Choose a CDD…" : "Type the distributor's name"}
+                emptyLabel="No CDDs registered for this facility"
+                onChange={(v) => setDraft({ ...draft, distributor_name: v })}
+              />
             ))}
             {field("Supervisor", (
               <Input value={draft.supervisor_name || ""} onChange={(e) => setDraft({ ...draft, supervisor_name: e.target.value })} />
