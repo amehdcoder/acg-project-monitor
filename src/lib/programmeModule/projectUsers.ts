@@ -27,16 +27,16 @@ export const useProjectUsers = (projectId?: string) => {
     if (!ids.length) { setUsers([]); setLoading(false); return; }
     const { data: profiles } = await supabase
       .from("profiles")
-      .select("user_id,full_name,email,phone")
+      .select("user_id,first_name,last_name,email,phone_number")
       .in("user_id", ids)
       .limit(2000);
-    const rows = ((profiles as ProjectUserRow[]) || [])
-      .filter((p) => (p.full_name || "").trim() || p.email)
+    const rows = (profiles || [])
       .map((p) => ({
         user_id: p.user_id,
-        full_name: (p.full_name || "").trim() || (p.email || "Unnamed user"),
+        full_name: [p.first_name, p.last_name].filter(Boolean).join(" ").trim()
+          || p.email || "Unnamed user",
         email: p.email || null,
-        phone: p.phone || null,
+        phone: p.phone_number || null,
       }))
       .sort((a, b) => a.full_name.localeCompare(b.full_name));
     setUsers(rows);
