@@ -35,6 +35,8 @@ import {
   useTeamMembers, type PermissionKey, type TeamMemberRow, type TeamPermissions,
   type TeamType,
 } from "@/lib/programmeModule/projectTeam";
+import { useProjectUsers } from "@/lib/programmeModule/projectUsers";
+import LocationCombobox from "@/components/MdaChecklist/LocationCombobox";
 import GeoCascadeFields from "./GeoCascadeFields";
 
 interface Props {
@@ -54,6 +56,7 @@ const ProjectTeamPanel = ({ projectId, moduleId, canManage = false }: Props) => 
   const { toast } = useToast();
   const { members, reload } = useTeamMembers(projectId);
   const { facilities } = useFacilities(projectId);
+  const { users: projectUsers } = useProjectUsers(projectId);
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<TeamMemberRow | null>(null);
@@ -282,10 +285,27 @@ const ProjectTeamPanel = ({ projectId, moduleId, canManage = false }: Props) => 
                 </div>
                 <div>
                   <Label className="text-sm">Full name</Label>
-                  <Input
-                    className="mt-1" value={form.full_name}
-                    onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                  />
+                  <div className="mt-1">
+                    <LocationCombobox
+                      value={form.full_name}
+                      options={projectUsers.map((u) => u.full_name)}
+                      placeholder={projectUsers.length ? "Choose a project member…" : "Type a name"}
+                      emptyLabel="No project members yet"
+                      onChange={(v) => {
+                        const u = projectUsers.find((x) => x.full_name === v);
+                        setForm((f) => ({
+                          ...f,
+                          full_name: v,
+                          user_id: u?.user_id || "",
+                          email: u?.email || f.email,
+                          phone: u?.phone || f.phone,
+                        }));
+                      }}
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Pick someone with an account on this project, or type a new name.
+                  </p>
                 </div>
               </div>
 

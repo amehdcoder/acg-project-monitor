@@ -25,6 +25,8 @@ import {
   tallyTreatments, validateRound,
   type HouseholdRow, type MdaRoundRow, type MdaTreatmentRow,
 } from "@/lib/programmeModule/households";
+import { useCdds } from "@/lib/programmeModule/cddCaseSearch";
+import LocationCombobox from "@/components/MdaChecklist/LocationCombobox";
 
 interface Props {
   open: boolean;
@@ -93,6 +95,7 @@ const MdaRoundDialog = ({
 }: Props) => {
   const [draft, setDraft] = useState<Partial<MdaRoundRow>>({});
   const [rows, setRows] = useState<MdaTreatmentRow[]>([]);
+  const { cdds } = useCdds(projectId);
   const [showErrors, setShowErrors] = useState(false);
 
   useEffect(() => {
@@ -134,6 +137,23 @@ const MdaRoundDialog = ({
       ]);
     }
   }, [open, round, roundTreatments, members, otherMembers, household, projectId, moduleId]);
+
+  /**
+   * CDDs registered on the system. Those attached to the facilities where the
+   * household's beneficiaries were registered come first; the rest stay
+   * available so a distributor is never blocked.
+   */
+  const cddNames = useMemo(() => {
+    const facilityIds = new Set(
+      [
+        (household as { facility_id?: string | null }).facility_id,
+        ...members.map((m) => m.facility_id),
+      ].filter(Boolean) as string[],
+    );
+    const mine = cdds.filter((c) => c.facility_id && facilityIds.has(c.facility_id));
+    const others = cdds.filter((c) => !c.facility_id || !facilityIds.has(c.facility_id));
+    return [...new Set([...mine, ...others].map((c) => c.full_name).filter(Boolean))];
+  }, [cdds, members, household]);
 
   const { errors, warnings, tally } = useMemo(
     () => validateRound(draft, rows, existingRounds, round?.id),
@@ -215,7 +235,13 @@ const MdaRoundDialog = ({
               />
             ))}
             {field("Distributor (CDD)", (
-              <Input value={draft.distributor_name || ""} onChange={(e) => setDraft({ ...draft, distributor_name: e.target.value })} />
+              <LocationCombobox
+                value={draft.distributor_name || ""}
+                options={cddNames}
+                placeholder={cddNames.length ? "Choose a CDD…" : "Type the distributor's name"}
+                emptyLabel="No CDDs registered for this facility"
+                onChange={(v) => setDraft({ ...draft, distributor_name: v })}
+              />
             ))}
             {field("Supervisor", (
               <Input value={draft.supervisor_name || ""} onChange={(e) => setDraft({ ...draft, supervisor_name: e.target.value })} />
