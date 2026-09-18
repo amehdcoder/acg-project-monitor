@@ -93,6 +93,7 @@ const MdaRoundDialog = ({
 }: Props) => {
   const [draft, setDraft] = useState<Partial<MdaRoundRow>>({});
   const [rows, setRows] = useState<MdaTreatmentRow[]>([]);
+  const { cdds } = useCdds(projectId);
   const [showErrors, setShowErrors] = useState(false);
 
   useEffect(() => {
