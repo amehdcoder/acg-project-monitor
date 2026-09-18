@@ -35,6 +35,8 @@ import {
   useTeamMembers, type PermissionKey, type TeamMemberRow, type TeamPermissions,
   type TeamType,
 } from "@/lib/programmeModule/projectTeam";
+import { useProjectUsers } from "@/lib/programmeModule/projectUsers";
+import LocationCombobox from "@/components/MdaChecklist/LocationCombobox";
 import GeoCascadeFields from "./GeoCascadeFields";
 
 interface Props {
