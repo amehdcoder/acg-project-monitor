@@ -56,6 +56,7 @@ const ProjectTeamPanel = ({ projectId, moduleId, canManage = false }: Props) => 
   const { toast } = useToast();
   const { members, reload } = useTeamMembers(projectId);
   const { facilities } = useFacilities(projectId);
+  const { users: projectUsers } = useProjectUsers(projectId);
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<TeamMemberRow | null>(null);
