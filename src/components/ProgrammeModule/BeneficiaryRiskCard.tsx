@@ -43,9 +43,12 @@ const BeneficiaryRiskCard = ({
   const { toast } = useToast();
   const { facilities } = useFacilities(projectId);
   const [age, setAge] = useState<number | null>(null);
-  const [visitCount, setVisitCount] = useState<number | null>(null);
   const [dispatching, setDispatching] = useState(false);
   const [dispatched, setDispatched] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const { visits, reload } = useBeneficiaryHomeVisits(beneficiary.id);
+  const openVisit = visits.find(isVisitOpen) || null;
+  const visitCount = visits.length;
 
   const facilityId = (beneficiary as unknown as { facility_id?: string | null }).facility_id || null;
   const facility = facilities.find((f) => f.id === facilityId) || null;
