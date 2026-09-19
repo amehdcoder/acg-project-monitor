@@ -93,6 +93,9 @@ const LtfuRiskPanel = ({
   });
   const [visitNotes, setVisitNotes] = useState("");
   const [busy, setBusy] = useState(false);
+  const [reportVisit, setReportVisit] = useState<HomeVisitRow | null>(null);
+  const [reportName, setReportName] = useState("");
+  const [reportFacility, setReportFacility] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
