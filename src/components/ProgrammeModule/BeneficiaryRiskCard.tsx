@@ -15,6 +15,10 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { bandLabel, scoreLtfuRisk } from "@/lib/programmeModule/ltfuRisk";
 import { useFacilities } from "@/lib/programmeModule/facilities";
+import {
+  useBeneficiaryHomeVisits, isVisitOpen, visitSummary,
+} from "@/lib/programmeModule/homeVisits";
+import HomeVisitOutcomeDialog from "./HomeVisitOutcomeDialog";
 import type {
   BeneficiaryReferralRow, BeneficiaryRow, BeneficiaryServiceRow,
 } from "@/lib/programmeModule/types";
@@ -43,9 +47,12 @@ const BeneficiaryRiskCard = ({
   const { toast } = useToast();
   const { facilities } = useFacilities(projectId);
   const [age, setAge] = useState<number | null>(null);
-  const [visitCount, setVisitCount] = useState<number | null>(null);
   const [dispatching, setDispatching] = useState(false);
   const [dispatched, setDispatched] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const { visits, reload } = useBeneficiaryHomeVisits(beneficiary.id);
+  const openVisit = visits.find(isVisitOpen) || null;
+  const visitCount = visits.length;
 
   const facilityId = (beneficiary as unknown as { facility_id?: string | null }).facility_id || null;
   const facility = facilities.find((f) => f.id === facilityId) || null;
@@ -63,17 +70,7 @@ const BeneficiaryRiskCard = ({
     setAge(Number.isFinite(n) && n > 0 ? n : null);
   }, [beneficiary]);
 
-  useEffect(() => {
-    let alive = true;
-    void (async () => {
-      const { count } = await supabase
-        .from("beneficiary_home_visits")
-        .select("id", { count: "exact", head: true })
-        .eq("beneficiary_id", beneficiary.id);
-      if (alive) setVisitCount(count ?? 0);
-    })();
-    return () => { alive = false; };
-  }, [beneficiary.id, dispatched]);
+  useEffect(() => { if (dispatched) void reload(); }, [dispatched, reload]);
 
   const risk = useMemo(() => {
     const surgical = services.some((s) => {
@@ -164,9 +161,34 @@ const BeneficiaryRiskCard = ({
           {dispatched ? "Home visit dispatched" : "Dispatch a community health worker"}
         </Button>
       )}
+      {visits.length > 0 && (
+        <div className="mt-3 space-y-1 border-t border-border pt-3">
+          <p className="text-xs font-medium text-foreground">Home visits</p>
+          {visits.slice(0, 4).map((v) => (
+            <p key={v.id} className="text-xs text-muted-foreground">• {visitSummary(v)}</p>
+          ))}
+        </div>
+      )}
+
+      {openVisit && (
+        <Button size="sm" className="mt-3 w-full" onClick={() => setReportOpen(true)}>
+          Report the visit outcome
+        </Button>
+      )}
+
       <p className="mt-2 text-[11px] text-muted-foreground">
         Decision support for the care team — it prioritises tracing, it does not judge the person.
       </p>
+
+      <HomeVisitOutcomeDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        projectId={projectId}
+        visit={openVisit}
+        beneficiaryName={beneficiary.full_name}
+        facilityId={facilityId}
+        onReported={() => void reload()}
+      />
     </Card>
   );
 };

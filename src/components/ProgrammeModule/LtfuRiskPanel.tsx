@@ -23,7 +23,9 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Activity, Send, Loader2, MapPin, CheckCircle2, Search } from "lucide-react";
+import { Activity, Send, Loader2, MapPin, CheckCircle2, Search, ClipboardCheck } from "lucide-react";
+import { OUTCOME_LABEL } from "@/lib/programmeModule/homeVisits";
+import HomeVisitOutcomeDialog from "./HomeVisitOutcomeDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -91,6 +93,9 @@ const LtfuRiskPanel = ({
   });
   const [visitNotes, setVisitNotes] = useState("");
   const [busy, setBusy] = useState(false);
+  const [reportVisit, setReportVisit] = useState<HomeVisitRow | null>(null);
+  const [reportName, setReportName] = useState("");
+  const [reportFacility, setReportFacility] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -354,12 +359,16 @@ const LtfuRiskPanel = ({
                       </Select>
                     </TableCell>
                     <TableCell>
-                      <Select value={d.outcome || ""} onValueChange={(v) => void updateVisit(d.id, { outcome: v })}>
-                        <SelectTrigger className="h-8 w-[220px]"><SelectValue placeholder="Record outcome" /></SelectTrigger>
-                        <SelectContent className="z-[1200] bg-popover">
-                          {OUTCOMES.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
+                      {d.outcome ? (
+                        <span className="text-sm text-foreground">{OUTCOME_LABEL[d.outcome] || d.outcome}</span>
+                      ) : (
+                        <Button
+                          size="sm" variant="outline" className="gap-1"
+                          onClick={() => { setReportVisit(d); setReportName(b?.full_name || ""); setReportFacility((b as unknown as { facility_id?: string })?.facility_id || null); }}
+                        >
+                          <ClipboardCheck className="h-3.5 w-3.5" /> Report outcome
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 );
@@ -429,6 +438,16 @@ const LtfuRiskPanel = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <HomeVisitOutcomeDialog
+        open={!!reportVisit}
+        onOpenChange={(v) => { if (!v) setReportVisit(null); }}
+        projectId={projectId}
+        visit={reportVisit}
+        beneficiaryName={reportName}
+        facilityId={reportFacility}
+        onReported={() => { setReportVisit(null); void load(); }}
+      />
     </div>
   );
 };
