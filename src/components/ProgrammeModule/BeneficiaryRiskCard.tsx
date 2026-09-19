@@ -66,17 +66,7 @@ const BeneficiaryRiskCard = ({
     setAge(Number.isFinite(n) && n > 0 ? n : null);
   }, [beneficiary]);
 
-  useEffect(() => {
-    let alive = true;
-    void (async () => {
-      const { count } = await supabase
-        .from("beneficiary_home_visits")
-        .select("id", { count: "exact", head: true })
-        .eq("beneficiary_id", beneficiary.id);
-      if (alive) setVisitCount(count ?? 0);
-    })();
-    return () => { alive = false; };
-  }, [beneficiary.id, dispatched]);
+  useEffect(() => { if (dispatched) void reload(); }, [dispatched, reload]);
 
   const risk = useMemo(() => {
     const surgical = services.some((s) => {
