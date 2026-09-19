@@ -161,9 +161,34 @@ const BeneficiaryRiskCard = ({
           {dispatched ? "Home visit dispatched" : "Dispatch a community health worker"}
         </Button>
       )}
+      {visits.length > 0 && (
+        <div className="mt-3 space-y-1 border-t border-border pt-3">
+          <p className="text-xs font-medium text-foreground">Home visits</p>
+          {visits.slice(0, 4).map((v) => (
+            <p key={v.id} className="text-xs text-muted-foreground">• {visitSummary(v)}</p>
+          ))}
+        </div>
+      )}
+
+      {openVisit && (
+        <Button size="sm" className="mt-3 w-full" onClick={() => setReportOpen(true)}>
+          Report the visit outcome
+        </Button>
+      )}
+
       <p className="mt-2 text-[11px] text-muted-foreground">
         Decision support for the care team — it prioritises tracing, it does not judge the person.
       </p>
+
+      <HomeVisitOutcomeDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        projectId={projectId}
+        visit={openVisit}
+        beneficiaryName={beneficiary.full_name}
+        facilityId={facilityId}
+        onReported={() => void reload()}
+      />
     </Card>
   );
 };
