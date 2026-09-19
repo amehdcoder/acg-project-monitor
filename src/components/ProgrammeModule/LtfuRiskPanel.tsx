@@ -438,6 +438,16 @@ const LtfuRiskPanel = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <HomeVisitOutcomeDialog
+        open={!!reportVisit}
+        onOpenChange={(v) => { if (!v) setReportVisit(null); }}
+        projectId={projectId}
+        visit={reportVisit}
+        beneficiaryName={reportName}
+        facilityId={reportFacility}
+        onReported={() => { setReportVisit(null); void load(); }}
+      />
     </div>
   );
 };
