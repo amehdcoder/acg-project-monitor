@@ -15,6 +15,10 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { bandLabel, scoreLtfuRisk } from "@/lib/programmeModule/ltfuRisk";
 import { useFacilities } from "@/lib/programmeModule/facilities";
+import {
+  useBeneficiaryHomeVisits, isVisitOpen, visitSummary,
+} from "@/lib/programmeModule/homeVisits";
+import HomeVisitOutcomeDialog from "./HomeVisitOutcomeDialog";
 import type {
   BeneficiaryReferralRow, BeneficiaryRow, BeneficiaryServiceRow,
 } from "@/lib/programmeModule/types";
