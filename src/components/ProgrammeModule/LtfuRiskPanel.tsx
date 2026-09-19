@@ -23,7 +23,9 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Activity, Send, Loader2, MapPin, CheckCircle2, Search } from "lucide-react";
+import { Activity, Send, Loader2, MapPin, CheckCircle2, Search, ClipboardCheck } from "lucide-react";
+import { OUTCOME_LABEL } from "@/lib/programmeModule/homeVisits";
+import HomeVisitOutcomeDialog from "./HomeVisitOutcomeDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
