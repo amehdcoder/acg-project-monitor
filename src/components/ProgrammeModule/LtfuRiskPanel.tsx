@@ -354,12 +354,16 @@ const LtfuRiskPanel = ({
                       </Select>
                     </TableCell>
                     <TableCell>
-                      <Select value={d.outcome || ""} onValueChange={(v) => void updateVisit(d.id, { outcome: v })}>
-                        <SelectTrigger className="h-8 w-[220px]"><SelectValue placeholder="Record outcome" /></SelectTrigger>
-                        <SelectContent className="z-[1200] bg-popover">
-                          {OUTCOMES.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
+                      {d.outcome ? (
+                        <span className="text-sm text-foreground">{OUTCOME_LABEL[d.outcome] || d.outcome}</span>
+                      ) : (
+                        <Button
+                          size="sm" variant="outline" className="gap-1"
+                          onClick={() => { setReportVisit(d); setReportName(b?.full_name || ""); setReportFacility((b as unknown as { facility_id?: string })?.facility_id || null); }}
+                        >
+                          <ClipboardCheck className="h-3.5 w-3.5" /> Report outcome
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 );
