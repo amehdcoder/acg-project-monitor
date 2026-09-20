@@ -50,6 +50,8 @@ interface Props {
   moduleId?: string;
   /** Administrators and facility staff with recording rights. */
   canRecord?: boolean;
+  /** Designated clinicians who may review, stage and confirm cases. */
+  canConfirm?: boolean;
   /** Empty for administrators — otherwise the facilities the user belongs to. */
   allowedFacilityIds?: string[] | null;
   onBeneficiaryRegistered?: () => void;
@@ -73,7 +75,8 @@ const Metric = ({ label, value, hint }: { label: string; value: number | string;
 );
 
 const CddCaseSearchPanel = ({
-  projectId, moduleId, canRecord = false, allowedFacilityIds = null, onBeneficiaryRegistered,
+  projectId, moduleId, canRecord = false, canConfirm = false,
+  allowedFacilityIds = null, onBeneficiaryRegistered,
   onCompleteRecord,
 }: Props) => {
   const { toast } = useToast();
@@ -141,11 +144,17 @@ const CddCaseSearchPanel = ({
   const isIncoming = (c: PotentialCaseRow) =>
     c.status === "referred" && !!c.referred_to_facility_id && !!levels[c.referred_to_facility_id];
 
-  const canActOn = (c: PotentialCaseRow) =>
-    canRecord && (!allowedFacilityIds || allowedFacilityIds.length === 0
+  /** Is this case inside a facility this person works with? */
+  const inMyFacilities = (c: PotentialCaseRow) =>
+    !allowedFacilityIds || allowedFacilityIds.length === 0
       || levels[c.facility_id] === "record" || levels[c.facility_id] === "manage"
-      || (c.referred_to_facility_id
-        && ["record", "manage"].includes(levels[c.referred_to_facility_id] || "")));
+      || !!(c.referred_to_facility_id
+        && ["record", "manage"].includes(levels[c.referred_to_facility_id] || ""));
+
+  const canActOn = (c: PotentialCaseRow) => canRecord && inMyFacilities(c);
+
+  /** Only designated clinicians review, stage and confirm a potential case. */
+  const canConfirmOn = (c: PotentialCaseRow) => canConfirm && inMyFacilities(c);
 
   /**
    * Opens the full registration form on a record created from case search,
@@ -313,7 +322,7 @@ const CddCaseSearchPanel = ({
                     Found by {cddName(c.cdd_id)} · {fmtDate(c.search_date)} · {facilityName(c.facility_id)}
                   </p>
                 </div>
-                {canActOn(c) && (
+                {canConfirmOn(c) && (
                   <Button size="sm" className="gap-1" onClick={() => setConfirmCase(c)}>
                     <Stethoscope className="h-4 w-4" /> Review &amp; stage
                   </Button>
@@ -444,6 +453,7 @@ const CddCaseSearchPanel = ({
               const tone = CASE_STATUS_TONE[c.status];
               const incoming = isIncoming(c);
               const actable = canActOn(c);
+              const confirmable = canConfirmOn(c);
               return (
                 <div key={c.id} className="rounded-lg border border-border p-3">
                   <div className="flex flex-wrap items-start gap-3">
@@ -489,7 +499,7 @@ const CddCaseSearchPanel = ({
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
-                      {actable && c.status !== "registered" && (
+                      {confirmable && c.status !== "registered" && (
                         <Button
                           variant="outline" size="sm" className="gap-1"
                           onClick={() => setConfirmCase(c)}

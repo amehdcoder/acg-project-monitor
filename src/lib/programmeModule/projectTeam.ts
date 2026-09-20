@@ -72,6 +72,13 @@ export interface TeamPermissions {
   confirm_cases?: boolean;
   manage_cdds?: boolean;
   manage_households?: boolean;
+  home_visits?: boolean;
+  dispatch_visits?: boolean;
+  accept_referrals?: boolean;
+  assess_livelihood?: boolean;
+  verify_livelihood?: boolean;
+  manage_livelihood?: boolean;
+  manage_facilities?: boolean;
   view_dashboards?: boolean;
   view_safeguarding?: boolean;
   export_data?: boolean;
@@ -87,9 +94,16 @@ export const PERMISSION_LIST: {
   { key: "view_records", label: "See beneficiary records", hint: "Open the register and read records", group: "Records" },
   { key: "edit_records", label: "Register & edit beneficiaries", hint: "Add new people and change their details", group: "Records" },
   { key: "record_services", label: "Record services & follow-ups", hint: "Add visits, assessments and referrals", group: "Records" },
-  { key: "confirm_cases", label: "Confirm CDD cases (clinician)", hint: "Review, stage and confirm case-search findings", group: "Case search" },
+  { key: "accept_referrals", label: "Accept referrals into a facility", hint: "Take in people referred from other facilities", group: "Records" },
+  { key: "confirm_cases", label: "Confirm cases (clinician)", hint: "Review, stage and confirm case-search findings", group: "Case search" },
   { key: "manage_cdds", label: "Manage CDDs & case search", hint: "Register CDDs and record potential cases", group: "Case search" },
+  { key: "home_visits", label: "Do follow-up & home visits", hint: "Report the outcome of a home visit", group: "Follow-up" },
+  { key: "dispatch_visits", label: "Send people on home visits", hint: "Assign a CHEW or focal person to visit someone at risk", group: "Follow-up" },
   { key: "manage_households", label: "Manage households & MDA", hint: "Households, water points and treatment rounds", group: "Community" },
+  { key: "assess_livelihood", label: "Do livelihood assessments", hint: "Complete the vulnerability assessment form", group: "Livelihood" },
+  { key: "verify_livelihood", label: "Verify livelihood shortlists", hint: "Home-visit checks that confirm or correct a suggested name", group: "Livelihood" },
+  { key: "manage_livelihood", label: "Run livelihood opportunities", hint: "Create opportunities and decide who gets a place", group: "Livelihood" },
+  { key: "manage_facilities", label: "Manage health facilities", hint: "Register facilities and their focal persons", group: "Administration" },
   { key: "view_dashboards", label: "See dashboards & analysis", hint: "Journey, facility and cluster dashboards", group: "Oversight" },
   { key: "view_safeguarding", label: "See safeguarding screens", hint: "Still requires a vault key to read sealed narratives", group: "Oversight" },
   { key: "export_data", label: "Export data", hint: "Download registers and CSV exports", group: "Oversight" },
@@ -104,15 +118,88 @@ export const PRESETS: Record<TeamType, TeamPermissions> = {
   },
   lga: {
     view_records: true, record_services: true, manage_cdds: true,
-    manage_households: true, view_dashboards: true,
+    manage_households: true, home_visits: true, dispatch_visits: true, view_dashboards: true,
   },
   partner: { view_records: true, view_dashboards: true, export_data: true },
   facility: {
-    view_records: true, edit_records: true, record_services: true,
-    confirm_cases: true, manage_cdds: true, manage_households: true, view_dashboards: true,
+    view_records: true, edit_records: true, record_services: true, accept_referrals: true,
+    confirm_cases: true, manage_cdds: true, manage_households: true,
+    home_visits: true, dispatch_visits: true, view_dashboards: true,
   },
   national: { view_records: true, view_dashboards: true, export_data: true, manage_team: true },
 };
+
+/**
+ * Duty presets — the jobs people actually do on beneficiary records.
+ * Picking one ticks the right boxes; every box can still be changed after.
+ */
+export const DUTY_PRESETS: { key: string; label: string; hint: string; permissions: TeamPermissions }[] = [
+  {
+    key: "clinician",
+    label: "Clinician (confirms cases)",
+    hint: "Reviews case-search findings, stages them and confirms or rejects",
+    permissions: {
+      view_records: true, edit_records: true, record_services: true,
+      confirm_cases: true, accept_referrals: true, view_dashboards: true,
+    },
+  },
+  {
+    key: "follow_up",
+    label: "Follow-up & home visits",
+    hint: "Visits people at home and reports what was found",
+    permissions: {
+      view_records: true, record_services: true, home_visits: true, view_dashboards: true,
+    },
+  },
+  {
+    key: "visit_coordinator",
+    label: "Follow-up coordinator",
+    hint: "Sends people on visits and tracks who is at risk of dropping out",
+    permissions: {
+      view_records: true, record_services: true, home_visits: true,
+      dispatch_visits: true, view_dashboards: true, export_data: true,
+    },
+  },
+  {
+    key: "livelihood_verifier",
+    label: "Livelihood verifier",
+    hint: "Checks suggested names on the ground before places are given",
+    permissions: {
+      view_records: true, assess_livelihood: true, verify_livelihood: true, view_dashboards: true,
+    },
+  },
+  {
+    key: "livelihood_manager",
+    label: "Livelihood manager",
+    hint: "Creates opportunities, reviews shortlists and awards places",
+    permissions: {
+      view_records: true, assess_livelihood: true, verify_livelihood: true,
+      manage_livelihood: true, view_dashboards: true, export_data: true,
+    },
+  },
+  {
+    key: "case_search",
+    label: "Case search supervisor",
+    hint: "Registers CDDs and keeps case search running",
+    permissions: {
+      view_records: true, manage_cdds: true, record_services: true,
+      manage_households: true, view_dashboards: true,
+    },
+  },
+  {
+    key: "records_admin",
+    label: "Records administrator",
+    hint: "Full running of the records on this project",
+    permissions: Object.fromEntries(PERMISSION_LIST.map((p) => [p.key, true])) as TeamPermissions,
+  },
+  {
+    key: "read_only",
+    label: "Read only",
+    hint: "Can look at records and dashboards, change nothing",
+    permissions: { view_records: true, view_dashboards: true },
+  },
+];
+
 
 export interface TeamMemberRow {
   id: string;
