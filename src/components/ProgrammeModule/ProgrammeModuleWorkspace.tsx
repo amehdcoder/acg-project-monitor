@@ -254,6 +254,10 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
             show: can("manage_cdds") || can("confirm_cases") || can("view_records"),
           },
           {
+            key: "livelihood", label: "Livelihood & empowerment", icon: Briefcase,
+            show: can("view_records") || can("view_dashboards"),
+          },
+          {
             key: "team", label: "Project team", icon: Users,
             show: canConfigure || can("manage_team") || onTeamRegister,
           },
