@@ -4,12 +4,12 @@
 // Kept as plain data so the confirmation form stays a form — a clinician ticks
 // what is true, and the record reads like a consultation note afterwards.
 
-export type ClinicalCondition = "lymphoedema" | "hydrocoele";
+export type ClinicalCondition = string;
 
 export interface SymptomItem { key: string; label: string }
 
 /** Presenting complaints, in the words a clinic uses. */
-export const SYMPTOMS: Record<ClinicalCondition, SymptomItem[]> = {
+const SYMPTOM_SETS: Record<string, SymptomItem[]> = {
   lymphoedema: [
     { key: "swelling", label: "Swelling of the limb" },
     { key: "pain", label: "Pain or aching in the limb" },
@@ -37,6 +37,12 @@ export const SYMPTOMS: Record<ClinicalCondition, SymptomItem[]> = {
     { key: "stigma", label: "Avoids public gatherings because of it" },
   ],
 };
+
+/** Symptom list for a condition, falling back to the limb-swelling list. */
+export const symptomsFor = (condition: ClinicalCondition): SymptomItem[] =>
+  SYMPTOM_SETS[condition] || SYMPTOM_SETS.lymphoedema;
+
+export const SYMPTOMS = SYMPTOM_SETS;
 
 export const ONSET_OPTIONS = [
   { value: "days", label: "Days" },
@@ -159,7 +165,7 @@ const ticked = (m?: Record<string, boolean> | null) =>
   Object.entries(m || {}).filter(([, v]) => v).map(([k]) => k);
 
 export const symptomLabels = (condition: ClinicalCondition, s?: CaseSymptoms | null) =>
-  ticked(s?.items).map((k) => SYMPTOMS[condition].find((x) => x.key === k)?.label || k);
+  ticked(s?.items).map((k) => symptomsFor(condition).find((x) => x.key === k)?.label || k);
 
 export const treatmentLabels = (t?: CaseTreatment | null) =>
   ticked(t?.given).map((k) => TREATMENTS_GIVEN.find((x) => x.key === k)?.label || k);

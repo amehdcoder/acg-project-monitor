@@ -34,7 +34,7 @@ import {
 } from "@/lib/programmeModule/cddCaseSearch";
 import {
   CERTAINTY_OPTIONS, COMORBIDITIES, DIAGNOSIS_OPTIONS, NEXT_STEPS, ONSET_OPTIONS,
-  PROGRESSION_OPTIONS, SEVERITY_OPTIONS, SYMPTOMS, TREATMENTS_GIVEN,
+  PROGRESSION_OPTIONS, SEVERITY_OPTIONS, symptomsFor, TREATMENTS_GIVEN,
   clinicalSummary, emptyDiagnosis, emptySymptoms, emptyTreatment, validateClinical,
   type CaseDiagnosis, type CaseSymptoms, type CaseTreatment,
 } from "@/lib/programmeModule/caseClinical";
@@ -353,7 +353,7 @@ const CaseConfirmationDialog = ({ open, onOpenChange, projectId, caseRow, onSave
               </p>
             </div>
             <div className="grid gap-1.5 sm:grid-cols-2">
-              {SYMPTOMS[condition].map((s) => (
+              {symptomsFor(condition).map((s) => (
                 <label key={s.key} className="flex cursor-pointer items-start gap-2 text-sm">
                   <Checkbox
                     className="mt-0.5"
