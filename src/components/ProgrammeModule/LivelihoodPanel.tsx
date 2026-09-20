@@ -304,12 +304,19 @@ const LivelihoodPanel = ({
 
   const exportCsv = () => {
     if (!outcome) return;
-    const head = ["Rank", "Case ID", "Name", "Community", "Vulnerability", "Readiness", "Band", "Basis", "Package", "List"];
+    const head = ["Rank", "Case ID", "Name", "Community", "Vulnerability", "Readiness", "Band",
+      "Preferred livelihood", "Why they chose it", "Preference match %", "Km to facility",
+      "Km to venue", "Basis", "Package", "List"];
+    const line = (e: { rank: number; basis: string; result: TargetingResult }, list: string) => [
+      e.rank, e.result.caseId, e.result.name, e.result.community,
+      e.result.vulnerability, e.result.readiness, BAND_LABELS[e.result.band],
+      e.result.preferenceLabel || "", e.result.preferenceNarrative || e.result.preferenceReason || "",
+      e.result.preferenceFit, e.result.distanceToFacilityKm ?? "",
+      e.result.distanceToOpportunityKm ?? "", e.basis, e.result.package, list,
+    ];
     const rows = [
-      ...outcome.selected.map((e) => [e.rank, e.result.caseId, e.result.name, e.result.community,
-        e.result.vulnerability, e.result.readiness, BAND_LABELS[e.result.band], e.basis, e.result.package, "Selected"]),
-      ...outcome.waitlist.map((e) => [e.rank, e.result.caseId, e.result.name, e.result.community,
-        e.result.vulnerability, e.result.readiness, BAND_LABELS[e.result.band], e.basis, e.result.package, "Waitlist"]),
+      ...outcome.selected.map((e) => line(e, "Selected")),
+      ...outcome.waitlist.map((e) => line(e, "Waitlist")),
     ];
     const csv = [head, ...rows]
       .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
