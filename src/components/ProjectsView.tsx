@@ -65,6 +65,8 @@ interface Project {
   recent_entries_count?: number;
   last_submission_at?: string | null;
   location_info?: string | null;
+  /** Owner/Co-Owner lock: project shows only the Beneficiary Records system. */
+  records_only?: boolean;
 }
 
 // Component to show chat button with unread badge
