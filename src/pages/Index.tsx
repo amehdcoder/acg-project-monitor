@@ -278,7 +278,20 @@ const Index = () => {
       case "my-submissions": return <SubmissionHistory onClose={() => setActiveTab("forms")} />;
       case "cases": return <CasesView />;
       case "templates": return <FormTemplatesView />;
-      case "projects": return <ProjectsView onSelectProject={(projectId) => { setSelectedProjectId(projectId); handleTabChange("forms"); }} />;
+      case "projects": return (
+        <ProjectsView
+          onSelectProject={(projectId) => { setSelectedProjectId(projectId); handleTabChange("forms"); }}
+          onOpenRecords={(projectId) => { setSelectedProjectId(projectId); handleTabChange("records"); }}
+        />
+      );
+      case "records": return (
+        <RecordsWorkspaceTab
+          projectId={selectedProjectId}
+          canConfigure={isAdmin}
+          isOwner={isOwner}
+          isSuperAdmin={isSuperAdmin || isOwner}
+        />
+      );
       case "data": return guardedPage("data", <DataView />);
       case "integrations": return guardedPage("integrations", <IntegrationsView />);
       case "geocoding": return guardedPage("geocoding", <GeocodingView />);
