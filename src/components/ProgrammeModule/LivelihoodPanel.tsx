@@ -647,13 +647,28 @@ const LivelihoodPanel = ({
                 onChange={(e) => setForm({ ...form, start_date: e.target.value })}
               />
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs">State (optional filter)</Label>
-              <Input value={String(form.state || "")} onChange={(e) => setForm({ ...form, state: e.target.value })} />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">LGA (optional filter)</Label>
-              <Input value={String(form.lga || "")} onChange={(e) => setForm({ ...form, lga: e.target.value })} />
+            <div className="space-y-2 sm:col-span-2">
+              <Label className="text-xs">Where the opportunity runs (optional filter)</Label>
+              <GeoCascadeFields
+                value={{
+                  state: String(form.state || ""),
+                  lga: String(form.lga || ""),
+                  ward: String(form.ward || ""),
+                  community: String(form.community || ""),
+                }}
+                onChange={(patch) => setForm({
+                  ...form,
+                  state: patch.state ?? "",
+                  lga: patch.lga ?? "",
+                  ward: patch.ward ?? "",
+                  community: patch.community ?? "",
+                })}
+                communityLabel="Community / venue"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Leave a level blank to cover everywhere below it. Travel distance is measured from
+                each person's home to this area.
+              </p>
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Minimum women (%)</Label>
