@@ -732,6 +732,33 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
             <DialogDescription>Manage status for "{settingsProject?.name}".</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {isOwnerLevel && (
+              <div className="rounded-xl border border-primary/25 bg-primary/5 p-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-primary/12">
+                    <HeartPulse className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-3">
+                      <Label htmlFor="set-records-only" className="text-sm font-semibold">
+                        Beneficiary Records only
+                      </Label>
+                      <Switch
+                        id="set-records-only"
+                        checked={settingsForm.records_only}
+                        onCheckedChange={(checked) =>
+                          setSettingsForm((current) => ({ ...current, records_only: checked }))
+                        }
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      When on, everyone except you and Co-Owners sees only the Longitudinal
+                      Beneficiary Records system on this project — no other page is available to them.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="set-status">Status</Label>
               <select
