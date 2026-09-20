@@ -80,7 +80,7 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
   const { isOfficer, reload: reloadOfficerAccess } = useIsSafeguardingOfficer(projectId);
   const [view, setView] = useState<
     | "records" | "journey" | "facility" | "followups" | "households" | "clusters" | "network"
-    | "risk" | "casesearch" | "safeguarding" | "safeguarding_dashboard" | "team"
+    | "risk" | "casesearch" | "livelihood" | "safeguarding" | "safeguarding_dashboard" | "team"
   >("records");
 
   // What this person is allowed to see and do, from the project team register.
