@@ -642,6 +642,19 @@ const LivelihoodPanel = ({
         opportunityId={opportunityId || null}
         onSaved={() => void reloadAssessments()}
       />
+
+      <LivelihoodVerificationDialog
+        open={Boolean(verifying)}
+        onOpenChange={(v) => { if (!v) setVerifying(null); }}
+        projectId={projectId}
+        moduleId={moduleId}
+        opportunityId={opportunityId || null}
+        beneficiary={verifying ? locationById.get(verifying.beneficiaryId) || null : null}
+        predicted={verifying?.predicted ?? 0}
+        assessmentId={verifying ? byBeneficiary.get(verifying.beneficiaryId)?.id || null : null}
+        existing={verifying?.verification || null}
+        onSaved={() => void reloadVerifications()}
+      />
     </div>
   );
 };
