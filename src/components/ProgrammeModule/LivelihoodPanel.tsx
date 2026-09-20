@@ -44,6 +44,9 @@ import {
 } from "@/lib/programmeModule/livelihoodVerification";
 import LivelihoodAssessmentDialog from "./LivelihoodAssessmentDialog";
 import LivelihoodVerificationDialog from "./LivelihoodVerificationDialog";
+import GeoCascadeFields from "./GeoCascadeFields";
+import { useFacilities } from "@/lib/programmeModule/facilities";
+import { haversineKm } from "@/lib/microplanning/distance";
 
 interface Props {
   projectId: string;
@@ -69,6 +72,9 @@ const daysSince = (d?: string | null) => {
   return Math.floor((Date.now() - t) / 86_400_000);
 };
 
+const sameName = (a?: string | null, b?: string | null) =>
+  String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
+
 const emptyOpportunity = {
   title: "",
   partner: "",
@@ -77,6 +83,7 @@ const emptyOpportunity = {
   state: "",
   lga: "",
   ward: "",
+  community: "",
   start_date: "",
   quota_women_pct: 50,
   quota_disability_pct: 20,
@@ -139,14 +146,63 @@ const LivelihoodPanel = ({
     };
   };
 
+  /* ---- Distance: how far people really are from care and from the venue -- */
+  const { facilities } = useFacilities(projectId);
+  const facilityPoint = useMemo(() => {
+    const m = new Map<string, [number, number]>();
+    for (const f of facilities) {
+      if (f.latitude != null && f.longitude != null) m.set(f.id, [f.latitude, f.longitude]);
+    }
+    return m;
+  }, [facilities]);
+
+  /** Venue point: the recorded venue if given, otherwise the centre of the
+   *  registered homes in the area the opportunity covers. */
+  const venuePoint = useMemo<[number, number] | null>(() => {
+    if (!opportunity) return null;
+    if (opportunity.venue_latitude != null && opportunity.venue_longitude != null) {
+      return [opportunity.venue_latitude, opportunity.venue_longitude];
+    }
+    const inArea = beneficiaries.filter((b) =>
+      b.latitude != null && b.longitude != null
+      && (!opportunity.state || sameName(b.state, opportunity.state))
+      && (!opportunity.lga || sameName(b.lga, opportunity.lga))
+      && (!opportunity.ward || sameName(b.ward, opportunity.ward)));
+    if (!inArea.length) return null;
+    const lat = inArea.reduce((a, b) => a + Number(b.latitude), 0) / inArea.length;
+    const lng = inArea.reduce((a, b) => a + Number(b.longitude), 0) / inArea.length;
+    return [lat, lng];
+  }, [opportunity, beneficiaries]);
+
+  const geoFor = (b: BeneficiaryRow) => {
+    const home: [number, number] | null =
+      b.latitude != null && b.longitude != null ? [Number(b.latitude), Number(b.longitude)] : null;
+    const fac = b.facility_id ? facilityPoint.get(b.facility_id) : undefined;
+    const round1 = (n: number) => Math.round(n * 10) / 10;
+    const locationTier: "ward" | "lga" | "state" | "outside" | null = !opportunity
+      ? null
+      : opportunity.ward && sameName(b.ward, opportunity.ward) ? "ward"
+        : opportunity.lga && sameName(b.lga, opportunity.lga) ? "lga"
+          : opportunity.state && sameName(b.state, opportunity.state) ? "state"
+            : opportunity.state || opportunity.lga || opportunity.ward ? "outside" : null;
+    return {
+      distanceToFacilityKm: home && fac ? round1(haversineKm(home[0], home[1], fac[0], fac[1])) : null,
+      distanceToOpportunityKm: home && venuePoint
+        ? round1(haversineKm(home[0], home[1], venuePoint[0], venuePoint[1])) : null,
+      opportunityType: opportunity?.opportunity_type ?? null,
+      locationTier,
+    };
+  };
+
   const rawResults: TargetingResult[] = useMemo(
     () => beneficiaries.map((b) => scoreLivelihood({
       beneficiary: b,
       answers: (byBeneficiary.get(b.id)?.answers as Record<string, unknown>) || {},
       ...signalsFor(b),
+      ...geoFor(b),
     })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [beneficiaries, byBeneficiary, clinical],
+    [beneficiaries, byBeneficiary, clinical, opportunity, facilityPoint, venuePoint],
   );
 
   /** What the ground visits have taught the system so far. */
@@ -248,12 +304,19 @@ const LivelihoodPanel = ({
 
   const exportCsv = () => {
     if (!outcome) return;
-    const head = ["Rank", "Case ID", "Name", "Community", "Vulnerability", "Readiness", "Band", "Basis", "Package", "List"];
+    const head = ["Rank", "Case ID", "Name", "Community", "Vulnerability", "Readiness", "Band",
+      "Preferred livelihood", "Why they chose it", "Preference match %", "Km to facility",
+      "Km to venue", "Basis", "Package", "List"];
+    const line = (e: { rank: number; basis: string; result: TargetingResult }, list: string) => [
+      e.rank, e.result.caseId, e.result.name, e.result.community,
+      e.result.vulnerability, e.result.readiness, BAND_LABELS[e.result.band],
+      e.result.preferenceLabel || "", e.result.preferenceNarrative || e.result.preferenceReason || "",
+      e.result.preferenceFit, e.result.distanceToFacilityKm ?? "",
+      e.result.distanceToOpportunityKm ?? "", e.basis, e.result.package, list,
+    ];
     const rows = [
-      ...outcome.selected.map((e) => [e.rank, e.result.caseId, e.result.name, e.result.community,
-        e.result.vulnerability, e.result.readiness, BAND_LABELS[e.result.band], e.basis, e.result.package, "Selected"]),
-      ...outcome.waitlist.map((e) => [e.rank, e.result.caseId, e.result.name, e.result.community,
-        e.result.vulnerability, e.result.readiness, BAND_LABELS[e.result.band], e.basis, e.result.package, "Waitlist"]),
+      ...outcome.selected.map((e) => line(e, "Selected")),
+      ...outcome.waitlist.map((e) => line(e, "Waitlist")),
     ];
     const csv = [head, ...rows]
       .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -303,6 +366,19 @@ const LivelihoodPanel = ({
         </TableCell>
         <TableCell className="max-w-[18rem] text-xs text-muted-foreground">
           {entry.basis}
+          {entry.result.preferenceLabel && (
+            <span className="mt-1 block text-[11px] text-foreground">
+              Wants: {entry.result.preferenceLabel} · match {entry.result.preferenceFit}%
+            </span>
+          )}
+          {entry.result.preferenceNotes.map((n) => (
+            <span key={n} className="mt-1 block text-[11px]">{n}</span>
+          ))}
+          {entry.result.distanceToFacilityKm != null && (
+            <span className="mt-1 block text-[11px]">
+              {entry.result.distanceToFacilityKm} km from their facility
+            </span>
+          )}
           {entry.result.adjustmentReasons.map((r) => (
             <span key={r} className="mt-1 block text-[11px]">{r}</span>
           ))}
@@ -427,8 +503,14 @@ const LivelihoodPanel = ({
             <Sparkles className="h-4 w-4" />
             <span>
               Mean vulnerability of the selected list is {outcome.summary.meanVulnerability}/100 across{" "}
-              {outcome.summary.communities} communities. {outcome.waitlist.length} on the waitlist,{" "}
-              {outcome.excluded.length} held back.
+              {outcome.summary.communities} communities. {outcome.summary.ownChoice} of{" "}
+              {outcome.summary.selected} asked for this livelihood themselves (average match{" "}
+              {outcome.summary.meanPreferenceFit}%)
+              {outcome.summary.meanDistanceKm != null
+                && `, living on average ${outcome.summary.meanDistanceKm} km from where it runs`}
+              {outcome.summary.farFromVenue > 0
+                && ` — ${outcome.summary.farFromVenue} further than they said they can travel`}.{" "}
+              {outcome.waitlist.length} on the waitlist, {outcome.excluded.length} held back.
             </span>
           </Card>
 
@@ -591,13 +673,28 @@ const LivelihoodPanel = ({
                 onChange={(e) => setForm({ ...form, start_date: e.target.value })}
               />
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs">State (optional filter)</Label>
-              <Input value={String(form.state || "")} onChange={(e) => setForm({ ...form, state: e.target.value })} />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">LGA (optional filter)</Label>
-              <Input value={String(form.lga || "")} onChange={(e) => setForm({ ...form, lga: e.target.value })} />
+            <div className="space-y-2 sm:col-span-2">
+              <Label className="text-xs">Where the opportunity runs (optional filter)</Label>
+              <GeoCascadeFields
+                value={{
+                  state: String(form.state || ""),
+                  lga: String(form.lga || ""),
+                  ward: String(form.ward || ""),
+                  community: String(form.community || ""),
+                }}
+                onChange={(patch) => setForm({
+                  ...form,
+                  state: patch.state ?? "",
+                  lga: patch.lga ?? "",
+                  ward: patch.ward ?? "",
+                  community: patch.community ?? "",
+                })}
+                communityLabel="Community / venue"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Leave a level blank to cover everywhere below it. Travel distance is measured from
+                each person's home to this area.
+              </p>
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Minimum women (%)</Label>

@@ -6961,6 +6961,7 @@ export type Database = {
       }
       livelihood_opportunities: {
         Row: {
+          community: string | null
           created_at: string
           created_by: string | null
           id: string
@@ -6979,9 +6980,12 @@ export type Database = {
           target_beneficiaries: number
           title: string
           updated_at: string
+          venue_latitude: number | null
+          venue_longitude: number | null
           ward: string | null
         }
         Insert: {
+          community?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -7000,9 +7004,12 @@ export type Database = {
           target_beneficiaries?: number
           title: string
           updated_at?: string
+          venue_latitude?: number | null
+          venue_longitude?: number | null
           ward?: string | null
         }
         Update: {
+          community?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -7021,6 +7028,8 @@ export type Database = {
           target_beneficiaries?: number
           title?: string
           updated_at?: string
+          venue_latitude?: number | null
+          venue_longitude?: number | null
           ward?: string | null
         }
         Relationships: []
