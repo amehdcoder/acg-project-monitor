@@ -90,9 +90,11 @@ function ProjectChatButton({ projectId, projectName, onOpenChat }: {
 
 interface ProjectsViewProps {
   onSelectProject?: (projectId: string) => void;
+  /** Opens the Longitudinal Beneficiary Records system for a locked project. */
+  onOpenRecords?: (projectId: string) => void;
 }
 
-const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
+const ProjectsView = ({ onSelectProject, onOpenRecords }: ProjectsViewProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
