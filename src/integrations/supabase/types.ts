@@ -6891,6 +6891,140 @@ export type Database = {
         }
         Relationships: []
       }
+      livelihood_assessments: {
+        Row: {
+          answers: Json
+          assessed_by: string | null
+          assessed_on: string
+          beneficiary_id: string
+          created_at: string
+          decision: string
+          decision_notes: string | null
+          domain_scores: Json
+          id: string
+          module_id: string | null
+          opportunity_id: string | null
+          priority_band: string | null
+          project_id: string
+          readiness_score: number
+          recommended_package: string | null
+          updated_at: string
+          vulnerability_score: number
+        }
+        Insert: {
+          answers?: Json
+          assessed_by?: string | null
+          assessed_on?: string
+          beneficiary_id: string
+          created_at?: string
+          decision?: string
+          decision_notes?: string | null
+          domain_scores?: Json
+          id?: string
+          module_id?: string | null
+          opportunity_id?: string | null
+          priority_band?: string | null
+          project_id: string
+          readiness_score?: number
+          recommended_package?: string | null
+          updated_at?: string
+          vulnerability_score?: number
+        }
+        Update: {
+          answers?: Json
+          assessed_by?: string | null
+          assessed_on?: string
+          beneficiary_id?: string
+          created_at?: string
+          decision?: string
+          decision_notes?: string | null
+          domain_scores?: Json
+          id?: string
+          module_id?: string | null
+          opportunity_id?: string | null
+          priority_band?: string | null
+          project_id?: string
+          readiness_score?: number
+          recommended_package?: string | null
+          updated_at?: string
+          vulnerability_score?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "livelihood_assessments_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "livelihood_opportunities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      livelihood_opportunities: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          lga: string | null
+          module_id: string | null
+          notes: string | null
+          one_per_household: boolean
+          opportunity_type: string | null
+          partner: string | null
+          project_id: string
+          quota_disability_pct: number
+          quota_women_pct: number
+          start_date: string | null
+          state: string | null
+          status: string
+          target_beneficiaries: number
+          title: string
+          updated_at: string
+          ward: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          lga?: string | null
+          module_id?: string | null
+          notes?: string | null
+          one_per_household?: boolean
+          opportunity_type?: string | null
+          partner?: string | null
+          project_id: string
+          quota_disability_pct?: number
+          quota_women_pct?: number
+          start_date?: string | null
+          state?: string | null
+          status?: string
+          target_beneficiaries?: number
+          title: string
+          updated_at?: string
+          ward?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          lga?: string | null
+          module_id?: string | null
+          notes?: string | null
+          one_per_household?: boolean
+          opportunity_type?: string | null
+          partner?: string | null
+          project_id?: string
+          quota_disability_pct?: number
+          quota_women_pct?: number
+          start_date?: string | null
+          state?: string | null
+          status?: string
+          target_beneficiaries?: number
+          title?: string
+          updated_at?: string
+          ward?: string | null
+        }
+        Relationships: []
+      }
       locations: {
         Row: {
           accuracy: number | null
