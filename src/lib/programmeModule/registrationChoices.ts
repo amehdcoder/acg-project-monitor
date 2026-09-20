@@ -171,5 +171,35 @@ export const applyRegistrationChoices = (
     return { ...section, questions };
   });
 
-  return changed ? { ...config, sections } : config;
+  // Add any psychographic questions the register does not carry yet.
+  const present = new Set(sections.flatMap((s) => (s.questions || []).map((x) => x.name)));
+  const missing = REQUIRED_PSYCHOGRAPHICS.filter((p) => !present.has(p.name));
+  let withExtras = sections;
+  if (missing.length && sections.length) {
+    changed = true;
+    const targetIndex = Math.max(
+      0,
+      sections.findIndex((s) => s.placement === "personal"),
+    );
+    withExtras = sections.map((s, i) =>
+      i === targetIndex
+        ? {
+            ...s,
+            questions: [
+              ...(s.questions || []),
+              ...missing.map((p) => ({
+                id: uid(),
+                name: p.name,
+                label: p.label,
+                type: "select_one" as const,
+                required: false,
+                options: choiceOptions(p.list),
+              })),
+            ],
+          }
+        : s,
+    );
+  }
+
+  return changed ? { ...config, sections: withExtras } : config;
 };
