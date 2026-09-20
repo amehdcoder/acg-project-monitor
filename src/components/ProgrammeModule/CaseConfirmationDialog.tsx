@@ -189,6 +189,9 @@ const CaseConfirmationDialog = ({ open, onOpenChange, projectId, caseRow, onSave
           learned: learned ? { stage: learned.stage, confidence: learned.confidence } : null,
           reference_mm: Number(reference) || null,
         },
+        symptoms: symptoms as unknown as Record<string, unknown>,
+        diagnosis: diagnosis as unknown as Record<string, unknown>,
+        treatment: treatment as unknown as Record<string, unknown>,
         notes,
         rejectionReason: rejection,
       });
