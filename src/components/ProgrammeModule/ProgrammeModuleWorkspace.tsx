@@ -394,6 +394,16 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
         />
       )}
 
+      {view === "livelihood" && projectId && (
+        <LivelihoodPanel
+          projectId={projectId}
+          moduleId={active?.id}
+          beneficiaries={scopedBeneficiaries}
+          canManage={canConfigure || can("edit_records")}
+          onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }}
+        />
+      )}
+
       {view === "safeguarding" && (
         <SafeguardingPanel
           projectId={projectId}
