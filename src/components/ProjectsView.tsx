@@ -378,7 +378,11 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
       setSavingSettings(true);
       const { error } = await supabase
         .from("projects")
-        .update({ status: settingsForm.status })
+        .update(
+          isOwnerLevel
+            ? { status: settingsForm.status, records_only: settingsForm.records_only }
+            : { status: settingsForm.status },
+        )
         .eq("id", settingsProject.id);
       if (error) throw error;
       await logAction("edit_project", `Updated settings for "${settingsProject.name}"`, "project", settingsProject.id);
