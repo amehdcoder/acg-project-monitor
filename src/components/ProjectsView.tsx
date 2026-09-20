@@ -369,7 +369,7 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
 
   const openSettingsDialog = (project: Project) => {
     setSettingsProject(project);
-    setSettingsForm({ status: project.status || "active" });
+    setSettingsForm({ status: project.status || "active", records_only: !!project.records_only });
   };
 
   const handleSaveSettings = async () => {
