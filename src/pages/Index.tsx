@@ -285,8 +285,8 @@ const Index = () => {
         />
       );
       case "records": return (
-        <RecordsWorkspaceTab
-          projectId={selectedProjectId}
+        <ProgrammeModuleWorkspace
+          projectId={selectedProjectId || undefined}
           canConfigure={isAdmin}
           isOwner={isOwner}
           isSuperAdmin={isSuperAdmin || isOwner}
