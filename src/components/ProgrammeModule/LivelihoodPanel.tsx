@@ -50,6 +50,10 @@ interface Props {
   moduleId?: string;
   beneficiaries: BeneficiaryRow[];
   canManage?: boolean;
+  /** People allowed to complete the vulnerability assessment form. */
+  canAssess?: boolean;
+  /** People allowed to verify a shortlisted person on the ground. */
+  canVerify?: boolean;
   onOpenBeneficiary?: (b: BeneficiaryRow) => void;
 }
 
@@ -82,7 +86,8 @@ const emptyOpportunity = {
 };
 
 const LivelihoodPanel = ({
-  projectId, moduleId, beneficiaries, canManage = false, onOpenBeneficiary,
+  projectId, moduleId, beneficiaries, canManage = false, canAssess = true, canVerify = true,
+  onOpenBeneficiary,
 }: Props) => {
   const { toast } = useToast();
   const { opportunities, reload: reloadOpportunities } = useLivelihoodOpportunities(projectId);
@@ -312,17 +317,21 @@ const LivelihoodPanel = ({
         <TableCell className="text-xs">{entry.result.completeness}%</TableCell>
         <TableCell className="text-right">
           <div className="flex flex-wrap justify-end gap-1">
-            <Button size="sm" variant="outline" className="gap-1" onClick={() => b && setAssessing(b)}>
-              <ClipboardCheck className="h-3.5 w-3.5" /> {assessed ? "Review" : "Assess"}
-            </Button>
-            <Button
-              size="sm"
-              variant={v ? "outline" : "secondary"}
-              className="gap-1"
-              onClick={() => setVerifying(entry.result)}
-            >
-              <ShieldCheck className="h-3.5 w-3.5" /> {v ? "Re-verify" : "Verify"}
-            </Button>
+            {(canAssess || canManage) && (
+              <Button size="sm" variant="outline" className="gap-1" onClick={() => b && setAssessing(b)}>
+                <ClipboardCheck className="h-3.5 w-3.5" /> {assessed ? "Review" : "Assess"}
+              </Button>
+            )}
+            {(canVerify || canManage) && (
+              <Button
+                size="sm"
+                variant={v ? "outline" : "secondary"}
+                className="gap-1"
+                onClick={() => setVerifying(entry.result)}
+              >
+                <ShieldCheck className="h-3.5 w-3.5" /> {v ? "Re-verify" : "Verify"}
+              </Button>
+            )}
             {canManage && (
               <Select
                 value={assessed?.decision || ""}
@@ -455,10 +464,12 @@ const LivelihoodPanel = ({
                         <span className="font-medium">{q.result.name}</span>
                         <span className="text-muted-foreground"> — {q.why}</span>
                       </span>
-                      <Button size="sm" variant="ghost" className="h-7 gap-1 px-2"
-                        onClick={() => setVerifying(q.result)}>
-                        <ShieldCheck className="h-3.5 w-3.5" /> Verify
-                      </Button>
+                      {(canVerify || canManage) && (
+                        <Button size="sm" variant="ghost" className="h-7 gap-1 px-2"
+                          onClick={() => setVerifying(q.result)}>
+                          <ShieldCheck className="h-3.5 w-3.5" /> Verify
+                        </Button>
+                      )}
                     </li>
                   ))}
                 </ul>

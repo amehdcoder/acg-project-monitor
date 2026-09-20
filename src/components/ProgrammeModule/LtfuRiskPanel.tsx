@@ -42,6 +42,8 @@ interface Props {
   moduleId?: string;
   beneficiaries: BeneficiaryRow[];
   canDispatch?: boolean;
+  /** People allowed to report the outcome of a home/follow-up visit. */
+  canReportVisits?: boolean;
   onOpenBeneficiary?: (b: BeneficiaryRow) => void;
 }
 
@@ -73,7 +75,8 @@ const OUTCOMES = [
 ];
 
 const LtfuRiskPanel = ({
-  projectId, moduleId, beneficiaries, canDispatch = true, onOpenBeneficiary,
+  projectId, moduleId, beneficiaries, canDispatch = true, canReportVisits = true,
+  onOpenBeneficiary,
 }: Props) => {
   const { toast } = useToast();
   const { facilities } = useFacilities(projectId);
@@ -361,6 +364,8 @@ const LtfuRiskPanel = ({
                     <TableCell>
                       {d.outcome ? (
                         <span className="text-sm text-foreground">{OUTCOME_LABEL[d.outcome] || d.outcome}</span>
+                      ) : !canReportVisits ? (
+                        <span className="text-xs text-muted-foreground">Awaiting visit</span>
                       ) : (
                         <Button
                           size="sm" variant="outline" className="gap-1"
