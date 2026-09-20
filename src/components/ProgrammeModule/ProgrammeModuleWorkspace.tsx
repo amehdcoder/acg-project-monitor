@@ -11,7 +11,7 @@ import {
 import {
   Plus, Settings2, CloudOff, RefreshCw, Layers, Users, Building2, ShieldAlert,
   LayoutGrid, CalendarClock, Hospital, Route, ShieldCheck, Home, Network, Activity,
-  Search,
+  Search, Briefcase,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -39,6 +39,7 @@ import KinshipGraphPanel from "./KinshipGraphPanel";
 import LtfuRiskPanel from "./LtfuRiskPanel";
 import ClusterDashboard from "./ClusterDashboard";
 import CddCaseSearchPanel from "./CddCaseSearchPanel";
+import LivelihoodPanel from "./LivelihoodPanel";
 import { useIsSafeguardingOfficer } from "@/lib/programmeModule/safeguarding";
 import { useMyFacilityAccess } from "@/lib/programmeModule/facilities";
 
@@ -79,7 +80,7 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
   const { isOfficer, reload: reloadOfficerAccess } = useIsSafeguardingOfficer(projectId);
   const [view, setView] = useState<
     | "records" | "journey" | "facility" | "followups" | "households" | "clusters" | "network"
-    | "risk" | "casesearch" | "safeguarding" | "safeguarding_dashboard" | "team"
+    | "risk" | "casesearch" | "livelihood" | "safeguarding" | "safeguarding_dashboard" | "team"
   >("records");
 
   // What this person is allowed to see and do, from the project team register.
@@ -253,6 +254,10 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
             show: can("manage_cdds") || can("confirm_cases") || can("view_records"),
           },
           {
+            key: "livelihood", label: "Livelihood & empowerment", icon: Briefcase,
+            show: can("view_records") || can("view_dashboards"),
+          },
+          {
             key: "team", label: "Project team", icon: Users,
             show: canConfigure || can("manage_team") || onTeamRegister,
           },
@@ -386,6 +391,16 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
           allowedFacilityIds={isFocalPerson ? Object.keys(facilityLevels) : null}
           onBeneficiaryRegistered={() => void reloadBeneficiaries()}
           onCompleteRecord={(row) => setCompleting(row)}
+        />
+      )}
+
+      {view === "livelihood" && projectId && (
+        <LivelihoodPanel
+          projectId={projectId}
+          moduleId={active?.id}
+          beneficiaries={scopedBeneficiaries}
+          canManage={canConfigure || can("edit_records")}
+          onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }}
         />
       )}
 
