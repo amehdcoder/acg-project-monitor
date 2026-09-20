@@ -359,6 +359,19 @@ const LivelihoodPanel = ({
         </TableCell>
         <TableCell className="max-w-[18rem] text-xs text-muted-foreground">
           {entry.basis}
+          {entry.result.preferenceLabel && (
+            <span className="mt-1 block text-[11px] text-foreground">
+              Wants: {entry.result.preferenceLabel} · match {entry.result.preferenceFit}%
+            </span>
+          )}
+          {entry.result.preferenceNotes.map((n) => (
+            <span key={n} className="mt-1 block text-[11px]">{n}</span>
+          ))}
+          {entry.result.distanceToFacilityKm != null && (
+            <span className="mt-1 block text-[11px]">
+              {entry.result.distanceToFacilityKm} km from their facility
+            </span>
+          )}
           {entry.result.adjustmentReasons.map((r) => (
             <span key={r} className="mt-1 block text-[11px]">{r}</span>
           ))}
@@ -483,8 +496,14 @@ const LivelihoodPanel = ({
             <Sparkles className="h-4 w-4" />
             <span>
               Mean vulnerability of the selected list is {outcome.summary.meanVulnerability}/100 across{" "}
-              {outcome.summary.communities} communities. {outcome.waitlist.length} on the waitlist,{" "}
-              {outcome.excluded.length} held back.
+              {outcome.summary.communities} communities. {outcome.summary.ownChoice} of{" "}
+              {outcome.summary.selected} asked for this livelihood themselves (average match{" "}
+              {outcome.summary.meanPreferenceFit}%)
+              {outcome.summary.meanDistanceKm != null
+                && `, living on average ${outcome.summary.meanDistanceKm} km from where it runs`}
+              {outcome.summary.farFromVenue > 0
+                && ` — ${outcome.summary.farFromVenue} further than they said they can travel`}.{" "}
+              {outcome.waitlist.length} on the waitlist, {outcome.excluded.length} held back.
             </span>
           </Card>
 
