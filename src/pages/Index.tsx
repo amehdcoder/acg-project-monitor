@@ -115,6 +115,12 @@ const Index = () => {
   useAppUpdateNotifications();
   usePushNotifications();
   const { trackPageVisit } = useSurveillanceTracking(user?.id);
+  const recordsLock = useRecordsOnlyProjects();
+  const recordsLockActive =
+    !recordsLock.isOwnerLevel &&
+    recordsLock.locked.length > 0 &&
+    (recordsLock.exclusive ||
+      (activeTab === "records" && !!selectedProjectId && recordsLock.lockedIds.has(selectedProjectId)));
 
   useEffect(() => {
     const urlTab = searchParams.get("tab");
