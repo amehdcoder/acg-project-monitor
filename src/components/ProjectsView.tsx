@@ -769,7 +769,7 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
               <select
                 id="set-status"
                 value={settingsForm.status}
-                onChange={(e) => setSettingsForm({ status: e.target.value })}
+                onChange={(e) => setSettingsForm((current) => ({ ...current, status: e.target.value }))}
                 className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
               >
                 <option value="active">Active</option>
