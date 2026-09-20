@@ -39,6 +39,7 @@ import KinshipGraphPanel from "./KinshipGraphPanel";
 import LtfuRiskPanel from "./LtfuRiskPanel";
 import ClusterDashboard from "./ClusterDashboard";
 import CddCaseSearchPanel from "./CddCaseSearchPanel";
+import LivelihoodPanel from "./LivelihoodPanel";
 import { useIsSafeguardingOfficer } from "@/lib/programmeModule/safeguarding";
 import { useMyFacilityAccess } from "@/lib/programmeModule/facilities";
 
