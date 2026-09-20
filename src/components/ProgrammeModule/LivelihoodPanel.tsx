@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/table";
 import {
   Briefcase, Plus, Loader2, Download, Search, Sparkles, ClipboardCheck,
+  ShieldCheck, Brain, MapPinned,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -37,7 +38,12 @@ import {
   useLivelihoodAssessments, useLivelihoodOpportunities,
   type LivelihoodOpportunityRow, type TargetingResult,
 } from "@/lib/programmeModule/livelihood";
+import {
+  FINDINGS, applyCalibration, learnFromVerifications, useLivelihoodVerifications,
+  verificationQueue, type AdjustedResult,
+} from "@/lib/programmeModule/livelihoodVerification";
 import LivelihoodAssessmentDialog from "./LivelihoodAssessmentDialog";
+import LivelihoodVerificationDialog from "./LivelihoodVerificationDialog";
 
 interface Props {
   projectId: string;
@@ -81,6 +87,7 @@ const LivelihoodPanel = ({
   const { toast } = useToast();
   const { opportunities, reload: reloadOpportunities } = useLivelihoodOpportunities(projectId);
   const { byBeneficiary, reload: reloadAssessments } = useLivelihoodAssessments(projectId);
+  const { verifications, reload: reloadVerifications } = useLivelihoodVerifications(projectId);
   const { records: morbidity } = useMorbidityRecords(projectId) as unknown as {
     records: { beneficiary_id: string | null; stage: string | null; acute_attacks_last_year: number | null; surgery_status: string | null }[];
   };
@@ -91,6 +98,7 @@ const LivelihoodPanel = ({
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
   const [assessing, setAssessing] = useState<BeneficiaryRow | null>(null);
+  const [verifying, setVerifying] = useState<AdjustedResult | null>(null);
 
   useEffect(() => {
     if (!opportunityId && opportunities.length) setOpportunityId(opportunities[0].id);
@@ -126,7 +134,7 @@ const LivelihoodPanel = ({
     };
   };
 
-  const results: TargetingResult[] = useMemo(
+  const rawResults: TargetingResult[] = useMemo(
     () => beneficiaries.map((b) => scoreLivelihood({
       beneficiary: b,
       answers: (byBeneficiary.get(b.id)?.answers as Record<string, unknown>) || {},
@@ -134,6 +142,22 @@ const LivelihoodPanel = ({
     })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [beneficiaries, byBeneficiary, clinical],
+  );
+
+  /** What the ground visits have taught the system so far. */
+  const calibration = useMemo(() => {
+    const byId = new Map(rawResults.map((r) => [r.beneficiaryId, r]));
+    return learnFromVerifications(
+      verifications,
+      (id) => byId.get(id)?.community || "—",
+      (id) => byId.get(id)?.completeness ?? 0,
+    );
+  }, [verifications, rawResults]);
+
+  /** Scores after the system corrects itself against what verifiers found. */
+  const results: AdjustedResult[] = useMemo(
+    () => rawResults.map((r) => applyCalibration(r, calibration)),
+    [rawResults, calibration],
   );
 
   const locationById = useMemo(() => {
@@ -157,6 +181,13 @@ const LivelihoodPanel = ({
       return { state: b?.state, lga: b?.lga, ward: b?.ward };
     });
   }, [opportunity, results, locationById]);
+
+  /** Who a verifier should be sent to next. */
+  const queue = useMemo(() => {
+    if (!outcome || !opportunity) return [];
+    const ranked = [...outcome.selected, ...outcome.waitlist].map((e) => e.result as AdjustedResult);
+    return verificationQueue(ranked, opportunity.target_beneficiaries, calibration).slice(0, 8);
+  }, [outcome, opportunity, calibration]);
 
   const filtered = (rows: { result: TargetingResult }[]) => {
     const q = search.trim().toLowerCase();
@@ -229,9 +260,11 @@ const LivelihoodPanel = ({
     URL.revokeObjectURL(url);
   };
 
-  const renderRow = (entry: { result: TargetingResult; rank: number; basis: string }, list: string) => {
+  const renderRow = (entry: { result: AdjustedResult; rank: number; basis: string }, list: string) => {
     const b = locationById.get(entry.result.beneficiaryId);
     const assessed = byBeneficiary.get(entry.result.beneficiaryId);
+    const v = entry.result.verification;
+    const findingLabel = v ? FINDINGS.find((f) => f.value === v.finding)?.label || v.finding : null;
     return (
       <TableRow key={list + entry.result.beneficiaryId}>
         <TableCell className="tabular-nums">{entry.rank}</TableCell>
@@ -248,10 +281,26 @@ const LivelihoodPanel = ({
           <Badge className={cn("border", toneClasses[BAND_TONE[entry.result.band]])}>
             {entry.result.vulnerability}
           </Badge>
+          {entry.result.adjustment !== 0 && (
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              was {entry.result.predicted} ({entry.result.adjustment > 0 ? "+" : ""}{entry.result.adjustment})
+            </p>
+          )}
         </TableCell>
         <TableCell className="tabular-nums text-muted-foreground">{entry.result.readiness}</TableCell>
+        <TableCell className="text-xs">
+          {v ? (
+            <Badge variant="outline" className="text-[10px]">{findingLabel}</Badge>
+          ) : (
+            <span className="text-muted-foreground">Not verified</span>
+          )}
+          <p className="mt-1 text-[10px] text-muted-foreground">{entry.result.certainty}% sure</p>
+        </TableCell>
         <TableCell className="max-w-[18rem] text-xs text-muted-foreground">
           {entry.basis}
+          {entry.result.adjustmentReasons.map((r) => (
+            <span key={r} className="mt-1 block text-[11px]">{r}</span>
+          ))}
           {entry.result.flags.length > 0 && (
             <span className="mt-1 flex flex-wrap gap-1">
               {entry.result.flags.map((f) => (
@@ -265,6 +314,14 @@ const LivelihoodPanel = ({
           <div className="flex flex-wrap justify-end gap-1">
             <Button size="sm" variant="outline" className="gap-1" onClick={() => b && setAssessing(b)}>
               <ClipboardCheck className="h-3.5 w-3.5" /> {assessed ? "Review" : "Assess"}
+            </Button>
+            <Button
+              size="sm"
+              variant={v ? "outline" : "secondary"}
+              className="gap-1"
+              onClick={() => setVerifying(entry.result)}
+            >
+              <ShieldCheck className="h-3.5 w-3.5" /> {v ? "Re-verify" : "Verify"}
             </Button>
             {canManage && (
               <Select
@@ -366,6 +423,49 @@ const LivelihoodPanel = ({
             </span>
           </Card>
 
+          <div className="grid gap-3 lg:grid-cols-2">
+            <Card className="space-y-2 p-4">
+              <p className="flex items-center gap-2 font-semibold">
+                <Brain className="h-4 w-4" /> What the system has learned on the ground
+              </p>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <Badge variant="outline">{calibration.visits} verified</Badge>
+                <Badge variant="outline">{Math.round(calibration.agreement * 100)}% matched the record</Badge>
+                <Badge variant="outline">{calibration.confidence}% confidence in its own correction</Badge>
+              </div>
+              <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">
+                {calibration.lessons.map((l) => <li key={l}>{l}</li>)}
+              </ul>
+            </Card>
+
+            <Card className="space-y-2 p-4">
+              <p className="flex items-center gap-2 font-semibold">
+                <MapPinned className="h-4 w-4" /> Verify these next
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Names where being wrong would change who gets a place.
+              </p>
+              {queue.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Everyone on the list has been verified.</p>
+              ) : (
+                <ul className="space-y-1 text-xs">
+                  {queue.map((q) => (
+                    <li key={q.result.beneficiaryId} className="flex items-center justify-between gap-2">
+                      <span>
+                        <span className="font-medium">{q.result.name}</span>
+                        <span className="text-muted-foreground"> — {q.why}</span>
+                      </span>
+                      <Button size="sm" variant="ghost" className="h-7 gap-1 px-2"
+                        onClick={() => setVerifying(q.result)}>
+                        <ShieldCheck className="h-3.5 w-3.5" /> Verify
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          </div>
+
           <Card className="space-y-3 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="font-semibold">Selected — {outcome.selected.length} of {outcome.summary.target} places</p>
@@ -385,6 +485,7 @@ const LivelihoodPanel = ({
                     <TableHead>Beneficiary</TableHead>
                     <TableHead>Vuln.</TableHead>
                     <TableHead>Ready</TableHead>
+                    <TableHead>Ground check</TableHead>
                     <TableHead>Why</TableHead>
                     <TableHead>Assessed</TableHead>
                     <TableHead className="text-right">Action</TableHead>
@@ -394,7 +495,7 @@ const LivelihoodPanel = ({
                   {filtered(outcome.selected).map((e) => renderRow(e as never, "sel"))}
                   {outcome.selected.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center text-sm text-muted-foreground">
                         Nobody qualifies yet — register beneficiaries or complete assessments.
                       </TableCell>
                     </TableRow>
