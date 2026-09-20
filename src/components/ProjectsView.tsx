@@ -107,7 +107,7 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
   const [editScope, setEditScope] = useState<ProjectScope>({ ...EMPTY_SCOPE });
   const [savingEdit, setSavingEdit] = useState(false);
   const [settingsProject, setSettingsProject] = useState<Project | null>(null);
-  const [settingsForm, setSettingsForm] = useState<{ status: string }>({ status: "active" });
+  const [settingsForm, setSettingsForm] = useState<{ status: string; records_only: boolean }>({ status: "active", records_only: false });
   const [savingSettings, setSavingSettings] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [accessProject, setAccessProject] = useState<{ id: string; name: string } | null>(null);
