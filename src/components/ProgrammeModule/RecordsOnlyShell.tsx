@@ -84,7 +84,7 @@ const RecordsOnlyShell = ({ projects, initialProjectId, onExit }: Props) => {
               <Lock className="h-3.5 w-3.5" /> Records-only project
             </span>
             <span className="hidden truncate text-xs text-primary-foreground/80 sm:inline">
-              {profile?.full_name || profile?.email}
+              {[profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || profile?.email}
             </span>
             <Button
               variant="ghost"
