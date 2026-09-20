@@ -115,7 +115,7 @@ const CddDialog = ({
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <Label className="text-sm">Health facility</Label>
-              <Select value={form.facility_id} onValueChange={(v) => set("facility_id", v)}>
+              <Select value={form.facility_id} onValueChange={pickFacility}>
                 <SelectTrigger className="mt-1"><SelectValue placeholder="Select facility…" /></SelectTrigger>
                 <SelectContent className="z-[1200] bg-popover">
                   {facilities.map((f) => (
@@ -157,12 +157,20 @@ const CddDialog = ({
             </div>
           </div>
 
-          <GeoCascadeFields
-            value={{ state: form.state, lga: form.lga, ward: form.ward, community: form.community }}
-            onChange={(p) => setForm((f) => ({
-              ...f, state: p.state ?? "", lga: p.lga ?? "", ward: p.ward ?? "", community: p.community ?? "",
-            }))}
-          />
+          <div className="space-y-1">
+            <GeoCascadeFields
+              value={{ state: form.state, lga: form.lga, ward: form.ward, community: form.community }}
+              onChange={(p) => setForm((f) => ({
+                ...f, state: p.state ?? "", lga: p.lga ?? "", ward: p.ward ?? "", community: p.community ?? "",
+              }))}
+            />
+            {facilityGeoLabel(facilities.find((f) => f.id === form.facility_id)) && (
+              <p className="text-xs text-muted-foreground">
+                Filled from the facility ({facilityGeoLabel(facilities.find((f) => f.id === form.facility_id))}) —
+                change any level if the CDD works elsewhere.
+              </p>
+            )}
+          </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div>

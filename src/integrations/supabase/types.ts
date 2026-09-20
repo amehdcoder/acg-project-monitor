@@ -8651,6 +8651,7 @@ export type Database = {
           confirmed_stage_label: string | null
           created_at: string
           created_by: string
+          diagnosis: Json
           duration_years: number | null
           facility_id: string
           full_name: string
@@ -8674,6 +8675,8 @@ export type Database = {
           state: string | null
           status: string
           submission_uuid: string | null
+          symptoms: Json
+          treatment: Json
           updated_at: string
           ward: string | null
         }
@@ -8698,6 +8701,7 @@ export type Database = {
           confirmed_stage_label?: string | null
           created_at?: string
           created_by?: string
+          diagnosis?: Json
           duration_years?: number | null
           facility_id: string
           full_name: string
@@ -8721,6 +8725,8 @@ export type Database = {
           state?: string | null
           status?: string
           submission_uuid?: string | null
+          symptoms?: Json
+          treatment?: Json
           updated_at?: string
           ward?: string | null
         }
@@ -8745,6 +8751,7 @@ export type Database = {
           confirmed_stage_label?: string | null
           created_at?: string
           created_by?: string
+          diagnosis?: Json
           duration_years?: number | null
           facility_id?: string
           full_name?: string
@@ -8768,6 +8775,8 @@ export type Database = {
           state?: string | null
           status?: string
           submission_uuid?: string | null
+          symptoms?: Json
+          treatment?: Json
           updated_at?: string
           ward?: string | null
         }

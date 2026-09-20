@@ -32,6 +32,12 @@ import { buildFeatures, predictStage, useLesionStageModel } from "@/lib/programm
 import {
   MMDP_CONDITIONS, confirmPotentialCase, type PotentialCaseRow,
 } from "@/lib/programmeModule/cddCaseSearch";
+import {
+  CERTAINTY_OPTIONS, COMORBIDITIES, DIAGNOSIS_OPTIONS, NEXT_STEPS, ONSET_OPTIONS,
+  PROGRESSION_OPTIONS, SEVERITY_OPTIONS, symptomsFor, TREATMENTS_GIVEN,
+  clinicalSummary, emptyDiagnosis, emptySymptoms, emptyTreatment, validateClinical,
+  type CaseDiagnosis, type CaseSymptoms, type CaseTreatment,
+} from "@/lib/programmeModule/caseClinical";
 
 interface Props {
   open: boolean;
@@ -55,6 +61,9 @@ const CaseConfirmationDialog = ({ open, onOpenChange, projectId, caseRow, onSave
   const [rejection, setRejection] = useState("");
   const [saving, setSaving] = useState(false);
   const [stageChoice, setStageChoice] = useState("");
+  const [symptoms, setSymptoms] = useState<CaseSymptoms>(emptySymptoms);
+  const [diagnosis, setDiagnosis] = useState<CaseDiagnosis>(emptyDiagnosis);
+  const [treatment, setTreatment] = useState<CaseTreatment>(emptyTreatment);
 
   useEffect(() => {
     if (!open || !caseRow) return;
@@ -66,6 +75,24 @@ const CaseConfirmationDialog = ({ open, onOpenChange, projectId, caseRow, onSave
     setRejection(caseRow.rejection_reason || "");
     setMetrics(null);
     setPhotoUrl("");
+    // The consultation, pre-filled with what the CDD already reported.
+    const s = { ...emptySymptoms(), ...(caseRow.symptoms as Partial<CaseSymptoms> | undefined) };
+    setSymptoms({
+      ...s,
+      items: s.items || {},
+      acute_attacks_last_year: s.acute_attacks_last_year ?? caseRow.acute_attacks_last_year ?? null,
+      onset: s.onset || ((caseRow.duration_years ?? 0) >= 1 ? "years" : ""),
+    });
+    setDiagnosis({
+      ...emptyDiagnosis(),
+      ...(caseRow.diagnosis as Partial<CaseDiagnosis> | undefined),
+      comorbidities: (caseRow.diagnosis as Partial<CaseDiagnosis> | undefined)?.comorbidities || {},
+    });
+    setTreatment({
+      ...emptyTreatment(),
+      ...(caseRow.treatment as Partial<CaseTreatment> | undefined),
+      given: (caseRow.treatment as Partial<CaseTreatment> | undefined)?.given || {},
+    });
   }, [open, caseRow]);
 
   // Resolve the CDD's picture, then measure it on this device.
@@ -134,6 +161,13 @@ const CaseConfirmationDialog = ({ open, onOpenChange, projectId, caseRow, onSave
       toast({ title: "Give a reason", description: "Say why this is not an MMDP case.", variant: "destructive" });
       return;
     }
+    if (confirmed) {
+      const problem = validateClinical(diagnosis);
+      if (problem) {
+        toast({ title: "Complete the consultation", description: problem, variant: "destructive" });
+        return;
+      }
+    }
     setSaving(true);
     try {
       const stage = stageChoice === "" ? null : Number(stageChoice);
@@ -155,6 +189,9 @@ const CaseConfirmationDialog = ({ open, onOpenChange, projectId, caseRow, onSave
           learned: learned ? { stage: learned.stage, confidence: learned.confidence } : null,
           reference_mm: Number(reference) || null,
         },
+        symptoms: symptoms as unknown as Record<string, unknown>,
+        diagnosis: diagnosis as unknown as Record<string, unknown>,
+        treatment: treatment as unknown as Record<string, unknown>,
         notes,
         rejectionReason: rejection,
       });
@@ -305,6 +342,214 @@ const CaseConfirmationDialog = ({ open, onOpenChange, projectId, caseRow, onSave
                 </SelectContent>
               </Select>
             </div>
+          </Card>
+
+          {/* ---------------- The consultation itself ---------------- */}
+          <Card className="space-y-3 p-4">
+            <div>
+              <p className="text-sm font-medium text-foreground">Symptoms reported</p>
+              <p className="text-xs text-muted-foreground">
+                What the person complains of today — tick all that apply.
+              </p>
+            </div>
+            <div className="grid gap-1.5 sm:grid-cols-2">
+              {symptomsFor(condition).map((s) => (
+                <label key={s.key} className="flex cursor-pointer items-start gap-2 text-sm">
+                  <Checkbox
+                    className="mt-0.5"
+                    checked={!!symptoms.items[s.key]}
+                    onCheckedChange={(v) => setSymptoms((p) => ({
+                      ...p, items: { ...p.items, [s.key]: v === true },
+                    }))}
+                  />
+                  <span className="text-foreground">{s.label}</span>
+                </label>
+              ))}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-4">
+              <div>
+                <Label className="text-xs">How long</Label>
+                <Select value={symptoms.onset} onValueChange={(v) => setSymptoms((p) => ({ ...p, onset: v }))}>
+                  <SelectTrigger className="mt-1 h-9"><SelectValue placeholder="Select" /></SelectTrigger>
+                  <SelectContent className="z-[1200] bg-popover">
+                    {ONSET_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Course</Label>
+                <Select
+                  value={symptoms.progression}
+                  onValueChange={(v) => setSymptoms((p) => ({ ...p, progression: v }))}
+                >
+                  <SelectTrigger className="mt-1 h-9"><SelectValue placeholder="Select" /></SelectTrigger>
+                  <SelectContent className="z-[1200] bg-popover">
+                    {PROGRESSION_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Severity today</Label>
+                <Select
+                  value={symptoms.severity}
+                  onValueChange={(v) => setSymptoms((p) => ({ ...p, severity: v }))}
+                >
+                  <SelectTrigger className="mt-1 h-9"><SelectValue placeholder="Select" /></SelectTrigger>
+                  <SelectContent className="z-[1200] bg-popover">
+                    {SEVERITY_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Acute attacks (12 months)</Label>
+                <Input
+                  type="number" inputMode="numeric" className="mt-1 h-9"
+                  value={symptoms.acute_attacks_last_year ?? ""}
+                  onChange={(e) => setSymptoms((p) => ({
+                    ...p,
+                    acute_attacks_last_year: e.target.value === "" ? null : Number(e.target.value),
+                  }))}
+                />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">History in the person's own words</Label>
+              <Textarea
+                className="mt-1" rows={2} value={symptoms.narrative}
+                onChange={(e) => setSymptoms((p) => ({ ...p, narrative: e.target.value }))}
+              />
+            </div>
+          </Card>
+
+          <Card className="space-y-3 p-4">
+            <p className="text-sm font-medium text-foreground">Diagnosis</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label className="text-xs">Primary diagnosis</Label>
+                <Select
+                  value={diagnosis.primary}
+                  onValueChange={(v) => setDiagnosis((p) => ({ ...p, primary: v }))}
+                >
+                  <SelectTrigger className="mt-1 h-9"><SelectValue placeholder="Select diagnosis…" /></SelectTrigger>
+                  <SelectContent className="z-[1200] bg-popover">
+                    {DIAGNOSIS_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Certainty</Label>
+                <Select
+                  value={diagnosis.certainty}
+                  onValueChange={(v) => setDiagnosis((p) => ({ ...p, certainty: v }))}
+                >
+                  <SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent className="z-[1200] bg-popover">
+                    {CERTAINTY_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              {diagnosis.primary === "other" && (
+                <div className="sm:col-span-2">
+                  <Label className="text-xs">Write the diagnosis</Label>
+                  <Input
+                    className="mt-1 h-9" value={diagnosis.primary_other}
+                    onChange={(e) => setDiagnosis((p) => ({ ...p, primary_other: e.target.value }))}
+                  />
+                </div>
+              )}
+              <div className="sm:col-span-2">
+                <Label className="text-xs">Differential / ruled out</Label>
+                <Input
+                  className="mt-1 h-9" value={diagnosis.differential}
+                  placeholder="e.g. podoconiosis ruled out — no highland soil exposure"
+                  onChange={(e) => setDiagnosis((p) => ({ ...p, differential: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div>
+              <p className="mb-1.5 text-xs text-muted-foreground">Other conditions present</p>
+              <div className="grid gap-1.5 sm:grid-cols-3">
+                {COMORBIDITIES.map((c) => (
+                  <label key={c.key} className="flex cursor-pointer items-start gap-2 text-sm">
+                    <Checkbox
+                      className="mt-0.5"
+                      checked={!!diagnosis.comorbidities[c.key]}
+                      onCheckedChange={(v) => setDiagnosis((p) => ({
+                        ...p, comorbidities: { ...p.comorbidities, [c.key]: v === true },
+                      }))}
+                    />
+                    <span className="text-foreground">{c.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </Card>
+
+          <Card className="space-y-3 p-4">
+            <p className="text-sm font-medium text-foreground">Treatment given & plan</p>
+            <div className="grid gap-1.5 sm:grid-cols-2">
+              {TREATMENTS_GIVEN.map((t) => (
+                <label key={t.key} className="flex cursor-pointer items-start gap-2 text-sm">
+                  <Checkbox
+                    className="mt-0.5"
+                    checked={!!treatment.given[t.key]}
+                    onCheckedChange={(v) => setTreatment((p) => ({
+                      ...p, given: { ...p.given, [t.key]: v === true },
+                    }))}
+                  />
+                  <span className="text-foreground">{t.label}</span>
+                </label>
+              ))}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label className="text-xs">Medicines, dose and duration</Label>
+                <Textarea
+                  className="mt-1" rows={2} value={treatment.medicines}
+                  placeholder="e.g. Amoxicillin 500 mg 8-hourly for 7 days"
+                  onChange={(e) => setTreatment((p) => ({ ...p, medicines: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Self-care plan agreed</Label>
+                <Textarea
+                  className="mt-1" rows={2} value={treatment.self_care_plan}
+                  placeholder="e.g. wash twice daily, elevate at night, treat entry lesions"
+                  onChange={(e) => setTreatment((p) => ({ ...p, self_care_plan: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Next step</Label>
+                <Select
+                  value={treatment.next_step}
+                  onValueChange={(v) => setTreatment((p) => ({ ...p, next_step: v }))}
+                >
+                  <SelectTrigger className="mt-1 h-9"><SelectValue placeholder="Select next step…" /></SelectTrigger>
+                  <SelectContent className="z-[1200] bg-popover">
+                    {NEXT_STEPS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Next review date</Label>
+                <Input
+                  type="date" className="mt-1 h-9" value={treatment.follow_up_date}
+                  onChange={(e) => setTreatment((p) => ({ ...p, follow_up_date: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Counselling given</Label>
+              <Textarea
+                className="mt-1" rows={2} value={treatment.counselling_notes}
+                onChange={(e) => setTreatment((p) => ({ ...p, counselling_notes: e.target.value }))}
+              />
+            </div>
+            {clinicalSummary(condition, symptoms, diagnosis, treatment) && (
+              <p className="rounded-md bg-muted/50 p-2 text-xs text-muted-foreground">
+                {clinicalSummary(condition, symptoms, diagnosis, treatment)}
+              </p>
+            )}
           </Card>
 
           <div className="grid gap-3 sm:grid-cols-2">

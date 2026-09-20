@@ -107,6 +107,10 @@ export interface PotentialCaseRow {
   measurements: Record<string, number | null>;
   analysis: Record<string, unknown>;
   clinician_notes: string | null;
+  /** The consultation itself: complaints, diagnosis and what was done. */
+  symptoms: Record<string, unknown>;
+  diagnosis: Record<string, unknown>;
+  treatment: Record<string, unknown>;
   rejection_reason: string | null;
   referred_to_facility_id: string | null;
   referred_at: string | null;
@@ -198,6 +202,9 @@ export const usePotentialCases = (projectId?: string) => {
       clinical_criteria: (c.clinical_criteria || {}) as Record<string, boolean>,
       measurements: (c.measurements || {}) as Record<string, number | null>,
       analysis: (c.analysis || {}) as Record<string, unknown>,
+      symptoms: (c.symptoms || {}) as Record<string, unknown>,
+      diagnosis: (c.diagnosis || {}) as Record<string, unknown>,
+      treatment: (c.treatment || {}) as Record<string, unknown>,
     })));
     setLoading(false);
   }, [projectId]);
@@ -274,6 +281,10 @@ export interface ConfirmationInput {
   criteria?: Record<string, boolean>;
   measurements?: Record<string, number | null>;
   analysis?: Record<string, unknown>;
+  /** The consultation record. */
+  symptoms?: Record<string, unknown>;
+  diagnosis?: Record<string, unknown>;
+  treatment?: Record<string, unknown>;
   notes?: string;
   rejectionReason?: string;
 }
@@ -291,6 +302,9 @@ export const confirmPotentialCase = async (id: string, input: ConfirmationInput)
     clinical_criteria: input.criteria || {},
     measurements: input.measurements || {},
     analysis: input.analysis || {},
+    symptoms: input.symptoms || {},
+    diagnosis: input.diagnosis || {},
+    treatment: input.treatment || {},
     clinician_notes: input.notes || null,
     rejection_reason: input.confirmed ? null : input.rejectionReason || null,
   }).eq("id", id);
