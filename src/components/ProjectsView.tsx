@@ -530,9 +530,20 @@ const ProjectsView = ({ onSelectProject, onOpenRecords }: ProjectsViewProps) => 
                     <CardTitle className="font-display text-lg line-clamp-1">
                       {project.name}
                     </CardTitle>
-                    <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${getStatusColor(project.status)}`}>
-                      {project.status}
-                    </span>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${getStatusColor(project.status)}`}>
+                        {project.status}
+                      </span>
+                      {project.records_only && (
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary"
+                          title="Only the Longitudinal Beneficiary Records system is available on this project"
+                        >
+                          <Lock className="h-3 w-3" />
+                          Records only
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <DropdownMenu>
