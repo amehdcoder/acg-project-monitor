@@ -32,6 +32,12 @@ import { buildFeatures, predictStage, useLesionStageModel } from "@/lib/programm
 import {
   MMDP_CONDITIONS, confirmPotentialCase, type PotentialCaseRow,
 } from "@/lib/programmeModule/cddCaseSearch";
+import {
+  CERTAINTY_OPTIONS, COMORBIDITIES, DIAGNOSIS_OPTIONS, NEXT_STEPS, ONSET_OPTIONS,
+  PROGRESSION_OPTIONS, SEVERITY_OPTIONS, SYMPTOMS, TREATMENTS_GIVEN,
+  clinicalSummary, emptyDiagnosis, emptySymptoms, emptyTreatment, validateClinical,
+  type CaseDiagnosis, type CaseSymptoms, type CaseTreatment,
+} from "@/lib/programmeModule/caseClinical";
 
 interface Props {
   open: boolean;
