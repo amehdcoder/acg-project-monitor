@@ -91,6 +91,8 @@ import { Loader2 } from "lucide-react";
 
 import { toast } from "@/hooks/use-toast";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { useRecordsOnlyProjects } from "@/lib/programmeModule/recordsOnly";
+import RecordsOnlyShell from "@/components/ProgrammeModule/RecordsOnlyShell";
 
 const Index = () => {
   const [searchParams, setSearchParams] = useSearchParams();
