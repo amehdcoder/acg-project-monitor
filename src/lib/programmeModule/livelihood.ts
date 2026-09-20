@@ -48,6 +48,10 @@ export interface LivelihoodOpportunityRow {
   state: string | null;
   lga: string | null;
   ward: string | null;
+  community?: string | null;
+  /** Where the training / market / venue actually sits, for travel analysis. */
+  venue_latitude?: number | null;
+  venue_longitude?: number | null;
   start_date: string | null;
   quota_women_pct: number;
   quota_disability_pct: number;
@@ -111,14 +115,14 @@ export interface AssessmentField {
 }
 
 export interface AssessmentSection {
-  key: DomainKey | "readiness" | "protection";
+  key: DomainKey | "readiness" | "protection" | "preference";
   title: string;
   intro: string;
   fields: AssessmentField[];
 }
 
 export type DomainKey =
-  | "economic" | "dependency" | "disease" | "exclusion" | "shocks";
+  | "economic" | "dependency" | "disease" | "exclusion" | "shocks" | "access";
 
 const sel = (
   name: string, label: string,
@@ -291,6 +295,94 @@ export const ASSESSMENT_SECTIONS: AssessmentSection[] = [
     ],
   },
   {
+    key: "access",
+    title: "Where they live & reaching care",
+    intro:
+      "Distance is not a detail. A person who walks three hours to the clinic pays for it in "
+      + "transport, lost trading days and missed treatment — and will pay the same price to reach "
+      + "a training centre or a market.",
+    fields: [
+      sel("facility_travel_time", "Time to reach the health facility they are registered at", [
+        ["over_2h", "More than 2 hours", 1],
+        ["1_2h", "1 – 2 hours", 0.75],
+        ["30_60m", "30 – 60 minutes", 0.45],
+        ["under_30m", "Under 30 minutes", 0.1],
+      ]),
+      sel("transport_mode", "How they normally travel", [
+        ["walk", "On foot only", 1],
+        ["hired", "Hired okada / taxi each time", 0.75],
+        ["shared", "Shared public transport", 0.5],
+        ["own", "Own transport", 0],
+      ]),
+      sel("transport_cost", "Return transport cost for one visit", [
+        ["cannot_afford", "Cannot afford it at all", 1],
+        ["high", "More than a day's income", 0.8],
+        ["moderate", "About half a day's income", 0.45],
+        ["low", "Little or nothing", 0],
+      ]),
+      sel("road_access", "Road condition to the community", [
+        ["cut_off", "Cut off in the rains / by water", 1],
+        ["poor", "Poor, passable with difficulty", 0.65],
+        ["fair", "Fair", 0.3],
+        ["good", "Good all year", 0],
+      ]),
+      sel("missed_for_distance", "Has distance or transport already made them miss treatment?", [
+        ["often", "Often", 1], ["sometimes", "Sometimes", 0.6],
+        ["once", "Once", 0.3], ["never", "Never", 0],
+      ]),
+      {
+        name: "travel_willingness_km",
+        label: "Furthest they can travel for the opportunity (km)",
+        type: "number", max: 20, invert: true,
+        hint: "Used to check the venue is actually reachable — not to score vulnerability.",
+      },
+    ],
+  },
+  {
+    key: "preference",
+    title: "What they want to do — in their own words",
+    intro:
+      "The single best predictor of whether support survives the first year is whether the person "
+      + "chose the trade themselves. Their choice and their reason carry real weight in the ranking.",
+    fields: [
+      sel("preferred_opportunity", "Livelihood they would most like to be supported with",
+        OPPORTUNITY_TYPES.map((o) => [o.value, o.label, 0] as [string, string, number])),
+      sel("preferred_second", "Second choice if the first is not offered",
+        [["none", "No second choice", 0] as [string, string, number],
+          ...OPPORTUNITY_TYPES.map((o) => [o.value, o.label, 0] as [string, string, number])]),
+      sel("preference_reason", "Main reason for that choice", [
+        ["existing_skill", "Already knows the trade", 0],
+        ["market_demand", "There is demand for it here", 0],
+        ["fits_condition", "It is work the condition allows", 0],
+        ["low_capital", "It needs little capital to keep running", 0],
+        ["family_support", "Family can help run it", 0],
+        ["quick_income", "It brings money in quickly", 0],
+        ["only_option", "It is the only thing available", 0],
+        ["other", "Other reason", 0],
+      ]),
+      { name: "preference_narrative", label: "Why, in their own words", type: "text" },
+      sel("preference_strength", "How settled is this choice?", [
+        ["decided", "Decided — has thought it through", 0],
+        ["leaning", "Leaning towards it", 0],
+        ["open", "Open to advice", 0],
+        ["unsure", "Does not know yet", 0],
+      ]),
+      sel("prior_experience", "Experience in the preferred livelihood", [
+        ["ran_it", "Has run it before", 0],
+        ["helped", "Helped someone run it", 0],
+        ["trained", "Trained but never practised", 0],
+        ["none", "No experience", 0],
+      ]),
+      sel("accepts_alternative", "Would they accept a different package if this one is full?", [
+        ["yes", "Yes, gladly", 0], ["maybe", "Possibly, with discussion", 0], ["no", "No", 0],
+      ]),
+      sel("start_timeline", "How soon could they start?", [
+        ["now", "Immediately", 0], ["one_month", "Within a month", 0],
+        ["after_treatment", "After treatment or surgery", 0], ["unsure", "Not sure", 0],
+      ]),
+    ],
+  },
+  {
     key: "readiness",
     title: "Readiness for the opportunity",
     intro:
@@ -349,11 +441,12 @@ export const fieldByName = (name: string) => ALL_FIELDS.find((f) => f.name === n
 
 /** How much each domain counts towards the vulnerability score. */
 export const DOMAIN_WEIGHTS: Record<DomainKey, number> = {
-  economic: 0.32,
-  dependency: 0.15,
-  disease: 0.26,
-  exclusion: 0.15,
-  shocks: 0.12,
+  economic: 0.28,
+  dependency: 0.13,
+  disease: 0.23,
+  exclusion: 0.13,
+  shocks: 0.10,
+  access: 0.13,
 };
 
 export const DOMAIN_LABELS: Record<DomainKey, string> = {
@@ -362,6 +455,7 @@ export const DOMAIN_LABELS: Record<DomainKey, string> = {
   disease: "Disease & disability burden",
   exclusion: "Exclusion & social protection gap",
   shocks: "Shocks & harmful coping",
+  access: "Distance, transport & reaching care",
 };
 
 export interface TargetingInput {
@@ -377,6 +471,14 @@ export interface TargetingInput {
   homeVisitOutcomes?: string[];
   /** Loss-to-follow-up score, 0–100, when already computed. */
   ltfuScore?: number | null;
+  /** Straight-line km from the person's home to the facility holding the case. */
+  distanceToFacilityKm?: number | null;
+  /** Straight-line km from the person's home to where the opportunity runs. */
+  distanceToOpportunityKm?: number | null;
+  /** Type of support on offer, so the person's own preference can be matched. */
+  opportunityType?: string | null;
+  /** How well the person's location matches the opportunity's location filters. */
+  locationTier?: "ward" | "lga" | "state" | "outside" | null;
 }
 
 export interface TargetingResult {
@@ -398,6 +500,19 @@ export interface TargetingResult {
   community: string;
   consentGiven: boolean;
   protectionConcern: boolean;
+  /** Distance analysis. */
+  distanceToFacilityKm: number | null;
+  distanceToOpportunityKm: number | null;
+  locationTier: "ward" | "lga" | "state" | "outside" | "unknown";
+  /** The person's own stated choice. */
+  preferenceChoice: string | null;
+  preferenceLabel: string | null;
+  preferenceReason: string | null;
+  preferenceNarrative: string | null;
+  /** 0–100: how well the offer matches what they asked for. */
+  preferenceFit: number;
+  preferenceNotes: string[];
+  travelWillingnessKm: number | null;
 }
 
 const num = (v: unknown): number | null => {
@@ -494,13 +609,27 @@ const recordSignals = (input: TargetingInput) => {
     if (o === "relocated") { push("shocks", 0.8); reasons.push("Reported to have relocated."); }
   }
 
+  // Distance — measured, not asked. Remoteness is a vulnerability in itself and
+  // it is the reason many affected people never convert support into income.
+  const dFac = input.distanceToFacilityKm;
+  if (dFac != null && dFac > 0) {
+    push("access", clamp01(dFac / 15));
+    if (dFac >= 10) reasons.push(`Lives ${dFac.toFixed(1)} km from the facility holding the case — a real cost every visit.`);
+  }
+  const dOpp = input.distanceToOpportunityKm;
+  if (dOpp != null && dOpp > 0) {
+    push("access", clamp01(dOpp / 25) * 0.6);
+    if (dOpp >= 20) reasons.push(`${dOpp.toFixed(1)} km from where the opportunity runs — check transport before enrolling.`);
+  }
+  if (input.locationTier === "outside") reasons.push("Lives outside the area this opportunity covers.");
+
   return { add, reasons };
 };
 
 export const scoreLivelihood = (input: TargetingInput): TargetingResult => {
   const answers = input.answers || {};
   const domainValues: Record<DomainKey, number[]> = {
-    economic: [], dependency: [], disease: [], exclusion: [], shocks: [],
+    economic: [], dependency: [], disease: [], exclusion: [], shocks: [], access: [],
   };
 
   let answered = 0;
@@ -515,7 +644,8 @@ export const scoreLivelihood = (input: TargetingInput): TargetingResult => {
       if (w == null) continue;
       answered += 1;
       if (section.key === "readiness") readinessValues.push(w);
-      else if (section.key !== "protection") domainValues[section.key].push(w);
+      else if (section.key === "protection" || section.key === "preference") continue;
+      else domainValues[section.key].push(w);
     }
   }
 
@@ -541,9 +671,62 @@ export const scoreLivelihood = (input: TargetingInput): TargetingResult => {
   });
   const vulnScore = Math.round((weightUsed ? vulnerability / weightUsed : 0) * 100);
 
-  const readiness = readinessValues.length
+  const baseReadiness = readinessValues.length
     ? Math.round((readinessValues.reduce((a, b) => a + b, 0) / readinessValues.length) * 100)
     : 0;
+
+  /* --- The person's own choice -------------------------------------- */
+  const choice = String(answers.preferred_opportunity ?? "") || null;
+  const second = String(answers.preferred_second ?? "") || null;
+  const offer = input.opportunityType || null;
+  const strength = String(answers.preference_strength ?? "");
+  const experience = String(answers.prior_experience ?? "");
+  const accepts = String(answers.accepts_alternative ?? "");
+  const preferenceNotes: string[] = [];
+
+  let fit = 50; // nothing asked yet — neutral, never a penalty
+  if (choice && offer) {
+    if (choice === offer) {
+      fit = 88;
+      preferenceNotes.push("This is the livelihood they asked for themselves.");
+    } else if (second && second === offer) {
+      fit = 68;
+      preferenceNotes.push("Their second choice — they said they would take it.");
+    } else if (accepts === "yes") {
+      fit = 52;
+      preferenceNotes.push(`Wanted ${OPPORTUNITY_TYPES.find((o) => o.value === choice)?.label || choice}, but is glad to take this instead.`);
+    } else if (accepts === "maybe") {
+      fit = 40;
+      preferenceNotes.push("Asked for something else — willing to discuss this one.");
+    } else {
+      fit = 18;
+      preferenceNotes.push("Asked for a different livelihood and does not want this one — discuss before offering a place.");
+    }
+  } else if (choice && !offer) {
+    fit = 60;
+  }
+  if (strength === "decided") fit += 8;
+  else if (strength === "unsure") fit -= 8;
+  if (experience === "ran_it") { fit += 8; preferenceNotes.push("Has run this kind of trade before."); }
+  else if (experience === "none" && fit > 30) fit -= 4;
+  if (String(answers.start_timeline ?? "") === "now") fit += 4;
+  if (String(answers.start_timeline ?? "") === "after_treatment") {
+    preferenceNotes.push("Can only start after treatment or surgery — sequence care first.");
+  }
+  const preferenceFit = Math.max(0, Math.min(100, Math.round(fit)));
+  if (String(answers.preference_reason ?? "") === "only_option") {
+    preferenceNotes.push("Chose it because nothing else is available — check the market before investing.");
+  }
+
+  // Readiness is what the person can do AND what they actually want to do.
+  const readiness = readinessValues.length
+    ? Math.round(baseReadiness * 0.7 + preferenceFit * 0.3)
+    : preferenceFit && choice ? Math.round(preferenceFit * 0.6) : 0;
+
+  const travelWillingnessKm = (() => {
+    const n = num(answers.travel_willingness_km);
+    return n != null && n > 0 ? n : null;
+  })();
 
   const band: TargetingResult["band"] =
     vulnScore >= 75 ? "extreme" : vulnScore >= 60 ? "high" : vulnScore >= 40 ? "moderate" : "low";
@@ -556,19 +739,31 @@ export const scoreLivelihood = (input: TargetingInput): TargetingResult => {
   if (protectionConcern) flags.push("Safeguarding concern — refer before enrolling");
   if (String(answers.id_documents ?? "") === "none") flags.push("No ID — support enrolment for payment");
   if (String(answers.work_capacity ?? "") === "none") flags.push("Cannot work today — care first");
+  if (choice && offer && choice !== offer && accepts === "no") {
+    flags.push("Prefers a different livelihood");
+  }
+  if (travelWillingnessKm != null && input.distanceToOpportunityKm != null
+    && input.distanceToOpportunityKm > travelWillingnessKm) {
+    flags.push(`Venue is ${Math.round(input.distanceToOpportunityKm)} km away — further than they can travel`);
+  }
+  if ((input.distanceToFacilityKm ?? 0) >= 15) flags.push("Very far from the facility — plan outreach");
+
+  const choiceLabel = choice
+    ? OPPORTUNITY_TYPES.find((o) => o.value === choice)?.label || choice : null;
 
   const pkg = (() => {
     if (band === "low") return "Not a priority for this round — keep on the register.";
+    const wanted = choiceLabel ? ` Build it around their own choice: ${choiceLabel.toLowerCase()}.` : "";
     if (readiness >= 70) {
-      return band === "extreme"
+      return (band === "extreme"
         ? "Productive grant with close mentoring, plus three months of consumption support."
-        : "Productive grant or skills package — ready to start.";
+        : "Productive grant or skills package — ready to start.") + wanted;
     }
     if (readiness >= 40) {
-      return "Group-based support first (savings group and skills), then a grant at the next cycle.";
+      return "Group-based support first (savings group and skills), then a grant at the next cycle." + wanted;
     }
     return "Care and consumption support first — morbidity management, self-care and cash for basics; "
-      + "re-assess for a productive package in three months.";
+      + "re-assess for a productive package in three months." + wanted;
   })();
 
   const reasons = [...signals.reasons];
@@ -601,6 +796,16 @@ export const scoreLivelihood = (input: TargetingInput): TargetingResult => {
     community: input.beneficiary.village || input.beneficiary.ward || "—",
     consentGiven,
     protectionConcern,
+    distanceToFacilityKm: input.distanceToFacilityKm ?? null,
+    distanceToOpportunityKm: input.distanceToOpportunityKm ?? null,
+    locationTier: input.locationTier || "unknown",
+    preferenceChoice: choice,
+    preferenceLabel: choiceLabel,
+    preferenceReason: String(answers.preference_reason ?? "") || null,
+    preferenceNarrative: String(answers.preference_narrative ?? "") || null,
+    preferenceFit,
+    preferenceNotes,
+    travelWillingnessKm,
   };
 };
 
@@ -652,6 +857,11 @@ export interface ShortlistOutcome {
     meanVulnerability: number;
     quotaWomenMet: boolean;
     quotaDisabilityMet: boolean;
+    /** Preference & distance analysis of the selected list. */
+    ownChoice: number;
+    meanPreferenceFit: number;
+    meanDistanceKm: number | null;
+    farFromVenue: number;
   };
 }
 
@@ -689,11 +899,25 @@ export const buildShortlist = (
     eligible.push(r);
   }
 
+  // Need comes first, but a place given to someone who wants a different trade
+  // is a place wasted — so the person's own stated choice shapes the order too.
+  const suitability = (r: TargetingResult) =>
+    r.vulnerability * 0.75 + r.preferenceFit * 0.25;
+
   const order = (a: TargetingResult, b: TargetingResult) =>
-    b.vulnerability - a.vulnerability
+    suitability(b) - suitability(a)
+    || b.vulnerability - a.vulnerability
     || b.domains.disease - a.domains.disease
     || b.readiness - a.readiness
     || a.name.localeCompare(b.name);
+
+  const basisFor = (r: TargetingResult, lead: string) => {
+    const bits = [lead];
+    if (r.preferenceLabel && r.preferenceFit >= 80) bits.push("asked for this livelihood themselves");
+    else if (r.preferenceLabel && r.preferenceFit < 30) bits.push(`would rather do ${r.preferenceLabel.toLowerCase()}`);
+    if (r.distanceToOpportunityKm != null) bits.push(`${r.distanceToOpportunityKm.toFixed(1)} km from the venue`);
+    return bits.join(" · ");
+  };
 
   const pool = [...eligible].sort(order);
   const target = Math.max(0, Math.floor(opts.target || 0));
@@ -712,7 +936,7 @@ export const buildShortlist = (
   const take = (r: TargetingResult, basis: string) => {
     taken.add(r.beneficiaryId);
     if (r.householdId) usedHouseholds.add(r.householdId);
-    picked.push({ result: r, rank: picked.length + 1, basis });
+    picked.push({ result: r, rank: picked.length + 1, basis: basisFor(r, basis) });
   };
 
   // 1. Reserve the inclusion floors with the most vulnerable who qualify.
@@ -753,6 +977,17 @@ export const buildShortlist = (
   const meanVulnerability = picked.length
     ? Math.round(picked.reduce((a, e) => a + e.result.vulnerability, 0) / picked.length)
     : 0;
+  const ownChoice = picked.filter((e) => e.result.preferenceFit >= 80).length;
+  const meanPreferenceFit = picked.length
+    ? Math.round(picked.reduce((a, e) => a + e.result.preferenceFit, 0) / picked.length)
+    : 0;
+  const dists = picked.map((e) => e.result.distanceToOpportunityKm).filter((d): d is number => d != null);
+  const meanDistanceKm = dists.length
+    ? Math.round((dists.reduce((a, b) => a + b, 0) / dists.length) * 10) / 10
+    : null;
+  const farFromVenue = picked.filter((e) =>
+    e.result.travelWillingnessKm != null && e.result.distanceToOpportunityKm != null
+    && e.result.distanceToOpportunityKm > e.result.travelWillingnessKm).length;
 
   return {
     selected: picked,
@@ -769,6 +1004,10 @@ export const buildShortlist = (
       meanVulnerability,
       quotaWomenMet: women >= womenNeeded,
       quotaDisabilityMet: disability >= disabilityNeeded,
+      ownChoice,
+      meanPreferenceFit,
+      meanDistanceKm,
+      farFromVenue,
     },
   };
 };

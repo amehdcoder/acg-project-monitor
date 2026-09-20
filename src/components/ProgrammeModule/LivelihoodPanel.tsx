@@ -44,6 +44,9 @@ import {
 } from "@/lib/programmeModule/livelihoodVerification";
 import LivelihoodAssessmentDialog from "./LivelihoodAssessmentDialog";
 import LivelihoodVerificationDialog from "./LivelihoodVerificationDialog";
+import GeoCascadeFields from "./GeoCascadeFields";
+import { useFacilities } from "@/lib/programmeModule/facilities";
+import { haversineKm } from "@/lib/microplanning/distance";
 
 interface Props {
   projectId: string;
@@ -69,6 +72,9 @@ const daysSince = (d?: string | null) => {
   return Math.floor((Date.now() - t) / 86_400_000);
 };
 
+const sameName = (a?: string | null, b?: string | null) =>
+  String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
+
 const emptyOpportunity = {
   title: "",
   partner: "",
@@ -77,6 +83,7 @@ const emptyOpportunity = {
   state: "",
   lga: "",
   ward: "",
+  community: "",
   start_date: "",
   quota_women_pct: 50,
   quota_disability_pct: 20,
@@ -139,14 +146,63 @@ const LivelihoodPanel = ({
     };
   };
 
+  /* ---- Distance: how far people really are from care and from the venue -- */
+  const { facilities } = useFacilities(projectId);
+  const facilityPoint = useMemo(() => {
+    const m = new Map<string, [number, number]>();
+    for (const f of facilities) {
+      if (f.latitude != null && f.longitude != null) m.set(f.id, [f.latitude, f.longitude]);
+    }
+    return m;
+  }, [facilities]);
+
+  /** Venue point: the recorded venue if given, otherwise the centre of the
+   *  registered homes in the area the opportunity covers. */
+  const venuePoint = useMemo<[number, number] | null>(() => {
+    if (!opportunity) return null;
+    if (opportunity.venue_latitude != null && opportunity.venue_longitude != null) {
+      return [opportunity.venue_latitude, opportunity.venue_longitude];
+    }
+    const inArea = beneficiaries.filter((b) =>
+      b.latitude != null && b.longitude != null
+      && (!opportunity.state || sameName(b.state, opportunity.state))
+      && (!opportunity.lga || sameName(b.lga, opportunity.lga))
+      && (!opportunity.ward || sameName(b.ward, opportunity.ward)));
+    if (!inArea.length) return null;
+    const lat = inArea.reduce((a, b) => a + Number(b.latitude), 0) / inArea.length;
+    const lng = inArea.reduce((a, b) => a + Number(b.longitude), 0) / inArea.length;
+    return [lat, lng];
+  }, [opportunity, beneficiaries]);
+
+  const geoFor = (b: BeneficiaryRow) => {
+    const home: [number, number] | null =
+      b.latitude != null && b.longitude != null ? [Number(b.latitude), Number(b.longitude)] : null;
+    const fac = b.facility_id ? facilityPoint.get(b.facility_id) : undefined;
+    const round1 = (n: number) => Math.round(n * 10) / 10;
+    const locationTier: "ward" | "lga" | "state" | "outside" | null = !opportunity
+      ? null
+      : opportunity.ward && sameName(b.ward, opportunity.ward) ? "ward"
+        : opportunity.lga && sameName(b.lga, opportunity.lga) ? "lga"
+          : opportunity.state && sameName(b.state, opportunity.state) ? "state"
+            : opportunity.state || opportunity.lga || opportunity.ward ? "outside" : null;
+    return {
+      distanceToFacilityKm: home && fac ? round1(haversineKm(home[0], home[1], fac[0], fac[1])) : null,
+      distanceToOpportunityKm: home && venuePoint
+        ? round1(haversineKm(home[0], home[1], venuePoint[0], venuePoint[1])) : null,
+      opportunityType: opportunity?.opportunity_type ?? null,
+      locationTier,
+    };
+  };
+
   const rawResults: TargetingResult[] = useMemo(
     () => beneficiaries.map((b) => scoreLivelihood({
       beneficiary: b,
       answers: (byBeneficiary.get(b.id)?.answers as Record<string, unknown>) || {},
       ...signalsFor(b),
+      ...geoFor(b),
     })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [beneficiaries, byBeneficiary, clinical],
+    [beneficiaries, byBeneficiary, clinical, opportunity, facilityPoint, venuePoint],
   );
 
   /** What the ground visits have taught the system so far. */
