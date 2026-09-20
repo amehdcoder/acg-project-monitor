@@ -553,10 +553,18 @@ const ProjectsView = ({ onSelectProject, onOpenRecords }: ProjectsViewProps) => 
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => onSelectProject?.(project.id)}>
-                      <ArrowRight className="mr-2 h-4 w-4" />
-                      View Forms
-                    </DropdownMenuItem>
+                    {project.records_only && (
+                      <DropdownMenuItem onClick={() => onOpenRecords?.(project.id)}>
+                        <HeartPulse className="mr-2 h-4 w-4" />
+                        Open Beneficiary Records
+                      </DropdownMenuItem>
+                    )}
+                    {!(project.records_only && !isOwnerLevel) && (
+                      <DropdownMenuItem onClick={() => onSelectProject?.(project.id)}>
+                        <ArrowRight className="mr-2 h-4 w-4" />
+                        View Forms
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem onClick={() => openEditDialog(project)}>
                       <Edit className="mr-2 h-4 w-4" />
                       Edit Project
