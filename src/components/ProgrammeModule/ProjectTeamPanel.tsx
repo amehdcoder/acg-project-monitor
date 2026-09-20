@@ -431,6 +431,17 @@ const ProjectTeamPanel = ({ projectId, moduleId, canManage = false }: Props) => 
                 <p className="text-xs text-muted-foreground">
                   Tick anything they need. Starting points are suggested for each team type and can be changed freely.
                 </p>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {DUTY_PRESETS.map((d) => (
+                    <Button
+                      key={d.key} type="button" size="sm" variant="outline"
+                      className="h-7 px-2 text-xs" title={d.hint}
+                      onClick={() => setPerms({ ...d.permissions })}
+                    >
+                      {d.label}
+                    </Button>
+                  ))}
+                </div>
                 <div className="mt-3 space-y-3">
                   {groups.map((g) => (
                     <div key={g}>
