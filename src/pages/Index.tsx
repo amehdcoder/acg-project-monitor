@@ -93,6 +93,7 @@ import { toast } from "@/hooks/use-toast";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useRecordsOnlyProjects } from "@/lib/programmeModule/recordsOnly";
 import RecordsOnlyShell from "@/components/ProgrammeModule/RecordsOnlyShell";
+import ProgrammeModuleWorkspace from "@/components/ProgrammeModule/ProgrammeModuleWorkspace";
 
 const Index = () => {
   const [searchParams, setSearchParams] = useSearchParams();
