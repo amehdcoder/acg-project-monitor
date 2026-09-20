@@ -16,7 +16,10 @@ import {
   ClipboardList,
   MessageCircle,
   QrCode,
+  HeartPulse,
+  Lock,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import ProjectAccessDialog from "@/components/DeviceCollect/ProjectAccessDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
