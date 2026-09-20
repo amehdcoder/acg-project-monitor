@@ -654,13 +654,17 @@ const ProjectsView = ({ onSelectProject, onOpenRecords }: ProjectsViewProps) => 
               </div>
 
               <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  className="flex-1" 
-                  onClick={() => onSelectProject?.(project.id)}
+                <Button
+                  variant={project.records_only ? "acg" : "outline"}
+                  className="flex-1"
+                  onClick={() =>
+                    project.records_only
+                      ? onOpenRecords?.(project.id)
+                      : onSelectProject?.(project.id)
+                  }
                 >
-                  <ArrowRight className="h-4 w-4" />
-                  Open Project
+                  {project.records_only ? <HeartPulse className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
+                  {project.records_only ? "Open Records" : "Open Project"}
                 </Button>
                 <ProjectChatButton 
                   projectId={project.id} 
