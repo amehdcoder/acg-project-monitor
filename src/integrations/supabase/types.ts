@@ -7025,6 +7025,75 @@ export type Database = {
         }
         Relationships: []
       }
+      livelihood_verifications: {
+        Row: {
+          assessment_id: string | null
+          beneficiary_id: string
+          created_at: string
+          finding: string
+          id: string
+          latitude: number | null
+          longitude: number | null
+          module_id: string | null
+          notes: string | null
+          observed: Json
+          observed_vulnerability: number | null
+          opportunity_id: string | null
+          predicted_vulnerability: number | null
+          project_id: string
+          recommendation: string | null
+          updated_at: string
+          verifier_id: string | null
+          verifier_name: string | null
+          verifier_role: string | null
+          visit_date: string
+        }
+        Insert: {
+          assessment_id?: string | null
+          beneficiary_id: string
+          created_at?: string
+          finding?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          module_id?: string | null
+          notes?: string | null
+          observed?: Json
+          observed_vulnerability?: number | null
+          opportunity_id?: string | null
+          predicted_vulnerability?: number | null
+          project_id: string
+          recommendation?: string | null
+          updated_at?: string
+          verifier_id?: string | null
+          verifier_name?: string | null
+          verifier_role?: string | null
+          visit_date?: string
+        }
+        Update: {
+          assessment_id?: string | null
+          beneficiary_id?: string
+          created_at?: string
+          finding?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          module_id?: string | null
+          notes?: string | null
+          observed?: Json
+          observed_vulnerability?: number | null
+          opportunity_id?: string | null
+          predicted_vulnerability?: number | null
+          project_id?: string
+          recommendation?: string | null
+          updated_at?: string
+          verifier_id?: string | null
+          verifier_name?: string | null
+          verifier_role?: string | null
+          visit_date?: string
+        }
+        Relationships: []
+      }
       locations: {
         Row: {
           accuracy: number | null
