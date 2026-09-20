@@ -61,6 +61,9 @@ const CaseConfirmationDialog = ({ open, onOpenChange, projectId, caseRow, onSave
   const [rejection, setRejection] = useState("");
   const [saving, setSaving] = useState(false);
   const [stageChoice, setStageChoice] = useState("");
+  const [symptoms, setSymptoms] = useState<CaseSymptoms>(emptySymptoms);
+  const [diagnosis, setDiagnosis] = useState<CaseDiagnosis>(emptyDiagnosis);
+  const [treatment, setTreatment] = useState<CaseTreatment>(emptyTreatment);
 
   useEffect(() => {
     if (!open || !caseRow) return;
@@ -72,6 +75,24 @@ const CaseConfirmationDialog = ({ open, onOpenChange, projectId, caseRow, onSave
     setRejection(caseRow.rejection_reason || "");
     setMetrics(null);
     setPhotoUrl("");
+    // The consultation, pre-filled with what the CDD already reported.
+    const s = { ...emptySymptoms(), ...(caseRow.symptoms as Partial<CaseSymptoms> | undefined) };
+    setSymptoms({
+      ...s,
+      items: s.items || {},
+      acute_attacks_last_year: s.acute_attacks_last_year ?? caseRow.acute_attacks_last_year ?? null,
+      onset: s.onset || ((caseRow.duration_years ?? 0) >= 1 ? "years" : ""),
+    });
+    setDiagnosis({
+      ...emptyDiagnosis(),
+      ...(caseRow.diagnosis as Partial<CaseDiagnosis> | undefined),
+      comorbidities: (caseRow.diagnosis as Partial<CaseDiagnosis> | undefined)?.comorbidities || {},
+    });
+    setTreatment({
+      ...emptyTreatment(),
+      ...(caseRow.treatment as Partial<CaseTreatment> | undefined),
+      given: (caseRow.treatment as Partial<CaseTreatment> | undefined)?.given || {},
+    });
   }, [open, caseRow]);
 
   // Resolve the CDD's picture, then measure it on this device.
@@ -139,6 +160,13 @@ const CaseConfirmationDialog = ({ open, onOpenChange, projectId, caseRow, onSave
     if (!confirmed && !rejection.trim()) {
       toast({ title: "Give a reason", description: "Say why this is not an MMDP case.", variant: "destructive" });
       return;
+    }
+    if (confirmed) {
+      const problem = validateClinical(diagnosis);
+      if (problem) {
+        toast({ title: "Complete the consultation", description: problem, variant: "destructive" });
+        return;
+      }
     }
     setSaving(true);
     try {
