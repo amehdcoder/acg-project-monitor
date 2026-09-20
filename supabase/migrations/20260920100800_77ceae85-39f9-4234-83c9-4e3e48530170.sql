@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.guard_project_records_only() FROM PUBLIC, anon, authenticated;
