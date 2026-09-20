@@ -147,7 +147,7 @@ interface FollowUpForm {
 }
 
 const CasesView = () => {
-  const { user, profile, isAdmin, isOwner } = useAuth();
+  const { user, profile, isAdmin, isOwner, isSuperAdmin } = useAuth();
   const [simulate, setSimulate] = useState(false);
   const [cases, setCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1563,7 +1563,12 @@ const CasesView = () => {
             <p className="py-2 sm:pl-4"><span className="font-bold text-health-ink">Protection-aware</span><br />Sensitive narratives remain access-restricted</p>
           </div>
         </section>
-        <ProgrammeModuleWorkspace projectId={selectedProject.id} canConfigure={isAdmin} isOwner={isOwner} />
+        <ProgrammeModuleWorkspace
+          projectId={selectedProject.id}
+          canConfigure={isAdmin}
+          isOwner={isOwner}
+          isSuperAdmin={isSuperAdmin || isOwner}
+        />
       </div>
     );
   }

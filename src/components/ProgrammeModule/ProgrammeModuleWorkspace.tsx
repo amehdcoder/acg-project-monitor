@@ -25,6 +25,7 @@ import BeneficiaryFormDialog from "./BeneficiaryFormDialog";
 import ProjectTeamPanel from "./ProjectTeamPanel";
 import { useMyTeamPermissions } from "@/lib/programmeModule/projectTeam";
 import ModuleConfigurator from "./ModuleConfigurator";
+import ModuleProjectsDialog from "./ModuleProjectsDialog";
 import FacilityFocalPersons from "./FacilityFocalPersons";
 import FacilityRegistry from "./FacilityRegistry";
 import FacilityDashboard from "./FacilityDashboard";
@@ -49,6 +50,8 @@ interface Props {
   /** Only administrators may add or configure modules. */
   canConfigure?: boolean;
   isOwner?: boolean;
+  /** Super Admin: may add the records to, or remove them from, any project. */
+  isSuperAdmin?: boolean;
 }
 
 /**
@@ -59,7 +62,9 @@ interface Props {
  * programme components, sections, questions, workflow, layout, branding and
  * Case ID format — comes from `programme_modules.config`, never from this code.
  */
-const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = false }: Props) => {
+const ProgrammeModuleWorkspace = ({
+  projectId, canConfigure = false, isOwner = false, isSuperAdmin = false,
+}: Props) => {
   const { toast } = useToast();
   const { modules, loading, reload } = useProgrammeModules(projectId);
   const [activeId, setActiveId] = useState<string>("");
@@ -77,6 +82,7 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
   const [creating, setCreating] = useState(false);
   const [deleteRequestsOpen, setDeleteRequestsOpen] = useState(false);
   const [officersOpen, setOfficersOpen] = useState(false);
+  const [projectsOpen, setProjectsOpen] = useState(false);
   const { isOfficer, reload: reloadOfficerAccess } = useIsSafeguardingOfficer(projectId);
   const [view, setView] = useState<
     | "records" | "journey" | "facility" | "followups" | "households" | "clusters" | "network"
@@ -220,6 +226,11 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
         {canConfigure && active && (
           <Button variant="outline" size="sm" className="gap-1" onClick={() => setConfigOpen(true)}>
             <Settings2 className="h-4 w-4" /> Configure
+          </Button>
+        )}
+        {isSuperAdmin && (
+          <Button variant="outline" size="sm" className="gap-1" onClick={() => setProjectsOpen(true)}>
+            <Layers className="h-4 w-4" /> Records on projects
           </Button>
         )}
         {canConfigure && (
@@ -376,7 +387,10 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
           projectId={projectId}
           moduleId={active?.id}
           beneficiaries={scopedBeneficiaries}
-          canDispatch={canConfigure || Object.values(facilityLevels).some((l) => l !== "view")}
+          canDispatch={canConfigure || can("dispatch_visits")
+            || (!onTeamRegister && Object.values(facilityLevels).some((l) => l !== "view"))}
+          canReportVisits={canConfigure || can("home_visits")
+            || (!onTeamRegister && Object.values(facilityLevels).some((l) => l !== "view"))}
           onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }}
         />
       )}
@@ -385,9 +399,9 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
         <CddCaseSearchPanel
           projectId={projectId}
           moduleId={active?.id}
-          canRecord={(canConfigure || Object.values(facilityLevels).some((l) => l !== "view")
-            || can("manage_cdds") || can("confirm_cases"))
-            && (can("manage_cdds") || can("confirm_cases"))}
+          canRecord={canConfigure || can("manage_cdds")
+            || (!onTeamRegister && Object.values(facilityLevels).some((l) => l !== "view"))}
+          canConfirm={canConfigure || can("confirm_cases")}
           allowedFacilityIds={isFocalPerson ? Object.keys(facilityLevels) : null}
           onBeneficiaryRegistered={() => void reloadBeneficiaries()}
           onCompleteRecord={(row) => setCompleting(row)}
@@ -399,7 +413,9 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
           projectId={projectId}
           moduleId={active?.id}
           beneficiaries={scopedBeneficiaries}
-          canManage={canConfigure || can("edit_records")}
+          canManage={canConfigure || can("manage_livelihood")}
+          canAssess={canConfigure || can("assess_livelihood") || can("manage_livelihood")}
+          canVerify={canConfigure || can("verify_livelihood") || can("manage_livelihood")}
           onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }}
         />
       )}
@@ -426,6 +442,13 @@ const ProgrammeModuleWorkspace = ({ projectId, canConfigure = false, isOwner = f
         onOpenChange={setDeleteRequestsOpen}
         projectId={projectId}
         onDecided={() => void reloadBeneficiaries()}
+      />
+
+      <ModuleProjectsDialog
+        open={projectsOpen}
+        onOpenChange={setProjectsOpen}
+        allowed={isSuperAdmin}
+        onChanged={() => void reload()}
       />
 
       <SafeguardingOfficers
