@@ -107,7 +107,7 @@ const LivelihoodAssessmentDialog = ({
               </div>
               {result && (
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge className={cn("border", toneClasses(BAND_TONE[result.band]))}>
+                  <Badge className={cn("border", toneClasses[BAND_TONE[result.band]])}>
                     {BAND_LABELS[result.band]} · {result.vulnerability}/100
                   </Badge>
                   <Badge variant="outline">Readiness {result.readiness}/100</Badge>
