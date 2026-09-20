@@ -141,11 +141,17 @@ const CddCaseSearchPanel = ({
   const isIncoming = (c: PotentialCaseRow) =>
     c.status === "referred" && !!c.referred_to_facility_id && !!levels[c.referred_to_facility_id];
 
-  const canActOn = (c: PotentialCaseRow) =>
-    canRecord && (!allowedFacilityIds || allowedFacilityIds.length === 0
+  /** Is this case inside a facility this person works with? */
+  const inMyFacilities = (c: PotentialCaseRow) =>
+    !allowedFacilityIds || allowedFacilityIds.length === 0
       || levels[c.facility_id] === "record" || levels[c.facility_id] === "manage"
-      || (c.referred_to_facility_id
-        && ["record", "manage"].includes(levels[c.referred_to_facility_id] || "")));
+      || !!(c.referred_to_facility_id
+        && ["record", "manage"].includes(levels[c.referred_to_facility_id] || ""));
+
+  const canActOn = (c: PotentialCaseRow) => canRecord && inMyFacilities(c);
+
+  /** Only designated clinicians review, stage and confirm a potential case. */
+  const canConfirmOn = (c: PotentialCaseRow) => canConfirm && inMyFacilities(c);
 
   /**
    * Opens the full registration form on a record created from case search,
