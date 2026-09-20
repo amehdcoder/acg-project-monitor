@@ -382,6 +382,20 @@ const Index = () => {
     );
   }
 
+  // Projects the Owner / Co-Owner locked to the Longitudinal Beneficiary
+  // Records system: everyone else sees that system and nothing else.
+  if (recordsLockActive) {
+    return (
+      <ErrorBoundary name="RecordsOnly">
+        <RecordsOnlyShell
+          projects={recordsLock.locked}
+          initialProjectId={selectedProjectId}
+          onExit={recordsLock.exclusive ? undefined : () => { setSelectedProjectId(null); setActiveTab("projects"); }}
+        />
+      </ErrorBoundary>
+    );
+  }
+
   return (
     <GeoSetupGate>
     <ProximityProvider>
