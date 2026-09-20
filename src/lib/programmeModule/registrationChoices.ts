@@ -125,6 +125,18 @@ export const GEO_FIELDS = ["state", "lga", "ward", "village"];
  * still collect standardised answers. Only untouched free-text boxes are
  * converted; anything an administrator already customised is left alone.
  */
+/**
+ * Psychographic questions every register should carry. Registers created from
+ * an older template simply gain the ones they are missing.
+ */
+const REQUIRED_PSYCHOGRAPHICS: { name: string; label: string; list: string[] }[] = [
+  { name: "marital_status", label: "Marital Status", list: MARITAL_STATUS },
+  { name: "religion", label: "Religion", list: RELIGION },
+  { name: "primary_language", label: "Primary Language", list: PRIMARY_LANGUAGE },
+  { name: "living_arrangement", label: "Living Arrangement", list: LIVING_ARRANGEMENT },
+  { name: "caregiver_availability", label: "Caregiver Availability", list: CAREGIVER_AVAILABILITY },
+];
+
 export const applyRegistrationChoices = (
   config: ProgrammeModuleConfig,
 ): ProgrammeModuleConfig => {
@@ -159,5 +171,35 @@ export const applyRegistrationChoices = (
     return { ...section, questions };
   });
 
-  return changed ? { ...config, sections } : config;
+  // Add any psychographic questions the register does not carry yet.
+  const present = new Set(sections.flatMap((s) => (s.questions || []).map((x) => x.name)));
+  const missing = REQUIRED_PSYCHOGRAPHICS.filter((p) => !present.has(p.name));
+  let withExtras = sections;
+  if (missing.length && sections.length) {
+    changed = true;
+    const targetIndex = Math.max(
+      0,
+      sections.findIndex((s) => s.placement === "personal"),
+    );
+    withExtras = sections.map((s, i) =>
+      i === targetIndex
+        ? {
+            ...s,
+            questions: [
+              ...(s.questions || []),
+              ...missing.map((p) => ({
+                id: uid(),
+                name: p.name,
+                label: p.label,
+                type: "select_one" as const,
+                required: false,
+                options: choiceOptions(p.list),
+              })),
+            ],
+          }
+        : s,
+    );
+  }
+
+  return changed ? { ...config, sections: withExtras } : config;
 };
