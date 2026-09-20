@@ -91,6 +91,9 @@ import { Loader2 } from "lucide-react";
 
 import { toast } from "@/hooks/use-toast";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { useRecordsOnlyProjects } from "@/lib/programmeModule/recordsOnly";
+import RecordsOnlyShell from "@/components/ProgrammeModule/RecordsOnlyShell";
+import ProgrammeModuleWorkspace from "@/components/ProgrammeModule/ProgrammeModuleWorkspace";
 
 const Index = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -113,6 +116,12 @@ const Index = () => {
   useAppUpdateNotifications();
   usePushNotifications();
   const { trackPageVisit } = useSurveillanceTracking(user?.id);
+  const recordsLock = useRecordsOnlyProjects();
+  const recordsLockActive =
+    !recordsLock.isOwnerLevel &&
+    recordsLock.locked.length > 0 &&
+    (recordsLock.exclusive ||
+      (activeTab === "records" && !!selectedProjectId && recordsLock.lockedIds.has(selectedProjectId)));
 
   useEffect(() => {
     const urlTab = searchParams.get("tab");
@@ -270,7 +279,20 @@ const Index = () => {
       case "my-submissions": return <SubmissionHistory onClose={() => setActiveTab("forms")} />;
       case "cases": return <CasesView />;
       case "templates": return <FormTemplatesView />;
-      case "projects": return <ProjectsView onSelectProject={(projectId) => { setSelectedProjectId(projectId); handleTabChange("forms"); }} />;
+      case "projects": return (
+        <ProjectsView
+          onSelectProject={(projectId) => { setSelectedProjectId(projectId); handleTabChange("forms"); }}
+          onOpenRecords={(projectId) => { setSelectedProjectId(projectId); handleTabChange("records"); }}
+        />
+      );
+      case "records": return (
+        <ProgrammeModuleWorkspace
+          projectId={selectedProjectId || undefined}
+          canConfigure={isAdmin}
+          isOwner={isOwner}
+          isSuperAdmin={isSuperAdmin || isOwner}
+        />
+      );
       case "data": return guardedPage("data", <DataView />);
       case "integrations": return guardedPage("integrations", <IntegrationsView />);
       case "geocoding": return guardedPage("geocoding", <GeocodingView />);
@@ -379,6 +401,20 @@ const Index = () => {
           <button onClick={async () => { await supabase.auth.signOut(); navigate("/auth"); }} className="mt-4 rounded-lg bg-primary px-6 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">Sign Out</button>
         </div>
       </div>
+    );
+  }
+
+  // Projects the Owner / Co-Owner locked to the Longitudinal Beneficiary
+  // Records system: everyone else sees that system and nothing else.
+  if (recordsLockActive) {
+    return (
+      <ErrorBoundary name="RecordsOnly">
+        <RecordsOnlyShell
+          projects={recordsLock.locked}
+          initialProjectId={selectedProjectId}
+          onExit={recordsLock.exclusive ? undefined : () => { setSelectedProjectId(null); setActiveTab("projects"); }}
+        />
+      </ErrorBoundary>
     );
   }
 

@@ -16,7 +16,10 @@ import {
   ClipboardList,
   MessageCircle,
   QrCode,
+  HeartPulse,
+  Lock,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import ProjectAccessDialog from "@/components/DeviceCollect/ProjectAccessDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -62,6 +65,8 @@ interface Project {
   recent_entries_count?: number;
   last_submission_at?: string | null;
   location_info?: string | null;
+  /** Owner/Co-Owner lock: project shows only the Beneficiary Records system. */
+  records_only?: boolean;
 }
 
 // Component to show chat button with unread badge
@@ -85,9 +90,11 @@ function ProjectChatButton({ projectId, projectName, onOpenChat }: {
 
 interface ProjectsViewProps {
   onSelectProject?: (projectId: string) => void;
+  /** Opens the Longitudinal Beneficiary Records system for a locked project. */
+  onOpenRecords?: (projectId: string) => void;
 }
 
-const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
+const ProjectsView = ({ onSelectProject, onOpenRecords }: ProjectsViewProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -102,7 +109,7 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
   const [editScope, setEditScope] = useState<ProjectScope>({ ...EMPTY_SCOPE });
   const [savingEdit, setSavingEdit] = useState(false);
   const [settingsProject, setSettingsProject] = useState<Project | null>(null);
-  const [settingsForm, setSettingsForm] = useState<{ status: string }>({ status: "active" });
+  const [settingsForm, setSettingsForm] = useState<{ status: string; records_only: boolean }>({ status: "active", records_only: false });
   const [savingSettings, setSavingSettings] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [accessProject, setAccessProject] = useState<{ id: string; name: string } | null>(null);
@@ -364,7 +371,7 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
 
   const openSettingsDialog = (project: Project) => {
     setSettingsProject(project);
-    setSettingsForm({ status: project.status || "active" });
+    setSettingsForm({ status: project.status || "active", records_only: !!project.records_only });
   };
 
   const handleSaveSettings = async () => {
@@ -373,7 +380,11 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
       setSavingSettings(true);
       const { error } = await supabase
         .from("projects")
-        .update({ status: settingsForm.status })
+        .update(
+          isOwnerLevel
+            ? { status: settingsForm.status, records_only: settingsForm.records_only }
+            : { status: settingsForm.status },
+        )
         .eq("id", settingsProject.id);
       if (error) throw error;
       await logAction("edit_project", `Updated settings for "${settingsProject.name}"`, "project", settingsProject.id);
@@ -519,9 +530,20 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
                     <CardTitle className="font-display text-lg line-clamp-1">
                       {project.name}
                     </CardTitle>
-                    <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${getStatusColor(project.status)}`}>
-                      {project.status}
-                    </span>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${getStatusColor(project.status)}`}>
+                        {project.status}
+                      </span>
+                      {project.records_only && (
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary"
+                          title="Only the Longitudinal Beneficiary Records system is available on this project"
+                        >
+                          <Lock className="h-3 w-3" />
+                          Records only
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <DropdownMenu>
@@ -531,10 +553,18 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => onSelectProject?.(project.id)}>
-                      <ArrowRight className="mr-2 h-4 w-4" />
-                      View Forms
-                    </DropdownMenuItem>
+                    {project.records_only && (
+                      <DropdownMenuItem onClick={() => onOpenRecords?.(project.id)}>
+                        <HeartPulse className="mr-2 h-4 w-4" />
+                        Open Beneficiary Records
+                      </DropdownMenuItem>
+                    )}
+                    {!(project.records_only && !isOwnerLevel) && (
+                      <DropdownMenuItem onClick={() => onSelectProject?.(project.id)}>
+                        <ArrowRight className="mr-2 h-4 w-4" />
+                        View Forms
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem onClick={() => openEditDialog(project)}>
                       <Edit className="mr-2 h-4 w-4" />
                       Edit Project
@@ -624,13 +654,17 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
               </div>
 
               <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  className="flex-1" 
-                  onClick={() => onSelectProject?.(project.id)}
+                <Button
+                  variant={project.records_only ? "acg" : "outline"}
+                  className="flex-1"
+                  onClick={() =>
+                    project.records_only
+                      ? onOpenRecords?.(project.id)
+                      : onSelectProject?.(project.id)
+                  }
                 >
-                  <ArrowRight className="h-4 w-4" />
-                  Open Project
+                  {project.records_only ? <HeartPulse className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
+                  {project.records_only ? "Open Records" : "Open Project"}
                 </Button>
                 <ProjectChatButton 
                   projectId={project.id} 
@@ -732,12 +766,39 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
             <DialogDescription>Manage status for "{settingsProject?.name}".</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {isOwnerLevel && (
+              <div className="rounded-xl border border-primary/25 bg-primary/5 p-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-primary/12">
+                    <HeartPulse className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-3">
+                      <Label htmlFor="set-records-only" className="text-sm font-semibold">
+                        Beneficiary Records only
+                      </Label>
+                      <Switch
+                        id="set-records-only"
+                        checked={settingsForm.records_only}
+                        onCheckedChange={(checked) =>
+                          setSettingsForm((current) => ({ ...current, records_only: checked }))
+                        }
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      When on, everyone except you and Co-Owners sees only the Longitudinal
+                      Beneficiary Records system on this project — no other page is available to them.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="set-status">Status</Label>
               <select
                 id="set-status"
                 value={settingsForm.status}
-                onChange={(e) => setSettingsForm({ status: e.target.value })}
+                onChange={(e) => setSettingsForm((current) => ({ ...current, status: e.target.value }))}
                 className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
               >
                 <option value="active">Active</option>

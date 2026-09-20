@@ -9636,6 +9636,7 @@ export type Database = {
           id: string
           looker_dashboard_url: string | null
           name: string
+          records_only: boolean
           scope_lgas: string[]
           scope_states: string[]
           scope_wards: string[]
@@ -9651,6 +9652,7 @@ export type Database = {
           id?: string
           looker_dashboard_url?: string | null
           name: string
+          records_only?: boolean
           scope_lgas?: string[]
           scope_states?: string[]
           scope_wards?: string[]
@@ -9666,6 +9668,7 @@ export type Database = {
           id?: string
           looker_dashboard_url?: string | null
           name?: string
+          records_only?: boolean
           scope_lgas?: string[]
           scope_states?: string[]
           scope_wards?: string[]
