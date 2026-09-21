@@ -156,6 +156,30 @@ const LivelihoodAssessmentDialog = ({
               </Card>
             )}
 
+            <Card className="space-y-3 p-3">
+              <div>
+                <p className="font-semibold">Where the person lives now</p>
+                <p className="text-xs text-muted-foreground">
+                  Used to match people to opportunities running in their area and to judge travel.
+                </p>
+              </div>
+              <GeoCascadeFields
+                value={{
+                  state: String(answers.res_state ?? ""),
+                  lga: String(answers.res_lga ?? ""),
+                  ward: String(answers.res_ward ?? ""),
+                  community: String(answers.res_community ?? ""),
+                }}
+                onChange={(p) => setAnswers((prev) => ({
+                  ...prev,
+                  res_state: p.state ?? "",
+                  res_lga: p.lga ?? "",
+                  res_ward: p.ward ?? "",
+                  res_community: p.community ?? "",
+                }))}
+              />
+            </Card>
+
             {ASSESSMENT_SECTIONS.map((section) => (
               <Card key={section.key + section.title} className="space-y-3 p-3">
                 <div>
