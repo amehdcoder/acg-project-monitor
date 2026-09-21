@@ -51,8 +51,16 @@ const LivelihoodAssessmentDialog = ({
 
   useEffect(() => {
     if (!open) return;
-    setAnswers((existing?.answers as Record<string, unknown>) || {});
-  }, [open, existing]);
+    const saved = (existing?.answers as Record<string, unknown>) || {};
+    // Start from where the person was registered; the officer can correct it.
+    setAnswers({
+      res_state: beneficiary?.state || "",
+      res_lga: beneficiary?.lga || "",
+      res_ward: beneficiary?.ward || "",
+      res_community: beneficiary?.village || "",
+      ...saved,
+    });
+  }, [open, existing, beneficiary]);
 
   const result = useMemo(() => {
     if (!beneficiary) return null;
