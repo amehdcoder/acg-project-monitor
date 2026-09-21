@@ -87,3 +87,6 @@ verify_jwt = false
 
 [functions.kobo-quiz-webhook]
 verify_jwt = false
+
+[functions.health-exchange]
+verify_jwt = false
