@@ -179,11 +179,18 @@ const LivelihoodPanel = ({
       b.latitude != null && b.longitude != null ? [Number(b.latitude), Number(b.longitude)] : null;
     const fac = b.facility_id ? facilityPoint.get(b.facility_id) : undefined;
     const round1 = (n: number) => Math.round(n * 10) / 10;
+    // Where the assessment says the person lives now wins over the registration record.
+    const ans = (byBeneficiary.get(b.id)?.answers as Record<string, unknown>) || {};
+    const pick = (key: string, fallback?: string | null) =>
+      String(ans[key] ?? "").trim() || fallback || "";
+    const state = pick("res_state", b.state);
+    const lga = pick("res_lga", b.lga);
+    const ward = pick("res_ward", b.ward);
     const locationTier: "ward" | "lga" | "state" | "outside" | null = !opportunity
       ? null
-      : opportunity.ward && sameName(b.ward, opportunity.ward) ? "ward"
-        : opportunity.lga && sameName(b.lga, opportunity.lga) ? "lga"
-          : opportunity.state && sameName(b.state, opportunity.state) ? "state"
+      : opportunity.ward && sameName(ward, opportunity.ward) ? "ward"
+        : opportunity.lga && sameName(lga, opportunity.lga) ? "lga"
+          : opportunity.state && sameName(state, opportunity.state) ? "state"
             : opportunity.state || opportunity.lga || opportunity.ward ? "outside" : null;
     return {
       distanceToFacilityKm: home && fac ? round1(haversineKm(home[0], home[1], fac[0], fac[1])) : null,
@@ -239,9 +246,16 @@ const LivelihoodPanel = ({
       ward: opportunity.ward,
     }, (r) => {
       const b = locationById.get(r.beneficiaryId);
-      return { state: b?.state, lga: b?.lga, ward: b?.ward };
+      const ans = (byBeneficiary.get(r.beneficiaryId)?.answers as Record<string, unknown>) || {};
+      const pick = (key: string, fallback?: string | null) =>
+        String(ans[key] ?? "").trim() || fallback || null;
+      return {
+        state: pick("res_state", b?.state),
+        lga: pick("res_lga", b?.lga),
+        ward: pick("res_ward", b?.ward),
+      };
     });
-  }, [opportunity, results, locationById]);
+  }, [opportunity, results, locationById, byBeneficiary]);
 
   /** Who a verifier should be sent to next. */
   const queue = useMemo(() => {

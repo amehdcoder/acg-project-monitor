@@ -17,6 +17,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Loader2, ClipboardCheck } from "lucide-react";
+import GeoCascadeFields from "./GeoCascadeFields";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { toneClasses } from "@/lib/programmeModule/defaults";
@@ -50,8 +51,16 @@ const LivelihoodAssessmentDialog = ({
 
   useEffect(() => {
     if (!open) return;
-    setAnswers((existing?.answers as Record<string, unknown>) || {});
-  }, [open, existing]);
+    const saved = (existing?.answers as Record<string, unknown>) || {};
+    // Start from where the person was registered; the officer can correct it.
+    setAnswers({
+      res_state: beneficiary?.state || "",
+      res_lga: beneficiary?.lga || "",
+      res_ward: beneficiary?.ward || "",
+      res_community: beneficiary?.village || "",
+      ...saved,
+    });
+  }, [open, existing, beneficiary]);
 
   const result = useMemo(() => {
     if (!beneficiary) return null;
@@ -146,6 +155,30 @@ const LivelihoodAssessmentDialog = ({
                 )}
               </Card>
             )}
+
+            <Card className="space-y-3 p-3">
+              <div>
+                <p className="font-semibold">Where the person lives now</p>
+                <p className="text-xs text-muted-foreground">
+                  Used to match people to opportunities running in their area and to judge travel.
+                </p>
+              </div>
+              <GeoCascadeFields
+                value={{
+                  state: String(answers.res_state ?? ""),
+                  lga: String(answers.res_lga ?? ""),
+                  ward: String(answers.res_ward ?? ""),
+                  community: String(answers.res_community ?? ""),
+                }}
+                onChange={(p) => setAnswers((prev) => ({
+                  ...prev,
+                  res_state: p.state ?? "",
+                  res_lga: p.lga ?? "",
+                  res_ward: p.ward ?? "",
+                  res_community: p.community ?? "",
+                }))}
+              />
+            </Card>
 
             {ASSESSMENT_SECTIONS.map((section) => (
               <Card key={section.key + section.title} className="space-y-3 p-3">
