@@ -18,6 +18,7 @@ import {
   SEX_OPTIONS, TRAINING_STATUSES, saveCdd, type CddRow,
 } from "@/lib/programmeModule/cddCaseSearch";
 import type { FacilityRow } from "@/lib/programmeModule/facilities";
+import { facilityGeoLabel, facilityGeoPatch } from "@/lib/programmeModule/facilityGeo";
 
 interface Props {
   open: boolean;
@@ -67,6 +68,19 @@ const CddDialog = ({
 
   const set = (k: keyof typeof blank, v: string | boolean) =>
     setForm((p) => ({ ...p, [k]: v }));
+
+  // Picking a facility fills only the geography levels still left blank.
+  const pickFacility = (id: string) =>
+    setForm((p) => {
+      const patch = facilityGeoPatch(facilities.find((f) => f.id === id), p);
+      return {
+        ...p,
+        facility_id: id,
+        state: patch.state ?? p.state,
+        lga: patch.lga ?? p.lga,
+        ward: patch.ward ?? p.ward,
+      };
+    });
 
   const submit = async () => {
     if (!form.full_name.trim() || !form.facility_id) {

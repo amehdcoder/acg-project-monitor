@@ -20,6 +20,7 @@ import {
   type CddRow, type PotentialCaseRow,
 } from "@/lib/programmeModule/cddCaseSearch";
 import type { FacilityRow } from "@/lib/programmeModule/facilities";
+import { facilityGeoLabel, facilityGeoPatch } from "@/lib/programmeModule/facilityGeo";
 
 interface Props {
   open: boolean;
@@ -87,6 +88,19 @@ const PotentialCaseDialog = ({
   }, [open, caseRow, defaultFacilityId]);
 
   const set = (k: keyof typeof blank, v: string) => setForm((p) => ({ ...p, [k]: v }));
+
+  // Picking a facility fills only the geography levels still left blank.
+  const pickFacility = (id: string) =>
+    setForm((p) => {
+      const patch = facilityGeoPatch(facilities.find((f) => f.id === id), p);
+      return {
+        ...p,
+        facility_id: id,
+        state: patch.state ?? p.state,
+        lga: patch.lga ?? p.lga,
+        ward: patch.ward ?? p.ward,
+      };
+    });
 
   const facilityCdds = useMemo(
     () => cdds.filter((c) => !form.facility_id || c.facility_id === form.facility_id),
