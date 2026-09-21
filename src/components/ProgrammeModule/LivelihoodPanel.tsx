@@ -246,9 +246,16 @@ const LivelihoodPanel = ({
       ward: opportunity.ward,
     }, (r) => {
       const b = locationById.get(r.beneficiaryId);
-      return { state: b?.state, lga: b?.lga, ward: b?.ward };
+      const ans = (byBeneficiary.get(r.beneficiaryId)?.answers as Record<string, unknown>) || {};
+      const pick = (key: string, fallback?: string | null) =>
+        String(ans[key] ?? "").trim() || fallback || null;
+      return {
+        state: pick("res_state", b?.state),
+        lga: pick("res_lga", b?.lga),
+        ward: pick("res_ward", b?.ward),
+      };
     });
-  }, [opportunity, results, locationById]);
+  }, [opportunity, results, locationById, byBeneficiary]);
 
   /** Who a verifier should be sent to next. */
   const queue = useMemo(() => {
