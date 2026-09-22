@@ -5163,6 +5163,68 @@ export type Database = {
         }
         Relationships: []
       }
+      facility_commodity_stock: {
+        Row: {
+          category: string
+          commodity_code: string
+          commodity_name: string
+          created_at: string
+          expiry_date: string | null
+          external_facility_code: string | null
+          facility_id: string | null
+          id: string
+          last_synced_at: string | null
+          project_id: string
+          quantity_on_hand: number
+          reorder_level: number | null
+          source: string
+          unit: string | null
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          commodity_code: string
+          commodity_name: string
+          created_at?: string
+          expiry_date?: string | null
+          external_facility_code?: string | null
+          facility_id?: string | null
+          id?: string
+          last_synced_at?: string | null
+          project_id: string
+          quantity_on_hand?: number
+          reorder_level?: number | null
+          source?: string
+          unit?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          commodity_code?: string
+          commodity_name?: string
+          created_at?: string
+          expiry_date?: string | null
+          external_facility_code?: string | null
+          facility_id?: string | null
+          id?: string
+          last_synced_at?: string | null
+          project_id?: string
+          quantity_on_hand?: number
+          reorder_level?: number | null
+          source?: string
+          unit?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facility_commodity_stock_facility_id_fkey"
+            columns: ["facility_id"]
+            isOneToOne: false
+            referencedRelation: "health_facilities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       facility_focal_persons: {
         Row: {
           access_level: string
@@ -5859,6 +5921,183 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      health_exchange_connections: {
+        Row: {
+          auth_type: string
+          base_url: string
+          created_at: string
+          created_by: string | null
+          dataset_id: string | null
+          default_period_type: string
+          id: string
+          is_active: boolean
+          kind: string
+          last_status: string | null
+          last_sync_at: string | null
+          name: string
+          org_unit_id: string | null
+          project_id: string
+          updated_at: string
+          username: string | null
+        }
+        Insert: {
+          auth_type?: string
+          base_url: string
+          created_at?: string
+          created_by?: string | null
+          dataset_id?: string | null
+          default_period_type?: string
+          id?: string
+          is_active?: boolean
+          kind: string
+          last_status?: string | null
+          last_sync_at?: string | null
+          name: string
+          org_unit_id?: string | null
+          project_id: string
+          updated_at?: string
+          username?: string | null
+        }
+        Update: {
+          auth_type?: string
+          base_url?: string
+          created_at?: string
+          created_by?: string | null
+          dataset_id?: string | null
+          default_period_type?: string
+          id?: string
+          is_active?: boolean
+          kind?: string
+          last_status?: string | null
+          last_sync_at?: string | null
+          name?: string
+          org_unit_id?: string | null
+          project_id?: string
+          updated_at?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
+      health_exchange_credentials: {
+        Row: {
+          connection_id: string
+          secret: string
+          updated_at: string
+        }
+        Insert: {
+          connection_id: string
+          secret: string
+          updated_at?: string
+        }
+        Update: {
+          connection_id?: string
+          secret?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "health_exchange_credentials_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: true
+            referencedRelation: "health_exchange_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      health_exchange_mappings: {
+        Row: {
+          category_option_combo: string | null
+          connection_id: string
+          created_at: string
+          id: string
+          indicator_key: string
+          indicator_label: string | null
+          remote_id: string
+          remote_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          category_option_combo?: string | null
+          connection_id: string
+          created_at?: string
+          id?: string
+          indicator_key: string
+          indicator_label?: string | null
+          remote_id: string
+          remote_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category_option_combo?: string | null
+          connection_id?: string
+          created_at?: string
+          id?: string
+          indicator_key?: string
+          indicator_label?: string | null
+          remote_id?: string
+          remote_name?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "health_exchange_mappings_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "health_exchange_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      health_exchange_sync_logs: {
+        Row: {
+          action: string
+          actor_id: string | null
+          connection_id: string | null
+          created_at: string
+          direction: string
+          id: string
+          message: string | null
+          payload: Json | null
+          project_id: string
+          record_count: number
+          status: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          connection_id?: string | null
+          created_at?: string
+          direction: string
+          id?: string
+          message?: string | null
+          payload?: Json | null
+          project_id: string
+          record_count?: number
+          status: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          connection_id?: string | null
+          created_at?: string
+          direction?: string
+          id?: string
+          message?: string | null
+          payload?: Json | null
+          project_id?: string
+          record_count?: number
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "health_exchange_sync_logs_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "health_exchange_connections"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       health_facilities: {
         Row: {
