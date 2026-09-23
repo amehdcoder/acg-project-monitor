@@ -11,7 +11,7 @@ import {
 import {
   Plus, Settings2, CloudOff, RefreshCw, Layers, Users, Building2, ShieldAlert,
   LayoutGrid, CalendarClock, Hospital, Route, ShieldCheck, Home, Network, Activity,
-  Search, Briefcase,
+  Search, Briefcase, Share2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -41,6 +41,7 @@ import LtfuRiskPanel from "./LtfuRiskPanel";
 import ClusterDashboard from "./ClusterDashboard";
 import CddCaseSearchPanel from "./CddCaseSearchPanel";
 import LivelihoodPanel from "./LivelihoodPanel";
+import HealthExchangePanel from "./HealthExchangePanel";
 import { useIsSafeguardingOfficer } from "@/lib/programmeModule/safeguarding";
 import { useMyFacilityAccess } from "@/lib/programmeModule/facilities";
 
@@ -270,6 +271,10 @@ const ProgrammeModuleWorkspace = ({
             show: can("view_records") || can("view_dashboards"),
           },
           {
+            key: "exchange", label: "Data exchange (DHIS2/LMIS/FHIR)", icon: Share2,
+            show: canConfigure || can("view_dashboards"),
+          },
+          {
             key: "team", label: "Project team", icon: Users,
             show: canConfigure || can("manage_team") || onTeamRegister,
           },
@@ -419,6 +424,10 @@ const ProgrammeModuleWorkspace = ({
           canVerify={canConfigure || can("verify_livelihood") || can("manage_livelihood")}
           onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }}
         />
+      )}
+
+      {view === "exchange" && projectId && (
+        <HealthExchangePanel projectId={projectId} canManage={canConfigure} />
       )}
 
       {view === "safeguarding" && (
