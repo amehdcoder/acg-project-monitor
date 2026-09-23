@@ -87,6 +87,7 @@ const ProgrammeModuleWorkspace = ({
   const [view, setView] = useState<
     | "records" | "journey" | "facility" | "followups" | "households" | "clusters" | "network"
     | "risk" | "casesearch" | "livelihood" | "safeguarding" | "safeguarding_dashboard" | "team"
+    | "exchange"
   >("records");
 
   // What this person is allowed to see and do, from the project team register.
