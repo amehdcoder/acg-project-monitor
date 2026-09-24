@@ -19,7 +19,7 @@ import {
   listConnections, saveConnection, deleteConnection,
   listLogs, listStock, listMappings, saveMapping,
   saveCredential, testConnection, pullMetadata, pullStock, pushIndicators, pushFhirPatients,
-  computeIndicatorValues,
+  pullFhir, computeIndicatorValues, listBeneficiariesForExchange,
   type ExchangeConnection, type ExchangeKind, type ExchangeLog,
   type CommodityStock, type ExchangeMapping,
 } from "@/lib/programmeModule/healthExchange";
@@ -68,6 +68,10 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
   const [activeId, setActiveId] = useState<string>("");
   const [period, setPeriod] = useState(currentPeriod());
   const [values, setValues] = useState<{ key: string; label: string; value: number }[]>([]);
+  const [people, setPeople] = useState<{ id: string; case_id: string; full_name: string }[]>([]);
+  const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
+  const [lmisPath, setLmisPath] = useState("api/stockCards");
+  const [fhirQuery, setFhirQuery] = useState("Patient?_count=50");
 
   const active = useMemo(() => rows.find((r) => r.id === activeId) ?? null, [rows, activeId]);
 
@@ -98,6 +102,11 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
     if (!projectId || tab !== "indicators") return;
     computeIndicatorValues(projectId, period).then(setValues).catch(() => setValues([]));
   }, [projectId, period, tab]);
+
+  useEffect(() => {
+    if (!projectId || active?.kind !== "fhir") return;
+    listBeneficiariesForExchange(projectId).then(setPeople).catch(() => setPeople([]));
+  }, [active?.kind, projectId]);
 
   const run = async (key: string, fn: () => Promise<any>, ok: string) => {
     setBusy(key);
@@ -185,7 +194,7 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
                     <KeyRound className="h-4 w-4" /> Access token
                   </Button>
                 )}
-                {c.kind !== "lmis" && (
+                {c.kind === "dhis2" && (
                   <Button size="sm" variant="outline" className="gap-1" disabled={busy === c.id}
                     onClick={() => void run(c.id, () => pullMetadata(c.id), "Server details fetched")}>
                     <Download className="h-4 w-4" /> Pull details
@@ -193,7 +202,7 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
                 )}
                 {c.kind === "lmis" && (
                   <Button size="sm" variant="outline" className="gap-1" disabled={busy === c.id}
-                    onClick={() => void run(c.id, () => pullStock(c.id), "Stock updated")}>
+                    onClick={() => void run(c.id, () => pullStock(c.id, lmisPath), "Stock updated")}>
                     <Download className="h-4 w-4" /> Pull stock
                   </Button>
                 )}
@@ -234,20 +243,55 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
               <Input className="w-[160px]" value={period} onChange={(e) => setPeriod(e.target.value.replace(/\D/g, "").slice(0, 6))} />
             </div>
             {canManage && active?.kind === "dhis2" && (
-              <Button className="gap-1" disabled={!activeId || busy === "push"}
-                onClick={() => void run("push", () => pushIndicators(
-                  activeId, period, values.map((v) => ({ indicator_key: v.key, value: v.value })),
-                ), "Figures sent to the national database")}>
-                <Upload className="h-4 w-4" /> Send figures
-              </Button>
-            )}
-            {canManage && active?.kind === "fhir" && (
-              <Button variant="outline" className="gap-1" disabled={!activeId || busy === "fhir"}
-                onClick={() => void run("fhir", () => pushFhirPatients(activeId, []), "Records shared with the FHIR server")}>
-                <Upload className="h-4 w-4" /> Share records
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" className="gap-1" disabled={!activeId || busy === "validate"}
+                  onClick={() => void run("validate", () => pushIndicators(
+                    activeId, period, values.map((v) => ({ indicator_key: v.key, value: v.value })), undefined, true,
+                  ), "DHIS2 accepted the validation check")}>
+                  <PlugZap className="h-4 w-4" /> Validate
+                </Button>
+                <Button className="gap-1" disabled={!activeId || busy === "push"}
+                  onClick={() => void run("push", () => pushIndicators(
+                    activeId, period, values.map((v) => ({ indicator_key: v.key, value: v.value })),
+                  ), "Figures sent to the national database")}>
+                  <Upload className="h-4 w-4" /> Send figures
+                </Button>
+              </div>
             )}
           </div>
+
+          {active?.kind === "fhir" && (
+            <div className="grid gap-4 border-t pt-4 lg:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Beneficiaries to share</Label>
+                <div className="max-h-56 overflow-y-auto rounded-md border p-2">
+                  {people.map((person) => (
+                    <label key={person.id} className="flex min-h-10 cursor-pointer items-center gap-2 border-b px-2 last:border-0">
+                      <input type="checkbox" checked={selectedPeople.includes(person.id)}
+                        onChange={(e) => setSelectedPeople((current) => e.target.checked
+                          ? [...current, person.id]
+                          : current.filter((id) => id !== person.id))} />
+                      <span className="text-sm">{person.full_name} · {person.case_id}</span>
+                    </label>
+                  ))}
+                </div>
+                {canManage && (
+                  <Button className="gap-1" disabled={selectedPeople.length === 0 || busy === "fhir"}
+                    onClick={() => void run("fhir", () => pushFhirPatients(activeId, selectedPeople), "Records shared with the FHIR server")}>
+                    <Upload className="h-4 w-4" /> Share {selectedPeople.length || "selected"} records
+                  </Button>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>FHIR R4 search</Label>
+                <Input value={fhirQuery} onChange={(e) => setFhirQuery(e.target.value)} placeholder="Patient?_count=50" />
+                <Button variant="outline" className="gap-1" disabled={busy === "fhir-pull"}
+                  onClick={() => void run("fhir-pull", () => pullFhir(activeId, fhirQuery), "FHIR records received")}>
+                  <Download className="h-4 w-4" /> Pull records
+                </Button>
+              </div>
+            </div>
+          )}
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -297,6 +341,21 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
 
       {tab === "commodities" && (
         <Card className="space-y-3 p-4">
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="min-w-[260px] flex-1 space-y-1">
+              <Label>OpenLMIS stock-card path</Label>
+              <Input value={lmisPath} onChange={(e) => setLmisPath(e.target.value)} placeholder="api/stockCards" />
+            </div>
+            {canManage && rows.some((r) => r.kind === "lmis") && (
+              <Button variant="outline" className="gap-1" disabled={busy === "lmis-test"}
+                onClick={() => {
+                  const lmis = rows.find((r) => r.kind === "lmis");
+                  if (lmis) void run("lmis-test", () => testConnection(lmis.id, `${lmisPath}?page=0&size=1`), "OpenLMIS endpoint works");
+                }}>
+                <PlugZap className="h-4 w-4" /> Test stock endpoint
+              </Button>
+            )}
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-left text-muted-foreground">
@@ -391,7 +450,7 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
                     onValueChange={(v) => setEditing({ ...editing, auth_type: v as typeof editing.auth_type })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent className="z-[60] bg-popover">
-                      <SelectItem value="bearer">Access token</SelectItem>
+                    <SelectItem value="bearer">Personal access / OAuth token</SelectItem>
                       <SelectItem value="basic">Username &amp; password</SelectItem>
                       <SelectItem value="none">No sign-in</SelectItem>
                     </SelectContent>

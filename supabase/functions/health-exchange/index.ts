@@ -66,6 +66,27 @@ async function remoteFetch(url: string, init: RequestInit, timeoutMs = 25000) {
   }
 }
 
+function remoteMessage(body: unknown, fallback: string) {
+  if (typeof body === "string") return body.slice(0, 1000) || fallback;
+  const value = body as Record<string, unknown> | null;
+  if (!value) return fallback;
+  const issue = Array.isArray(value.issue) ? value.issue[0] as Record<string, unknown> | undefined : undefined;
+  const details = issue?.details as Record<string, unknown> | undefined;
+  return String(
+    value.message ?? value.description ?? value.status ?? details?.text ?? issue?.diagnostics ?? fallback,
+  ).slice(0, 1000);
+}
+
+function asArray(body: unknown): Record<string, unknown>[] {
+  if (Array.isArray(body)) return body as Record<string, unknown>[];
+  const value = body as Record<string, unknown> | null;
+  if (!value) return [];
+  for (const key of ["content", "items", "stock", "entries", "results", "data"]) {
+    if (Array.isArray(value[key])) return value[key] as Record<string, unknown>[];
+  }
+  return [];
+}
+
 async function log(
   db: ReturnType<typeof admin>,
   conn: Connection,
@@ -91,7 +112,9 @@ async function log(
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
-  const guard = await guardRequest(req, corsHeaders, { requireAdmin: false });
+  // Exchange credentials and national reporting are privileged operations.
+  // Project membership is not sufficient to call the service directly.
+  const guard = await guardRequest(req, corsHeaders, { requireAdmin: true });
   if (guard.response) return guard.response;
 
   let payload: Record<string, unknown>;
@@ -140,21 +163,28 @@ Deno.serve(async (req) => {
           ? "api/system/info"
           : connection.kind === "fhir"
             ? "metadata"
-            : "api/health";
+            : String(payload.path ?? "api/stockCards?page=0&size=1");
         const res = await remoteFetch(joinUrl(connection.base_url, path), { headers });
         await log(db, connection, "test", "connection_test", res.ok ? "success" : "error", 0,
-          res.ok ? `Reachable (HTTP ${res.status})` : `HTTP ${res.status}`, guard.userId);
-        return json({ ok: res.ok, status: res.status, body: res.ok ? res.body : String(res.body).slice(0, 500) });
+          res.ok ? `Reachable (HTTP ${res.status})` : remoteMessage(res.body, `HTTP ${res.status}`), guard.userId);
+        return json({
+          ok: res.ok,
+          status: res.status,
+          message: res.ok ? `Reachable (HTTP ${res.status})` : remoteMessage(res.body, `HTTP ${res.status}`),
+          body: res.body,
+        }, res.ok ? 200 : 502);
       }
 
       /* ------------------------- DHIS2 metadata ------------------------ */
       case "pull_metadata": {
         if (connection.kind !== "dhis2") return json({ error: "Metadata pull is for DHIS2 connections" }, 400);
-        const [orgUnits, dataElements] = await Promise.all([
+        const [orgUnits, dataElements, dataSets, categoryCombos] = await Promise.all([
           remoteFetch(joinUrl(connection.base_url, "api/organisationUnits?fields=id,name,level&pageSize=200"), { headers }),
           remoteFetch(joinUrl(connection.base_url, "api/dataElements?fields=id,name&pageSize=500"), { headers }),
+          remoteFetch(joinUrl(connection.base_url, "api/dataSets?fields=id,name,periodType,dataSetElements[dataElement[id,name]]&pageSize=200"), { headers }),
+          remoteFetch(joinUrl(connection.base_url, "api/categoryOptionCombos?fields=id,name&filter=ignoreApproval:neq:true&pageSize=500"), { headers }),
         ]);
-        const ok = orgUnits.ok && dataElements.ok;
+        const ok = orgUnits.ok && dataElements.ok && dataSets.ok && categoryCombos.ok;
         await log(db, connection, "pull", "dhis2_metadata", ok ? "success" : "error", 0,
           ok ? "Metadata pulled" : "Metadata pull failed", guard.userId);
         if (!ok) return json({ error: "Metadata pull failed" }, 502);
@@ -162,6 +192,8 @@ Deno.serve(async (req) => {
           ok: true,
           orgUnits: (orgUnits.body as any)?.organisationUnits ?? [],
           dataElements: (dataElements.body as any)?.dataElements ?? [],
+          dataSets: (dataSets.body as any)?.dataSets ?? [],
+          categoryOptionCombos: (categoryCombos.body as any)?.categoryOptionCombos ?? [],
         });
       }
 
@@ -169,6 +201,7 @@ Deno.serve(async (req) => {
       case "push_indicators": {
         if (connection.kind !== "dhis2") return json({ error: "Indicator push is for DHIS2 connections" }, 400);
         const period = String(payload.period ?? "");
+        const dryRun = payload.dry_run === true;
         const values = Array.isArray(payload.values) ? payload.values as { indicator_key: string; value: number }[] : [];
         if (!period || values.length === 0) return json({ error: "period and values required" }, 400);
 
@@ -191,28 +224,40 @@ Deno.serve(async (req) => {
           });
         if (dataValues.length === 0) return json({ error: "No mapped indicators to send" }, 400);
 
-        const res = await remoteFetch(joinUrl(connection.base_url, "api/dataValueSets"), {
+        const params = new URLSearchParams({
+          dryRun: String(dryRun),
+          importStrategy: "CREATE_AND_UPDATE",
+          preheatCache: "true",
+        });
+        const res = await remoteFetch(joinUrl(connection.base_url, `api/dataValueSets?${params}`), {
           method: "POST", headers, body: JSON.stringify({ dataValues }),
         });
-        const status = res.ok ? "success" : "error";
+        const importBody = res.body as Record<string, any> | null;
+        const conflicts = Number(importBody?.response?.conflicts?.length ?? importBody?.conflicts?.length ?? 0);
+        const ignored = Number(importBody?.response?.importCount?.ignored ?? importBody?.importCount?.ignored ?? 0);
+        const status = res.ok && conflicts === 0 && ignored === 0 ? "success" : res.ok ? "partial" : "error";
+        const importSummary = remoteMessage(res.body,
+          `${dryRun ? "Validated" : "Imported"} ${dataValues.length} values${conflicts || ignored ? `; ${conflicts} conflicts, ${ignored} ignored` : ""}`);
         await log(db, connection, "push", "dhis2_data_values", status, dataValues.length,
-          res.ok ? `Sent ${dataValues.length} values for ${period}` : `HTTP ${res.status}: ${String(res.body).slice(0, 300)}`,
+          res.ok ? importSummary : `HTTP ${res.status}: ${importSummary}`,
           guard.userId);
-        return json({ ok: res.ok, sent: dataValues.length, response: res.body }, res.ok ? 200 : 502);
+        return json({ ok: res.ok, dryRun, sent: dataValues.length, status, message: importSummary, response: res.body }, res.ok ? 200 : 502);
       }
 
       /* ------------------------- LMIS stock pull ----------------------- */
       case "pull_stock": {
         if (connection.kind !== "lmis") return json({ error: "Stock pull is for LMIS connections" }, 400);
-        const path = String(payload.path ?? "api/stock") +
-          (connection.org_unit_id ? `?facility=${encodeURIComponent(connection.org_unit_id)}` : "");
+        const requestedPath = String(payload.path ?? "api/stockCards");
+        const separator = requestedPath.includes("?") ? "&" : "?";
+        const path = requestedPath + (connection.org_unit_id
+          ? `${separator}facilityId=${encodeURIComponent(connection.org_unit_id)}&size=2000`
+          : `${separator}size=2000`);
         const res = await remoteFetch(joinUrl(connection.base_url, path), { headers });
         if (!res.ok) {
           await log(db, connection, "pull", "lmis_stock", "error", 0, `HTTP ${res.status}`, guard.userId);
-          return json({ error: `LMIS responded ${res.status}` }, 502);
+          return json({ error: remoteMessage(res.body, `LMIS responded ${res.status}`) }, 502);
         }
-        const body: any = res.body;
-        const items: any[] = Array.isArray(body) ? body : (body?.items ?? body?.stock ?? body?.entries ?? []);
+        const items = asArray(res.body);
 
         // Map external facility codes to registered facilities where possible.
         const { data: facilities } = await db.from("health_facilities")
@@ -221,19 +266,23 @@ Deno.serve(async (req) => {
         const byName = new Map((facilities ?? []).map((f: any) => [String(f.name ?? "").toLowerCase(), f.id]));
 
         const rows = items.map((it) => {
-          const code = String(it.facility_code ?? it.facilityCode ?? it.facility ?? "");
-          const facilityId = byCode.get(code.toLowerCase()) ?? byName.get(String(it.facility_name ?? "").toLowerCase()) ?? null;
+          const facility = (it.facility ?? it.servicePoint ?? {}) as Record<string, unknown>;
+          const orderable = (it.orderable ?? it.product ?? it.commodity ?? {}) as Record<string, unknown>;
+          const lot = (it.lot ?? {}) as Record<string, unknown>;
+          const code = String(it.facility_code ?? it.facilityCode ?? facility.code ?? facility.id ?? "");
+          const facilityName = String(it.facility_name ?? facility.name ?? "");
+          const facilityId = byCode.get(code.toLowerCase()) ?? byName.get(facilityName.toLowerCase()) ?? null;
           return {
             project_id: connection.project_id,
             facility_id: facilityId,
             external_facility_code: code || null,
-            commodity_code: String(it.code ?? it.commodity_code ?? it.productCode ?? it.id ?? "unknown"),
-            commodity_name: String(it.name ?? it.commodity_name ?? it.product ?? "Unnamed commodity"),
+            commodity_code: String(it.code ?? it.commodity_code ?? it.productCode ?? orderable.productCode ?? orderable.code ?? orderable.id ?? it.id ?? "unknown"),
+            commodity_name: String(it.name ?? it.commodity_name ?? orderable.fullProductName ?? orderable.name ?? "Unnamed commodity"),
             category: String(it.category ?? "morbidity_kit"),
-            unit: it.unit ? String(it.unit) : null,
-            quantity_on_hand: Number(it.quantity ?? it.stockOnHand ?? it.quantity_on_hand ?? 0) || 0,
+            unit: it.unit ? String(it.unit) : orderable.dispensable ? String((orderable.dispensable as Record<string, unknown>).displayUnit ?? "") || null : null,
+            quantity_on_hand: Number(it.quantity ?? it.stockOnHand ?? it.quantity_on_hand ?? it.quantityOnHand ?? 0) || 0,
             reorder_level: it.reorder_level != null ? Number(it.reorder_level) : (it.reorderLevel != null ? Number(it.reorderLevel) : null),
-            expiry_date: it.expiry_date ?? it.expiryDate ?? null,
+            expiry_date: it.expiry_date ?? it.expiryDate ?? lot.expirationDate ?? null,
             source: "lmis",
             last_synced_at: new Date().toISOString(),
           };
@@ -283,23 +332,25 @@ Deno.serve(async (req) => {
         const bundle = { resourceType: "Bundle", type: "transaction", entry: entries };
         const res = await remoteFetch(joinUrl(connection.base_url, ""), {
           method: "POST",
-          headers: { ...headers, "Content-Type": "application/fhir+json" },
+          headers: { ...headers, Accept: "application/fhir+json", "Content-Type": "application/fhir+json; charset=utf-8" },
           body: JSON.stringify(bundle),
         });
         await log(db, connection, "push", "fhir_patients", res.ok ? "success" : "error", entries.length,
-          res.ok ? `Sent ${entries.length} patients` : `HTTP ${res.status}: ${String(res.body).slice(0, 300)}`, guard.userId);
-        return json({ ok: res.ok, sent: entries.length, response: res.body }, res.ok ? 200 : 502);
+          res.ok ? `Sent ${entries.length} patients` : `HTTP ${res.status}: ${remoteMessage(res.body, "FHIR transaction failed")}`, guard.userId);
+        return json({ ok: res.ok, sent: entries.length, message: res.ok ? `Sent ${entries.length} patients` : remoteMessage(res.body, "FHIR transaction failed"), response: res.body }, res.ok ? 200 : 502);
       }
 
       /* ------------------------ FHIR Patient pull ---------------------- */
       case "pull_fhir": {
         if (connection.kind !== "fhir") return json({ error: "FHIR pull is for FHIR connections" }, 400);
         const query = String(payload.query ?? "Patient?_count=50");
-        const res = await remoteFetch(joinUrl(connection.base_url, query), { headers });
+        const res = await remoteFetch(joinUrl(connection.base_url, query), {
+          headers: { ...headers, Accept: "application/fhir+json" },
+        });
         const count = (res.body as any)?.entry?.length ?? 0;
         await log(db, connection, "pull", "fhir_query", res.ok ? "success" : "error", count,
-          res.ok ? `Received ${count} resources` : `HTTP ${res.status}`, guard.userId);
-        return json({ ok: res.ok, count, body: res.body }, res.ok ? 200 : 502);
+          res.ok ? `Received ${count} resources` : remoteMessage(res.body, `HTTP ${res.status}`), guard.userId);
+        return json({ ok: res.ok, count, message: res.ok ? `Received ${count} resources` : remoteMessage(res.body, `HTTP ${res.status}`), body: res.body }, res.ok ? 200 : 502);
       }
 
       default:
