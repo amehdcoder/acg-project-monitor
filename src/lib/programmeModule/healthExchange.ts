@@ -152,16 +152,27 @@ async function call(body: Record<string, unknown>) {
 
 export const saveCredential = (connection_id: string, secret: string) =>
   call({ action: "save_credential", connection_id, secret });
-export const testConnection = (connection_id: string) => call({ action: "test", connection_id });
+export const testConnection = (connection_id: string, path?: string) =>
+  call({ action: "test", connection_id, ...(path ? { path } : {}) });
 export const pullMetadata = (connection_id: string) => call({ action: "pull_metadata", connection_id });
 export const pullStock = (connection_id: string, path?: string) =>
   call({ action: "pull_stock", connection_id, ...(path ? { path } : {}) });
-export const pushIndicators = (connection_id: string, period: string, values: { indicator_key: string; value: number }[], org_unit?: string) =>
-  call({ action: "push_indicators", connection_id, period, values, ...(org_unit ? { org_unit } : {}) });
+export const pushIndicators = (connection_id: string, period: string, values: { indicator_key: string; value: number }[], org_unit?: string, dry_run = false) =>
+  call({ action: "push_indicators", connection_id, period, values, dry_run, ...(org_unit ? { org_unit } : {}) });
 export const pushFhirPatients = (connection_id: string, beneficiary_ids: string[]) =>
   call({ action: "push_fhir", connection_id, beneficiary_ids });
 export const pullFhir = (connection_id: string, query?: string) =>
   call({ action: "pull_fhir", connection_id, ...(query ? { query } : {}) });
+
+export async function listBeneficiariesForExchange(projectId: string) {
+  const { data, error } = await T("beneficiaries")
+    .select("id,case_id,full_name")
+    .eq("project_id", projectId)
+    .order("full_name")
+    .limit(500);
+  if (error) throw error;
+  return (data ?? []) as { id: string; case_id: string; full_name: string }[];
+}
 
 /** Count the programme's indicators for a reporting month (YYYYMM). */
 export async function computeIndicatorValues(projectId: string, period: string) {
