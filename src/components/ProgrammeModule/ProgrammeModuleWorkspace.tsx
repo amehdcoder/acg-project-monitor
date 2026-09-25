@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -16,6 +18,7 @@ import {
   Plus, Settings2, CloudOff, RefreshCw, Layers, Users, Building2, ShieldAlert,
   LayoutGrid, CalendarClock, Hospital, Route, ShieldCheck, Home, Network, Activity,
   Search, Briefcase, Share2, ChevronDown, SlidersHorizontal, BarChart3,
+  Trash2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -90,6 +93,9 @@ const ProgrammeModuleWorkspace = ({
   const [deleteRequestsOpen, setDeleteRequestsOpen] = useState(false);
   const [officersOpen, setOfficersOpen] = useState(false);
   const [projectsOpen, setProjectsOpen] = useState(false);
+  const [removeOpen, setRemoveOpen] = useState(false);
+  const [removeConfirm, setRemoveConfirm] = useState("");
+  const [removing, setRemoving] = useState(false);
   const { isOfficer, reload: reloadOfficerAccess } = useIsSafeguardingOfficer(projectId);
 
   // What this person is allowed to see and do, from the project team register.
@@ -202,6 +208,28 @@ const ProgrammeModuleWorkspace = ({
     }
   };
 
+  const removeActiveModule = async () => {
+    if (!active || !isSuperAdmin || removeConfirm.trim() !== active.name) return;
+    setRemoving(true);
+    try {
+      const { error } = await supabase.from("programme_modules").delete().eq("id", active.id);
+      if (error) throw error;
+      toast({
+        title: "Programme module deleted",
+        description: `${active.name} was removed from this project.`,
+      });
+      setRemoveOpen(false);
+      setRemoveConfirm("");
+      setSelected(null);
+      setActiveId("");
+      await reload();
+    } catch (e) {
+      toast({ title: "Could not delete module", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setRemoving(false);
+    }
+  };
+
   const sync = async () => {
     const { sent, failed } = await flushQueue();
     setPending(queueCount());
@@ -268,6 +296,17 @@ const ProgrammeModuleWorkspace = ({
         {canConfigure && (
           <Button size="sm" className="gap-1" onClick={() => setGalleryOpen(true)} aria-label="Add programme module">
             <Plus className="h-4 w-4" /> Add module
+          </Button>
+        )}
+        {isSuperAdmin && active && (
+          <Button
+            variant="destructive"
+            size="sm"
+            className="gap-1"
+            onClick={() => { setRemoveConfirm(""); setRemoveOpen(true); }}
+            aria-label={`Delete ${active.name}`}
+          >
+            <Trash2 className="h-4 w-4" /> Delete module
           </Button>
         )}
         </div>
@@ -517,6 +556,55 @@ const ProgrammeModuleWorkspace = ({
               skip logic, workflow, Case ID format and branding.
             </p>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={removeOpen}
+        onOpenChange={(open) => {
+          if (!removing) {
+            setRemoveOpen(open);
+            if (!open) setRemoveConfirm("");
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Delete programme module?</DialogTitle></DialogHeader>
+          {active && (
+            <div className="space-y-4">
+              <div className="rounded-md border border-destructive/25 bg-destructive/5 p-3">
+                <p className="font-semibold text-foreground">{active.name}</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  This permanently deletes the module and all {beneficiaries.length} currently loaded beneficiary
+                  records under it, including linked services, referrals, follow-ups and history. This cannot be undone.
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="confirm-module-removal" className="text-xs">
+                  Type the module name to confirm
+                </Label>
+                <Input
+                  id="confirm-module-removal"
+                  className="mt-1"
+                  value={removeConfirm}
+                  onChange={(event) => setRemoveConfirm(event.target.value)}
+                  placeholder={active.name}
+                  autoComplete="off"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" disabled={removing} onClick={() => setRemoveOpen(false)}>Cancel</Button>
+                <Button
+                  variant="destructive"
+                  disabled={removing || removeConfirm.trim() !== active.name}
+                  onClick={() => void removeActiveModule()}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  {removing ? "Deleting…" : "Delete permanently"}
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
