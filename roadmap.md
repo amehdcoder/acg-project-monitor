@@ -1,7 +1,7 @@
 # Roadmap
 
-- [ ] Replace crowded records tabs with grouped professional navigation.
-- [ ] Build a live project-wide General dashboard matching the supplied reference.
-- [ ] Preserve role, safeguarding, facility, and administration visibility rules.
-- [ ] Add focused derivation/navigation tests where existing test patterns allow.
-- [ ] Verify build diagnostics and signed-in desktop/mobile layouts.
+- [x] Replace crowded records tabs with grouped professional navigation.
+- [x] Build a live project-wide General dashboard matching the supplied reference.
+- [x] Preserve role, safeguarding, facility, and administration visibility rules.
+- [x] Add an administrator-only LGA-to-DHIS2 review, validation, and send workflow.
+- [ ] Verify the live DHIS2 LGA match and dry-run against the connected national server.
