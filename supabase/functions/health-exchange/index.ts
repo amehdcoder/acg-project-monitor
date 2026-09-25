@@ -7,6 +7,7 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { guardRequest } from "../_shared/authGuard.ts";
 import { buildAdxXml, buildSdmxCsv, buildSdmxJson, validateAdxXml, validateSdmxPayload, type ExchangeObservation } from "../_shared/exchangeStandards.ts";
+import { z } from "npm:zod@3.23.8";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -183,6 +184,55 @@ async function computeMonthlyValues(db: ReturnType<typeof admin>, projectId: str
   }
   await Promise.all(jobs);
   return Object.entries(out).map(([indicator_key, value]) => ({ indicator_key, value }));
+}
+
+const ScopedMonthlySchema = z.object({
+  period: z.string().regex(/^\d{6}$/),
+  state: z.string().trim().min(1).max(100).regex(/^[\p{L}\p{M} .'-]+$/u),
+  lga: z.string().trim().min(1).max(100).regex(/^[\p{L}\p{M} .'-]+$/u),
+  org_unit: z.string().trim().min(1).max(100).optional(),
+});
+
+/** Monthly totals restricted to beneficiaries in one State/LGA. */
+async function computeScopedMonthlyValues(db: ReturnType<typeof admin>, projectId: string, period: string, state: string, lga: string) {
+  const { start, end } = monthRange(period);
+  const scopedBeneficiaries = () => db.from("beneficiaries").select("id", { count: "exact", head: true })
+    .eq("project_id", projectId).ilike("state", state).ilike("lga", lga);
+  const scopedLinkedCount = async (table: string, dateColumn: string, dated = true, extra?: (query: any) => any) => {
+    let query: any = db.from(table).select("id,beneficiaries!inner(id,state,lga)", { count: "exact", head: true })
+      .eq("project_id", projectId).ilike("beneficiaries.state", state).ilike("beneficiaries.lga", lga);
+    if (dated) query = query.gte(dateColumn, start).lt(dateColumn, end);
+    if (extra) query = extra(query);
+    const { count, error } = await query;
+    return error ? 0 : count ?? 0;
+  };
+  const scopedBeneficiaryCount = async (dated: boolean, extra?: (query: any) => any) => {
+    let query: any = scopedBeneficiaries();
+    if (dated) query = query.gte("created_at", start).lt("created_at", end);
+    if (extra) query = extra(query);
+    const { count, error } = await query;
+    return error ? 0 : count ?? 0;
+  };
+  const sexCount = (sex: "f" | "m", dated: boolean, active = false) => scopedBeneficiaryCount(dated, (query) => {
+    let next = query.or(`profile->>sex.ilike.${sex}*,profile->>gender.ilike.${sex}*`);
+    if (active) next = next.eq("status", "active");
+    return next;
+  });
+  const [registered, active, confirmed, referrals, visits, treatments, morbidity, regF, regM, actF, actM] = await Promise.all([
+    scopedBeneficiaryCount(true), scopedBeneficiaryCount(false, (query) => query.eq("status", "active")),
+    scopedLinkedCount("mmdp_potential_cases", "created_at", true, (query) => query.not("confirmed_at", "is", null)),
+    scopedLinkedCount("beneficiary_referrals", "created_at"), scopedLinkedCount("beneficiary_home_visits", "created_at"),
+    scopedLinkedCount("household_mda_treatments", "created_at"), scopedLinkedCount("ntd_morbidity_records", "created_at"),
+    sexCount("f", true), sexCount("m", true), sexCount("f", false, true), sexCount("m", false, true),
+  ]);
+  const totals: Record<string, number> = {
+    beneficiaries_registered: registered, beneficiaries_active: active, cases_confirmed: confirmed,
+    referrals_made: referrals, home_visits: visits, mda_treatments: treatments, morbidity_records: morbidity,
+    "beneficiaries_registered:female": regF, "beneficiaries_registered:male": regM,
+    "beneficiaries_active:female": actF, "beneficiaries_active:male": actM,
+  };
+  const beneficiaryCount = await scopedBeneficiaryCount(false);
+  return { beneficiaryCount, values: Object.entries(totals).map(([indicator_key, value]) => ({ indicator_key, value })) };
 }
 
 /** Send mapped values to DHIS2 /api/dataValueSets and log the import summary. */
@@ -406,6 +456,18 @@ Deno.serve(async (req) => {
       case "monthly_values": {
         const period = String(payload.period ?? previousPeriod());
         return json({ ok: true, period, values: await computeMonthlyValues(db, connection.project_id, period) });
+      }
+      case "scoped_monthly_values":
+      case "push_scoped_monthly": {
+        if (connection.kind !== "dhis2") return json({ error: "LGA reporting is for DHIS2 connections" }, 400);
+        const parsed = ScopedMonthlySchema.safeParse(payload);
+        if (!parsed.success) return json({ error: parsed.error.flatten().fieldErrors }, 400);
+        const { period, state, lga, org_unit: orgUnit } = parsed.data;
+        const scoped = await computeScopedMonthlyValues(db, connection.project_id, period, state, lga);
+        if (action === "scoped_monthly_values") return json({ ok: true, period, geography: { state, lga, beneficiaryCount: scoped.beneficiaryCount }, values: scoped.values });
+        if (!orgUnit) return json({ error: "Confirm the DHIS2 organisation unit before sending." }, 400);
+        const result = await pushDataValues(db, connection, headers, period, scoped.values, orgUnit, payload.dry_run === true, guard.userId, "dhis2_lga_monthly");
+        return json({ ...result.body as object, geography: { state, lga, beneficiaryCount: scoped.beneficiaryCount } }, result.httpStatus);
       }
       case "push_monthly": {
         if (connection.kind !== "dhis2") return json({ error: "Monthly reporting is for DHIS2 connections" }, 400);

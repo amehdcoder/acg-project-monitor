@@ -328,6 +328,7 @@ const ProgrammeModuleWorkspace = ({
           allowedFacilityIds={isFocalPerson ? Object.keys(facilityLevels) : []}
           isSafeguardingOfficer={isOfficer}
           canRegister={can("edit_records")}
+          canExchange={canConfigure}
           onNavigate={setView}
           onRegister={() => setRegisterOpen(true)}
           onOpenBeneficiary={(beneficiary) => { setSelected(beneficiary); setView("records"); }}

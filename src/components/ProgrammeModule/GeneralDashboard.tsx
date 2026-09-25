@@ -17,6 +17,7 @@ import { useSafeguardingConcerns } from "@/lib/programmeModule/safeguarding";
 import type { BeneficiaryReferralRow, BeneficiaryRow, ProgrammeModuleConfig } from "@/lib/programmeModule/types";
 import NigeriaChoropleth, { type ChoroCell } from "@/components/Dashboard/ops/NigeriaChoropleth";
 import { lgaKey } from "@/components/Dashboard/ops/lgaGeo";
+import Dhis2LgaExchangeDialog from "./Dhis2LgaExchangeDialog";
 import { cn } from "@/lib/utils";
 
 type Destination = "records" | "journey" | "facility" | "followups" | "clusters" | "safeguarding";
@@ -29,6 +30,7 @@ interface Props {
   allowedFacilityIds?: string[];
   isSafeguardingOfficer?: boolean;
   canRegister?: boolean;
+  canExchange?: boolean;
   onNavigate: (destination: Destination) => void;
   onRegister: () => void;
   onOpenBeneficiary: (beneficiary: BeneficiaryRow) => void;
@@ -76,7 +78,7 @@ const Panel = ({ title, subtitle, className, children, action, icon: Icon, tone 
 
 const GeneralDashboard = ({
   projectId, moduleId, config, beneficiaries, allowedFacilityIds = [], isSafeguardingOfficer = false,
-  canRegister = false, onNavigate, onRegister, onOpenBeneficiary,
+  canRegister = false, canExchange = false, onNavigate, onRegister, onOpenBeneficiary,
 }: Props) => {
   const { profile } = useAuth();
   const { rows, loading, reload } = useBeneficiaryJourneys(projectId, moduleId);
@@ -84,6 +86,11 @@ const GeneralDashboard = ({
   const { concerns } = useSafeguardingConcerns(projectId, isSafeguardingOfficer);
   const [referrals, setReferrals] = useState<BeneficiaryReferralRow[]>([]);
   const [selectedGeography, setSelectedGeography] = useState<{ state: string; lga: string } | null>(null);
+  const [exchangeOpen, setExchangeOpen] = useState(false);
+  const selectGeography = (state: string, lga: string) => {
+    setSelectedGeography({ state, lga });
+    if (canExchange) setExchangeOpen(true);
+  };
 
   const loadReferrals = useCallback(async () => {
     const { data } = await supabase.from("beneficiary_referrals").select("*")
@@ -252,7 +259,7 @@ const GeneralDashboard = ({
                 height={390}
                 showBasemap={false}
                 className="z-0 !bg-card"
-                onSelectUnit={(state, lga) => setSelectedGeography({ state, lga })}
+                onSelectUnit={selectGeography}
               />
             ) : (
               <div className="flex h-[390px] flex-col items-center justify-center gap-3 px-6 text-center">
@@ -289,7 +296,7 @@ const GeneralDashboard = ({
             <div className="mt-3">
               <p className="mb-2 text-[10px] font-bold uppercase text-health-ink">Leading locations</p>
               <div className="space-y-2">
-                {geography.ranked.slice(0, 5).map((location, index) => <button key={lgaKey(location.state, location.lga)} type="button" className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-2 text-left" onClick={() => setSelectedGeography({ state: location.state, lga: location.lga })}><span className="flex h-6 w-6 items-center justify-center rounded-md text-[9px] font-bold text-primary-foreground" style={{ backgroundColor: MAP_SCALE[Math.min(index, MAP_SCALE.length - 1)].fill }}>{index + 1}</span><span className="min-w-0"><span className="block truncate text-[10px] font-bold text-health-ink">{location.lga}</span><span className="block truncate text-[9px] text-muted-foreground">{location.state} · {location.wards.size} ward{location.wards.size === 1 ? "" : "s"}</span></span><span className="font-report-display text-sm font-bold tabular-nums text-health-ink">{location.value}</span></button>)}
+                {geography.ranked.slice(0, 5).map((location, index) => <button key={lgaKey(location.state, location.lga)} type="button" className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-2 text-left" onClick={() => selectGeography(location.state, location.lga)}><span className="flex h-6 w-6 items-center justify-center rounded-md text-[9px] font-bold text-primary-foreground" style={{ backgroundColor: MAP_SCALE[Math.min(index, MAP_SCALE.length - 1)].fill }}>{index + 1}</span><span className="min-w-0"><span className="block truncate text-[10px] font-bold text-health-ink">{location.lga}</span><span className="block truncate text-[9px] text-muted-foreground">{location.state} · {location.wards.size} ward{location.wards.size === 1 ? "" : "s"}</span></span><span className="font-report-display text-sm font-bold tabular-nums text-health-ink">{location.value}</span></button>)}
                 {!geography.ranked.length && <Empty label="No geographic data recorded" />}
               </div>
             </div>
@@ -305,6 +312,7 @@ const GeneralDashboard = ({
           <Panel icon={Zap} tone="amber" title="Quick Actions"><div className="grid grid-cols-2 gap-2 p-2">{canRegister && <Button variant="outline" className="h-auto justify-start gap-2.5 px-2 py-3 text-xs" onClick={onRegister}><span className="records-stage-teal flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-primary-foreground"><Plus className="h-4 w-4" /></span> Add beneficiary</Button>}<Button variant="outline" className="h-auto justify-start gap-2.5 px-2 py-3 text-xs" onClick={() => onNavigate("records")}><span className="records-stage-blue flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-primary-foreground"><Search className="h-4 w-4" /></span> Search records</Button><Button variant="outline" className="h-auto justify-start gap-2.5 px-2 py-3 text-xs" onClick={() => onNavigate("facility")}><span className="records-stage-amber flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-primary-foreground"><Building2 className="h-4 w-4" /></span> Facilities</Button><Button variant="outline" className="h-auto justify-start gap-2.5 px-2 py-3 text-xs" onClick={() => onNavigate("journey")}><span className="records-stage-purple flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-primary-foreground"><FileText className="h-4 w-4" /></span> Generate report</Button></div></Panel>
         </div>
       </div>
+      {canExchange && <Dhis2LgaExchangeDialog projectId={projectId} geography={selectedGeography} open={exchangeOpen} onOpenChange={setExchangeOpen} />}
     </div>
   );
 };
