@@ -523,7 +523,7 @@ const IntegrationsView = () => {
                     <integration.icon className="h-7 w-7 text-primary" />
                   </div>
                   <div>
-                    <CardTitle className="font-display text-xl">
+                    <CardTitle className="">
                       {integration.name}
                     </CardTitle>
                     <div className="mt-1 flex items-center gap-2">
@@ -834,7 +834,7 @@ const IntegrationsView = () => {
       {/* Sync History */}
       <Card className="border-0 shadow-card">
         <CardHeader>
-          <CardTitle className="font-display flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             <History className="h-5 w-5" />
             Sync History
           </CardTitle>
@@ -904,7 +904,7 @@ const IntegrationsView = () => {
       {/* Settings Card */}
       <Card className="border-0 shadow-card">
         <CardHeader>
-          <CardTitle className="font-display flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
             Integration Settings
           </CardTitle>

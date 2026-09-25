@@ -4093,7 +4093,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                   return (
                     <Card className={verdictColor}>
                       <CardHeader className="py-2">
-                        <CardTitle className="text-sm flex items-center gap-2">
+                        <CardTitle className="flex items-center gap-2">
                           <ShieldCheck className="h-4 w-4" /> WHO Interpretation — {interp.headline}
                         </CardTitle>
                         <CardDescription className="text-[11px]">
@@ -4141,7 +4141,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                   return (
                     <Card className={blendVerdict.color}>
                       <CardHeader className="py-2">
-                        <CardTitle className="text-sm flex items-center gap-2">
+                        <CardTitle className="flex items-center gap-2">
                           <ShieldCheck className="h-4 w-4" /> Bayesian Blend & Reported-Coverage Validation
                         </CardTitle>
                         <CardDescription className="text-[11px]">
@@ -4212,7 +4212,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 )}
 
                 <Card className="border-primary/40">
-                  <CardHeader className="py-2"><CardTitle className="text-sm flex items-center gap-2"><Building className="h-4 w-4" />JRSM Microplanning Cross-Validation</CardTitle></CardHeader>
+                  <CardHeader className="py-2"><CardTitle className="flex items-center gap-2"><Building className="h-4 w-4" />JRSM Microplanning Cross-Validation</CardTitle></CardHeader>
                   <CardContent className="text-xs space-y-2">
                     {outsideMicroplan ? (
                       <div className="space-y-2">
@@ -4301,7 +4301,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 {segmentTallies.length > 0 && (
                   <Card className="border-border/60">
                     <CardHeader className="py-2">
-                      <CardTitle className="text-sm flex items-center gap-2"><BarChart3 className="h-4 w-4" /> Per-Segment Breakdown</CardTitle>
+                      <CardTitle className="flex items-center gap-2"><BarChart3 className="h-4 w-4" /> Per-Segment Breakdown</CardTitle>
                       <CardDescription className="text-[11px]">Inferred therapeutic and geographic coverage per segment, with Microplan community baseline.</CardDescription>
                     </CardHeader>
                     <CardContent className="overflow-x-auto p-2">

@@ -243,7 +243,7 @@ export default function MdaSupervisoryMap({ submissions, formName, monitoringPer
   return (
     <Card className="border-0 shadow-card">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 font-display">
+        <CardTitle className="flex items-center gap-2">
           <Compass className="h-5 w-5 text-primary" />
           MDA Supervisory Visit Map of Nigeria
         </CardTitle>

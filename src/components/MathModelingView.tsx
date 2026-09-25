@@ -1592,7 +1592,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
             {/* Time Config */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Time Configuration</CardTitle>
+                <CardTitle className="">Time Configuration</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="grid grid-cols-3 gap-2">
@@ -1610,7 +1610,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
             {/* Parameters */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base"><Variable className="h-5 w-5 text-primary" />Parameters</CardTitle>
+                <CardTitle className="flex items-center gap-2"><Variable className="h-5 w-5 text-primary" />Parameters</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 {parameters.map((p, i) => {
@@ -1673,7 +1673,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
             {/* Initial Values */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base"><FlaskConical className="h-5 w-5 text-primary" />Initial Values</CardTitle>
+                <CardTitle className="flex items-center gap-2"><FlaskConical className="h-5 w-5 text-primary" />Initial Values</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 {initialValues.map((v, i) => (
@@ -1692,7 +1692,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
             {/* Model Assumptions */}
             <Card className="lg:col-span-2">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
+                <CardTitle className="flex items-center gap-2">
                   <BookOpen className="h-5 w-5 text-primary" />
                   Model Assumptions
                 </CardTitle>
@@ -1727,7 +1727,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
             {/* Pulse Interventions (MDA) */}
             <Card className="lg:col-span-2">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
+                <CardTitle className="flex items-center gap-2">
                   <Zap className="h-5 w-5 text-accent-foreground" />
                   Pulse Interventions (MDA)
                 </CardTitle>
@@ -1865,7 +1865,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
             {/* Run Actions */}
             <Card className="border-primary/20 bg-primary/5">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base"><Sparkles className="h-5 w-5 text-primary" />Run Analyses</CardTitle>
+                <CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" />Run Analyses</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 <Button className="w-full gap-2" onClick={runSimulation} disabled={isLoading}>
@@ -3878,7 +3878,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                   <BookOpen className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <CardTitle className="text-2xl font-bold">Mathematical Model Guide</CardTitle>
+                  <CardTitle className="">Mathematical Model Guide</CardTitle>
                   <CardDescription>Technical specifications, assumptions, and equations for epidemiological models</CardDescription>
                 </div>
               </div>

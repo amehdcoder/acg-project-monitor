@@ -244,7 +244,7 @@ export default function MeshSyncManagerView() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
           <div>
-            <CardTitle className="text-base">Outbound queue</CardTitle>
+            <CardTitle className="">Outbound queue</CardTitle>
             <CardDescription>
               {counts.queued} queued · {counts.sending} sending · {counts.done} done · {counts.error} failed
             </CardDescription>

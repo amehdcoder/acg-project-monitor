@@ -527,7 +527,7 @@ const ProjectsView = ({ onSelectProject, onOpenRecords }: ProjectsViewProps) => 
                     <FolderOpen className="h-6 w-6 text-primary" />
                   </div>
                   <div>
-                    <CardTitle className="font-display text-lg line-clamp-1">
+                    <CardTitle className="line-clamp-1">
                       {project.name}
                     </CardTitle>
                     <div className="mt-1 flex flex-wrap items-center gap-1.5">

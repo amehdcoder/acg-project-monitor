@@ -332,7 +332,7 @@ export default function JigawaSupervisoryMap({ submissions, formName }: Props) {
   return (
     <Card className="border-0 shadow-card">
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 font-display text-sm">
+        <CardTitle className="flex items-center gap-2">
           <Compass className="h-4 w-4 text-primary" />
           Jigawa LGA Supervision Map
         </CardTitle>

@@ -86,7 +86,7 @@ const SupervisorAlerts = ({ alerts, onDismiss }: Props) => {
     <Card className="border-0 shadow-card">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="font-display text-lg flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-amber-500" />
             Alerts
             <Badge variant="secondary" className="ml-1">{alerts.length}</Badge>

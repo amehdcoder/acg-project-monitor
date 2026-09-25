@@ -135,7 +135,7 @@ const JoinProject = () => {
 
         <Card className="border-primary/15 bg-card shadow-card">
           <CardHeader className="pb-3">
-            <CardTitle className="collector-title text-lg">Project access</CardTitle>
+            <CardTitle className="collector-title">Project access</CardTitle>
             <CardDescription>No username or password is required.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">

@@ -185,7 +185,7 @@ const CommunityForumView = () => {
               )}
             </div>
             <Badge className={`w-fit mt-2 ${getCategoryStyle(selectedPost.category).color}`}>{getCategoryStyle(selectedPost.category).label}</Badge>
-            <CardTitle className="text-lg mt-2">{selectedPost.title}</CardTitle>
+            <CardTitle className="mt-2">{selectedPost.title}</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{selectedPost.content}</p>

@@ -483,7 +483,7 @@ const MachineLearningView = () => {
         <div className="grid gap-6 md:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
+              <CardTitle className="flex items-center gap-2">
                 <Database className="h-5 w-5 text-primary" />Select Project
               </CardTitle>
             </CardHeader>
@@ -498,7 +498,7 @@ const MachineLearningView = () => {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
+              <CardTitle className="flex items-center gap-2">
                 <BarChart3 className="h-5 w-5 text-primary" />Select Form
               </CardTitle>
             </CardHeader>
@@ -530,7 +530,7 @@ const MachineLearningView = () => {
         <div className="grid gap-6 lg:grid-cols-3">
           <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
+              <CardTitle className="flex items-center gap-2">
                 <Settings2 className="h-5 w-5 text-primary" />Select Features (Input Variables)
               </CardTitle>
               <CardDescription>Choose the variables to use as predictors. Selected: {selectedFeatures.length}</CardDescription>
@@ -562,7 +562,7 @@ const MachineLearningView = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
+              <CardTitle className="flex items-center gap-2">
                 <Target className="h-5 w-5 text-accent" />Target Variable
               </CardTitle>
               <CardDescription>The variable you want to predict</CardDescription>
@@ -693,7 +693,7 @@ const MachineLearningView = () => {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
+              <CardTitle className="flex items-center gap-2">
                 <Brain className="h-5 w-5 text-primary" />Select Machine Learning Method
               </CardTitle>
             </CardHeader>
@@ -725,7 +725,7 @@ const MachineLearningView = () => {
           {/* Overfitting / Underfitting Controls */}
           <Card className="border-primary/20">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
+              <CardTitle className="flex items-center gap-2">
                 <ShieldCheck className="h-5 w-5 text-primary" />
                 Model Health Controls
               </CardTitle>
@@ -864,7 +864,7 @@ const MachineLearningView = () => {
           {results.model_health && (
             <Card className="border-primary/20">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
+                <CardTitle className="flex items-center gap-2">
                   <ShieldCheck className="h-5 w-5 text-primary" />Model Health Assessment
                 </CardTitle>
               </CardHeader>
@@ -1174,7 +1174,7 @@ const MachineLearningView = () => {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
+              <CardTitle className="flex items-center gap-2">
                 <GitCompare className="h-5 w-5 text-primary" />Model Comparison
               </CardTitle>
               <CardDescription>Select models to compare side by side. Train models with different settings and save them.</CardDescription>
@@ -1256,7 +1256,7 @@ const MachineLearningView = () => {
                       {comparisonRuns.map(run => (
                         <Card key={run.id} className="border-border">
                           <CardHeader className="pb-2">
-                            <CardTitle className="text-sm">{run.methodLabel}</CardTitle>
+                            <CardTitle className="">{run.methodLabel}</CardTitle>
                             <CardDescription className="text-xs">{run.config.trainRatio}/{run.config.testRatio}/{run.config.valRatio} split</CardDescription>
                           </CardHeader>
                           <CardContent className="space-y-2">
@@ -1296,7 +1296,7 @@ const MachineLearningView = () => {
 
                   {/* Radar chart comparison */}
                   <Card>
-                    <CardHeader><CardTitle className="text-sm">Performance Radar</CardTitle></CardHeader>
+                    <CardHeader><CardTitle className="">Performance Radar</CardTitle></CardHeader>
                     <CardContent>
                       <div className="h-[350px]">
                         <ResponsiveContainer width="100%" height="100%">

@@ -418,7 +418,7 @@ export default function ChecklistMaps({
     <div className="grid gap-4 xl:grid-cols-2">
       <Card className="flex flex-col overflow-hidden">
         <CardHeader className="flex-row items-center justify-between gap-2 space-y-0 border-b bg-muted/40 px-4 py-3">
-          <CardTitle className="flex min-w-0 items-center gap-2 text-sm font-semibold">
+          <CardTitle className="flex min-w-0 items-center gap-2">
             <MapPin className="h-4 w-4 shrink-0 text-primary" />
             <span className="truncate">Communities Visited · Status of MDA</span>
           </CardTitle>
@@ -433,7 +433,7 @@ export default function ChecklistMaps({
 
       <Card className="flex flex-col overflow-hidden">
         <CardHeader className="flex-row items-center justify-between gap-2 space-y-0 border-b bg-muted/40 px-4 py-3">
-          <CardTitle className="flex min-w-0 items-center gap-2 text-sm font-semibold">
+          <CardTitle className="flex min-w-0 items-center gap-2">
             <Users className="h-4 w-4 shrink-0 text-primary" />
             <span className="truncate">Households / Classes · Medicine Offered</span>
           </CardTitle>

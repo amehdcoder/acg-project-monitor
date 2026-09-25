@@ -171,7 +171,7 @@ const VoiceCloningManager = () => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg">
+        <CardTitle className="flex items-center gap-2">
           <AudioLines className="h-5 w-5 text-primary" />
           Neural Voice Cloning
         </CardTitle>

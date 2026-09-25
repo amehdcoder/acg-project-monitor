@@ -554,7 +554,7 @@ export default function SupervisoryGapAnalysisDashboard({
       {/* Header */}
       <CardHeader className="flex flex-row items-start justify-between gap-4 flex-wrap">
         <div>
-          <CardTitle className="font-display text-xl">Supervisory Gap Analysis Map</CardTitle>
+          <CardTitle className="">Supervisory Gap Analysis Map</CardTitle>
           <CardDescription>
             Identify coverage, access and supervision gaps to strengthen microplanning and MDA implementation
             {formName ? ` · ${formName}` : ""}
@@ -679,7 +679,7 @@ export default function SupervisoryGapAnalysisDashboard({
             {/* Gap Severity Donut */}
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Gap Severity Summary</CardTitle>
+                <CardTitle className="">Gap Severity Summary</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center gap-2">
@@ -714,7 +714,7 @@ export default function SupervisoryGapAnalysisDashboard({
 
             {/* Gap by Domain */}
             <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Gap by Domain</CardTitle></CardHeader>
+              <CardHeader className="pb-2"><CardTitle className="">Gap by Domain</CardTitle></CardHeader>
               <CardContent>
                 <div style={{ height: 220 }}>
                   <ResponsiveContainer>
@@ -734,7 +734,7 @@ export default function SupervisoryGapAnalysisDashboard({
 
             {/* Top 5 LGAs */}
             <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Top 5 LGAs by Critical Gaps</CardTitle></CardHeader>
+              <CardHeader className="pb-2"><CardTitle className="">Top 5 LGAs by Critical Gaps</CardTitle></CardHeader>
               <CardContent>
                 <table className="w-full text-xs">
                   <thead className="text-muted-foreground">
@@ -767,11 +767,11 @@ export default function SupervisoryGapAnalysisDashboard({
         {/* Footer panels */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Gap Insights</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="">Gap Insights</CardTitle></CardHeader>
             <CardContent className="text-xs text-muted-foreground leading-relaxed">{insights}</CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Recommended Actions</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="">Recommended Actions</CardTitle></CardHeader>
             <CardContent className="space-y-1.5 text-xs">
               {recommendedActions.map((a, i) => (
                 <div key={i} className="flex items-start gap-2">
@@ -782,7 +782,7 @@ export default function SupervisoryGapAnalysisDashboard({
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Data Quality</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="">Data Quality</CardTitle></CardHeader>
             <CardContent>
               <div className="flex items-center gap-3">
                 <Gauge value={dataQuality.overall} />
@@ -795,7 +795,7 @@ export default function SupervisoryGapAnalysisDashboard({
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Supervisory Progress</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="">Supervisory Progress</CardTitle></CardHeader>
             <CardContent>
               <div style={{ height: 140 }}>
                 <ResponsiveContainer>
@@ -822,7 +822,7 @@ export default function SupervisoryGapAnalysisDashboard({
                 <AlertOctagon className="h-5 w-5" />
               </span>
               <div>
-                <CardTitle className="text-sm">Off-Microplan Communities</CardTitle>
+                <CardTitle className="">Off-Microplan Communities</CardTitle>
                 <CardDescription className="text-xs">
                   Received MDA medicine but were not captured in the microplan — to reconcile
                 </CardDescription>

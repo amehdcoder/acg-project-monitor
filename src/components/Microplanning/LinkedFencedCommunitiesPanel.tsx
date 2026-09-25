@@ -69,7 +69,7 @@ export default function LinkedFencedCommunitiesPanel({ projectId, state, lga, wa
   return (
     <Card className={className}>
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-sm">
+        <CardTitle className="flex items-center gap-2">
           <Boxes className="h-4 w-4 text-primary" /> Fenced Communities
           {items.length > 0 && <Badge variant="secondary" className="ml-1 text-[10px]">{items.length}</Badge>}
         </CardTitle>

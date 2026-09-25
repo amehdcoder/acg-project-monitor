@@ -165,7 +165,7 @@ const SubmissionCharts = ({ formAnalytics, locationAnalytics, loading }: Submiss
       {/* Submissions by Form */}
       <Card className="border-0 shadow-card overflow-hidden">
         <CardHeader className="pb-2">
-          <CardTitle className="font-display text-base sm:text-lg flex items-center gap-2 text-[hsl(142,60%,35%)]">
+          <CardTitle className="flex items-center gap-2 text-[hsl(142,60%,35%)]">
             <FileText className="h-5 w-5" />
             Submissions by Form
           </CardTitle>
@@ -208,7 +208,7 @@ const SubmissionCharts = ({ formAnalytics, locationAnalytics, loading }: Submiss
       {/* Submissions by Location */}
       <Card className="border-0 shadow-card overflow-hidden">
         <CardHeader className="pb-2">
-          <CardTitle className="font-display text-base sm:text-lg flex items-center gap-2 text-[hsl(142,60%,35%)]">
+          <CardTitle className="flex items-center gap-2 text-[hsl(142,60%,35%)]">
             <MapPin className="h-5 w-5" />
             Coverage Level by State
           </CardTitle>

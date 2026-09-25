@@ -121,7 +121,7 @@ export default function MedicineAlertsPanel({ alerts, thresholds, onThresholds, 
   return (
     <Card className={critical.length ? "border-destructive/40" : visible.length ? "border-amber-300" : "border-emerald-300"}>
       <CardHeader className="py-3 px-4 border-b bg-muted/40 flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2">
           <BellRing className={`h-4 w-4 ${critical.length ? "text-destructive" : visible.length ? "text-amber-600" : "text-emerald-600"}`} />
           Supply integrity alerts
           {critical.length > 0 && <Badge variant="destructive" className="text-[10px]">{critical.length} critical</Badge>}

@@ -192,7 +192,7 @@ const BiometricAuth = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Fingerprint className="h-5 w-5 text-primary" />
-            <CardTitle className="text-base">Biometric Authentication</CardTitle>
+            <CardTitle className="">Biometric Authentication</CardTitle>
           </div>
           <Badge variant={isEnabled ? "default" : "outline"} className="text-[10px]">
             {isEnabled ? "Active" : "Inactive"}

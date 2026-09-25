@@ -161,7 +161,7 @@ export default function ChecklistReconciliation({ cache, canExport = true }: Pro
   return (
     <Card className="overflow-hidden">
       <CardHeader className="py-3 px-4 border-b bg-muted/40 flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2">
           <GitCompareArrows className="h-4 w-4 text-primary" /> Kobo ↔ Flattened Data Reconciliation
         </CardTitle>
         <div className="flex items-center gap-2">

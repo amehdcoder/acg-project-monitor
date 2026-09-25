@@ -477,7 +477,7 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
         {communities.length > 0 && (
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="flex flex-wrap items-center gap-1.5 text-sm">
+              <CardTitle className="flex flex-wrap items-center gap-1.5">
                 {quality.overallLevel === "good"
                   ? <ShieldCheck className="h-4 w-4" style={{ color: EMERALD }} />
                   : <ShieldAlert className="h-4 w-4" style={{ color: quality.overallLevel === "bad" ? RED : AMBER }} />}
@@ -602,7 +602,7 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
         {trendRows.length > 0 && (
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-1.5 text-sm">
+              <CardTitle className="flex items-center gap-1.5">
                 <TrendingUp className="h-4 w-4" style={{ color: ORANGE }} /> Communities Visited — Trend by LGA
                 <span className="font-normal text-muted-foreground">(distinct communities first supervised per day — click a line to drill)</span>
               </CardTitle>
@@ -650,7 +650,7 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
 
             <Card className="group">
               <CardHeader className="pb-2 cursor-pointer" onClick={() => openDrillForKeys("Communities — MDA Completed", completedRows.map((r) => r.c.key), EMERALD)}>
-                <CardTitle className="flex items-center gap-1.5 text-sm">
+                <CardTitle className="flex items-center gap-1.5">
                   <CheckCircle2 className="h-4 w-4" style={{ color: EMERALD }} /> Communities where MDA is Completed
                   <span className="ml-auto flex items-center gap-2 text-xs font-normal text-muted-foreground">
                     {fmt(completedRows.length)}<DrillCue />
@@ -678,7 +678,7 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
 
             <Card className="group">
               <CardHeader className="pb-2 cursor-pointer" onClick={() => openDrillForKeys("Communities — MDA Halted / Not Started / Ongoing", issueRows.map((r) => r.c.key), RED)}>
-                <CardTitle className="flex items-center gap-1.5 text-sm">
+                <CardTitle className="flex items-center gap-1.5">
                   <AlertTriangle className="h-4 w-4" style={{ color: RED }} /> Communities where MDA is Halted / Not Started / Ongoing
                   <span className="ml-auto flex items-center gap-2 text-xs font-normal text-muted-foreground">
                     {fmt(issueRows.length)}<DrillCue />
@@ -710,7 +710,7 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
         {qSae && (
           <Card className="group">
             <CardHeader className="pb-2 cursor-pointer" onClick={() => openDrillForKeys("Adverse Reaction (SAE) Complaints", saeRows.map((r) => r.c.key), ORANGE)}>
-              <CardTitle className="flex items-center gap-1.5 text-sm">
+              <CardTitle className="flex items-center gap-1.5">
                 <AlertTriangle className="h-4 w-4" style={{ color: ORANGE }} /> Adverse Reaction (SAE) Complaints
                 <span className="ml-auto flex items-center gap-2 text-xs font-normal text-muted-foreground">
                   {fmt(saeRows.length)} communit{saeRows.length === 1 ? "y" : "ies"}<DrillCue />
@@ -746,7 +746,7 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
         {hasCommodity && (
           <Card className="group">
             <CardHeader className="pb-2 cursor-pointer" onClick={() => openDrillForKeys("Commodity & Job-Aide Readiness", commodityRows.map((r) => r.c.key), TEAL)}>
-              <CardTitle className="flex items-center gap-1.5 text-sm">
+              <CardTitle className="flex items-center gap-1.5">
                 <Pill className="h-4 w-4" style={{ color: TEAL }} /> Commodity &amp; Job-Aide Readiness
                 <span className="ml-auto flex items-center gap-2 text-xs font-normal text-muted-foreground">
                   {fmt(commodityRows.length)} communit{commodityRows.length === 1 ? "y" : "ies"}<DrillCue />
@@ -807,7 +807,7 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
             )}
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="flex flex-wrap items-center gap-1.5 text-sm">
+                <CardTitle className="flex flex-wrap items-center gap-1.5">
                   <Users2 className="h-4 w-4" style={{ color: EMERALD }} /> Supervisor Accountability
                   <span className="font-normal text-muted-foreground">— click a bar to filter the timeline</span>
                   {selectedSup && (
@@ -865,7 +865,7 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-1.5 text-sm">
+                <CardTitle className="flex items-center gap-1.5">
                   <ClipboardCheck className="h-4 w-4 text-primary" /> Community Visit Timeline
                   {selectedSup && (
                     <button

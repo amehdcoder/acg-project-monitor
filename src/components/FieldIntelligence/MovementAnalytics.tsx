@@ -217,7 +217,7 @@ const MovementAnalytics = ({ projectId, formId, realtimeKey }: Props) => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Daily Activity Trend</CardTitle>
+                <CardTitle className="">Daily Activity Trend</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={250}>
@@ -235,7 +235,7 @@ const MovementAnalytics = ({ projectId, formId, realtimeKey }: Props) => {
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Collector Performance</CardTitle>
+                <CardTitle className="">Collector Performance</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={250}>
@@ -254,7 +254,7 @@ const MovementAnalytics = ({ projectId, formId, realtimeKey }: Props) => {
           {/* Anomalies */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
+              <CardTitle className="flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5 text-status-warning" />
                 Anomalies & Trends ({anomalies.length})
               </CardTitle>

@@ -191,7 +191,7 @@ export default function MedicineOfferedGeo({ respondents }: { respondents: Respo
   return (
     <Card className="overflow-hidden">
       <CardHeader className="flex-row items-center justify-between gap-2 space-y-0 border-b bg-muted/40 px-4 py-3">
-        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+        <CardTitle className="flex items-center gap-2">
           <Pill className="h-4 w-4 text-primary" /> Medicine Offered — by State &amp; by LGA
         </CardTitle>
         <Badge variant="outline" className="tabular-nums">

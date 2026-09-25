@@ -44,7 +44,7 @@ export default function MicroplanBindingCard({
     <Card className="overflow-hidden border-primary/30">
       <div className="h-1 w-full bg-gradient-to-r from-primary via-emerald-500 to-sky-500" />
       <CardHeader className="pb-3">
-        <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+        <CardTitle className="flex flex-wrap items-center gap-2">
           <Route className="h-4 w-4 text-primary" />
           Bind a Geo-enabled Microplanning project
           <Badge variant="outline" className="text-[10px] font-normal">Microplan × Checklist × Ledger</Badge>

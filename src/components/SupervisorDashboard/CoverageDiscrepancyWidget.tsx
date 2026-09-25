@@ -134,7 +134,7 @@ const CoverageDiscrepancyWidget = () => {
   return (
     <Card className="border-border/50">
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
+        <CardTitle className="flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 text-red-600" />
           Coverage Discrepancies
           <Badge variant="destructive" className="ml-auto">{discrepancies.length}</Badge>

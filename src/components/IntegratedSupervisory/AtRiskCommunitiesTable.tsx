@@ -58,7 +58,7 @@ export default function AtRiskCommunitiesTable({
   return (
     <Card className="overflow-hidden border-rose-300">
       <CardHeader className="border-b bg-gradient-to-r from-rose-500/15 via-amber-500/10 to-transparent py-3 px-4">
-        <CardTitle className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+        <CardTitle className="flex flex-wrap items-center gap-2">
           <AlertOctagon className="h-4 w-4 text-rose-600" />
           Communities at risk — MDA blocked with insufficient medicines
           <Badge variant="outline" className="border-rose-300 bg-rose-50 text-[10px] text-rose-700">

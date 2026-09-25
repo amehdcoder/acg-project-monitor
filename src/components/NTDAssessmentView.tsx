@@ -257,7 +257,7 @@ const NTDAssessmentView = () => {
           {step === "info" && (
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg"><User className="h-5 w-5" /> Beneficiary Information</CardTitle>
+                <CardTitle className="flex items-center gap-2"><User className="h-5 w-5" /> Beneficiary Information</CardTitle>
                 <CardDescription>Enter the person's details before starting the assessment</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -294,7 +294,7 @@ const NTDAssessmentView = () => {
           {step === "select" && (
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg"><Stethoscope className="h-5 w-5" /> What condition is suspected?</CardTitle>
+                <CardTitle className="flex items-center gap-2"><Stethoscope className="h-5 w-5" /> What condition is suspected?</CardTitle>
                 <CardDescription>Tap the condition that best matches what you see.</CardDescription>
               </CardHeader>
               <CardContent>

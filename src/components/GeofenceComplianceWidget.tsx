@@ -139,7 +139,7 @@ const GeofenceComplianceWidget = () => {
     return (
       <Card className="border-0 shadow-card">
         <CardHeader className="pb-2">
-          <CardTitle className="font-display text-base flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-primary" />
             Geofence Compliance
           </CardTitle>
@@ -157,7 +157,7 @@ const GeofenceComplianceWidget = () => {
     return (
       <Card className="border-0 shadow-card">
         <CardHeader className="pb-2">
-          <CardTitle className="font-display text-base flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             <ShieldOff className="h-5 w-5 text-muted-foreground" />
             Geofence Compliance
           </CardTitle>
@@ -175,7 +175,7 @@ const GeofenceComplianceWidget = () => {
     <Card className="border-0 shadow-card">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="font-display text-base flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             {isAboveThreshold ? (
               <ShieldAlert className="h-5 w-5 text-destructive" />
             ) : (

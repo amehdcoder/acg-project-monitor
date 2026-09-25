@@ -128,7 +128,7 @@ const DailyBriefing = ({ users, dailySummary, projectSummaries, scopeLabel, scop
               <Cpu className="h-4 w-4 text-violet-600" />
             </div>
             <div>
-              <CardTitle className="font-display text-lg">Daily Briefing</CardTitle>
+              <CardTitle className="">Daily Briefing</CardTitle>
               <p className="text-xs text-muted-foreground mt-0.5">Adaptive on-device engine · no AI credits</p>
             </div>
           </div>

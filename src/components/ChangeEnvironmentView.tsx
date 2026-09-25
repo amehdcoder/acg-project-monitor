@@ -247,7 +247,7 @@ const ChangeEnvironmentView = () => {
           <div className={`absolute top-0 left-0 right-0 h-1 ${!isLive ? "bg-gradient-to-r from-amber-400 to-orange-500" : "bg-muted"}`} />
           <CardHeader className="pb-2 sm:pb-3 p-3 sm:p-6">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-sm sm:text-lg flex items-center gap-1.5 sm:gap-2">
+              <CardTitle className="flex items-center gap-1.5 sm:gap-2">
                 <div className={`p-1.5 sm:p-2 rounded-lg ${!isLive ? "bg-amber-100 dark:bg-amber-900/30" : "bg-muted"}`}>
                   <FlaskConical className={`h-4 w-4 sm:h-5 sm:w-5 ${!isLive ? "text-amber-600" : "text-muted-foreground"}`} />
                 </div>
@@ -281,7 +281,7 @@ const ChangeEnvironmentView = () => {
           <div className={`absolute top-0 left-0 right-0 h-1 ${isLive ? "bg-gradient-to-r from-emerald-400 to-green-500" : "bg-muted"}`} />
           <CardHeader className="pb-2 sm:pb-3 p-3 sm:p-6">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-sm sm:text-lg flex items-center gap-1.5 sm:gap-2">
+              <CardTitle className="flex items-center gap-1.5 sm:gap-2">
                 <div className={`p-1.5 sm:p-2 rounded-lg ${isLive ? "bg-emerald-100 dark:bg-emerald-900/30" : "bg-muted"}`}>
                   <Rocket className={`h-4 w-4 sm:h-5 sm:w-5 ${isLive ? "text-emerald-600" : "text-muted-foreground"}`} />
                 </div>
@@ -317,7 +317,7 @@ const ChangeEnvironmentView = () => {
       {/* Form Selection */}
       <Card className="border-0 shadow-md">
         <CardHeader className="p-3 sm:p-6 pb-2 sm:pb-4">
-          <CardTitle className="text-sm sm:text-lg flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             <span className="flex items-center justify-center h-6 w-6 sm:h-7 sm:w-7 rounded-full bg-primary text-primary-foreground text-[10px] sm:text-xs font-bold">1</span>
             Select Form
           </CardTitle>
@@ -350,7 +350,7 @@ const ChangeEnvironmentView = () => {
         <>
           <Card className="border-0 shadow-md">
             <CardHeader className="p-3 sm:p-6 pb-2 sm:pb-4">
-              <CardTitle className="text-sm sm:text-lg flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <span className="flex items-center justify-center h-6 w-6 sm:h-7 sm:w-7 rounded-full bg-primary text-primary-foreground text-[10px] sm:text-xs font-bold">2</span>
                 Environment Configuration
               </CardTitle>
@@ -480,7 +480,7 @@ const ChangeEnvironmentView = () => {
           {isOwner && (
             <Card className="border-2 border-destructive/40 shadow-md">
               <CardHeader className="p-3 sm:p-6 pb-2 sm:pb-4">
-                <CardTitle className="text-sm sm:text-lg flex items-center gap-2 text-destructive">
+                <CardTitle className="flex items-center gap-2 text-destructive">
                   <ShieldAlert className="h-4 w-4 sm:h-5 sm:w-5" />
                   Clear Collected Data (Owner only)
                 </CardTitle>

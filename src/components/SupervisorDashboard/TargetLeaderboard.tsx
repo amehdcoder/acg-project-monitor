@@ -299,7 +299,7 @@ const TargetLeaderboard = () => {
               <Trophy className="h-4 w-4 text-yellow-600" />
             </div>
             <div>
-              <CardTitle className="font-display text-lg">Leaderboard</CardTitle>
+              <CardTitle className="">Leaderboard</CardTitle>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Ranked by XP · {users.length} users
               </p>

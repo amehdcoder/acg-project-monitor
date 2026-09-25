@@ -28,7 +28,7 @@ const DirectionsPanel = ({ directions, activeStep, onStepClick, onStart, onStop,
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2">
           <Navigation className="h-4 w-4 text-primary" />
           Turn-by-Turn
         </CardTitle>

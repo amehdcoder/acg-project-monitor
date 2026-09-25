@@ -505,7 +505,7 @@ const WidgetRenderer = ({
           {isEditing && (
             <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
           )}
-          <CardTitle className="text-sm font-medium truncate">{widget.title}</CardTitle>
+          <CardTitle className="truncate">{widget.title}</CardTitle>
         </div>
         {isEditing && (
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

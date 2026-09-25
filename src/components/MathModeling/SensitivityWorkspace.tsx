@@ -346,7 +346,7 @@ export function SensitivityWorkspace(props: Props) {
         <CardHeader>
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
-              <CardTitle className="flex items-center gap-2 text-xl">
+              <CardTitle className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-primary" />
                 Sensitivity Lab
               </CardTitle>
@@ -365,7 +365,7 @@ export function SensitivityWorkspace(props: Props) {
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               <Settings2 className="h-4 w-4" /> Configuration
             </CardTitle>
           </CardHeader>
@@ -567,7 +567,7 @@ export function SensitivityWorkspace(props: Props) {
         {/* RUN PANEL */}
         <Card className="h-fit">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               <PlayCircle className="h-4 w-4" /> Run analysis
             </CardTitle>
           </CardHeader>
@@ -835,7 +835,7 @@ function ResultsPanel({
           <CardHeader className="pb-3">
             <div className="flex items-start justify-between gap-3 flex-wrap">
               <div>
-                <CardTitle className="text-base flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2">
                   <BarChart3 className="h-4 w-4" />
                   {result.method === "sobol" ? "Sobol indices (first-order vs total-order)"
                     : isLHS ? "PRCC ranking — Tornado"
@@ -942,7 +942,7 @@ function ResultsPanel({
         {result.timeProfile && result.timeProfile.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <Activity className="h-4 w-4" /> Normalized sensitivity through time
               </CardTitle>
               <CardDescription>How each parameter's local influence evolves over the simulation window.</CardDescription>
@@ -956,7 +956,7 @@ function ResultsPanel({
         {result.method === "lhs" && result.samples && result.samples.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <ChevronRight className="h-4 w-4" /> Top driver — scatter vs output
               </CardTitle>
               <CardDescription>
@@ -973,7 +973,7 @@ function ResultsPanel({
       {/* TABLE */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Sensitivity table</CardTitle>
+          <CardTitle className="">Sensitivity table</CardTitle>
           <CardDescription>
             {result.rows.length} parameter{result.rows.length === 1 ? "" : "s"} ranked by absolute index.
             {result.method === "sobol" && " Sobol Sᴛ − S₁ flags interaction effects."}

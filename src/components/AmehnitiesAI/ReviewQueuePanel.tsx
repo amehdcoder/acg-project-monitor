@@ -104,7 +104,7 @@ export function ReviewQueuePanel() {
     <Card className="border-border/60">
       <CardHeader className="flex flex-row flex-wrap items-center gap-2 space-y-0 pb-3">
         <ClipboardCheck className="h-4 w-4 text-primary" />
-        <CardTitle className="text-sm font-semibold">Answer review queue</CardTitle>
+        <CardTitle className="">Answer review queue</CardTitle>
         <Badge variant="outline" className="gap-1 text-[10px]">
           {items?.length ?? 0} pending
         </Badge>

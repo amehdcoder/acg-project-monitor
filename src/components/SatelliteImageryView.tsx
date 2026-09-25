@@ -225,7 +225,7 @@ const SatelliteImageryView = () => {
         <div className="space-y-4">
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2"><Search className="h-4 w-4 text-primary" /> Location Search</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Search className="h-4 w-4 text-primary" /> Location Search</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex gap-2">
@@ -240,7 +240,7 @@ const SatelliteImageryView = () => {
 
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2"><Layers className="h-4 w-4 text-primary" /> Imagery Source</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Layers className="h-4 w-4 text-primary" /> Imagery Source</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <Select value={activeLayer} onValueChange={(v) => setActiveLayer(v as LayerKey)}>
@@ -265,7 +265,7 @@ const SatelliteImageryView = () => {
           {/* Microplan Locations */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <Database className="h-4 w-4 text-primary" /> Microplan Locations
                 {loadingMicroplan && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
               </CardTitle>
@@ -305,7 +305,7 @@ const SatelliteImageryView = () => {
 
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2"><Eye className="h-4 w-4 text-primary" /> Quick Views</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Eye className="h-4 w-4 text-primary" /> Quick Views</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               {[

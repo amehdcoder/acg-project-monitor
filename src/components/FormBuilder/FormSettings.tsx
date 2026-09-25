@@ -73,7 +73,7 @@ const FormSettings = ({
         {/* Form Details */}
         <Card className="border-0 shadow-card">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 font-display">
+            <CardTitle className="flex items-center gap-2">
               <Settings className="h-5 w-5 text-primary" />
               Form Details
             </CardTitle>
@@ -114,7 +114,7 @@ const FormSettings = ({
         {/* Access & Security */}
         <Card className="border-0 shadow-card">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 font-display">
+            <CardTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5 text-primary" />
               Access & Security
             </CardTitle>
@@ -289,7 +289,7 @@ const FormSettings = ({
         {/* Offline & Sync */}
         <Card className="border-0 shadow-card">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 font-display">
+            <CardTitle className="flex items-center gap-2">
               <Wifi className="h-5 w-5 text-primary" />
               Offline & Sync
             </CardTitle>
@@ -402,7 +402,7 @@ const FormSettings = ({
         {/* Conversational Voice (in-app SLM) */}
         <Card className="border-0 shadow-card">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 font-display">
+            <CardTitle className="flex items-center gap-2">
               <Brain className="h-5 w-5 text-primary" />
               Conversational Voice (AI)
             </CardTitle>
@@ -469,7 +469,7 @@ const FormSettings = ({
         {/* MDA Supervisory Checklist */}
         <Card className="border-0 shadow-card">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 font-display">
+            <CardTitle className="flex items-center gap-2">
               <ClipboardCheck className="h-5 w-5 text-primary" />
               MDA Supervisory Checklist
             </CardTitle>
@@ -577,7 +577,7 @@ const FormSettings = ({
         {/* Repeat Household Coverage Survey (replaces the old 3D flow) */}
         <Card className="border-0 shadow-card">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 font-display">
+            <CardTitle className="flex items-center gap-2">
               <ClipboardCheck className="h-5 w-5 text-primary" />
               Repeat Household Coverage Survey
             </CardTitle>

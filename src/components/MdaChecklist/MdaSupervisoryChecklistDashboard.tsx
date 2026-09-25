@@ -297,7 +297,7 @@ function HeatmapPanel({ title, subtitle, icon: Icon, tint, baseTint, heat, empty
   return (
     <Card className="overflow-hidden">
       <CardHeader className="pb-2 space-y-1" style={{ borderTop: `3px solid ${tint}` }}>
-        <CardTitle className="flex items-center gap-1.5 text-sm"><Icon className="h-4 w-4" style={{ color: tint }} />{title}</CardTitle>
+        <CardTitle className="flex items-center gap-1.5"><Icon className="h-4 w-4" style={{ color: tint }} />{title}</CardTitle>
         {subtitle && <p className="text-[11px] leading-snug text-muted-foreground">{subtitle}</p>}
       </CardHeader>
       <CardContent className="p-0">
@@ -1327,7 +1327,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions: rawSubmi
       {/* ── Longitudinal funnel ── */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-1.5 text-sm">
+          <CardTitle className="flex items-center gap-1.5">
             <ArrowRight className="h-4 w-4 text-primary" /> Longitudinal Linkage Funnel
             <span className="font-normal text-muted-foreground">— Community Checklist → follow-up outcomes</span>
           </CardTitle>
@@ -1396,7 +1396,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions: rawSubmi
 
       {/* ── Activity trend ── */}
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Supervision Activity Trend <span className="font-normal text-muted-foreground">(last 14 days)</span></CardTitle></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="">Supervision Activity Trend <span className="font-normal text-muted-foreground">(last 14 days)</span></CardTitle></CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={trend} margin={{ top: 5, right: 10, left: -18, bottom: 0 }}>
@@ -1458,7 +1458,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions: rawSubmi
       {/* ── Longitudinal linkage register ── */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-1.5 text-sm">
+          <CardTitle className="flex items-center gap-1.5">
             <ClipboardList className="h-4 w-4 text-primary" /> Community Longitudinal Register
             <span className="ml-auto text-xs font-normal text-muted-foreground">{fmt(linkage.length)} communit{linkage.length === 1 ? "y" : "ies"}</span>
           </CardTitle>
@@ -1613,7 +1613,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions: rawSubmi
       {/* ── Field worker accountability ── */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-1.5 text-sm"><Users2 className="h-4 w-4 text-primary" />Field Worker Submissions</CardTitle>
+          <CardTitle className="flex items-center gap-1.5"><Users2 className="h-4 w-4 text-primary" />Field Worker Submissions</CardTitle>
           <p className="text-[11px] text-muted-foreground">
             Total = Checklist visits + Follow-ups. Checklist visits reconcile with the {fmt(total)} supervised communities above.
           </p>

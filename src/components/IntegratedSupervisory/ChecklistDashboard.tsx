@@ -113,7 +113,7 @@ const Panel = ({
     <>
       <Card className="flex flex-col overflow-hidden">
         <CardHeader className="py-3 px-4 border-b bg-muted/40 flex-row items-center justify-between gap-2 space-y-0">
-          <CardTitle className="text-sm font-semibold flex min-w-0 items-center gap-2">
+          <CardTitle className="flex min-w-0 items-center gap-2">
             <Icon className="h-4 w-4 shrink-0 text-primary" />
             <span className="truncate">{title}</span>
           </CardTitle>
@@ -840,7 +840,7 @@ export default function ChecklistDashboard({
       {/* SAE monitor */}
       <Card className={saeRows.length > 0 ? "border-rose-300 bg-rose-50/60" : ""}>
         <CardHeader className="py-3 px-4 border-b flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             <AlertTriangle className={`h-4 w-4 ${saeRows.length ? "text-rose-600" : "text-muted-foreground"}`} />
             Adverse Events Monitor
           </CardTitle>

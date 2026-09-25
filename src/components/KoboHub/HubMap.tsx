@@ -114,7 +114,7 @@ export default function HubMap({ rows, schema, field, colourField, filters }: Pr
   return (
     <Card className="bg-slate-900/70 border-slate-800">
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center justify-between gap-2 text-sm text-slate-100">
+        <CardTitle className="flex items-center justify-between gap-2 text-slate-100">
           <span className="flex items-center gap-2"><MapPin className="h-4 w-4 text-cyan-400" />{field.label}</span>
           <Badge variant="outline" className="border-slate-700 text-slate-400">{points.length} points</Badge>
         </CardTitle>

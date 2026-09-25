@@ -582,7 +582,7 @@ export const CalibrationWorkspace = ({
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
-              <CardTitle className="flex items-center gap-2 text-xl">
+              <CardTitle className="flex items-center gap-2">
                 <FlaskConical className="h-5 w-5 text-primary" />
                 Calibration Workspace
               </CardTitle>
@@ -600,7 +600,7 @@ export const CalibrationWorkspace = ({
       {step === 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Governing Equations</CardTitle>
+            <CardTitle className="">Governing Equations</CardTitle>
             <CardDescription>
               These ODEs and the parameter set below define the model that will be calibrated.
               All numerical work is performed server-side with RK4 integration.
@@ -635,7 +635,7 @@ export const CalibrationWorkspace = ({
       {step === 1 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Observed Dataset</CardTitle>
+            <CardTitle className="">Observed Dataset</CardTitle>
             <CardDescription>Choose the shape of your data and provide it.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
@@ -745,7 +745,7 @@ export const CalibrationWorkspace = ({
       {step === 2 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Variable Mapping</CardTitle>
+            <CardTitle className="">Variable Mapping</CardTitle>
             <CardDescription>
               Map each <strong>observed column</strong> to one or more model compartments whose values
               <em> sum </em>to that observation (e.g. total cases = E + I + T). Use
@@ -938,7 +938,7 @@ export const CalibrationWorkspace = ({
       {step === 3 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Calibration Method & Parameter Bounds</CardTitle>
+            <CardTitle className="">Calibration Method & Parameter Bounds</CardTitle>
             <CardDescription>
               Choose the optimization method, then select which parameters to estimate. Unselected parameters are held at their current value.
             </CardDescription>
@@ -1171,7 +1171,7 @@ export const CalibrationWorkspace = ({
             <CardHeader>
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div>
-                  <CardTitle className="text-base">Observed vs Predicted</CardTitle>
+                  <CardTitle className="">Observed vs Predicted</CardTitle>
                   <CardDescription>Lines = model prediction · Dots = observed data points at measurement times</CardDescription>
                 </div>
                 <div className="flex gap-2">
@@ -1229,7 +1229,7 @@ export const CalibrationWorkspace = ({
             <CardHeader>
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div>
-                  <CardTitle className="text-base">Calibrated Parameters</CardTitle>
+                  <CardTitle className="">Calibrated Parameters</CardTitle>
                   <CardDescription>
                     Live snapshot · {calibratedRows.length} parameter{calibratedRows.length === 1 ? "" : "s"} ·
                     updated {new Date(result.reproducibility.timestamp).toLocaleTimeString()}
@@ -1307,7 +1307,7 @@ export const CalibrationWorkspace = ({
           {(result.warnings?.length || result.identifiabilityHints?.length) ? (
             <Card className="border-destructive/30 bg-destructive/5">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 text-destructive" /> Diagnostics & Warnings
                 </CardTitle>
               </CardHeader>
@@ -1325,7 +1325,7 @@ export const CalibrationWorkspace = ({
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Reproducibility Summary</CardTitle>
+                <CardTitle className="">Reproducibility Summary</CardTitle>
                 <CardDescription>Captured automatically — copy or include in your report.</CardDescription>
               </CardHeader>
               <CardContent>
@@ -1336,7 +1336,7 @@ export const CalibrationWorkspace = ({
             </Card>
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Downloads</CardTitle>
+                <CardTitle className="">Downloads</CardTitle>
                 <CardDescription>Publication-ready outputs.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">

@@ -233,7 +233,7 @@ const DeviceCollectShell = () => {
                 <CardHeader className="py-4">
                   <div className="flex items-center gap-3">
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-primary/10"><ClipboardCheck className="h-5 w-5 text-primary" /></div>
-                    <div className="min-w-0 flex-1"><CardTitle className="collector-title text-base">See Clear Eye Health Facility Checklist</CardTitle><CardDescription className="mt-1">Facility visit checklist · Offline ready</CardDescription></div>
+                    <div className="min-w-0 flex-1"><CardTitle className="collector-title">See Clear Eye Health Facility Checklist</CardTitle><CardDescription className="mt-1">Facility visit checklist · Offline ready</CardDescription></div>
                     <ChevronRight className="h-5 w-5 text-muted-foreground" />
                   </div>
                 </CardHeader>
@@ -250,7 +250,7 @@ const DeviceCollectShell = () => {
                   <CardHeader className="py-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-secondary"><FolderOpen className="h-5 w-5 text-primary" /></div>
-                      <div className="min-w-0 flex-1"><CardTitle className="collector-title text-base">{form.name}</CardTitle>{form.description && <CardDescription className="mt-1 line-clamp-2">{form.description}</CardDescription>}<p className="mt-1 text-[11px] font-medium text-primary">Offline ready</p></div>
+                      <div className="min-w-0 flex-1"><CardTitle className="collector-title">{form.name}</CardTitle>{form.description && <CardDescription className="mt-1 line-clamp-2">{form.description}</CardDescription>}<p className="mt-1 text-[11px] font-medium text-primary">Offline ready</p></div>
                       <ChevronRight className="h-5 w-5 text-muted-foreground" />
                     </div>
                   </CardHeader>
@@ -263,19 +263,19 @@ const DeviceCollectShell = () => {
             <div className="mb-4"><h2 className="collector-title text-xl font-bold">Recent Records</h2><p className="mt-1 text-xs text-muted-foreground">Continue drafts and manage records waiting to send.</p></div>
             <Card className="cursor-pointer hover:border-primary/50" onClick={() => setSavedMode("edit")}>
               <CardHeader className="py-4">
-                <CardTitle className="text-base">Drafts <Badge variant="secondary" className="ml-2">{counts.draft}</Badge></CardTitle>
+                <CardTitle className="">Drafts <Badge variant="secondary" className="ml-2">{counts.draft}</Badge></CardTitle>
                 <CardDescription>Unfinished records you can continue.</CardDescription>
               </CardHeader>
             </Card>
             <Card className="cursor-pointer hover:border-primary/50" onClick={() => setSavedMode("send")}>
               <CardHeader className="py-4">
-                <CardTitle className="text-base">Ready to send <Badge variant="secondary" className="ml-2">{counts.finalized}</Badge></CardTitle>
+                <CardTitle className="">Ready to send <Badge variant="secondary" className="ml-2">{counts.finalized}</Badge></CardTitle>
                 <CardDescription>Finalized records queued until a connection is available.</CardDescription>
               </CardHeader>
             </Card>
             <Card className="cursor-pointer hover:border-primary/50" onClick={() => setSavedMode("view")}>
               <CardHeader className="py-4">
-                <CardTitle className="text-base">Sent <Badge variant="secondary" className="ml-2">{counts.sent}</Badge></CardTitle>
+                <CardTitle className="">Sent <Badge variant="secondary" className="ml-2">{counts.sent}</Badge></CardTitle>
                 <CardDescription>Records already delivered to the project.</CardDescription>
               </CardHeader>
             </Card>
@@ -299,7 +299,7 @@ const DeviceCollectShell = () => {
                   onClick={() => setCaseType(ct)}
                 >
                   <CardHeader className="py-4">
-                    <CardTitle className="text-base flex items-center gap-2">
+                    <CardTitle className="flex items-center gap-2">
                       <Briefcase className="h-4 w-4 text-primary" /> {ct.label || ct.name}
                     </CardTitle>
                     <CardDescription>

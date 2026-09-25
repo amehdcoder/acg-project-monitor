@@ -317,7 +317,7 @@ const IndoorTrackingView = ({ projectId, formId }: Props) => {
         <div className="space-y-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <Building2 className="h-4 w-4 text-primary" />Controls
               </CardTitle>
             </CardHeader>
@@ -356,7 +356,7 @@ const IndoorTrackingView = ({ projectId, formId }: Props) => {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <Building2 className="h-4 w-4 text-primary" />Top Zones
               </CardTitle>
             </CardHeader>

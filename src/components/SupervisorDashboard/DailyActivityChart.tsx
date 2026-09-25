@@ -31,7 +31,7 @@ const DailyActivityChart = ({ summary }: Props) => {
               <Clock className="h-4 w-4 text-primary" />
             </div>
             <div>
-              <CardTitle className="font-display text-base">Submissions by Hour</CardTitle>
+              <CardTitle className="">Submissions by Hour</CardTitle>
               <p className="text-[10px] text-muted-foreground mt-0.5">
                 {summary.total_submissions} total · Peak at {peakHour?.label || "—"} ({peakHour?.count || 0})
               </p>

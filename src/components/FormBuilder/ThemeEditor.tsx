@@ -163,7 +163,7 @@ const ThemeEditor = ({ theme, onChange }: ThemeEditorProps) => {
       {/* Header / enable */}
       <Card className="border-0 shadow-card">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 font-display">
+          <CardTitle className="flex items-center gap-2">
             <Palette className="h-5 w-5 text-primary" />
             Theme & Appearance
           </CardTitle>
@@ -216,7 +216,7 @@ const ThemeEditor = ({ theme, onChange }: ThemeEditorProps) => {
       {/* Layout */}
       <Card className="border-0 shadow-card">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 font-display">
+          <CardTitle className="flex items-center gap-2">
             <LayoutGrid className="h-5 w-5 text-primary" />
             Layout
           </CardTitle>
@@ -286,7 +286,7 @@ const ThemeEditor = ({ theme, onChange }: ThemeEditorProps) => {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="border-0 shadow-card">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 font-display">
+            <CardTitle className="flex items-center gap-2">
               <Sun className="h-5 w-5 text-amber-500" />
               Light mode colours
             </CardTitle>
@@ -305,7 +305,7 @@ const ThemeEditor = ({ theme, onChange }: ThemeEditorProps) => {
 
         <Card className="border-0 shadow-card">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 font-display">
+            <CardTitle className="flex items-center gap-2">
               <Moon className="h-5 w-5 text-indigo-400" />
               Dark mode colours
             </CardTitle>
@@ -326,7 +326,7 @@ const ThemeEditor = ({ theme, onChange }: ThemeEditorProps) => {
       {/* Live preview */}
       <Card className="border-0 shadow-card">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 font-display">
+          <CardTitle className="flex items-center gap-2">
             <Eye className="h-5 w-5 text-primary" />
             Live preview
             <Badge variant="secondary" className="ml-2 text-xs">Light & Dark</Badge>

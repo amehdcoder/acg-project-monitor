@@ -150,7 +150,7 @@ const AdminDashboardBuilder = ({ onBack }: AdminDashboardBuilderProps) => {
             >
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-2">
-                  <CardTitle className="text-base font-semibold leading-tight">
+                  <CardTitle className="leading-tight">
                     {form.name}
                   </CardTitle>
                   <Badge

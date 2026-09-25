@@ -164,7 +164,7 @@ const AutoInsightsDashboard = ({ formName, submissions, questions }: AutoInsight
       {insights.timeSeries.length > 1 && (
         <Card className="border-0 shadow-card">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-primary" /> Submissions Over Time
             </CardTitle>
           </CardHeader>
@@ -192,7 +192,7 @@ const AutoInsightsDashboard = ({ formName, submissions, questions }: AutoInsight
       {insights.hasGeo && (
         <Card className="border-0 shadow-card overflow-hidden">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               <MapPin className="h-4 w-4 text-primary" /> Geographic Distribution
               <Badge variant="secondary" className="text-[10px]">{insights.geoPoints.length} points</Badge>
             </CardTitle>
@@ -221,7 +221,7 @@ const AutoInsightsDashboard = ({ formName, submissions, questions }: AutoInsight
       {insights.byState.length > 1 && (
         <Card className="border-0 shadow-card">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4 text-primary" /> Submissions by Location
             </CardTitle>
           </CardHeader>
@@ -251,7 +251,7 @@ const AutoInsightsDashboard = ({ formName, submissions, questions }: AutoInsight
             {insights.categorical.map((c, idx) => (
               <Card key={c.questionId} className="border-0 shadow-card">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold truncate" title={c.label}>{c.label}</CardTitle>
+                  <CardTitle className="truncate" title={c.label}>{c.label}</CardTitle>
                   <p className="text-xs text-muted-foreground">
                     Top: <span className="font-medium text-foreground">{c.topCategory}</span> · {c.uniqueValues} categories
                   </p>
@@ -300,7 +300,7 @@ const AutoInsightsDashboard = ({ formName, submissions, questions }: AutoInsight
             {insights.numeric.map((n, idx) => (
               <Card key={n.questionId} className="border-0 shadow-card">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold truncate" title={n.label}>{n.label}</CardTitle>
+                  <CardTitle className="truncate" title={n.label}>{n.label}</CardTitle>
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground mt-1">
                     <span>Mean <b className="text-foreground">{n.mean}</b></span>
                     <span>Median <b className="text-foreground">{n.median}</b></span>

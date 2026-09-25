@@ -447,7 +447,7 @@ const SecurityAuditView = () => {
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Security Categories</CardTitle>
+                <CardTitle className="">Security Categories</CardTitle>
               </CardHeader>
               <CardContent>
                 {["Authentication", "Encryption", "Access Control", "Data Integrity", "Monitoring", "Infrastructure"].map(cat => {
@@ -515,7 +515,7 @@ const SecurityAuditView = () => {
           <TabsContent value="encryption" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2">
                   <Lock className="h-4 w-4" /> Encryption Status
                 </CardTitle>
               </CardHeader>

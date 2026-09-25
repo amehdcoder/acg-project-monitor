@@ -23,7 +23,7 @@ const ProjectOverview = ({ projects }: Props) => {
   return (
     <Card className="border-0 shadow-card">
       <CardHeader className="pb-3">
-        <CardTitle className="font-display text-lg flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2">
           <FolderOpen className="h-5 w-5 text-primary" />
           Project Overview
         </CardTitle>

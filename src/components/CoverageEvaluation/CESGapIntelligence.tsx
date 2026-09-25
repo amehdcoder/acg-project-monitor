@@ -289,7 +289,7 @@ export default function CESGapIntelligence() {
         <CardHeader className="bg-slate-900 text-white py-3">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <CardTitle className="text-base flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <BrainCircuit className="h-5 w-5 text-indigo-400" />
                 Live Gap Intelligence Map
               </CardTitle>
@@ -375,7 +375,7 @@ export default function CESGapIntelligence() {
                   {selectedCluster.ai.confidenceScore}% confidence
                 </Badge>
               </div>
-              <CardTitle className="mt-2 text-lg">{selectedCluster.ai.label}</CardTitle>
+              <CardTitle className="mt-2">{selectedCluster.ai.label}</CardTitle>
               <CardDescription className="flex items-center gap-1 text-slate-600">
                 <MapPin className="h-3 w-3" /> {selectedCluster.centroid.lat.toFixed(5)},{" "}
                 {selectedCluster.centroid.lng.toFixed(5)}

@@ -157,7 +157,7 @@ const StandardAssessmentAnalytics = ({ code }: Props) => {
 
   const renderDistCard = (title: string, data: { name: string; value: number }[], icon?: React.ReactNode) => (
     <Card>
-      <CardHeader><CardTitle className="text-sm flex items-center gap-2">{icon}{title}</CardTitle></CardHeader>
+      <CardHeader><CardTitle className="flex items-center gap-2">{icon}{title}</CardTitle></CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={180}>
           <BarChart data={data}>
@@ -203,7 +203,7 @@ const StandardAssessmentAnalytics = ({ code }: Props) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
-          <CardHeader><CardTitle className="text-base flex items-center gap-2"><Activity className="h-4 w-4" />Severity distribution</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="flex items-center gap-2"><Activity className="h-4 w-4" />Severity distribution</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
               <PieChart>
@@ -218,7 +218,7 @@ const StandardAssessmentAnalytics = ({ code }: Props) => {
         </Card>
 
         <Card>
-          <CardHeader><CardTitle className="text-base flex items-center gap-2"><Users className="h-4 w-4" />Severity × Sex</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="flex items-center gap-2"><Users className="h-4 w-4" />Severity × Sex</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={analytics.sevBySexData}>
@@ -238,7 +238,7 @@ const StandardAssessmentAnalytics = ({ code }: Props) => {
 
       {code === "wg_ss" && analytics.disabilityFlags && (
         <Card>
-          <CardHeader><CardTitle className="text-base flex items-center gap-2"><Eye className="h-4 w-4" />Disability domains affected</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="flex items-center gap-2"><Eye className="h-4 w-4" />Disability domains affected</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={analytics.disabilityFlags}>

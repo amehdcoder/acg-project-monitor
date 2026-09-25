@@ -179,7 +179,7 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
       {/* controls */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+          <CardTitle className="flex flex-wrap items-center gap-2">
             <Brain className="h-4 w-4 text-primary" /> Human patterns & social networks
             <Badge variant="outline" className="text-[10px] font-normal">Fuzzy join · Sørensen–Dice</Badge>
             {engine.computing && !busy && (
@@ -342,7 +342,7 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
           {/* rare intelligence answers */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-sm"><Lightbulb className="h-4 w-4 text-amber-500" /> Rare intelligence — what the data quietly reveals</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Lightbulb className="h-4 w-4 text-amber-500" /> Rare intelligence — what the data quietly reveals</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-3 lg:grid-cols-2">
               {answers.map((a) => (
@@ -365,7 +365,7 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
           {/* brokers, cliques, rhythms */}
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><GitBranch className="h-4 w-4" /> Brokers & structural holes</CardTitle></CardHeader>
+              <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2"><GitBranch className="h-4 w-4" /> Brokers & structural holes</CardTitle></CardHeader>
               <CardContent>
                 <p className="mb-2 text-[11px] text-muted-foreground">
                   Actors whose removal disconnects communities from supply — single points of failure and the highest-leverage people to supervise.
@@ -396,7 +396,7 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
             </Card>
 
             <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-destructive" /> Documentation-poor cliques (collusion risk)</CardTitle></CardHeader>
+              <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-destructive" /> Documentation-poor cliques (collusion risk)</CardTitle></CardHeader>
               <CardContent>
                 <p className="mb-2 text-[11px] text-muted-foreground">
                   Tight groups repeatedly transacting with each other while signatures / proof-of-delivery are missing.
@@ -422,7 +422,7 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
 
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Clock className="h-4 w-4" /> Work rhythms (chronotypes)</CardTitle></CardHeader>
+              <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2"><Clock className="h-4 w-4" /> Work rhythms (chronotypes)</CardTitle></CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={220}>
                   <ComposedChart data={rhythms.hours}>
@@ -451,7 +451,7 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
             </Card>
 
             <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Dominant causes across diagnosed communities</CardTitle></CardHeader>
+              <CardHeader className="pb-2"><CardTitle className="">Dominant causes across diagnosed communities</CardTitle></CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={380}>
                   <BarChart data={causeRanking} layout="vertical" margin={{ left: 40 }}>
@@ -468,7 +468,7 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
 
           {/* actors table */}
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Users className="h-4 w-4" /> Actor profiles — workload, reach & accountability</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2"><Users className="h-4 w-4" /> Actor profiles — workload, reach & accountability</CardTitle></CardHeader>
             <CardContent className="overflow-x-auto">
               <Table>
                 <TableHeader><TableRow>
@@ -507,7 +507,7 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
           {/* diagnosis table */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-amber-500" /> Why medicines were not distributed, coverage was poor, or distribution started late
                 <Badge variant="outline" className="text-[10px]">{diag.length.toLocaleString()} communities</Badge>
               </CardTitle>

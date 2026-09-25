@@ -107,7 +107,7 @@ export default function EmailServicesView() {
         <TabsContent value="compose" className="space-y-3">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-primary" />Compose email
               </CardTitle>
               <CardDescription>
@@ -154,7 +154,7 @@ export default function EmailServicesView() {
               <Card key={p.id} className="overflow-hidden">
                 <div className={`h-1.5 bg-gradient-to-r ${p.color}`} />
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">{p.name}</CardTitle>
+                  <CardTitle className="">{p.name}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2 text-xs">
                   <div>
@@ -179,7 +179,7 @@ export default function EmailServicesView() {
         <TabsContent value="chat">
           <Card className="overflow-hidden">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <MessageSquareText className="h-4 w-4 text-primary" />Project Chat
               </CardTitle>
               <CardDescription>Collaborate with your team in context while you manage emails.</CardDescription>

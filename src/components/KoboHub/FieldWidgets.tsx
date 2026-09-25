@@ -33,7 +33,7 @@ function Shell({ icon, title, badge, children }: {
   return (
     <Card className="bg-slate-900/70 border-slate-800">
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center justify-between gap-2 text-sm text-slate-100">
+        <CardTitle className="flex items-center justify-between gap-2 text-slate-100">
           <span className="flex items-center gap-2 min-w-0">
             <span className="text-cyan-400 shrink-0">{icon}</span>
             <span className="truncate">{title}</span>

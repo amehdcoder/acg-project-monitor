@@ -386,7 +386,7 @@ const MediaAnalysisView = () => {
 
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">
+              <CardTitle className="">
                 {mainView === "collected" ? "Collected Media" : "Upload Media"}
               </CardTitle>
               <CardDescription>
@@ -503,7 +503,7 @@ const MediaAnalysisView = () => {
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <CardTitle className="text-base flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2">
                   <FileCheck className="h-4 w-4 text-primary" />
                   Analysis Results
                   {results.length > 0 && <Badge variant="secondary" className="ml-1">{results.length}</Badge>}

@@ -584,7 +584,7 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
         <div className="container mx-auto px-4 pt-6">
           <Card className="border-0 shadow-card overflow-hidden">
             <CardHeader className="flex flex-row items-center justify-between pb-3 bg-gradient-to-r from-primary/5 to-transparent">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <div className="p-1.5 rounded-lg bg-primary/10">
                   <BarChart3 className="h-5 w-5 text-primary" />
                 </div>
@@ -689,7 +689,7 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
-                      <CardTitle className="text-base truncate">{dashboard.name}</CardTitle>
+                      <CardTitle className="truncate">{dashboard.name}</CardTitle>
                       {dashboard.description && (
                         <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
                           {dashboard.description}

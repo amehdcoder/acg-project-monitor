@@ -486,7 +486,7 @@ const UserGeofenceManager = ({ formId, formName, onClose }: UserGeofenceManagerP
           {/* Existing Assignments */}
           <Card className="border-0 shadow-card">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 font-display">
+              <CardTitle className="flex items-center gap-2">
                 <Shield className="h-5 w-5 text-primary" />
                 Active Assignments ({assignments.length})
               </CardTitle>
@@ -556,7 +556,7 @@ const UserGeofenceManager = ({ formId, formName, onClose }: UserGeofenceManagerP
           {/* Add New Assignment */}
           <Card className="border-0 shadow-card">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 font-display">
+              <CardTitle className="flex items-center gap-2">
                 <Plus className="h-5 w-5 text-primary" />
                 Add Geofence Assignment
               </CardTitle>

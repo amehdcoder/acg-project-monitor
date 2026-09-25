@@ -177,7 +177,7 @@ const SpatialAnalysisView = () => {
       if (chart.type === "bar") {
         return (
           <Card key={i}>
-            <CardHeader><CardTitle className="text-base">{chart.title}</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="">{chart.title}</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={chart.data}>
@@ -198,7 +198,7 @@ const SpatialAnalysisView = () => {
       if (chart.type === "scatter") {
         return (
           <Card key={i}>
-            <CardHeader><CardTitle className="text-base">{chart.title}</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="">{chart.title}</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <ScatterChart>
@@ -220,7 +220,7 @@ const SpatialAnalysisView = () => {
       if (chart.type === "pie") {
         return (
           <Card key={i}>
-            <CardHeader><CardTitle className="text-base">{chart.title}</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="">{chart.title}</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
@@ -265,7 +265,7 @@ const SpatialAnalysisView = () => {
       {/* Step 1 */}
       <Card className="border-0 shadow-md">
         <CardHeader className="pb-4">
-          <CardTitle className="text-lg flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             <span className="flex items-center justify-center h-7 w-7 rounded-full bg-primary text-primary-foreground text-xs font-bold shadow-sm">1</span>
             Select Data Source
           </CardTitle>
@@ -317,7 +317,7 @@ const SpatialAnalysisView = () => {
       {selectedForm && (
         <Card className="border-0 shadow-md">
           <CardHeader className="pb-4">
-            <CardTitle className="text-lg flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               <span className="flex items-center justify-center h-7 w-7 rounded-full bg-primary text-primary-foreground text-xs font-bold shadow-sm">2</span>
               Choose Geospatial Analysis
             </CardTitle>
@@ -372,7 +372,7 @@ const SpatialAnalysisView = () => {
           {results.summary && (
             <Card className="border-0 shadow-md border-l-4 border-l-emerald-500">
               <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2">
                   <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
                     <CheckCircle className="h-5 w-5 text-emerald-600" />
                   </div>
@@ -388,7 +388,7 @@ const SpatialAnalysisView = () => {
           {results.statistics && results.statistics.length > 0 && (
             <Card className="border-0 shadow-md">
               <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2">
                   <Target className="h-4 w-4 text-primary" />
                   Spatial Statistics
                 </CardTitle>
@@ -425,7 +425,7 @@ const SpatialAnalysisView = () => {
           {results.interpretation && (
             <Card className="border-0 shadow-md bg-gradient-to-br from-primary/5 to-accent/5">
               <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2">
                   <div className="p-1.5 rounded-lg bg-primary/10">
                     <Lightbulb className="h-4 w-4 text-primary" />
                   </div>
@@ -441,7 +441,7 @@ const SpatialAnalysisView = () => {
           {results.recommendations?.length > 0 && (
             <Card className="border-0 shadow-md">
               <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 text-accent" />
                   Recommendations
                 </CardTitle>

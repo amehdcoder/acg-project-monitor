@@ -336,7 +336,7 @@ function ChartShell({ q, label, icon: Icon, answered, total, children }: any) {
     <Card className="overflow-hidden border-border/60 transition-all hover:shadow-md">
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
-          <CardTitle className="flex items-center gap-2 text-sm font-semibold leading-tight">
+          <CardTitle className="flex items-center gap-2 leading-tight">
             <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
             <span className="line-clamp-2">{label}</span>
           </CardTitle>
@@ -557,7 +557,7 @@ export default function MdaAdaptiveDashboard({
       <CardHeader>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex flex-col gap-1">
-            <CardTitle className="flex items-center gap-2 font-display text-lg">
+            <CardTitle className="flex items-center gap-2">
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-500 text-white shadow">
                 <Sparkles className="h-4 w-4" />
               </span>
@@ -663,7 +663,7 @@ export default function MdaAdaptiveDashboard({
         {timeline.length > 1 && (
           <Card className="border-border/60">
             <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-sm">
+              <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="h-4 w-4 text-indigo-500" /> Supervisory Visits Over Time
               </CardTitle>
             </CardHeader>

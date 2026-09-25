@@ -27,7 +27,7 @@ const TrafficPanel = ({ incidents }: Props) => {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 text-primary" />Traffic Alerts
           <Badge variant="secondary" className="ml-auto">{incidents.length}</Badge>
         </CardTitle>

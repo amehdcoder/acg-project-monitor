@@ -158,7 +158,7 @@ export default function CESAuditLogViewer({ surveyId: propSurveyId }: CESAuditLo
         <CardHeader className="pb-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <CardTitle className="flex items-center gap-2 text-base">
+              <CardTitle className="flex items-center gap-2">
                 <ClipboardList className="h-5 w-5 text-primary" />
                 CES Audit Log
               </CardTitle>

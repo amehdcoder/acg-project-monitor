@@ -173,7 +173,7 @@ const ScheduledReports = ({ formId, formName }: Props) => {
       <Card className="border-0 shadow-card">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="font-display text-lg flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               <CalendarClock className="h-5 w-5 text-primary" />
               Scheduled Reports
             </CardTitle>

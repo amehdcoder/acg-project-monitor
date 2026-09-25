@@ -73,7 +73,7 @@ export default function CascadeVerificationPanel({
       {/* Balance ladder */}
       <Card>
         <CardHeader className="py-3 px-4 border-b bg-muted/40">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             <Warehouse className="h-4 w-4 text-primary" /> Balance at every level of the supply chain
           </CardTitle>
         </CardHeader>
@@ -149,7 +149,7 @@ export default function CascadeVerificationPanel({
       {chart.length > 0 && (
         <Card>
           <CardHeader className="py-3 px-4 border-b bg-muted/40">
-            <CardTitle className="text-sm font-semibold">Allocated vs dispatched vs confirmed, by State</CardTitle>
+            <CardTitle className="">Allocated vs dispatched vs confirmed, by State</CardTitle>
           </CardHeader>
           <CardContent className="p-4">
             <div className="h-[300px]">
@@ -173,7 +173,7 @@ export default function CascadeVerificationPanel({
       {/* State store ledger */}
       <Card>
         <CardHeader className="py-3 px-4 border-b bg-muted/40">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             <Truck className="h-4 w-4 text-primary" /> State medical store ledger
           </CardTitle>
         </CardHeader>
@@ -222,7 +222,7 @@ export default function CascadeVerificationPanel({
       <Card>
         <CardHeader className="py-3 px-4 border-b bg-muted/40 space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle className="text-sm font-semibold">
+            <CardTitle className="">
               State dispatch vs EDO / Logistic Officer confirmation — line-by-line
             </CardTitle>
             {canExport && (

@@ -299,7 +299,7 @@ const IterationAnalysisView = () => {
           {analysis?.themes && analysis.themes.length > 0 && (
             <Card className="border-0 shadow-soft">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
+                <CardTitle className="flex items-center gap-2">
                   <PieChart className="h-4 w-4 text-primary" />
                   Theme Distribution
                 </CardTitle>
@@ -332,7 +332,7 @@ const IterationAnalysisView = () => {
           {completionData.length > 0 && (
             <Card className="border-0 shadow-soft">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
+                <CardTitle className="flex items-center gap-2">
                   <BarChart3 className="h-4 w-4 text-primary" />
                   Completion Rate by Form
                 </CardTitle>
@@ -355,7 +355,7 @@ const IterationAnalysisView = () => {
           {projectDistribution.length > 1 && (
             <Card className="border-0 shadow-soft">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
+                <CardTitle className="flex items-center gap-2">
                   <FolderOpen className="h-4 w-4 text-primary" />
                   Incidents by Project
                 </CardTitle>
@@ -378,7 +378,7 @@ const IterationAnalysisView = () => {
           {summary.forms.length > 0 && (
             <Card className="border-0 shadow-soft">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
+                <CardTitle className="flex items-center gap-2">
                   <FileText className="h-4 w-4 text-primary" />
                   Incidents by Form
                 </CardTitle>

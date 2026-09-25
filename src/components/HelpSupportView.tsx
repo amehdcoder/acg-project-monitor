@@ -257,7 +257,7 @@ const HelpSupportView = () => {
             filteredFAQs.map(cat => (
               <Card key={cat.category}>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">{cat.category}</CardTitle>
+                  <CardTitle className="">{cat.category}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <Accordion type="multiple" className="space-y-1">
@@ -307,7 +307,7 @@ const HelpSupportView = () => {
         <TabsContent value="shortcuts">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Keyboard Shortcuts</CardTitle>
+              <CardTitle className="">Keyboard Shortcuts</CardTitle>
               <CardDescription>Speed up your workflow with these shortcuts</CardDescription>
             </CardHeader>
             <CardContent>
@@ -334,7 +334,7 @@ const HelpSupportView = () => {
           <div className="grid gap-4 sm:grid-cols-2">
             <Card className="hover:shadow-md transition-all">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base"><Mail className="h-5 w-5 text-primary" />Email Support</CardTitle>
+                <CardTitle className="flex items-center gap-2"><Mail className="h-5 w-5 text-primary" />Email Support</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-3">For technical issues, feature requests, or general inquiries</p>
@@ -346,7 +346,7 @@ const HelpSupportView = () => {
             </Card>
             <Card className="hover:shadow-md transition-all">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base"><Phone className="h-5 w-5 text-primary" />Phone Support</CardTitle>
+                <CardTitle className="flex items-center gap-2"><Phone className="h-5 w-5 text-primary" />Phone Support</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-3">For urgent issues during business hours (WAT)</p>
@@ -358,7 +358,7 @@ const HelpSupportView = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">System Status</CardTitle>
+              <CardTitle className="">System Status</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -384,7 +384,7 @@ const HelpSupportView = () => {
           {/* Feedback Form */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
+              <CardTitle className="flex items-center gap-2">
                 <MessageSquare className="h-5 w-5 text-primary" />
                 Submit Feedback
               </CardTitle>
@@ -507,7 +507,7 @@ const HelpSupportView = () => {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="text-base flex items-center gap-2">
+                    <CardTitle className="flex items-center gap-2">
                       <RefreshCw className="h-4 w-4 text-primary" />
                       Your Feedback History
                     </CardTitle>

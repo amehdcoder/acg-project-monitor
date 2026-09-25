@@ -387,7 +387,7 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
     <div className="space-y-4">
       <Card className="border-border/50">
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
+          <CardTitle className="flex items-center gap-2">
             <History className="h-4 w-4 text-primary" />
             Historical Data Review
             <Badge variant="outline" className="ml-auto">{filtered.length} locations</Badge>

@@ -412,7 +412,7 @@ const AccessibilityToolsView = () => {
         <div className="space-y-4 pr-2">
           {/* Cognitive Support */}
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Brain className="h-4 w-4 text-primary" /> Cognitive Support</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2"><Brain className="h-4 w-4 text-primary" /> Cognitive Support</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               <ToggleCard id="auto-complete" icon={Type} label="Auto-Complete" description="Suggest completions as you type in text fields" checked={prefs.autoComplete} onChange={(v: boolean) => updatePref("autoComplete", v)} />
               <ToggleCard id="spell-check" icon={CheckCircle} label="Spell Check" description="Highlight spelling errors in text inputs" checked={prefs.spellCheck} onChange={(v: boolean) => updatePref("spellCheck", v)} />
@@ -423,7 +423,7 @@ const AccessibilityToolsView = () => {
           {/* Voice Assistant */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <Mic className="h-4 w-4 text-primary" /> Voice Assistant
                 <Badge variant="secondary" className="ml-auto text-[10px]">English only</Badge>
               </CardTitle>
@@ -572,7 +572,7 @@ const AccessibilityToolsView = () => {
 
           {/* Visual */}
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Eye className="h-4 w-4 text-primary" /> Visual Accessibility</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2"><Eye className="h-4 w-4 text-primary" /> Visual Accessibility</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               <ToggleCard id="auto-font" icon={ZoomIn} label="Auto Font Size" description="Adjust font size based on device settings" checked={prefs.autoFontSize} onChange={(v: boolean) => updatePref("autoFontSize", v)} />
               <ToggleCard id="reduced-motion" icon={Pause} label="Reduced Motion" description="Minimize animations and transitions" checked={prefs.reducedMotion} onChange={(v: boolean) => updatePref("reducedMotion", v)} />
@@ -581,7 +581,7 @@ const AccessibilityToolsView = () => {
 
           {/* Audio */}
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Ear className="h-4 w-4 text-primary" /> Audio & Notifications</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2"><Ear className="h-4 w-4 text-primary" /> Audio & Notifications</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               <ToggleCard id="audio-cues" icon={Volume2} label="Audio Cues" description="Play sounds for important events and notifications" checked={prefs.audioCues} onChange={(v: boolean) => updatePref("audioCues", v)} />
               <ToggleCard id="audio-descriptions" icon={Ear} label="Audio Descriptions" description="Enable spoken descriptions for multimedia content" checked={prefs.audioDescriptions} onChange={(v: boolean) => updatePref("audioDescriptions", v)} />
@@ -595,7 +595,7 @@ const AccessibilityToolsView = () => {
 
           {/* Motor */}
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Hand className="h-4 w-4 text-primary" /> Motor Accessibility</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2"><Hand className="h-4 w-4 text-primary" /> Motor Accessibility</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               <ToggleCard id="large-targets" icon={MousePointerClick} label="Large Click Targets" description="Increase button and link sizes for easier tapping" checked={prefs.largeClickTargets} onChange={(v: boolean) => updatePref("largeClickTargets", v)} />
               <ToggleCard id="sticky-keys" icon={Hand} label="Sticky Keys" description="Hold modifier keys without pressing simultaneously" checked={prefs.stickyKeys} onChange={(v: boolean) => updatePref("stickyKeys", v)} />
@@ -606,7 +606,7 @@ const AccessibilityToolsView = () => {
 
           {/* Accessibility Scanner */}
           <Card className="border-primary/20">
-            <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><ScanLine className="h-4 w-4 text-primary" /> Accessibility Scanner</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2"><ScanLine className="h-4 w-4 text-primary" /> Accessibility Scanner</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               <p className="text-xs text-muted-foreground">Scan the current page for common accessibility issues and get fix suggestions.</p>
               <Button onClick={scanAccessibility} disabled={scanning} className="w-full gap-2">

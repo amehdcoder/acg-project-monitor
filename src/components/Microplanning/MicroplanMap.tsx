@@ -1148,7 +1148,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
     <Card className={`border-border/50 overflow-hidden ${isFullscreen ? "rounded-none border-0 h-screen overflow-auto bg-background" : ""}`} ref={(el) => { (exportContainerRef as any).current = el; (fullscreenRef as any).current = el; }}>
       <CardHeader className="pb-2 px-3 pt-3 space-y-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+          <CardTitle className="flex items-center gap-2">
             <Map className="h-4 w-4 text-primary" />
             Geo-enabled Microplan Map
             <Badge variant="outline" className="text-[9px] ml-1">{cascadedEntries.length} entries</Badge>

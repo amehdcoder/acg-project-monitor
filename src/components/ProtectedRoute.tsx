@@ -68,7 +68,7 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
               <ShieldAlert className="h-9 w-9 text-destructive" />
             </div>
-            <CardTitle className="font-display text-2xl text-destructive font-bold">
+            <CardTitle className="text-destructive">
               Account Deactivated
             </CardTitle>
             <CardDescription className="mt-2 text-muted-foreground text-sm font-normal">
