@@ -1,5 +1,4 @@
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { BarChart3, Users } from "lucide-react";
 import { describe, expect, it, vi } from "vitest";
 import WorkspaceNavigation, { type WorkspaceNavGroup } from "./WorkspaceNavigation";
@@ -21,7 +20,7 @@ const groups: WorkspaceNavGroup[] = [
 ];
 
 describe("WorkspaceNavigation", () => {
-  it("groups the workspace and excludes inaccessible sections", async () => {
+  it("groups the workspace and excludes inaccessible sections", () => {
     const onViewChange = vi.fn();
     render(<WorkspaceNavigation groups={groups} view="dashboard" onViewChange={onViewChange} />);
 
@@ -29,8 +28,8 @@ describe("WorkspaceNavigation", () => {
     expect(screen.getByRole("button", { name: /overview/i })).toBeInTheDocument();
     expect(screen.queryByText("Households & MDA")).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: /people & care/i }));
-    await userEvent.click(screen.getByText("Beneficiary records"));
+    fireEvent.click(screen.getByRole("button", { name: /people & care/i }));
+    fireEvent.click(screen.getByText("Beneficiary records"));
     expect(onViewChange).toHaveBeenCalledWith("records");
   });
 });
