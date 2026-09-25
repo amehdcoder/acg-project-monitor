@@ -5926,6 +5926,9 @@ export type Database = {
         Row: {
           agency_id: string | null
           auth_type: string
+          auto_push_day: number
+          auto_push_dry_run: boolean
+          auto_push_enabled: boolean
           base_url: string
           created_at: string
           created_by: string | null
@@ -5939,8 +5942,10 @@ export type Database = {
           id: string
           is_active: boolean
           kind: string
+          last_auto_period: string | null
           last_status: string | null
           last_sync_at: string | null
+          lmis_program_id: string | null
           name: string
           org_unit_id: string | null
           project_id: string
@@ -5951,6 +5956,9 @@ export type Database = {
         Insert: {
           agency_id?: string | null
           auth_type?: string
+          auto_push_day?: number
+          auto_push_dry_run?: boolean
+          auto_push_enabled?: boolean
           base_url: string
           created_at?: string
           created_by?: string | null
@@ -5964,8 +5972,10 @@ export type Database = {
           id?: string
           is_active?: boolean
           kind: string
+          last_auto_period?: string | null
           last_status?: string | null
           last_sync_at?: string | null
+          lmis_program_id?: string | null
           name: string
           org_unit_id?: string | null
           project_id: string
@@ -5976,6 +5986,9 @@ export type Database = {
         Update: {
           agency_id?: string | null
           auth_type?: string
+          auto_push_day?: number
+          auto_push_dry_run?: boolean
+          auto_push_enabled?: boolean
           base_url?: string
           created_at?: string
           created_by?: string | null
@@ -5989,8 +6002,10 @@ export type Database = {
           id?: string
           is_active?: boolean
           kind?: string
+          last_auto_period?: string | null
           last_status?: string | null
           last_sync_at?: string | null
+          lmis_program_id?: string | null
           name?: string
           org_unit_id?: string | null
           project_id?: string
