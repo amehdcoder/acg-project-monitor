@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { BarChart3, Users } from "lucide-react";
 import { describe, expect, it, vi } from "vitest";
 import WorkspaceNavigation, { type WorkspaceNavGroup } from "./WorkspaceNavigation";
@@ -26,10 +26,8 @@ describe("WorkspaceNavigation", () => {
 
     expect(screen.getByText("General dashboard")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /overview/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /people & care/i })).toBeInTheDocument();
     expect(screen.queryByText("Households & MDA")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: /people & care/i }));
-    fireEvent.click(screen.getByText("Beneficiary records"));
-    expect(onViewChange).toHaveBeenCalledWith("records");
+    expect(onViewChange).not.toHaveBeenCalled();
   });
 });
