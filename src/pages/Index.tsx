@@ -86,7 +86,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import { ProximityProvider } from "@/hooks/useProximity";
 import ProximityHub from "@/components/Proximity/ProximityHub";
 // framer-motion no longer needed at this level (tab-switch wrapper removed to kill blink)
-import { Loader2 } from "lucide-react";
+import { Loader2, HeartPulse } from "lucide-react";
 
 
 import { toast } from "@/hooks/use-toast";
@@ -117,11 +117,20 @@ const Index = () => {
   usePushNotifications();
   const { trackPageVisit } = useSurveillanceTracking(user?.id);
   const recordsLock = useRecordsOnlyProjects();
+  const [ownerRecordsMode, setOwnerRecordsModeState] = useState<boolean>(() => {
+    try { return localStorage.getItem("amehnities:owner-records-mode") === "1"; } catch { return false; }
+  });
+  const setOwnerRecordsMode = (on: boolean) => {
+    setOwnerRecordsModeState(on);
+    try { localStorage.setItem("amehnities:owner-records-mode", on ? "1" : "0"); } catch { /* ignore */ }
+  };
+  const ownerCanSwitch = recordsLock.isOwnerLevel && recordsLock.locked.length > 0;
   const recordsLockActive =
-    !recordsLock.isOwnerLevel &&
-    recordsLock.locked.length > 0 &&
-    (recordsLock.exclusive ||
-      (!!selectedProjectId && recordsLock.lockedIds.has(selectedProjectId)));
+    (ownerCanSwitch && ownerRecordsMode) ||
+    (!recordsLock.isOwnerLevel &&
+      recordsLock.locked.length > 0 &&
+      (recordsLock.exclusive ||
+        (!!selectedProjectId && recordsLock.lockedIds.has(selectedProjectId))));
 
   useEffect(() => {
     const urlTab = searchParams.get("tab");
@@ -412,7 +421,8 @@ const Index = () => {
         <RecordsOnlyShell
           projects={recordsLock.locked}
           initialProjectId={selectedProjectId}
-          onExit={recordsLock.exclusive ? undefined : () => { setSelectedProjectId(null); setActiveTab("projects"); }}
+          onExit={ownerCanSwitch ? undefined : recordsLock.exclusive ? undefined : () => { setSelectedProjectId(null); setActiveTab("projects"); }}
+          onSwitchToFullApp={ownerCanSwitch ? () => setOwnerRecordsMode(false) : undefined}
         />
       </ErrorBoundary>
     );
@@ -442,6 +452,22 @@ const Index = () => {
           onToggleCollapse={() => setSidebarCollapsed(prev => !prev)}
         />
 
+        {ownerCanSwitch && (
+          <button
+            type="button"
+            onClick={() => setOwnerRecordsMode(true)}
+            title="Open the app exactly as records-only users see it"
+            className="fixed bottom-5 right-5 z-[60] flex items-center gap-3 rounded-full border border-primary/20 bg-primary py-2 pl-2 pr-4 text-left text-primary-foreground shadow-lg transition-transform hover:-translate-y-0.5"
+          >
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-foreground/15">
+              <HeartPulse className="h-5 w-5" />
+            </span>
+            <span className="leading-tight">
+              <span className="block text-[10px] font-bold uppercase tracking-wide text-primary-foreground/75">Owner view</span>
+              <span className="block text-sm font-semibold">Switch to records workspace</span>
+            </span>
+          </button>
+        )}
         <div className="flex flex-1 flex-col min-h-0 w-full overflow-x-hidden">
           <Header onMenuClick={() => setSidebarOpen(true)} profile={profile} />
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { HeartPulse, LogOut, ShieldCheck, ArrowLeft, Lock } from "lucide-react";
+import { HeartPulse, LogOut, ShieldCheck, ArrowLeft, Lock, LayoutGrid } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -13,6 +13,8 @@ interface Props {
   initialProjectId?: string | null;
   /** Shown when the user still has other, unlocked projects to go back to. */
   onExit?: () => void;
+  /** Owner / Co-owner only: return to the full application. */
+  onSwitchToFullApp?: () => void;
 }
 
 /**
@@ -20,7 +22,7 @@ interface Props {
  * Longitudinal Beneficiary Records system. Nothing else in the application is
  * reachable from here.
  */
-const RecordsOnlyShell = ({ projects, initialProjectId, onExit }: Props) => {
+const RecordsOnlyShell = ({ projects, initialProjectId, onExit, onSwitchToFullApp }: Props) => {
   const { profile, signOut, isAdmin, isSuperAdmin, isOwner } = useAuth();
   const [projectId, setProjectId] = useState<string>(
     initialProjectId && projects.some((p) => p.id === initialProjectId)
@@ -80,9 +82,21 @@ const RecordsOnlyShell = ({ projects, initialProjectId, onExit }: Props) => {
                 </SelectContent>
               </Select>
             )}
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-foreground/15 px-3 py-1.5 text-xs font-semibold">
-              <Lock className="h-3.5 w-3.5" /> Records-only project
-            </span>
+            {onSwitchToFullApp ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={onSwitchToFullApp}
+                className="gap-1.5 font-semibold"
+                title="Leave the records workspace and return to the full application"
+              >
+                <LayoutGrid className="h-4 w-4" /> Switch to full app
+              </Button>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-foreground/15 px-3 py-1.5 text-xs font-semibold">
+                <Lock className="h-3.5 w-3.5" /> Records-only project
+              </span>
+            )}
             <span className="hidden truncate text-xs text-primary-foreground/80 sm:inline">
               {[profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || profile?.email}
             </span>
