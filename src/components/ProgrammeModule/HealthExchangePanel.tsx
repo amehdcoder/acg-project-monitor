@@ -28,6 +28,7 @@ import {
 import { buildSdmxCsv, buildSdmxJson } from "@/lib/programmeModule/exchangeStandards";
 import { Switch } from "@/components/ui/switch";
 import Dhis2InstanceBrowser from "./Dhis2InstanceBrowser";
+import Dhis2LoginPanel from "./Dhis2LoginPanel";
 import type { Dhis2Catalog } from "@/lib/programmeModule/healthExchange";
 
 interface Props {
@@ -260,6 +261,14 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
           )}
         </div>
       </div>
+
+      {tab === "connections" && canManage && (
+        <Dhis2LoginPanel
+          projectId={projectId}
+          existing={rows.find((r) => r.kind === "dhis2") ?? null}
+          onSignedIn={(r) => { setActiveId(r.connection_id); void reload(); }}
+        />
+      )}
 
       {tab === "connections" && (
         <div className="grid gap-3 md:grid-cols-2">

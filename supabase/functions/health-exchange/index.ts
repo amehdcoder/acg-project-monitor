@@ -316,6 +316,74 @@ Deno.serve(async (req) => {
     return json({ ok: true });
   }
 
+  // DHIS2 sign-in: verify username/password against the instance, save them
+  // server-side as a basic-auth connection, and return what the account can report.
+  if (action === "dhis2_login") {
+    const input = z.object({
+      project_id: z.string().uuid(),
+      base_url: z.string().trim().url().max(300).refine((u) => u.startsWith("https://"), "Server address must start with https://"),
+      username: z.string().trim().min(1).max(150),
+      password: z.string().min(1).max(500),
+      connection_id: z.string().uuid().optional(),
+    }).safeParse(payload);
+    if (!input.success) return json({ error: input.error.issues[0]?.message ?? "Invalid sign-in details" }, 400);
+    const { project_id, username, password } = input.data;
+    const base = input.data.base_url.replace(/\/+$/, "");
+    const h = { Accept: "application/json", Authorization: `Basic ${btoa(`${username}:${password}`)}` };
+    const [me, sets, info] = await Promise.all([
+      remoteFetch(joinUrl(base, "api/me?fields=username,displayName,email,organisationUnits[id,name,level],dataSets,userRoles[name],authorities"), { headers: h }, 30000),
+      remoteFetch(joinUrl(base, "api/dataSets?fields=id,name,periodType,access[data[write]],dataSetElements~size,organisationUnits~size&paging=false"), { headers: h }, 60000),
+      remoteFetch(joinUrl(base, "api/system/info"), { headers: h }, 30000),
+    ]);
+    if (me.status === 401 || me.status === 403) return json({ error: "DHIS2 rejected that username or password." }, 401);
+    if (!me.ok || typeof me.body !== "object") return json({ error: `Could not reach DHIS2 at that address (${remoteMessage(me.body, `HTTP ${me.status}`).slice(0, 200)}).` }, 502);
+    const u: any = me.body;
+    const assigned = new Set<string>(Array.isArray(u.dataSets) ? u.dataSets : []);
+    const isSuper = Array.isArray(u.authorities) && u.authorities.includes("ALL");
+    const all = sets.ok ? ((sets.body as any)?.dataSets ?? []) : [];
+    const reports = all.map((d: any) => ({
+      id: d.id, name: d.name, periodType: d.periodType,
+      elementCount: Number(d.dataSetElements ?? 0), orgUnitCount: Number(d.organisationUnits ?? 0),
+      canWrite: d.access?.data?.write === true || isSuper,
+      assigned: assigned.has(d.id),
+    })).filter((d: any) => d.canWrite || d.assigned)
+      .sort((a: any, b: any) => Number(b.canWrite) - Number(a.canWrite) || a.name.localeCompare(b.name));
+
+    const row = {
+      project_id, kind: "dhis2", base_url: base, auth_type: "basic", username,
+      name: `DHIS2 · ${u.displayName ?? username}`,
+    };
+    let connId = input.data.connection_id;
+    if (connId) {
+      const { data: existing } = await db.from("health_exchange_connections").select("id").eq("id", connId).eq("project_id", project_id).maybeSingle();
+      if (!existing) connId = undefined;
+    }
+    if (connId) {
+      const { error } = await db.from("health_exchange_connections").update({ base_url: base, auth_type: "basic", username }).eq("id", connId);
+      if (error) return json({ error: error.message }, 400);
+    } else {
+      const { data: created, error } = await db.from("health_exchange_connections").insert({ ...row, created_by: guard.userId }).select("id").single();
+      if (error) {
+        const { data: c2, error: e2 } = await db.from("health_exchange_connections").insert(row).select("id").single();
+        if (e2 || !c2) return json({ error: (e2 ?? error).message }, 400);
+        connId = c2.id;
+      } else connId = created.id;
+    }
+    const { error: credErr } = await db.from("health_exchange_credentials")
+      .upsert({ connection_id: connId, secret: password, updated_at: new Date().toISOString() });
+    if (credErr) return json({ error: credErr.message }, 400);
+    const { data: savedConn } = await db.from("health_exchange_connections").select("*").eq("id", connId).single();
+    if (savedConn) await log(db, savedConn as Connection, "test", "dhis2_login", "success", reports.length, `Signed in as ${u.username ?? username}`, guard.userId);
+    const i: any = info.ok ? info.body : {};
+    return json({
+      ok: true, connection_id: connId,
+      system: { name: i?.systemName ?? null, version: i?.version ?? null },
+      user: { username: u.username ?? username, displayName: u.displayName ?? null, email: u.email ?? null, roles: (u.userRoles ?? []).map((r: any) => r.name) },
+      orgUnits: u.organisationUnits ?? [],
+      reports,
+    });
+  }
+
   // Monthly automation: called by the scheduler (or an admin) with no connection.
   if (action === "run_scheduled") {
     const today = new Date();
