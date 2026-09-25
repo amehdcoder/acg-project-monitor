@@ -229,9 +229,15 @@ export default defineConfig(({ mode }) => {
     }),
   ].filter(Boolean),
   resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
+    alias: [
+      // The generated client file is pinned to a retired backend address.
+      // Route every import to a client built from the live backend env vars.
+      {
+        find: /^@\/integrations\/supabase\/client$/,
+        replacement: path.resolve(__dirname, "./src/integrations/backendClient.ts"),
+      },
+      { find: "@", replacement: path.resolve(__dirname, "./src") },
+    ],
     dedupe: ["react", "react-dom", "react/jsx-runtime"],
   },
   });
