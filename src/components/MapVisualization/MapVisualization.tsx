@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card";
 import MapControls, { ZoomControls } from "./MapControls";
 import MapLegend from "./MapLegend";
 import PegmanControl from "./PegmanControl";
-import StreetViewPanel from "./StreetViewPanel";
+import StreetViewPanel from "@/components/maps/GoogleStreetViewPanel";
 import {
   MapMarker,
   MapViewLevel,
@@ -549,11 +549,14 @@ const MapVisualization = ({
       {/* Street View Panel */}
       {streetViewCoords && (
         <StreetViewPanel
+          open
           lat={streetViewCoords.lat}
           lng={streetViewCoords.lng}
-          onClose={() => {
-            setStreetViewCoords(null);
-            setStreetViewActive(false);
+          onOpenChange={(open) => {
+            if (!open) {
+              setStreetViewCoords(null);
+              setStreetViewActive(false);
+            }
           }}
         />
       )}
