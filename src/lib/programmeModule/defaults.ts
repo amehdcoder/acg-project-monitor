@@ -335,12 +335,6 @@ export const MODULE_TEMPLATES: { key: string; name: string; description: string;
       "Seven integrated components — eye health, MMDP/NTD, mental health, WASH, livelihood, health system and documents — with timeline, referrals and follow-up.",
     config: CISKULA_PRESET,
   },
-  {
-    key: "blank",
-    name: "Blank longitudinal register",
-    description: "One component and a short profile. Build up sections, questions and workflow from scratch.",
-    config: BLANK_PRESET,
-  },
 ];
 
 /* ------------------------------------------------------------------ */
