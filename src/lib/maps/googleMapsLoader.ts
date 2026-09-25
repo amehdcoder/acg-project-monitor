@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
  */
 let googleMapsPromise: Promise<void> | null = null;
 let cachedKey: string | null = null;
+const GOOGLE_MAPS_READY_CALLBACK = "__amehnitiesGoogleMapsReady";
 
 /**
  * Set to true when Google rejects the API key (billing disabled, referrer not
@@ -71,13 +72,17 @@ export function loadGoogleMaps(): Promise<void> {
         reject(new Error("Google Maps API key unavailable"));
         return;
       }
+      const callbackHost = window as unknown as Record<string, unknown>;
       const script = document.createElement("script");
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&v=weekly&libraries=geometry`;
+      callbackHost[GOOGLE_MAPS_READY_CALLBACK] = () => {
+        delete callbackHost[GOOGLE_MAPS_READY_CALLBACK];
+        resolve();
+      };
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&loading=async&callback=${GOOGLE_MAPS_READY_CALLBACK}`;
       script.async = true;
-      script.defer = true;
       script.dataset.googleMapsLoader = "1";
-      script.onload = () => resolve();
       script.onerror = () => {
+        delete callbackHost[GOOGLE_MAPS_READY_CALLBACK];
         googleMapsPromise = null;
         reject(new Error("Failed to load Google Maps"));
       };

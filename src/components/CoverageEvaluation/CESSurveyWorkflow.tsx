@@ -41,7 +41,7 @@ import {
   registerCESSyncOnReconnect, getDeviceId, generateUUID, saveSurveyOffline, getOfflineSurvey, type OfflineHousehold,
 } from "@/lib/ces/offlineHouseholds";
 import { getLastPrewarmCenter } from "@/lib/ces/satellitePrewarm";
-import StreetViewPanel from "./StreetViewPanel";
+import StreetViewPanel from "@/components/maps/GoogleStreetViewPanel";
 import {
   getResidentialMask,
   getCachedResidentialMask,

@@ -9,7 +9,7 @@ import {
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import PegmanControl from "@/components/MapVisualization/PegmanControl";
-import StreetViewPanel from "@/components/MapVisualization/StreetViewPanel";
+import StreetViewPanel from "@/components/maps/GoogleStreetViewPanel";
 
 interface RouteEntry {
   id: string;
@@ -910,11 +910,14 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
           {/* Street View Panel */}
           {streetViewCoords && (
             <StreetViewPanel
+              open
               lat={streetViewCoords.lat}
               lng={streetViewCoords.lng}
-              onClose={() => {
-                setStreetViewCoords(null);
-                setStreetViewActive(false);
+              onOpenChange={(open) => {
+                if (!open) {
+                  setStreetViewCoords(null);
+                  setStreetViewActive(false);
+                }
               }}
             />
           )}
