@@ -279,20 +279,41 @@
     letter-spacing: 0;
   }
 
-  .records-kpi-blue { border-color: hsl(var(--records-blue) / 0.22); }
-  .records-kpi-blue > div > span, .records-stage-blue { background: hsl(var(--records-blue)); }
-  .records-kpi-teal { border-color: hsl(var(--records-teal) / 0.22); }
-  .records-kpi-teal > div > span, .records-stage-teal { background: hsl(var(--records-teal)); }
-  .records-kpi-cyan { border-color: hsl(var(--records-cyan) / 0.22); }
-  .records-kpi-cyan > div > span, .records-stage-cyan { background: hsl(var(--records-cyan)); }
-  .records-kpi-green { border-color: hsl(var(--records-green) / 0.22); }
-  .records-kpi-green > div > span, .records-stage-green { background: hsl(var(--records-green)); }
-  .records-kpi-amber { border-color: hsl(var(--records-amber) / 0.26); }
-  .records-kpi-amber > div > span, .records-stage-amber { background: hsl(var(--records-amber)); }
-  .records-kpi-red { border-color: hsl(var(--records-red) / 0.22); }
-  .records-kpi-red > div > span, .records-stage-red { background: hsl(var(--records-red)); }
-  .records-kpi-purple { border-color: hsl(var(--records-purple) / 0.22); }
-  .records-kpi-purple > div > span, .records-stage-purple { background: hsl(var(--records-purple)); }
+  .records-kpi-blue { border-color: hsl(var(--records-blue) / 0.28); }
+  .records-kpi-teal { border-color: hsl(var(--records-teal) / 0.28); }
+  .records-kpi-cyan { border-color: hsl(var(--records-cyan) / 0.28); }
+  .records-kpi-green { border-color: hsl(var(--records-green) / 0.28); }
+  .records-kpi-amber { border-color: hsl(var(--records-amber) / 0.32); }
+  .records-kpi-red { border-color: hsl(var(--records-red) / 0.28); }
+  .records-kpi-purple { border-color: hsl(var(--records-purple) / 0.28); }
+  .records-kpi-blue > div > span, .records-stage-blue {
+    background: linear-gradient(140deg, hsl(199 95% 50%), hsl(var(--records-blue)) 55%, hsl(222 88% 38%));
+    box-shadow: 0 4px 10px -2px hsl(var(--records-blue) / 0.55), inset 0 1px 0 hsl(0 0% 100% / 0.4);
+  }
+  .records-kpi-teal > div > span, .records-stage-teal {
+    background: linear-gradient(140deg, hsl(160 84% 42%), hsl(var(--records-teal)) 55%, hsl(172 85% 24%));
+    box-shadow: 0 4px 10px -2px hsl(var(--records-teal) / 0.55), inset 0 1px 0 hsl(0 0% 100% / 0.4);
+  }
+  .records-kpi-cyan > div > span, .records-stage-cyan {
+    background: linear-gradient(140deg, hsl(187 92% 46%), hsl(var(--records-cyan)) 55%, hsl(195 85% 34%));
+    box-shadow: 0 4px 10px -2px hsl(var(--records-cyan) / 0.55), inset 0 1px 0 hsl(0 0% 100% / 0.4);
+  }
+  .records-kpi-green > div > span, .records-stage-green {
+    background: linear-gradient(140deg, hsl(88 70% 42%), hsl(var(--records-green)) 55%, hsl(122 65% 28%));
+    box-shadow: 0 4px 10px -2px hsl(var(--records-green) / 0.55), inset 0 1px 0 hsl(0 0% 100% / 0.4);
+  }
+  .records-kpi-amber > div > span, .records-stage-amber {
+    background: linear-gradient(140deg, hsl(40 96% 52%), hsl(var(--records-amber)) 55%, hsl(25 92% 44%));
+    box-shadow: 0 4px 10px -2px hsl(var(--records-amber) / 0.55), inset 0 1px 0 hsl(0 0% 100% / 0.45);
+  }
+  .records-kpi-red > div > span, .records-stage-red {
+    background: linear-gradient(140deg, hsl(349 84% 56%), hsl(var(--records-red)) 55%, hsl(348 80% 42%));
+    box-shadow: 0 4px 10px -2px hsl(var(--records-red) / 0.55), inset 0 1px 0 hsl(0 0% 100% / 0.4);
+  }
+  .records-kpi-purple > div > span, .records-stage-purple {
+    background: linear-gradient(140deg, hsl(262 90% 60%), hsl(var(--records-purple)) 55%, hsl(268 80% 48%));
+    box-shadow: 0 4px 10px -2px hsl(var(--records-purple) / 0.55), inset 0 1px 0 hsl(0 0% 100% / 0.4);
+  }
 
   @media (prefers-reduced-motion: no-preference) {
     .records-dashboard > * { animation: records-enter 220ms ease-out both; }
