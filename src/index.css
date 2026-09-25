@@ -96,6 +96,15 @@
     --health-surface: 210 45% 98%;
     --health-ink: 210 64% 22%;
 
+    /* Longitudinal records dashboard — CiSKuLA-style health spectrum */
+    --records-blue: 203 84% 44%;
+    --records-teal: 171 78% 34%;
+    --records-cyan: 182 78% 39%;
+    --records-green: 139 58% 40%;
+    --records-amber: 39 91% 51%;
+    --records-red: 351 75% 55%;
+    --records-purple: 267 57% 51%;
+
     /* KPI card gradients - Power BI-inspired vibrant palette */
     --kpi-submissions: 160 70% 38%;     /* emerald */
     --kpi-sync: 195 80% 42%;            /* cyan */
@@ -202,6 +211,13 @@
     --health-red: 356 72% 65%;
     --health-surface: 216 26% 13%;
     --health-ink: 210 30% 95%;
+    --records-blue: 202 82% 58%;
+    --records-teal: 169 65% 50%;
+    --records-cyan: 183 70% 52%;
+    --records-green: 139 55% 52%;
+    --records-amber: 40 88% 58%;
+    --records-red: 351 76% 64%;
+    --records-purple: 267 65% 66%;
 
     /* KPI card gradients (dark) */
     --kpi-submissions: 160 65% 42%;
