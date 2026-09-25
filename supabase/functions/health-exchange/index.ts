@@ -201,10 +201,12 @@ Deno.serve(async (req) => {
       case "pull_metadata": {
         if (connection.kind !== "dhis2") return json({ error: "Metadata pull is for DHIS2 connections" }, 400);
         const [orgUnits, dataElements, dataSets, categoryCombos] = await Promise.all([
-          remoteFetch(joinUrl(connection.base_url, "api/organisationUnits?fields=id,name,level&pageSize=200"), { headers }),
-          remoteFetch(joinUrl(connection.base_url, "api/dataElements?fields=id,name&pageSize=500"), { headers }),
-          remoteFetch(joinUrl(connection.base_url, "api/dataSets?fields=id,name,periodType,dataSetElements[dataElement[id,name]]&pageSize=200"), { headers }),
-          remoteFetch(joinUrl(connection.base_url, "api/categoryOptionCombos?fields=id,name&filter=ignoreApproval:neq:true&pageSize=500"), { headers }),
+          // National instances hold 100k+ org units (down to wards/facilities);
+          // pull all State/LGA/Ward levels (1-4) and everything else unpaged.
+          remoteFetch(joinUrl(connection.base_url, `api/organisationUnits?fields=id,name,level&filter=level:le:${Number(payload.max_level ?? 4) || 4}&paging=false`), { headers }, 60000),
+          remoteFetch(joinUrl(connection.base_url, "api/dataElements?fields=id,name&paging=false"), { headers }, 60000),
+          remoteFetch(joinUrl(connection.base_url, "api/dataSets?fields=id,name,periodType,dataSetElements[dataElement[id,name]]&paging=false"), { headers }, 60000),
+          remoteFetch(joinUrl(connection.base_url, "api/categoryOptionCombos?fields=id,name&paging=false"), { headers }, 60000),
         ]);
         const ok = orgUnits.ok && dataElements.ok && dataSets.ok && categoryCombos.ok;
         await log(db, connection, "pull", "dhis2_metadata", ok ? "success" : "error", 0,
