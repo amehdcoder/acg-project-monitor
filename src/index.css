@@ -82,8 +82,8 @@
     --status-info-light: 220 55% 30%;
 
     /* Chart palette */
-    --chart-primary: 160 50% 35%;
-    --chart-secondary: 160 50% 55%;
+    --chart-primary: 224 64% 33%;
+    --chart-secondary: 175 84% 32%;
     --chart-accent: 265 50% 45%;
     --chart-highlight: 38 80% 50%;
     --chart-danger: 0 70% 55%;
@@ -199,8 +199,8 @@
     --status-info-light: 220 55% 35%;
 
     /* Chart palette (dark) */
-    --chart-primary: 160 50% 40%;
-    --chart-secondary: 160 50% 60%;
+    --chart-primary: 221 70% 62%;
+    --chart-secondary: 172 66% 50%;
     --chart-accent: 265 50% 55%;
     --chart-highlight: 38 80% 55%;
     --chart-danger: 0 70% 60%;
@@ -1313,4 +1313,19 @@ select option {
 @layer base {
   h1, h2, h3, h4 { letter-spacing: -0.015em; }
   .lucide { stroke-width: 1.75; }
+}
+
+/* Branded chart tooltip cards (applies to every Recharts tooltip) */
+.recharts-default-tooltip {
+  background: hsl(var(--card)) !important;
+  border: 1px solid hsl(var(--border) / 0.6) !important;
+  border-left: 3px solid hsl(var(--chart-secondary)) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: 0 8px 24px -8px hsl(224 64% 20% / 0.25) !important;
+  padding: 8px 12px !important;
+  font-size: 12px !important;
+}
+.recharts-default-tooltip .recharts-tooltip-label {
+  font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+  color: hsl(var(--muted-foreground)); margin-bottom: 4px !important;
 }

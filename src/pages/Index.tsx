@@ -101,7 +101,11 @@ const Index = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
   // Initialize state from URL params — Forms is the default landing page.
-  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "forms");
+  const [activeTab, setActiveTab] = useState(() => {
+    const fromUrl = searchParams.get("tab");
+    if (fromUrl) return fromUrl;
+    try { return sessionStorage.getItem("amehnities:active-tab") || "forms"; } catch { return "forms"; }
+  });
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(searchParams.get("project"));
   
   const [showSubmissionHistory, setShowSubmissionHistory] = useState(false);
@@ -132,28 +136,25 @@ const Index = () => {
       (recordsLock.exclusive ||
         (!!selectedProjectId && recordsLock.lockedIds.has(selectedProjectId))));
 
+  // Incoming links may still carry ?tab=; honour it once, then keep tab state out of the URL.
   useEffect(() => {
     const urlTab = searchParams.get("tab");
     const urlProject = searchParams.get("project");
-
     if (urlTab) setActiveTab((current) => (current === urlTab ? current : urlTab));
-    setSelectedProjectId((current) => (current === urlProject ? current : urlProject));
+    if (urlProject !== null || !searchParams.has("tab")) {
+      setSelectedProjectId((current) => (current === urlProject ? current : urlProject));
+    }
   }, [searchParams]);
 
   useEffect(() => {
-    if (user?.id && activeTab) {
-      trackPageVisit(activeTab);
-    }
+    if (user?.id && activeTab) trackPageVisit(activeTab);
+    try { sessionStorage.setItem("amehnities:active-tab", activeTab); } catch { /* ignore */ }
 
-    // Sync shell state to URL without letting stale URL params force the tab back to Dashboard.
     const currentParams = new URLSearchParams(window.location.search);
     const nextParams = new URLSearchParams(currentParams);
-    nextParams.set("tab", activeTab);
-    nextParams.delete("__app_update");
+    ["tab", "subtab", "__app_update"].forEach((k) => nextParams.delete(k));
     if (selectedProjectId) nextParams.set("project", selectedProjectId);
     else nextParams.delete("project");
-    if (activeTab !== "dashboard") nextParams.delete("subtab");
-
     if (nextParams.toString() !== currentParams.toString()) {
       setSearchParams(nextParams, { replace: true });
     }

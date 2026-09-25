@@ -416,7 +416,7 @@ const ProjectsView = ({ onSelectProject, onOpenRecords }: ProjectsViewProps) => 
   };
 
   const getProjectColor = (index: number) => {
-    const colors = ["bg-green-500", "bg-blue-500", "bg-acg-gold", "bg-purple-500", "bg-pink-500"];
+    const colors = ["bg-primary", "bg-chart-secondary"];
     return colors[index % colors.length];
   };
 
@@ -527,7 +527,7 @@ const ProjectsView = ({ onSelectProject, onOpenRecords }: ProjectsViewProps) => 
                     <FolderOpen className="h-6 w-6 text-primary" />
                   </div>
                   <div>
-                    <CardTitle className="line-clamp-1">
+                    <CardTitle className="line-clamp-1 text-base normal-case tracking-tight text-foreground">
                       {project.name}
                     </CardTitle>
                     <div className="mt-1 flex flex-wrap items-center gap-1.5">
