@@ -27,6 +27,8 @@ import {
 } from "@/lib/programmeModule/healthExchange";
 import { buildSdmxCsv, buildSdmxJson } from "@/lib/programmeModule/exchangeStandards";
 import { Switch } from "@/components/ui/switch";
+import Dhis2InstanceBrowser from "./Dhis2InstanceBrowser";
+import type { Dhis2Catalog } from "@/lib/programmeModule/healthExchange";
 
 interface Props {
   projectId: string;
@@ -92,6 +94,7 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
   const [sdmxExportFormat, setSdmxExportFormat] = useState<"sdmx-json" | "sdmx-csv">("sdmx-csv");
   const [lmisId, setLmisId] = useState("");
   const [stockCategory, setStockCategory] = useState<"all" | "surgical_consumable" | "morbidity_kit">("all");
+  const [dhisCatalog, setDhisCatalog] = useState<Dhis2Catalog | null>(null);
 
   const active = useMemo(() => rows.find((r) => r.id === activeId) ?? null, [rows, activeId]);
 
@@ -516,6 +519,18 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
             </div>
           )}
 
+          {active?.kind === "dhis2" && (
+            <Dhis2InstanceBrowser
+              connection={active}
+              canManage={canManage}
+              onCatalog={setDhisCatalog}
+              onSaveTarget={async (patch) => {
+                const saved = await saveConnection({ ...active, ...patch });
+                setRows((rs) => rs.map((r) => (r.id === saved.id ? saved : r)));
+              }}
+            />
+          )}
+
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-left text-muted-foreground">
@@ -524,11 +539,43 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
               <tbody>
                 {values.map((v) => {
                   const m = mappings.find((x) => x.indicator_key === v.key);
+                  const liveSet = active?.kind === "dhis2" ? dhisCatalog?.dataSets.find((d) => d.id === active.dataset_id) : undefined;
+                  const liveEl = liveSet?.dataElements.find((e) => e.id === m?.remote_id);
                   return (
                     <tr key={v.key} className="border-t">
                       <td className="p-2">{v.label}</td>
                       <td className="p-2 font-semibold">{v.value}</td>
                       <td className="p-2">
+                        {liveSet ? (
+                          <div className="space-y-1">
+                            <Select value={liveEl ? liveEl.id : ""} disabled={!canManage}
+                              onValueChange={async (remote_id) => {
+                                const el = liveSet.dataElements.find((e) => e.id === remote_id);
+                                const coc = el?.categoryOptionCombos.length === 1 ? el.categoryOptionCombos[0].id : null;
+                                await saveMapping({ connection_id: activeId, indicator_key: v.key, indicator_label: v.label, remote_id, remote_name: el?.name ?? null, category_option_combo: coc } as any);
+                                setMappings(await listMappings(activeId));
+                              }}>
+                              <SelectTrigger className="h-8 w-[280px]">
+                                <SelectValue placeholder={m?.remote_id && m.remote_id !== "UNMAPPED" ? `Code ${m.remote_id} (not in this report)` : "Choose DHIS2 data element"} />
+                              </SelectTrigger>
+                              <SelectContent className="max-h-80">
+                                {liveSet.dataElements.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                            {liveEl && liveEl.categoryOptionCombos.length > 0 && (
+                              <Select value={m?.category_option_combo ?? ""} disabled={!canManage}
+                                onValueChange={async (coc) => {
+                                  await saveMapping({ connection_id: activeId, indicator_key: v.key, indicator_label: v.label, remote_id: liveEl.id, category_option_combo: coc } as any);
+                                  setMappings(await listMappings(activeId));
+                                }}>
+                                <SelectTrigger className="h-8 w-[280px]"><SelectValue placeholder="Choose breakdown" /></SelectTrigger>
+                                <SelectContent className="max-h-80">
+                                  {liveEl.categoryOptionCombos.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            )}
+                          </div>
+                        ) : (
                         <Input
                           className="h-8 w-[220px]"
                           placeholder="Code on the national server"
@@ -544,7 +591,9 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
                             setMappings(await listMappings(activeId));
                           }}
                         />
-                        {active?.kind === "dhis2" && (
+                        )}
+
+                        {active?.kind === "dhis2" && !liveSet && (
                           <Input
                             className="mt-1 h-8 w-[220px]"
                             placeholder="Category option combo (breakdown)"
