@@ -35,6 +35,11 @@ type Connection = {
   dataflow_version: string | null;
   dsd_id: string | null;
   default_dimensions: Record<string, string> | null;
+  auto_push_enabled?: boolean;
+  auto_push_day?: number;
+  auto_push_dry_run?: boolean;
+  last_auto_period?: string | null;
+  lmis_program_id?: string | null;
 };
 
 const admin = () => createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
@@ -131,6 +136,100 @@ async function log(
     .eq("id", conn.id);
 }
 
+
+/* ------------------ Monthly indicator totals (server-side) ------------------ */
+const BASE_INDICATORS = [
+  "beneficiaries_registered", "beneficiaries_active", "cases_confirmed", "referrals_made",
+  "home_visits", "mda_treatments", "morbidity_records",
+];
+const SEXES = ["female", "male"] as const;
+
+function monthRange(period: string) {
+  const year = Number(period.slice(0, 4));
+  const month = Number(period.slice(4, 6));
+  if (!/^\d{6}$/.test(period) || month < 1 || month > 12) throw new Error("Reporting month must be YYYYMM.");
+  return { start: new Date(Date.UTC(year, month - 1, 1)).toISOString(), end: new Date(Date.UTC(year, month, 1)).toISOString() };
+}
+
+function previousPeriod(now = new Date()) {
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+  return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+/** Totals plus sex breakdowns (key:female / key:male) for one project-month. */
+async function computeMonthlyValues(db: ReturnType<typeof admin>, projectId: string, period: string) {
+  const { start, end } = monthRange(period);
+  const count = async (table: string, extra?: (q: any) => any, dated = true) => {
+    let q: any = db.from(table).select("id", { count: "exact", head: true }).eq("project_id", projectId);
+    if (dated) q = q.gte("created_at", start).lt("created_at", end);
+    if (extra) q = extra(q);
+    const { count: c, error } = await q;
+    return error ? 0 : c ?? 0;
+  };
+  const sexFilter = (sex: string) => (q: any) => q.or(`profile->>sex.ilike.${sex}*,profile->>gender.ilike.${sex}*`);
+  const out: Record<string, number> = {};
+  const jobs: Promise<void>[] = [];
+  const set = (key: string, p: Promise<number>) => jobs.push(p.then((v) => { out[key] = v; }));
+  set("beneficiaries_registered", count("beneficiaries"));
+  set("beneficiaries_active", count("beneficiaries", (q) => q.eq("status", "active"), false));
+  set("cases_confirmed", count("mmdp_potential_cases", (q) => q.not("confirmed_at", "is", null)));
+  set("referrals_made", count("beneficiary_referrals"));
+  set("home_visits", count("beneficiary_home_visits"));
+  set("mda_treatments", count("household_mda_treatments"));
+  set("morbidity_records", count("ntd_morbidity_records"));
+  for (const sex of SEXES) {
+    set(`beneficiaries_registered:${sex}`, count("beneficiaries", sexFilter(sex === "female" ? "f" : "m")));
+    set(`beneficiaries_active:${sex}`, count("beneficiaries", (q) => sexFilter(sex === "female" ? "f" : "m")(q.eq("status", "active")), false));
+  }
+  await Promise.all(jobs);
+  return Object.entries(out).map(([indicator_key, value]) => ({ indicator_key, value }));
+}
+
+/** Send mapped values to DHIS2 /api/dataValueSets and log the import summary. */
+async function pushDataValues(
+  db: ReturnType<typeof admin>, connection: Connection, headers: Record<string, string>,
+  period: string, values: { indicator_key: string; value: number }[], orgUnit: string, dryRun: boolean,
+  actor: string | null, action = "dhis2_data_values",
+) {
+  const { data: maps } = await db.from("health_exchange_mappings")
+    .select("indicator_key, remote_id, category_option_combo")
+    .eq("connection_id", connection.id);
+  const byKey = new Map((maps ?? []).filter((m: any) => m.remote_id && m.remote_id !== "UNMAPPED").map((m: any) => [m.indicator_key, m]));
+  const dataValues = values.filter((v) => byKey.has(v.indicator_key)).map((v) => {
+    const m: any = byKey.get(v.indicator_key);
+    return {
+      dataElement: m.remote_id, period, orgUnit, value: String(v.value ?? 0),
+      ...(m.category_option_combo ? { categoryOptionCombo: m.category_option_combo } : {}),
+    };
+  });
+  if (!orgUnit) return { httpStatus: 400, body: { error: "Choose the reporting area (organisation unit) for this server first." } };
+  if (dataValues.length === 0) return { httpStatus: 400, body: { error: "No mapped indicators to send" } };
+  const params = new URLSearchParams({ dryRun: String(dryRun), importStrategy: "CREATE_AND_UPDATE", preheatCache: "true" });
+  if (connection.dataset_id) params.set("dataSet", connection.dataset_id);
+  const res = await remoteFetch(joinUrl(connection.base_url, `api/dataValueSets?${params}`), {
+    method: "POST", headers, body: JSON.stringify({ ...(connection.dataset_id ? { dataSet: connection.dataset_id } : {}), period, orgUnit, dataValues }),
+  }, 60000);
+  const importBody = res.body as Record<string, any> | null;
+  const conflictItems: any[] = importBody?.response?.conflicts ?? importBody?.conflicts ?? [];
+  const summaryReturned = res.status === 409 && importBody?.response?.responseType === "ImportSummary";
+  const counts = importBody?.response?.importCount ?? importBody?.importCount ?? {};
+  const ignored = Number(counts.ignored ?? 0);
+  const reached = res.ok || summaryReturned;
+  const status = res.ok && conflictItems.length === 0 && ignored === 0 ? "success" : reached ? "partial" : "error";
+  const message = reached
+    ? `${dryRun ? "Dry run" : "Import"} ${period}: ${counts.imported ?? 0} imported, ${counts.updated ?? 0} updated, ${ignored} ignored.${conflictItems.length ? " " + conflictItems.slice(0, 3).map((c) => c.value).join("; ") : ""}`
+    : `HTTP ${res.status}: ${remoteMessage(res.body, "DHIS2 rejected the request")}`;
+  await log(db, connection, "push", action, status as any, dataValues.length, message, actor);
+  return { httpStatus: reached ? 200 : 502, body: { ok: reached, dryRun, sent: dataValues.length, status, message, conflicts: conflictItems, response: res.body } };
+}
+
+/** Classify a logistics item as a surgical consumable or a morbidity kit. */
+function classifyCommodity(name: string, fallback?: unknown) {
+  if (fallback && ["surgical_consumable", "morbidity_kit"].includes(String(fallback))) return String(fallback);
+  return /suture|scalpel|blade|glove|gauze|syringe|needle|catheter|drape|forceps|surg|tt\b|trichiasis|hydrocele|anaesth|anesth|lidocaine/i.test(name)
+    ? "surgical_consumable" : "morbidity_kit";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -160,6 +259,31 @@ Deno.serve(async (req) => {
     return json({ ok: true });
   }
 
+  // Monthly automation: called by the scheduler (or an admin) with no connection.
+  if (action === "run_scheduled") {
+    const today = new Date();
+    const period = String(payload.period ?? previousPeriod(today));
+    const { data: due } = await db.from("health_exchange_connections")
+      .select("*").eq("kind", "dhis2").eq("is_active", true).eq("auto_push_enabled", true);
+    const results: unknown[] = [];
+    for (const c of (due ?? []) as Connection[]) {
+      if (payload.force !== true && (today.getUTCDate() < Number(c.auto_push_day ?? 5) || c.last_auto_period === period)) continue;
+      try {
+        const h = await authHeaders(db, c);
+        const values = await computeMonthlyValues(db, c.project_id, period);
+        const r = await pushDataValues(db, c, h, period, values, c.org_unit_id ?? "", c.auto_push_dry_run === true, null, "dhis2_monthly_auto");
+        if (r.httpStatus === 200 && c.auto_push_dry_run !== true) {
+          await db.from("health_exchange_connections").update({ last_auto_period: period }).eq("id", c.id);
+        }
+        results.push({ connection: c.name, period, ...r.body as object });
+      } catch (e) {
+        await log(db, c, "push", "dhis2_monthly_auto", "error", 0, (e as Error).message, null);
+        results.push({ connection: c.name, period, error: (e as Error).message });
+      }
+    }
+    return json({ ok: true, period, processed: results.length, results });
+  }
+
   if (!connectionId) return json({ error: "connection_id required" }, 400);
 
   const { data: conn, error: connErr } = await db
@@ -185,7 +309,9 @@ Deno.serve(async (req) => {
           ? "api/system/info"
           : connection.kind === "fhir"
             ? "metadata"
-            : String(payload.path ?? "api/stockCards?page=0&size=1");
+            : connection.kind === "sdmx"
+              ? String(payload.path ?? `dataflow/${connection.agency_id ?? "all"}/${connection.dataflow_id ?? "all"}/latest`)
+              : String(payload.path ?? "api/stockCardSummaries?page=0&size=1");
         const res = await remoteFetch(joinUrl(connection.base_url, path), { headers });
         await log(db, connection, "test", "connection_test", res.ok ? "success" : "error", 0,
           res.ok ? `Reachable (HTTP ${res.status})` : remoteMessage(res.body, `HTTP ${res.status}`), guard.userId);
@@ -225,52 +351,25 @@ Deno.serve(async (req) => {
       case "push_indicators": {
         if (connection.kind !== "dhis2") return json({ error: "Indicator push is for DHIS2 connections" }, 400);
         const period = String(payload.period ?? "");
-        const dryRun = payload.dry_run === true;
         const values = Array.isArray(payload.values) ? payload.values as { indicator_key: string; value: number }[] : [];
         if (!period || values.length === 0) return json({ error: "period and values required" }, 400);
+        const r = await pushDataValues(db, connection, headers, period, values, String(payload.org_unit ?? connection.org_unit_id ?? ""), payload.dry_run === true, guard.userId);
+        return json(r.body, r.httpStatus);
+      }
 
-        const { data: maps } = await db.from("health_exchange_mappings")
-          .select("indicator_key, remote_id, category_option_combo")
-          .eq("connection_id", connection.id);
-        const byKey = new Map((maps ?? []).map((m: any) => [m.indicator_key, m]));
-
-        const dataValues = values
-          .filter((v) => byKey.has(v.indicator_key))
-          .map((v) => {
-            const m: any = byKey.get(v.indicator_key);
-            return {
-              dataElement: m.remote_id,
-              period,
-              orgUnit: String(payload.org_unit ?? connection.org_unit_id ?? ""),
-              value: String(v.value ?? 0),
-              ...(m.category_option_combo ? { categoryOptionCombo: m.category_option_combo } : {}),
-            };
-          });
-        if (dataValues.length === 0) return json({ error: "No mapped indicators to send" }, 400);
-
-        const params = new URLSearchParams({
-          dryRun: String(dryRun),
-          importStrategy: "CREATE_AND_UPDATE",
-          preheatCache: "true",
-        });
-        const res = await remoteFetch(joinUrl(connection.base_url, `api/dataValueSets?${params}`), {
-          method: "POST", headers, body: JSON.stringify({ dataValues }),
-        });
-        const importBody = res.body as Record<string, any> | null;
-        const conflictItems: any[] = importBody?.response?.conflicts ?? importBody?.conflicts ?? [];
-        const conflicts = conflictItems.length;
-        const summaryReturned = res.status === 409 && importBody?.response?.responseType === "ImportSummary";
-        const ignored = Number(importBody?.response?.importCount?.ignored ?? importBody?.importCount?.ignored ?? 0);
-        const reached = res.ok || summaryReturned;
-        const status = res.ok && conflicts === 0 && ignored === 0 ? "success" : reached ? "partial" : "error";
-        const counts = importBody?.response?.importCount ?? importBody?.importCount ?? {};
-        const importSummary = reached
-          ? `${dryRun ? "Dry run" : "Import"}: ${counts.imported ?? 0} imported, ${counts.updated ?? 0} updated, ${ignored} ignored.${conflicts ? " " + conflictItems.slice(0, 3).map((c) => c.value).join("; ") : ""}`
-          : remoteMessage(res.body, `HTTP ${res.status}`);
-        await log(db, connection, "push", "dhis2_data_values", status, dataValues.length,
-          reached ? importSummary : `HTTP ${res.status}: ${importSummary}`,
-          guard.userId);
-        return json({ ok: reached, dryRun, sent: dataValues.length, status, message: importSummary, conflicts: conflictItems, response: res.body }, reached ? 200 : 502);
+      /* ------------- Monthly totals + category breakdowns ------------- */
+      case "monthly_values": {
+        const period = String(payload.period ?? previousPeriod());
+        return json({ ok: true, period, values: await computeMonthlyValues(db, connection.project_id, period) });
+      }
+      case "push_monthly": {
+        if (connection.kind !== "dhis2") return json({ error: "Monthly reporting is for DHIS2 connections" }, 400);
+        const period = String(payload.period ?? previousPeriod());
+        const values = await computeMonthlyValues(db, connection.project_id, period);
+        const dryRun = payload.dry_run === true;
+        const r = await pushDataValues(db, connection, headers, period, values, String(payload.org_unit ?? connection.org_unit_id ?? ""), dryRun, guard.userId, "dhis2_monthly");
+        if (r.httpStatus === 200 && !dryRun) await db.from("health_exchange_connections").update({ last_auto_period: period }).eq("id", connection.id);
+        return json(r.body, r.httpStatus);
       }
 
       /* ---------------------- ADX / SDMX exchange --------------------- */
@@ -299,7 +398,7 @@ Deno.serve(async (req) => {
           contentType = "application/adx+xml";
           validation = validateAdxXml(content);
         } else {
-          const sdmxInput = { agencyId: connection.agency_id ?? "HANDS", dataflowId: connection.dataflow_id ?? connection.dataset_id ?? "", dataflowVersion: connection.dataflow_version ?? "1.0", period, observations, defaults: connection.default_dimensions ?? {} };
+          const sdmxInput = { agencyId: connection.agency_id || "HANDS", dataflowId: connection.dataflow_id ?? connection.dataset_id ?? "", dataflowVersion: connection.dataflow_version ?? "1.0", period, observations, defaults: connection.default_dimensions ?? {} };
           if (!sdmxInput.dataflowId) return json({ error: "SDMX requires a dataflow ID" }, 400);
           content = format === "sdmx-json" ? buildSdmxJson(sdmxInput) : buildSdmxCsv(sdmxInput);
           contentType = format === "sdmx-json" ? "application/vnd.sdmx.data+json;version=2.0.0" : "application/vnd.sdmx.data+csv;version=2.0.0";
@@ -371,15 +470,21 @@ Deno.serve(async (req) => {
         if (connection.kind !== "lmis") return json({ error: "Stock pull is for LMIS connections" }, 400);
         const requestedPath = String(payload.path ?? "api/stockCards");
         const separator = requestedPath.includes("?") ? "&" : "?";
-        const path = requestedPath + (connection.org_unit_id
-          ? `${separator}facilityId=${encodeURIComponent(connection.org_unit_id)}&size=2000`
-          : `${separator}size=2000`);
+        const q = new URLSearchParams({ size: "2000" });
+        if (connection.org_unit_id) q.set("facilityId", connection.org_unit_id);
+        const program = connection.lmis_program_id || connection.dataset_id;
+        if (program) q.set(requestedPath.includes("stockCardSummaries") ? "programId" : "program", program);
+        const path = requestedPath + separator + q.toString();
         const res = await remoteFetch(joinUrl(connection.base_url, path), { headers });
         if (!res.ok) {
           await log(db, connection, "pull", "lmis_stock", "error", 0, `HTTP ${res.status}`, guard.userId);
           return json({ error: remoteMessage(res.body, `LMIS responded ${res.status}`) }, 502);
         }
-        const items = asArray(res.body);
+        // stockCardSummaries nest one card per lot under each orderable.
+        const items = asArray(res.body).flatMap((it) => Array.isArray(it.canFulfillForMe) && it.canFulfillForMe.length
+          ? (it.canFulfillForMe as Record<string, unknown>[]).map((card) => ({ ...card, orderable: card.orderable ?? it.orderable, facility: it.facility }))
+          : [it]);
+        const filterCategory = payload.category ? String(payload.category) : "";
 
         // Map external facility codes to registered facilities where possible.
         const { data: facilities } = await db.from("health_facilities")
@@ -393,14 +498,16 @@ Deno.serve(async (req) => {
           const lot = (it.lot ?? {}) as Record<string, unknown>;
           const code = String(it.facility_code ?? it.facilityCode ?? facility.code ?? facility.id ?? "");
           const facilityName = String(it.facility_name ?? facility.name ?? "");
-          const facilityId = byCode.get(code.toLowerCase()) ?? byName.get(facilityName.toLowerCase()) ?? null;
+          const facilityId = byCode.get(code.toLowerCase()) ?? byName.get(facilityName.toLowerCase())
+            ?? ((facilities ?? []).length === 1 ? (facilities as any[])[0].id : null);
+          const commodityName = String(it.name ?? it.commodity_name ?? orderable.fullProductName ?? orderable.name ?? "Unnamed commodity");
           return {
             project_id: connection.project_id,
             facility_id: facilityId,
             external_facility_code: code || null,
             commodity_code: String(it.code ?? it.commodity_code ?? it.productCode ?? orderable.productCode ?? orderable.code ?? orderable.id ?? it.id ?? "unknown"),
-            commodity_name: String(it.name ?? it.commodity_name ?? orderable.fullProductName ?? orderable.name ?? "Unnamed commodity"),
-            category: String(it.category ?? "morbidity_kit"),
+            commodity_name: commodityName,
+            category: classifyCommodity(commodityName, it.category),
             unit: it.unit ? String(it.unit) : orderable.dispensable ? String((orderable.dispensable as Record<string, unknown>).displayUnit ?? "") || null : null,
             quantity_on_hand: Number(it.quantity ?? it.stockOnHand ?? it.quantity_on_hand ?? it.quantityOnHand ?? 0) || 0,
             reorder_level: it.reorder_level != null ? Number(it.reorder_level) : (it.reorderLevel != null ? Number(it.reorderLevel) : null),
@@ -408,7 +515,7 @@ Deno.serve(async (req) => {
             source: "lmis",
             last_synced_at: new Date().toISOString(),
           };
-        }).filter((r) => r.facility_id);
+        }).filter((r) => r.facility_id && (!filterCategory || r.category === filterCategory));
 
         if (rows.length) {
           const { error } = await db.from("facility_commodity_stock")
@@ -421,6 +528,37 @@ Deno.serve(async (req) => {
         await log(db, connection, "pull", "lmis_stock", rows.length === items.length ? "success" : "partial",
           rows.length, `Updated ${rows.length} of ${items.length} stock lines`, guard.userId);
         return json({ ok: true, received: items.length, stored: rows.length });
+      }
+
+      /* ------------------------ LMIS stock push ------------------------ */
+      case "push_stock": {
+        if (connection.kind !== "lmis") return json({ error: "Stock push is for LMIS connections" }, 400);
+        const program = connection.lmis_program_id || connection.dataset_id;
+        const facility = String(payload.facility_id ?? connection.org_unit_id ?? "");
+        if (!program || !facility) return json({ error: "Set the OpenLMIS programme ID and facility ID on this server first." }, 400);
+        let q = db.from("facility_commodity_stock").select("*").eq("project_id", connection.project_id);
+        if (payload.category) q = q.eq("category", String(payload.category));
+        if (Array.isArray(payload.stock_ids) && payload.stock_ids.length) q = q.in("id", payload.stock_ids.map(String));
+        const { data: lines } = await q;
+        const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const valid = (lines ?? []).filter((l: any) => uuid.test(String(l.commodity_code)));
+        const skipped = (lines ?? []).length - valid.length;
+        if (!valid.length) return json({ error: "No stock lines carry an OpenLMIS product ID. Pull stock from OpenLMIS first so items are linked." }, 400);
+        const occurredDate = new Date().toISOString().slice(0, 10);
+        // A stock event without reason/source/destination is a physical inventory count.
+        const event = {
+          facilityId: facility, programId: program,
+          lineItems: valid.map((l: any) => ({ orderableId: l.commodity_code, quantity: Number(l.quantity_on_hand) || 0, occurredDate })),
+        };
+        const res = await remoteFetch(joinUrl(connection.base_url, String(payload.path ?? "api/stockEvents")), {
+          method: "POST", headers, body: JSON.stringify(event),
+        }, 60000);
+        const message = res.ok
+          ? `Sent ${valid.length} stock counts to OpenLMIS${skipped ? ` (${skipped} local-only items skipped)` : ""}`
+          : `HTTP ${res.status}: ${remoteMessage(res.body, "OpenLMIS rejected the stock event")}`;
+        await log(db, connection, "push", "lmis_stock", res.ok ? (skipped ? "partial" : "success") : "error", valid.length, message, guard.userId);
+        if (res.ok) await db.from("facility_commodity_stock").update({ last_synced_at: new Date().toISOString() }).in("id", valid.map((l: any) => l.id));
+        return json({ ok: res.ok, sent: valid.length, skipped, message, response: res.body }, res.ok ? 200 : 502);
       }
 
       /* ------------------------ FHIR Patient push ---------------------- */
