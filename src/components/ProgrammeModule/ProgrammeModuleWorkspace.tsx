@@ -94,7 +94,7 @@ const ProgrammeModuleWorkspace = ({
 
   // What this person is allowed to see and do, from the project team register.
   // People who are not listed keep the access they already had.
-  const { can, listed: onTeamRegister } = useMyTeamPermissions(projectId, canConfigure);
+  const { can, listed: onTeamRegister, loading: permissionsLoading } = useMyTeamPermissions(projectId, canConfigure);
   const [view, setView] = useState<WorkspaceView>(() => can("view_dashboards") ? "dashboard" : "records");
 
 
@@ -158,6 +158,12 @@ const ProgrammeModuleWorkspace = ({
       ],
     },
   ];
+
+  useEffect(() => {
+    if (permissionsLoading) return;
+    const visibleViews = navGroups.flatMap((group) => group.items).filter((item) => item.show).map((item) => item.key);
+    if (!visibleViews.includes(view)) setView(visibleViews.includes("records") ? "records" : visibleViews[0] || "records");
+  }, [permissionsLoading, view, canConfigure, isOfficer, onTeamRegister]);
 
   useEffect(() => {
     bindQueueAutoFlush();
@@ -267,7 +273,7 @@ const ProgrammeModuleWorkspace = ({
         </div>
       </div>
 
-      <WorkspaceNavigation groups={navGroups} view={view} onViewChange={setView} administration={
+      {!permissionsLoading && <WorkspaceNavigation groups={navGroups} view={view} onViewChange={setView} administration={
         <DropdownMenu>
           <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="gap-2"><SlidersHorizontal className="h-4 w-4" /> Manage<ChevronDown className="h-3.5 w-3.5" /></Button></DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64">
@@ -281,7 +287,7 @@ const ProgrammeModuleWorkspace = ({
             {canConfigure && <DropdownMenuItem onSelect={() => setDeleteRequestsOpen(true)} className="text-destructive"><ShieldAlert className="mr-2 h-4 w-4" /> Deletion requests</DropdownMenuItem>}
           </DropdownMenuContent>
         </DropdownMenu>
-      } />
+      } />}
 
 
 
@@ -300,7 +306,7 @@ const ProgrammeModuleWorkspace = ({
         </Card>
       )}
 
-      {active && view === "records" && (
+      {!permissionsLoading && active && view === "records" && (
         <BeneficiaryList
           beneficiaries={scopedBeneficiaries}
           config={normalizeConfig(active.config)}
@@ -313,7 +319,7 @@ const ProgrammeModuleWorkspace = ({
         />
       )}
 
-      {active && view === "dashboard" && (
+      {!permissionsLoading && active && view === "dashboard" && (
         <GeneralDashboard
           projectId={projectId}
           moduleId={active.id}

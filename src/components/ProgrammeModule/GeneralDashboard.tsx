@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Activity, AlertTriangle, ArrowRightLeft, Brain, BriefcaseBusiness, Building2,
+  Activity, ArrowRightLeft, Brain, Building2,
   CalendarDays, CheckCircle2, Database, Droplets, Eye, FileText, Hospital,
   Leaf, MapPinned, Pill, Plus, RefreshCw, Search, ShieldAlert, UserPlus, Users,
 } from "lucide-react";
@@ -82,8 +82,7 @@ const GeneralDashboard = ({
   const due = beneficiaries.filter((beneficiary) => beneficiary.next_follow_up_date && beneficiary.next_follow_up_date <= today).length;
   const pendingReferrals = scopedReferrals.filter((referral) => !["completed", "declined"].includes(referral.status)).length;
   const serviceCount = scopedRows.reduce((sum, row) => sum + row.serviceCount, 0);
-  const componentKeys = (row: (typeof scopedRows)[number]) => row.components;
-  const componentCount = (keys: string[]) => scopedRows.filter((row) => includesAny(componentKeys(row), keys)).length;
+  const componentCount = (keys: string[]) => scopedRows.filter((row) => includesAny(row.components, keys)).length;
   const assessed = scopedRows.filter((row) => Boolean(row.perceivedChange)).length;
   const improved = scopedRows.filter((row) => ["Improved", "Much improved"].includes(row.perceivedChange || "")).length;
   const outcomes = [
