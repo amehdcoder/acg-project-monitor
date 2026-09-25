@@ -251,7 +251,7 @@ const GeneralDashboard = ({
                 cells={geography.cells}
                 height={390}
                 showBasemap={false}
-                className="z-0"
+                className="z-0 !bg-card"
                 onSelectUnit={(state, lga) => setSelectedGeography({ state, lga })}
               />
             ) : (
