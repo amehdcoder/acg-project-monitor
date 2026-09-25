@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity, ArrowRightLeft, BarChart3, Brain, Building2,
   CalendarDays, CheckCircle2, Database, Droplets, Eye, FileText, HeartPulse, Hospital,
-  Leaf, LocateFixed, Map, MapPin, MapPinned, Navigation, Pill, Plus, RefreshCw, Search,
+  Leaf, LocateFixed, Map as MapIcon, MapPin, MapPinned, Navigation, Pill, Plus, RefreshCw, Search,
   ShieldAlert, Sparkles, UserPlus, Users, Zap,
 } from "lucide-react";
 import { Bar, BarChart, Cell, Pie, PieChart, Tooltip, XAxis, YAxis } from "recharts";
@@ -242,7 +242,7 @@ const GeneralDashboard = ({
         tone="green"
         title="Geographic Distribution"
         subtitle="Live beneficiary concentration by Local Government Area"
-        action={<Button variant="ghost" size="sm" onClick={() => onNavigate("clusters")}><Map className="h-4 w-4" /> Explore clusters</Button>}
+        action={<Button variant="ghost" size="sm" onClick={() => onNavigate("clusters")}><MapIcon className="h-4 w-4" /> Explore clusters</Button>}
       >
         <div className="grid gap-0 lg:grid-cols-[minmax(0,2.2fr)_minmax(270px,0.8fr)]">
           <div className="relative min-h-[390px] overflow-hidden border-b border-health-blue/10 bg-health-surface lg:border-b-0 lg:border-r">
@@ -273,7 +273,7 @@ const GeneralDashboard = ({
             <div className="grid grid-cols-2 gap-2">
               {[
                 { label: "Mapped records", value: geography.mapped, icon: MapPin, tone: "green" },
-                { label: "States covered", value: geography.stateCount, icon: Map, tone: "blue" },
+                { label: "States covered", value: geography.stateCount, icon: MapIcon, tone: "blue" },
                 { label: "LGAs covered", value: geography.lgaCount, icon: LocateFixed, tone: "purple" },
                 { label: "Wards covered", value: geography.wardCount, icon: Navigation, tone: "amber" },
               ].map((item) => <div key={item.label} className="rounded-md border border-health-blue/10 bg-health-surface p-2.5"><div className="flex items-center gap-2"><span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-primary-foreground", `records-stage-${item.tone}`)}><item.icon className="h-4 w-4" /></span><div><p className="font-report-display text-lg font-bold leading-none text-health-ink">{item.value.toLocaleString()}</p><p className="mt-1 text-[9px] font-semibold text-muted-foreground">{item.label}</p></div></div></div>)}
