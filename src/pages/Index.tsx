@@ -117,11 +117,20 @@ const Index = () => {
   usePushNotifications();
   const { trackPageVisit } = useSurveillanceTracking(user?.id);
   const recordsLock = useRecordsOnlyProjects();
+  const [ownerRecordsMode, setOwnerRecordsModeState] = useState<boolean>(() => {
+    try { return localStorage.getItem("amehnities:owner-records-mode") === "1"; } catch { return false; }
+  });
+  const setOwnerRecordsMode = (on: boolean) => {
+    setOwnerRecordsModeState(on);
+    try { localStorage.setItem("amehnities:owner-records-mode", on ? "1" : "0"); } catch { /* ignore */ }
+  };
+  const ownerCanSwitch = recordsLock.isOwnerLevel && recordsLock.locked.length > 0;
   const recordsLockActive =
-    !recordsLock.isOwnerLevel &&
-    recordsLock.locked.length > 0 &&
-    (recordsLock.exclusive ||
-      (!!selectedProjectId && recordsLock.lockedIds.has(selectedProjectId)));
+    (ownerCanSwitch && ownerRecordsMode) ||
+    (!recordsLock.isOwnerLevel &&
+      recordsLock.locked.length > 0 &&
+      (recordsLock.exclusive ||
+        (!!selectedProjectId && recordsLock.lockedIds.has(selectedProjectId))));
 
   useEffect(() => {
     const urlTab = searchParams.get("tab");
@@ -412,7 +421,8 @@ const Index = () => {
         <RecordsOnlyShell
           projects={recordsLock.locked}
           initialProjectId={selectedProjectId}
-          onExit={recordsLock.exclusive ? undefined : () => { setSelectedProjectId(null); setActiveTab("projects"); }}
+          onExit={ownerCanSwitch ? undefined : recordsLock.exclusive ? undefined : () => { setSelectedProjectId(null); setActiveTab("projects"); }}
+          onSwitchToFullApp={ownerCanSwitch ? () => setOwnerRecordsMode(false) : undefined}
         />
       </ErrorBoundary>
     );
