@@ -2,6 +2,13 @@ import type { Config } from "tailwindcss";
 
 export default {
   darkMode: ["class"],
+  // Dynamically composed records-* icon tones (General Dashboard) must not be tree-shaken.
+  safelist: [
+    "records-kpi-blue", "records-kpi-teal", "records-kpi-cyan", "records-kpi-green",
+    "records-kpi-amber", "records-kpi-red", "records-kpi-purple",
+    "records-stage-blue", "records-stage-teal", "records-stage-cyan", "records-stage-green",
+    "records-stage-amber", "records-stage-red", "records-stage-purple",
+  ],
   content: ["./pages/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
   prefix: "",
   theme: {
