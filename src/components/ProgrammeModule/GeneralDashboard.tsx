@@ -250,6 +250,7 @@ const GeneralDashboard = ({
               <NigeriaChoropleth
                 cells={geography.cells}
                 height={390}
+                showBasemap={false}
                 className="z-0"
                 onSelectUnit={(state, lga) => setSelectedGeography({ state, lga })}
               />
