@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.1"
   }
   public: {
     Tables: {
@@ -5924,12 +5924,18 @@ export type Database = {
       }
       health_exchange_connections: {
         Row: {
+          agency_id: string | null
           auth_type: string
           base_url: string
           created_at: string
           created_by: string | null
+          dataflow_id: string | null
+          dataflow_version: string | null
           dataset_id: string | null
+          default_dimensions: Json
           default_period_type: string
+          dsd_id: string | null
+          exchange_format: string
           id: string
           is_active: boolean
           kind: string
@@ -5938,16 +5944,23 @@ export type Database = {
           name: string
           org_unit_id: string | null
           project_id: string
+          token_url: string | null
           updated_at: string
           username: string | null
         }
         Insert: {
+          agency_id?: string | null
           auth_type?: string
           base_url: string
           created_at?: string
           created_by?: string | null
+          dataflow_id?: string | null
+          dataflow_version?: string | null
           dataset_id?: string | null
+          default_dimensions?: Json
           default_period_type?: string
+          dsd_id?: string | null
+          exchange_format?: string
           id?: string
           is_active?: boolean
           kind: string
@@ -5956,16 +5969,23 @@ export type Database = {
           name: string
           org_unit_id?: string | null
           project_id: string
+          token_url?: string | null
           updated_at?: string
           username?: string | null
         }
         Update: {
+          agency_id?: string | null
           auth_type?: string
           base_url?: string
           created_at?: string
           created_by?: string | null
+          dataflow_id?: string | null
+          dataflow_version?: string | null
           dataset_id?: string | null
+          default_dimensions?: Json
           default_period_type?: string
+          dsd_id?: string | null
+          exchange_format?: string
           id?: string
           is_active?: boolean
           kind?: string
@@ -5974,6 +5994,7 @@ export type Database = {
           name?: string
           org_unit_id?: string | null
           project_id?: string
+          token_url?: string | null
           updated_at?: string
           username?: string | null
         }
@@ -6010,6 +6031,7 @@ export type Database = {
           category_option_combo: string | null
           connection_id: string
           created_at: string
+          dimensions: Json
           id: string
           indicator_key: string
           indicator_label: string | null
@@ -6021,6 +6043,7 @@ export type Database = {
           category_option_combo?: string | null
           connection_id: string
           created_at?: string
+          dimensions?: Json
           id?: string
           indicator_key: string
           indicator_label?: string | null
@@ -6032,6 +6055,7 @@ export type Database = {
           category_option_combo?: string | null
           connection_id?: string
           created_at?: string
+          dimensions?: Json
           id?: string
           indicator_key?: string
           indicator_label?: string | null
