@@ -121,7 +121,7 @@ const Index = () => {
     !recordsLock.isOwnerLevel &&
     recordsLock.locked.length > 0 &&
     (recordsLock.exclusive ||
-      (activeTab === "records" && !!selectedProjectId && recordsLock.lockedIds.has(selectedProjectId)));
+      (!!selectedProjectId && recordsLock.lockedIds.has(selectedProjectId)));
 
   useEffect(() => {
     const urlTab = searchParams.get("tab");
