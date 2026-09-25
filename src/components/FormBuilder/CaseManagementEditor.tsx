@@ -584,7 +584,7 @@ const CaseManagementEditor = ({
                 {localSettings.caseType && (
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="">Form Action</CardTitle>
+                      <CardTitle>Form Action</CardTitle>
                       <CardDescription>
                         Define how this form interacts with cases
                       </CardDescription>

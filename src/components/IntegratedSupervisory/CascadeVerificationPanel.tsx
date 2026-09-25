@@ -149,7 +149,7 @@ export default function CascadeVerificationPanel({
       {chart.length > 0 && (
         <Card>
           <CardHeader className="py-3 px-4 border-b bg-muted/40">
-            <CardTitle className="">Allocated vs dispatched vs confirmed, by State</CardTitle>
+            <CardTitle>Allocated vs dispatched vs confirmed, by State</CardTitle>
           </CardHeader>
           <CardContent className="p-4">
             <div className="h-[300px]">
@@ -222,7 +222,7 @@ export default function CascadeVerificationPanel({
       <Card>
         <CardHeader className="py-3 px-4 border-b bg-muted/40 space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle className="">
+            <CardTitle>
               State dispatch vs EDO / Logistic Officer confirmation — line-by-line
             </CardTitle>
             {canExport && (

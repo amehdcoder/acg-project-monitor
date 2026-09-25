@@ -1256,7 +1256,7 @@ const MachineLearningView = () => {
                       {comparisonRuns.map(run => (
                         <Card key={run.id} className="border-border">
                           <CardHeader className="pb-2">
-                            <CardTitle className="">{run.methodLabel}</CardTitle>
+                            <CardTitle>{run.methodLabel}</CardTitle>
                             <CardDescription className="text-xs">{run.config.trainRatio}/{run.config.testRatio}/{run.config.valRatio} split</CardDescription>
                           </CardHeader>
                           <CardContent className="space-y-2">
@@ -1296,7 +1296,7 @@ const MachineLearningView = () => {
 
                   {/* Radar chart comparison */}
                   <Card>
-                    <CardHeader><CardTitle className="">Performance Radar</CardTitle></CardHeader>
+                    <CardHeader><CardTitle>Performance Radar</CardTitle></CardHeader>
                     <CardContent>
                       <div className="h-[350px]">
                         <ResponsiveContainer width="100%" height="100%">

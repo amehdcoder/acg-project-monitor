@@ -447,7 +447,7 @@ const SecurityAuditView = () => {
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="">Security Categories</CardTitle>
+                <CardTitle>Security Categories</CardTitle>
               </CardHeader>
               <CardContent>
                 {["Authentication", "Encryption", "Access Control", "Data Integrity", "Monitoring", "Infrastructure"].map(cat => {

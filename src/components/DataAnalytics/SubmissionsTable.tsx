@@ -357,7 +357,7 @@ const SubmissionsTable = ({
   if (loading) {
     return (
       <Card className="border-0 shadow-card">
-        <CardHeader><CardTitle className="">Submissions</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Submissions</CardTitle></CardHeader>
         <CardContent>
           <div className="space-y-4 animate-pulse">
             {[1, 2, 3, 4, 5].map((i) => <div key={i} className="h-12 bg-muted rounded" />)}
@@ -371,7 +371,7 @@ const SubmissionsTable = ({
     <Card className="border-0 shadow-card">
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3 flex-wrap">
-          <CardTitle className="">
+          <CardTitle>
             Submissions <span className="text-sm font-normal text-muted-foreground">({sorted.length.toLocaleString()})</span>
           </CardTitle>
           {selectedIds.size > 0 && (

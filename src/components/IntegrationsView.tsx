@@ -523,7 +523,7 @@ const IntegrationsView = () => {
                     <integration.icon className="h-7 w-7 text-primary" />
                   </div>
                   <div>
-                    <CardTitle className="">
+                    <CardTitle>
                       {integration.name}
                     </CardTitle>
                     <div className="mt-1 flex items-center gap-2">

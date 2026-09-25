@@ -1396,7 +1396,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions: rawSubmi
 
       {/* ── Activity trend ── */}
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="">Supervision Activity Trend <span className="font-normal text-muted-foreground">(last 14 days)</span></CardTitle></CardHeader>
+        <CardHeader className="pb-2"><CardTitle>Supervision Activity Trend <span className="font-normal text-muted-foreground">(last 14 days)</span></CardTitle></CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={trend} margin={{ top: 5, right: 10, left: -18, bottom: 0 }}>

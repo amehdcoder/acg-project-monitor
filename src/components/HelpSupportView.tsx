@@ -257,7 +257,7 @@ const HelpSupportView = () => {
             filteredFAQs.map(cat => (
               <Card key={cat.category}>
                 <CardHeader className="pb-3">
-                  <CardTitle className="">{cat.category}</CardTitle>
+                  <CardTitle>{cat.category}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <Accordion type="multiple" className="space-y-1">
@@ -307,7 +307,7 @@ const HelpSupportView = () => {
         <TabsContent value="shortcuts">
           <Card>
             <CardHeader>
-              <CardTitle className="">Keyboard Shortcuts</CardTitle>
+              <CardTitle>Keyboard Shortcuts</CardTitle>
               <CardDescription>Speed up your workflow with these shortcuts</CardDescription>
             </CardHeader>
             <CardContent>
@@ -358,7 +358,7 @@ const HelpSupportView = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle className="">System Status</CardTitle>
+              <CardTitle>System Status</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">

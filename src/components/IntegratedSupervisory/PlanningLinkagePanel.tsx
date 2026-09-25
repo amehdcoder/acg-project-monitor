@@ -252,7 +252,7 @@ export default function PlanningLinkagePanel({
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="">Equity gradient — coverage by access conditions</CardTitle>
+                <CardTitle>Equity gradient — coverage by access conditions</CardTitle>
               </CardHeader>
               <CardContent className="overflow-x-auto">
                 <Table>
@@ -358,7 +358,7 @@ export default function PlanningLinkagePanel({
           {/* ── actions ────────────────────────────────────────────────── */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="">Act now — corrections ranked by population still at risk</CardTitle>
+              <CardTitle>Act now — corrections ranked by population still at risk</CardTitle>
               <p className="text-[11px] text-muted-foreground">
                 Recomputed on every microplan, checklist and ledger sync, so the list reflects the field as it stands today.
               </p>

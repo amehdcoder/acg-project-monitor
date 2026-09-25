@@ -154,7 +154,7 @@ export default function EmailServicesView() {
               <Card key={p.id} className="overflow-hidden">
                 <div className={`h-1.5 bg-gradient-to-r ${p.color}`} />
                 <CardHeader className="pb-2">
-                  <CardTitle className="">{p.name}</CardTitle>
+                  <CardTitle>{p.name}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2 text-xs">
                   <div>

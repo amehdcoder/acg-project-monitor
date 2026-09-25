@@ -230,7 +230,7 @@ const StandardAssessmentFiller = ({
 
       {sections.map(([section, qs]) => (
         <Card key={section}>
-          <CardHeader><CardTitle className="">{section}</CardTitle></CardHeader>
+          <CardHeader><CardTitle>{section}</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             {qs.filter(isVisible).map((q) => {
               const opts = resolveOptions(q);

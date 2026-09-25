@@ -409,7 +409,7 @@ const ARCameraOverlay = ({ projectId, formId }: Props) => {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="">Nearby Points</CardTitle>
+              <CardTitle>Nearby Points</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <div className="max-h-[300px] overflow-y-auto">

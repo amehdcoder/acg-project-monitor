@@ -40,7 +40,7 @@ const CommunicationTips = () => {
       {/* Levels of Hearing Impairment */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="">🔊 Understanding Hearing Impairment Levels</CardTitle>
+          <CardTitle>🔊 Understanding Hearing Impairment Levels</CardTitle>
           <p className="text-xs text-muted-foreground">Adapt your communication approach based on the person's level of hearing ability</p>
         </CardHeader>
         <CardContent>
@@ -124,7 +124,7 @@ const CommunicationTips = () => {
       {/* Field workflow */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="">📋 Recommended Field Workflow</CardTitle>
+          <CardTitle>📋 Recommended Field Workflow</CardTitle>
         </CardHeader>
         <CardContent>
           <ol className="text-xs space-y-3">

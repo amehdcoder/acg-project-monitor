@@ -3342,7 +3342,7 @@ const FormFiller = ({
           {isMdaChecklist ? null : (
             <Card className="border-0 shadow-card mb-4">
               <CardHeader className="bg-gradient-to-r from-primary/10 to-transparent">
-                <CardTitle className="">{formName || "Untitled Form"}</CardTitle>
+                <CardTitle>{formName || "Untitled Form"}</CardTitle>
                 {formDescription && <CardDescription className="text-sm">{formDescription}</CardDescription>}
               </CardHeader>
             </Card>

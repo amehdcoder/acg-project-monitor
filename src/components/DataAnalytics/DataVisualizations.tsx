@@ -265,7 +265,7 @@ const DataVisualizations = ({ submissions, selectedForm, loading }: DataVisualiz
           {/* Submissions Over Time */}
           <Card className="border-0 shadow-card">
             <CardHeader>
-              <CardTitle className="">Submissions Over Time</CardTitle>
+              <CardTitle>Submissions Over Time</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-64">
@@ -298,7 +298,7 @@ const DataVisualizations = ({ submissions, selectedForm, loading }: DataVisualiz
           {chartData.pieData.length > 0 && (
             <Card className="border-0 shadow-card">
               <CardHeader>
-                <CardTitle className="">Submissions by Location</CardTitle>
+                <CardTitle>Submissions by Location</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-64">
@@ -330,7 +330,7 @@ const DataVisualizations = ({ submissions, selectedForm, loading }: DataVisualiz
         <TabsContent value="map" className="mt-6">
           <Card className="border-0 shadow-card">
             <CardHeader>
-              <CardTitle className="">Geographic Distribution</CardTitle>
+              <CardTitle>Geographic Distribution</CardTitle>
             </CardHeader>
             <CardContent>
               {mapMarkers.length > 0 || geofenceBoundaries.length > 0 ? (
@@ -363,7 +363,7 @@ const DataVisualizations = ({ submissions, selectedForm, loading }: DataVisualiz
           {/* Line Chart for Trends */}
           <Card className="border-0 shadow-card">
             <CardHeader>
-              <CardTitle className="">Submission Trends</CardTitle>
+              <CardTitle>Submission Trends</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-64">
@@ -427,7 +427,7 @@ const DataVisualizations = ({ submissions, selectedForm, loading }: DataVisualiz
           {chartData.numericData.length > 0 && (
             <Card className="border-0 shadow-card">
               <CardHeader>
-                <CardTitle className="">Numeric Data Analysis</CardTitle>
+                <CardTitle>Numeric Data Analysis</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-64">
@@ -454,7 +454,7 @@ const DataVisualizations = ({ submissions, selectedForm, loading }: DataVisualiz
           {/* Summary Statistics */}
           <Card className="border-0 shadow-card">
             <CardHeader>
-              <CardTitle className="">Summary Statistics</CardTitle>
+              <CardTitle>Summary Statistics</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

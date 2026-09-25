@@ -315,7 +315,7 @@ const WhatIfAnalysis = () => {
             {scenarios.length > 0 && (
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="">Saved Scenarios ({scenarios.length})</CardTitle>
+                  <CardTitle>Saved Scenarios ({scenarios.length})</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ScrollArea className="max-h-[200px]">

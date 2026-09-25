@@ -177,7 +177,7 @@ const SpatialAnalysisView = () => {
       if (chart.type === "bar") {
         return (
           <Card key={i}>
-            <CardHeader><CardTitle className="">{chart.title}</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{chart.title}</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={chart.data}>
@@ -198,7 +198,7 @@ const SpatialAnalysisView = () => {
       if (chart.type === "scatter") {
         return (
           <Card key={i}>
-            <CardHeader><CardTitle className="">{chart.title}</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{chart.title}</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <ScatterChart>
@@ -220,7 +220,7 @@ const SpatialAnalysisView = () => {
       if (chart.type === "pie") {
         return (
           <Card key={i}>
-            <CardHeader><CardTitle className="">{chart.title}</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{chart.title}</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>

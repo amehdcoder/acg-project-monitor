@@ -316,7 +316,7 @@ const StatisticalAnalysisView = () => {
       if (chart.type === "bar") {
         return (
           <Card key={key}>
-            <CardHeader><CardTitle className="">{chart.title}</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{chart.title}</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={chart.data}>
@@ -337,7 +337,7 @@ const StatisticalAnalysisView = () => {
       if (chart.type === "pie") {
         return (
           <Card key={key}>
-            <CardHeader><CardTitle className="">{chart.title}</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{chart.title}</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <RechartsPie>
@@ -357,7 +357,7 @@ const StatisticalAnalysisView = () => {
       if (chart.type === "scatter") {
         return (
           <Card key={key}>
-            <CardHeader><CardTitle className="">{chart.title}</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{chart.title}</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <RechartsScatter>
@@ -375,7 +375,7 @@ const StatisticalAnalysisView = () => {
       if (chart.type === "line") {
         return (
           <Card key={key}>
-            <CardHeader><CardTitle className="">{chart.title}</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{chart.title}</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={chart.data}>
@@ -396,7 +396,7 @@ const StatisticalAnalysisView = () => {
       if (chart.type === "area") {
         return (
           <Card key={key}>
-            <CardHeader><CardTitle className="">{chart.title}</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{chart.title}</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <AreaChart data={chart.data}>

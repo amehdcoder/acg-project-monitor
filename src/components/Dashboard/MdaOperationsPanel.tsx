@@ -308,7 +308,7 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="border-none shadow-xl bg-white rounded-lg">
               <CardHeader>
-                <CardTitle className="font-black text-slate-900">Implementation Score by LGA</CardTitle>
+                <CardTitle>Implementation Score by LGA</CardTitle>
                 <CardDescription className="text-xs">Mean supervisory implementation score (top LGAs)</CardDescription>
               </CardHeader>
               <CardContent>
@@ -326,7 +326,7 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
 
             <Card className="border-none shadow-xl bg-white rounded-lg">
               <CardHeader>
-                <CardTitle className="font-black text-slate-900">Risk Categorisation</CardTitle>
+                <CardTitle>Risk Categorisation</CardTitle>
                 <CardDescription className="text-xs">Distribution of supervisory risk ratings</CardDescription>
               </CardHeader>
               <CardContent>

@@ -163,7 +163,7 @@ Do not include any extra text.`;
         {/* Avatar Display */}
         <Card className="border-primary/20">
           <CardHeader className="pb-2">
-            <CardTitle className="">Avatar Interpreter</CardTitle>
+            <CardTitle>Avatar Interpreter</CardTitle>
           </CardHeader>
           <CardContent>
             <div ref={avatarRef} className="relative mx-auto w-48 h-48 rounded-2xl bg-gradient-to-br from-primary/10 via-accent/10 to-secondary/10 flex items-center justify-center mb-4 overflow-hidden border-2 border-primary/20">
@@ -243,7 +243,7 @@ Do not include any extra text.`;
 
           {frames.length > 0 && (
             <Card>
-              <CardHeader className="pb-2"><CardTitle className="">Sign Sequence</CardTitle></CardHeader>
+              <CardHeader className="pb-2"><CardTitle>Sign Sequence</CardTitle></CardHeader>
               <CardContent>
                 <ScrollArea className="max-h-[200px]">
                   <div className="space-y-1">

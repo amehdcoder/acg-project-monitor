@@ -451,7 +451,7 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
             </Card>
 
             <Card>
-              <CardHeader className="pb-2"><CardTitle className="">Dominant causes across diagnosed communities</CardTitle></CardHeader>
+              <CardHeader className="pb-2"><CardTitle>Dominant causes across diagnosed communities</CardTitle></CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={380}>
                   <BarChart data={causeRanking} layout="vertical" margin={{ left: 40 }}>

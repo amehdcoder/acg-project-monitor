@@ -959,7 +959,7 @@ const CaseDetails = ({ open, onOpenChange, caseId, onLaunchFollowUp }: CaseDetai
               <div className="space-y-4">
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="">Case Information</CardTitle>
+                    <CardTitle>Case Information</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="flex items-center justify-between">
@@ -993,7 +993,7 @@ const CaseDetails = ({ open, onOpenChange, caseId, onLaunchFollowUp }: CaseDetai
 
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="">Case Properties</CardTitle>
+                    <CardTitle>Case Properties</CardTitle>
                     <CardDescription>Saved data from form submissions</CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -1255,7 +1255,7 @@ const CaseDetails = ({ open, onOpenChange, caseId, onLaunchFollowUp }: CaseDetai
 
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="">People with access</CardTitle>
+                    <CardTitle>People with access</CardTitle>
                   </CardHeader>
                   <CardContent>
                     {permissions.length === 0 ? (

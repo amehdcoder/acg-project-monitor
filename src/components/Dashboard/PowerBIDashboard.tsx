@@ -902,7 +902,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
         {/* Source variance */}
         <Card className="xl:col-span-3 border-none shadow-lg bg-white rounded-lg overflow-hidden">
           <CardHeader className="p-4 pb-2">
-            <CardTitle className="font-black text-slate-900">Source Variance</CardTitle>
+            <CardTitle>Source Variance</CardTitle>
             <CardDescription className="text-[11px]">Coverage spread between sources (percentage points)</CardDescription>
           </CardHeader>
           <CardContent className="p-4 pt-0">
@@ -913,7 +913,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
         {/* Supervision coverage gap map */}
         <Card className="xl:col-span-3 border-none shadow-lg bg-white rounded-lg overflow-hidden">
           <CardHeader className="p-4 pb-2">
-            <CardTitle className="font-black text-slate-900">Supervision Coverage Gap Map</CardTitle>
+            <CardTitle>Supervision Coverage Gap Map</CardTitle>
             <CardDescription className="text-[11px]">Microplanned communities / settlements</CardDescription>
           </CardHeader>
           <CardContent className="p-3 pt-0">
@@ -970,7 +970,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
         {/* Therapeutic coverage by source */}
         <Card className="xl:col-span-5 border-none shadow-lg bg-white rounded-lg overflow-hidden">
           <CardHeader className="p-4 pb-2">
-            <CardTitle className="font-black text-slate-900">Therapeutic Coverage by Source</CardTitle>
+            <CardTitle>Therapeutic Coverage by Source</CardTitle>
             <CardDescription className="text-[11px]">Triangulation of three data sources, top LGAs by activity</CardDescription>
           </CardHeader>
           <CardContent className="p-3">
@@ -997,7 +997,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
         {/* Achievement maps */}
         <Card className="xl:col-span-4 border-none shadow-lg bg-white rounded-lg overflow-hidden">
           <CardHeader className="p-4 pb-2">
-            <CardTitle className="font-black text-slate-900">Therapeutic Coverage Achievement by Programme Threshold</CardTitle>
+            <CardTitle>Therapeutic Coverage Achievement by Programme Threshold</CardTitle>
             <CardDescription className="text-[11px]">LGAs achieving the disease-specific WHO/NTD target</CardDescription>
           </CardHeader>
           <CardContent className={`p-3 grid gap-2 ${diseaseScope.length === 1 ? "grid-cols-1" : "grid-cols-3"}`}>
@@ -1044,7 +1044,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
         <CardHeader className="p-4 pb-2">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <CardTitle className="font-black text-slate-900">Triangulation Ledger — Therapeutic &amp; Geographic Coverage</CardTitle>
+              <CardTitle>Triangulation Ledger — Therapeutic &amp; Geographic Coverage</CardTitle>
               <CardDescription className="text-[11px]">Three-source comparison per LGA. Use this ledger to validate differences between sources and drive coverage improvement.</CardDescription>
             </div>
             <div className="relative w-full sm:w-72 group">
@@ -1158,7 +1158,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
                 <AlertTriangle className="h-5 w-5" />
               </div>
               <div>
-                <CardTitle className="font-black text-slate-900">Coverage &amp; Supervision Gap Register</CardTitle>
+                <CardTitle>Coverage &amp; Supervision Gap Register</CardTitle>
                 <CardDescription className="text-[11px]">Microplanned communities not visited during supervision, or missing reported coverage (Microplan Coverage tab / Community Treatment Summary).</CardDescription>
               </div>
             </div>

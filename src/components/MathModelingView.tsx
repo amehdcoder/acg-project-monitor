@@ -1592,7 +1592,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
             {/* Time Config */}
             <Card>
               <CardHeader>
-                <CardTitle className="">Time Configuration</CardTitle>
+                <CardTitle>Time Configuration</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="grid grid-cols-3 gap-2">
@@ -3878,7 +3878,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                   <BookOpen className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <CardTitle className="">Mathematical Model Guide</CardTitle>
+                  <CardTitle>Mathematical Model Guide</CardTitle>
                   <CardDescription>Technical specifications, assumptions, and equations for epidemiological models</CardDescription>
                 </div>
               </div>

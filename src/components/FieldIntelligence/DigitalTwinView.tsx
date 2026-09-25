@@ -556,7 +556,7 @@ const DigitalTwinView = ({ projectId, formId }: Props) => {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="">Top Zones</CardTitle>
+              <CardTitle>Top Zones</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <div className="max-h-[220px] overflow-y-auto">

@@ -1027,7 +1027,7 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
               ].map((b) => (
                 <Card key={b.title} className="form-card">
                   <CardHeader className="pb-1">
-                    <CardTitle className="">{b.title}</CardTitle>
+                    <CardTitle>{b.title}</CardTitle>
                     <CardDescription className="text-[11px]">
                       Excellent ≥80% · Good ≥70% · Moderate ≥60% · below 60% needs additional training
                     </CardDescription>
@@ -1446,7 +1446,7 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
 
                 <Card className="form-card">
                   <CardHeader className="pb-2">
-                    <CardTitle className="">Submission timeline</CardTitle>
+                    <CardTitle>Submission timeline</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-1.5 pt-0">
                     {drill.submissions.map((s) => (

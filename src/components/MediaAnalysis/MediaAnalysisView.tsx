@@ -386,7 +386,7 @@ const MediaAnalysisView = () => {
 
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="">
+              <CardTitle>
                 {mainView === "collected" ? "Collected Media" : "Upload Media"}
               </CardTitle>
               <CardDescription>

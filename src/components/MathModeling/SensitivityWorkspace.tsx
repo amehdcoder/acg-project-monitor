@@ -973,7 +973,7 @@ function ResultsPanel({
       {/* TABLE */}
       <Card>
         <CardHeader>
-          <CardTitle className="">Sensitivity table</CardTitle>
+          <CardTitle>Sensitivity table</CardTitle>
           <CardDescription>
             {result.rows.length} parameter{result.rows.length === 1 ? "" : "s"} ranked by absolute index.
             {result.method === "sobol" && " Sobol Sᴛ − S₁ flags interaction effects."}

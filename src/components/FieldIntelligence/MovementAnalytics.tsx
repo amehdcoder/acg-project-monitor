@@ -217,7 +217,7 @@ const MovementAnalytics = ({ projectId, formId, realtimeKey }: Props) => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="">Daily Activity Trend</CardTitle>
+                <CardTitle>Daily Activity Trend</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={250}>
@@ -235,7 +235,7 @@ const MovementAnalytics = ({ projectId, formId, realtimeKey }: Props) => {
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="">Collector Performance</CardTitle>
+                <CardTitle>Collector Performance</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={250}>

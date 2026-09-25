@@ -582,7 +582,7 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
       {!loading && (
         <Card className="border-0 shadow-card">
           <CardHeader>
-            <CardTitle className="">
+            <CardTitle>
               Submissions ({filteredSubmissions.length})
             </CardTitle>
           </CardHeader>

@@ -560,7 +560,7 @@ const SettingsView = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle className="">Login Information</CardTitle>
+              <CardTitle>Login Information</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="rounded-lg border border-border p-4 space-y-2">

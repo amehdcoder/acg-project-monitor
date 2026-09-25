@@ -263,19 +263,19 @@ const DeviceCollectShell = () => {
             <div className="mb-4"><h2 className="collector-title text-xl font-bold">Recent Records</h2><p className="mt-1 text-xs text-muted-foreground">Continue drafts and manage records waiting to send.</p></div>
             <Card className="cursor-pointer hover:border-primary/50" onClick={() => setSavedMode("edit")}>
               <CardHeader className="py-4">
-                <CardTitle className="">Drafts <Badge variant="secondary" className="ml-2">{counts.draft}</Badge></CardTitle>
+                <CardTitle>Drafts <Badge variant="secondary" className="ml-2">{counts.draft}</Badge></CardTitle>
                 <CardDescription>Unfinished records you can continue.</CardDescription>
               </CardHeader>
             </Card>
             <Card className="cursor-pointer hover:border-primary/50" onClick={() => setSavedMode("send")}>
               <CardHeader className="py-4">
-                <CardTitle className="">Ready to send <Badge variant="secondary" className="ml-2">{counts.finalized}</Badge></CardTitle>
+                <CardTitle>Ready to send <Badge variant="secondary" className="ml-2">{counts.finalized}</Badge></CardTitle>
                 <CardDescription>Finalized records queued until a connection is available.</CardDescription>
               </CardHeader>
             </Card>
             <Card className="cursor-pointer hover:border-primary/50" onClick={() => setSavedMode("view")}>
               <CardHeader className="py-4">
-                <CardTitle className="">Sent <Badge variant="secondary" className="ml-2">{counts.sent}</Badge></CardTitle>
+                <CardTitle>Sent <Badge variant="secondary" className="ml-2">{counts.sent}</Badge></CardTitle>
                 <CardDescription>Records already delivered to the project.</CardDescription>
               </CardHeader>
             </Card>

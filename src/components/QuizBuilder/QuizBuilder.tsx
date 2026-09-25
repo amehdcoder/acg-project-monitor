@@ -1007,7 +1007,7 @@ const QuizBuilder = () => {
 
           <Card className="form-card">
             <CardHeader>
-              <CardTitle className="">{selectedQuiz.title}</CardTitle>
+              <CardTitle>{selectedQuiz.title}</CardTitle>
               {selectedQuiz.description && <CardDescription>{selectedQuiz.description}</CardDescription>}
               {koboConfig && (
                 <KoboSyncStatusBar

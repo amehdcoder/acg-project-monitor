@@ -122,7 +122,7 @@ const MapLegend = ({ markers, showLegend, geofences = [], showGeofences = true, 
       {stateCounts.length > 0 && (
         <>
           <CardHeader className={`py-2 px-3 pb-1 ${geofences.length > 0 ? "border-t border-border pt-2" : "border-t border-border pt-2"}`}>
-            <CardTitle className="">Submissions by State</CardTitle>
+            <CardTitle>Submissions by State</CardTitle>
           </CardHeader>
           <CardContent className="py-2 px-3 pt-0 max-h-[220px] overflow-y-auto">
             <div className="space-y-1.5">
