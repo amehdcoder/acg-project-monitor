@@ -268,3 +268,19 @@ export async function computeIndicatorValues(projectId: string, period: string) 
   };
   return REPORTABLE_INDICATORS.map((i) => ({ ...i, value: map[i.key] ?? 0 }));
 }
+
+export interface Dhis2OrgUnit { id: string; name: string; level?: number; childCount?: number; path?: string }
+export interface Dhis2DataElement { id: string; name: string; valueType?: string; categoryCombo: string | null; categoryOptionCombos: { id: string; name: string }[] }
+export interface Dhis2DataSet { id: string; name: string; periodType: string; canWrite: boolean; dataElements: Dhis2DataElement[] }
+export interface Dhis2Catalog {
+  system: { name: string | null; version: string | null; serverDate: string | null; contextPath: string };
+  user: { username: string | null; displayName: string | null };
+  roots: Dhis2OrgUnit[];
+  dataSets: Dhis2DataSet[];
+}
+export const browseDhis2 = (connection_id: string) =>
+  call({ action: "dhis2_browse", connection_id, mode: "overview" }) as Promise<Dhis2Catalog>;
+export const dhis2Children = (connection_id: string, parent: string) =>
+  call({ action: "dhis2_browse", connection_id, mode: "children", parent }) as Promise<{ orgUnits: Dhis2OrgUnit[] }>;
+export const dhis2SearchUnits = (connection_id: string, q: string) =>
+  call({ action: "dhis2_browse", connection_id, mode: "search", q }) as Promise<{ orgUnits: Dhis2OrgUnit[] }>;
