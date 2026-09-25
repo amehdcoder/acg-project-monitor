@@ -291,3 +291,16 @@ export const dhis2Children = (connection_id: string, parent: string) =>
   call({ action: "dhis2_browse", connection_id, mode: "children", parent }) as Promise<{ orgUnits: Dhis2OrgUnit[] }>;
 export const dhis2SearchUnits = (connection_id: string, q: string) =>
   call({ action: "dhis2_browse", connection_id, mode: "search", q }) as Promise<{ orgUnits: Dhis2OrgUnit[] }>;
+
+export interface Dhis2Report { id: string; name: string; periodType: string; elementCount: number; orgUnitCount: number; canWrite: boolean; assigned: boolean }
+export interface Dhis2LoginResult {
+  ok: boolean;
+  connection_id: string;
+  system: { name: string | null; version: string | null };
+  user: { username: string; displayName: string | null; email: string | null; roles: string[] };
+  orgUnits: { id: string; name: string; level?: number }[];
+  reports: Dhis2Report[];
+}
+/** Signs in to DHIS2; the password is stored server-side only and never returned. */
+export const dhis2Login = (input: { project_id: string; base_url: string; username: string; password: string; connection_id?: string }) =>
+  call({ action: "dhis2_login", ...input }) as Promise<Dhis2LoginResult>;
