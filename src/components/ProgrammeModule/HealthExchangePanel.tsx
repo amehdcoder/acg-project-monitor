@@ -21,9 +21,12 @@ import {
   saveCredential, testConnection, pullMetadata, pullStock, pushIndicators, pushFhirPatients,
   pullFhir, computeIndicatorValues, listBeneficiariesForExchange, previewAggregatePayload,
   pushAggregatePayload, pullSdmxStructure, pullSdmxData, validateImportedPayload,
+  pushMonthly, pullStockCategory, pushStock,
   type ExchangeConnection, type ExchangeKind, type ExchangeLog,
   type CommodityStock, type ExchangeMapping, type ExchangeFormat, type ExchangeAuthType,
 } from "@/lib/programmeModule/healthExchange";
+import { buildSdmxCsv, buildSdmxJson } from "@/lib/programmeModule/exchangeStandards";
+import { Switch } from "@/components/ui/switch";
 
 interface Props {
   projectId: string;
@@ -39,7 +42,14 @@ const EMPTY = {
   username: "", org_unit_id: "", dataset_id: "", default_period_type: "Monthly", is_active: true,
   exchange_format: "json" as ExchangeFormat, token_url: "", agency_id: "", dataflow_id: "",
   dataflow_version: "1.0", dsd_id: "", default_dimensions: {} as Record<string, string>,
+  auto_push_enabled: false, auto_push_day: 5, auto_push_dry_run: false, lmis_program_id: "",
 };
+
+function lastMonth() {
+  const d = new Date();
+  const p = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1));
+  return `${p.getUTCFullYear()}${String(p.getUTCMonth() + 1).padStart(2, "0")}`;
+}
 
 function currentPeriod() {
   const d = new Date();
@@ -73,12 +83,15 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
   const [values, setValues] = useState<{ key: string; label: string; value: number }[]>([]);
   const [people, setPeople] = useState<{ id: string; case_id: string; full_name: string }[]>([]);
   const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
-  const [lmisPath, setLmisPath] = useState("api/stockCards");
+  const [lmisPath, setLmisPath] = useState("api/stockCardSummaries");
   const [fhirQuery, setFhirQuery] = useState("Patient?_count=50");
   const [standardFormat, setStandardFormat] = useState<ExchangeFormat>("adx-xml");
   const [payloadPreview, setPayloadPreview] = useState("");
   const [importResult, setImportResult] = useState("");
   const [sdmxQuery, setSdmxQuery] = useState("");
+  const [sdmxExportFormat, setSdmxExportFormat] = useState<"sdmx-json" | "sdmx-csv">("sdmx-csv");
+  const [lmisId, setLmisId] = useState("");
+  const [stockCategory, setStockCategory] = useState<"all" | "surgical_consumable" | "morbidity_kit">("all");
 
   const active = useMemo(() => rows.find((r) => r.id === activeId) ?? null, [rows, activeId]);
 
@@ -161,6 +174,51 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
     anchor.download = `national-report-${period}.${extension}`;
     anchor.click();
     URL.revokeObjectURL(url);
+  };
+
+  /** Build an SDMX file in the browser from this month's figures — no server needed. */
+  const downloadSdmx = () => {
+    try {
+      const observations = values.map((v) => {
+        const m = mappings.find((x) => x.indicator_key === v.key);
+        const [base, sex] = v.key.split(":");
+        return {
+          indicatorKey: v.key,
+          remoteId: m?.remote_id && m.remote_id !== "UNMAPPED" ? m.remote_id : base.toUpperCase(),
+          value: v.value,
+          dimensions: { SEX: sex === "female" ? "F" : sex === "male" ? "M" : "_T", ...(m?.dimensions ?? {}) },
+        };
+      });
+      const iso = `${period.slice(0, 4)}-${period.slice(4, 6)}`;
+      const input = {
+        agencyId: active?.agency_id || "HANDS",
+        dataflowId: active?.dataflow_id || active?.dataset_id || "NTD_NATIONAL_INDICATORS",
+        dataflowVersion: active?.dataflow_version || "1.0",
+        period: iso, observations,
+        defaults: { FREQ: "M", REF_AREA: active?.org_unit_id || "NG", ...(active?.default_dimensions ?? {}) },
+      };
+      const content = sdmxExportFormat === "sdmx-json" ? buildSdmxJson(input) : buildSdmxCsv(input);
+      const blob = new Blob([content], { type: sdmxExportFormat === "sdmx-json" ? "application/json" : "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `national-indicators-${period}.sdmx.${sdmxExportFormat === "sdmx-json" ? "json" : "csv"}`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setPayloadPreview(content);
+      setStandardFormat(sdmxExportFormat);
+    } catch (e: any) {
+      toast({ title: "Could not build the SDMX file", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const lmisRows = rows.filter((r) => r.kind === "lmis");
+  const lmis = lmisRows.find((r) => r.id === lmisId) ?? lmisRows[0] ?? null;
+  const visibleStock = stockCategory === "all" ? stock : stock.filter((s) => s.category === stockCategory);
+
+  const saveAuto = async (patch: Partial<ExchangeConnection>) => {
+    if (!active) return;
+    await run("auto", () => saveConnection({ ...active, ...patch }), "Monthly reporting updated");
   };
 
   const validateImport = async (file: File) => {
@@ -263,6 +321,8 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
                       token_url: c.token_url ?? "", agency_id: c.agency_id ?? "", dataflow_id: c.dataflow_id ?? "",
                       dataflow_version: c.dataflow_version ?? "1.0", dsd_id: c.dsd_id ?? "",
                       default_dimensions: c.default_dimensions ?? {},
+                      auto_push_enabled: !!c.auto_push_enabled, auto_push_day: c.auto_push_day ?? 5,
+                      auto_push_dry_run: !!c.auto_push_dry_run, lmis_program_id: c.lmis_program_id ?? "",
                     })}>Edit</Button>
                     <Button size="sm" variant="ghost" className="text-destructive"
                       onClick={() => void run(c.id, () => deleteConnection(c.id), "Server removed")}>
@@ -396,6 +456,66 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
             </div>
           )}
 
+          <div className="flex flex-wrap items-end gap-2 rounded-md border bg-muted/20 p-3">
+            <div className="mr-auto">
+              <p className="text-sm font-semibold">Download SDMX report</p>
+              <p className="text-xs text-muted-foreground">Monthly totals and female/male breakdowns for {period}, ready to check before sending.</p>
+            </div>
+            <Select value={sdmxExportFormat} onValueChange={(v) => setSdmxExportFormat(v as "sdmx-json" | "sdmx-csv")}>
+              <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+              <SelectContent className="z-[60] bg-popover">
+                <SelectItem value="sdmx-csv">SDMX-CSV 2.0</SelectItem>
+                <SelectItem value="sdmx-json">SDMX-JSON 2.0</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button className="gap-1" disabled={values.length === 0} onClick={downloadSdmx}>
+              <Download className="h-4 w-4" /> Download SDMX
+            </Button>
+          </div>
+
+          {active?.kind === "dhis2" && (
+            <div className="space-y-3 rounded-md border p-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="mr-auto">
+                  <p className="text-sm font-semibold">Monthly automatic reporting</p>
+                  <p className="text-xs text-muted-foreground">
+                    Sends last month's totals and breakdowns to DHIS2 on the chosen day.
+                    {active.last_auto_period ? ` Last month sent: ${active.last_auto_period}.` : " Nothing sent automatically yet."}
+                  </p>
+                </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <Switch checked={!!active.auto_push_enabled} disabled={!canManage || busy === "auto"}
+                    onCheckedChange={(v) => void saveAuto({ auto_push_enabled: v })} /> On
+                </label>
+              </div>
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="space-y-1">
+                  <Label>Send on day</Label>
+                  <Input type="number" min={1} max={28} className="w-[90px]" defaultValue={active.auto_push_day ?? 5}
+                    disabled={!canManage} key={`day-${active.id}`}
+                    onBlur={(e) => { const d = Math.min(28, Math.max(1, Number(e.target.value) || 5)); if (d !== active.auto_push_day) void saveAuto({ auto_push_day: d }); }} />
+                </div>
+                <label className="flex items-center gap-2 pb-2 text-sm">
+                  <Switch checked={!!active.auto_push_dry_run} disabled={!canManage || busy === "auto"}
+                    onCheckedChange={(v) => void saveAuto({ auto_push_dry_run: v })} /> Practice run only
+                </label>
+                {canManage && (
+                  <div className="ml-auto flex gap-2">
+                    <Button variant="outline" disabled={busy === "monthly-dry"}
+                      onClick={() => void run("monthly-dry", () => pushMonthly(active.id, lastMonth(), true), "DHIS2 checked last month's report")}>
+                      Check {lastMonth()}
+                    </Button>
+                    <Button disabled={busy === "monthly"}
+                      onClick={() => void run("monthly", () => pushMonthly(active.id, lastMonth()), "Last month sent to DHIS2")}>
+                      <Upload className="h-4 w-4" /> Send {lastMonth()} now
+                    </Button>
+                  </div>
+                )}
+              </div>
+              {!active.org_unit_id && <p className="text-xs text-destructive">Set the reporting unit code on this server before automatic sending can work.</p>}
+            </div>
+          )}
+
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-left text-muted-foreground">
@@ -424,6 +544,21 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
                             setMappings(await listMappings(activeId));
                           }}
                         />
+                        {active?.kind === "dhis2" && (
+                          <Input
+                            className="mt-1 h-8 w-[220px]"
+                            placeholder="Category option combo (breakdown)"
+                            defaultValue={m?.category_option_combo ?? ""}
+                            key={`coc-${activeId}-${m?.id ?? v.key}`}
+                            disabled={!canManage || !activeId || !m}
+                            onBlur={async (e) => {
+                              const coc = e.target.value.trim() || null;
+                              if (!m || coc === (m.category_option_combo ?? null)) return;
+                              await saveMapping({ connection_id: activeId, indicator_key: v.key, indicator_label: v.label, remote_id: m.remote_id, category_option_combo: coc });
+                              setMappings(await listMappings(activeId));
+                            }}
+                          />
+                        )}
                         {(active?.kind === "sdmx" || standardFormat === "adx-xml") && (
                           <Input
                             className="mt-1 h-8 w-[220px]"
@@ -461,20 +596,52 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
       {tab === "commodities" && (
         <Card className="space-y-3 p-4">
           <div className="flex flex-wrap items-end gap-2">
-            <div className="min-w-[260px] flex-1 space-y-1">
-              <Label>OpenLMIS stock-card path</Label>
-              <Input value={lmisPath} onChange={(e) => setLmisPath(e.target.value)} placeholder="api/stockCards" />
+            <div className="space-y-1">
+              <Label>Logistics server</Label>
+              <Select value={lmis?.id ?? ""} onValueChange={setLmisId}>
+                <SelectTrigger className="w-[220px]"><SelectValue placeholder="Add an LMIS server first" /></SelectTrigger>
+                <SelectContent className="z-[60] bg-popover">
+                  {lmisRows.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
-            {canManage && rows.some((r) => r.kind === "lmis") && (
-              <Button variant="outline" className="gap-1" disabled={busy === "lmis-test"}
-                onClick={() => {
-                  const lmis = rows.find((r) => r.kind === "lmis");
-                  if (lmis) void run("lmis-test", () => testConnection(lmis.id, `${lmisPath}?page=0&size=1`), "OpenLMIS endpoint works");
-                }}>
-                <PlugZap className="h-4 w-4" /> Test stock endpoint
-              </Button>
-            )}
+            <div className="space-y-1">
+              <Label>Items</Label>
+              <Select value={stockCategory} onValueChange={(v) => setStockCategory(v as typeof stockCategory)}>
+                <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+                <SelectContent className="z-[60] bg-popover">
+                  <SelectItem value="all">All items</SelectItem>
+                  <SelectItem value="surgical_consumable">Surgical consumables</SelectItem>
+                  <SelectItem value="morbidity_kit">Morbidity kits</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="min-w-[220px] flex-1 space-y-1">
+              <Label>OpenLMIS stock path</Label>
+              <Input value={lmisPath} onChange={(e) => setLmisPath(e.target.value)} placeholder="api/stockCardSummaries" />
+            </div>
           </div>
+          {lmis && (
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" className="gap-1" disabled={busy === "lmis-test"}
+                onClick={() => void run("lmis-test", () => testConnection(lmis.id, `${lmisPath}?page=0&size=1`), "OpenLMIS endpoint works")}>
+                <PlugZap className="h-4 w-4" /> Test
+              </Button>
+              <Button variant="outline" className="gap-1" disabled={busy === "lmis-pull"}
+                onClick={() => void run("lmis-pull", () => pullStockCategory(lmis.id, lmisPath, stockCategory === "all" ? undefined : stockCategory), "Stock pulled from OpenLMIS")}>
+                <Download className="h-4 w-4" /> Pull {stockCategory === "all" ? "stock" : stockCategory === "surgical_consumable" ? "consumables" : "kits"}
+              </Button>
+              {canManage && (
+                <Button className="gap-1" disabled={busy === "lmis-push"}
+                  onClick={() => void run("lmis-push", () => pushStock(lmis.id, stockCategory === "all" ? undefined : stockCategory), "Stock counts sent to OpenLMIS")}>
+                  <Upload className="h-4 w-4" /> Push counts
+                </Button>
+              )}
+              {(!lmis.lmis_program_id && !lmis.dataset_id) && (
+                <p className="w-full text-xs text-destructive">Add the OpenLMIS programme ID and facility ID on this server (Edit) before pushing.</p>
+              )}
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-left text-muted-foreground">
@@ -485,12 +652,12 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {stock.map((s) => {
+                {visibleStock.map((s) => {
                   const low = s.reorder_level != null && s.quantity_on_hand <= s.reorder_level;
                   return (
                     <tr key={s.id} className="border-t">
                       <td className="p-2">{s.commodity_name}</td>
-                      <td className="p-2 text-muted-foreground">{s.category}</td>
+                      <td className="p-2 text-muted-foreground">{s.category === "surgical_consumable" ? "Surgical consumable" : s.category === "morbidity_kit" ? "Morbidity kit" : s.category}</td>
                       <td className="p-2 text-muted-foreground">{s.external_facility_code ?? "—"}</td>
                       <td className="p-2">
                         <span className={low ? "font-semibold text-destructive" : ""}>
@@ -504,7 +671,7 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
                     </tr>
                   );
                 })}
-                {stock.length === 0 && (
+                {visibleStock.length === 0 && (
                   <tr><td className="p-4 text-muted-foreground" colSpan={6}>
                     No stock pulled yet. Connect a logistics server and choose "Pull stock".
                   </td></tr>
@@ -596,6 +763,13 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
                   <Input value={editing.dataset_id} onChange={(e) => setEditing({ ...editing, dataset_id: e.target.value })} />
                 </div>
               </div>
+              {editing.kind === "lmis" && (
+                <div className="space-y-1">
+                  <Label>OpenLMIS programme ID</Label>
+                  <Input value={editing.lmis_program_id} placeholder="Programme UUID (reporting unit code = facility UUID)"
+                    onChange={(e) => setEditing({ ...editing, lmis_program_id: e.target.value })} />
+                </div>
+              )}
               {editing.kind === "sdmx" && (
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1"><Label>Agency ID</Label><Input value={editing.agency_id} onChange={(e) => setEditing({ ...editing, agency_id: e.target.value })} /></div>

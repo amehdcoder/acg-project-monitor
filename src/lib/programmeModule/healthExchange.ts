@@ -25,6 +25,11 @@ export interface ExchangeConnection {
   dataflow_version: string | null;
   dsd_id: string | null;
   default_dimensions: Record<string, string>;
+  auto_push_enabled: boolean;
+  auto_push_day: number;
+  auto_push_dry_run: boolean;
+  last_auto_period: string | null;
+  lmis_program_id: string | null;
   is_active: boolean;
   last_sync_at: string | null;
   last_status: string | null;
@@ -87,6 +92,10 @@ export const REPORTABLE_INDICATORS: { key: string; label: string }[] = [
   { key: "home_visits", label: "Home visits conducted" },
   { key: "mda_treatments", label: "MDA treatments recorded" },
   { key: "morbidity_records", label: "Morbidity management records" },
+  { key: "beneficiaries_registered:female", label: "Beneficiaries registered — female" },
+  { key: "beneficiaries_registered:male", label: "Beneficiaries registered — male" },
+  { key: "beneficiaries_active:female", label: "Active beneficiaries — female" },
+  { key: "beneficiaries_active:male", label: "Active beneficiaries — male" },
 ];
 
 export async function listConnections(projectId: string) {
@@ -180,6 +189,14 @@ export const pullSdmxData = (connection_id: string, query?: string) =>
   call({ action: "pull_sdmx", connection_id, ...(query ? { query } : {}) });
 export const validateImportedPayload = (connection_id: string, format: ExchangeFormat, content: string) =>
   call({ action: "validate_import", connection_id, format, content });
+export const monthlyValues = (connection_id: string, period: string) =>
+  call({ action: "monthly_values", connection_id, period });
+export const pushMonthly = (connection_id: string, period: string, dry_run = false) =>
+  call({ action: "push_monthly", connection_id, period, dry_run });
+export const pullStockCategory = (connection_id: string, path: string, category?: string) =>
+  call({ action: "pull_stock", connection_id, path, ...(category ? { category } : {}) });
+export const pushStock = (connection_id: string, category?: string) =>
+  call({ action: "push_stock", connection_id, ...(category ? { category } : {}) });
 export const pushFhirPatients = (connection_id: string, beneficiary_ids: string[]) =>
   call({ action: "push_fhir", connection_id, beneficiary_ids });
 export const pullFhir = (connection_id: string, query?: string) =>
@@ -211,6 +228,16 @@ export async function computeIndicatorValues(projectId: string, period: string) 
     return count ?? 0;
   };
 
+  const sexQ = (s: string) => (q: any) => q.or(`profile->>sex.ilike.${s}*,profile->>gender.ilike.${s}*`);
+  const activeBy = async (s: string) => {
+    const { count } = await sexQ(s)(T("beneficiaries").select("id", { count: "exact", head: true })
+      .eq("project_id", projectId).eq("status", "active"));
+    return count ?? 0;
+  };
+  const [regF, regM, actF, actM] = await Promise.all([
+    countIn("beneficiaries", "created_at", sexQ("f")), countIn("beneficiaries", "created_at", sexQ("m")),
+    activeBy("f"), activeBy("m"),
+  ]);
   const [registered, active, confirmed, referrals, visits, treatments, morbidity] = await Promise.all([
     countIn("beneficiaries", "created_at"),
     (async () => {
@@ -234,6 +261,10 @@ export async function computeIndicatorValues(projectId: string, period: string) 
     home_visits: visits,
     mda_treatments: treatments,
     morbidity_records: morbidity,
+    "beneficiaries_registered:female": regF,
+    "beneficiaries_registered:male": regM,
+    "beneficiaries_active:female": actF,
+    "beneficiaries_active:male": actM,
   };
   return REPORTABLE_INDICATORS.map((i) => ({ ...i, value: map[i.key] ?? 0 }));
 }
