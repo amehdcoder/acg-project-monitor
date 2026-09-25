@@ -61,11 +61,14 @@ export default function GoogleStreetViewPanel({
   }, []);
 
   const calculateHeading = useCallback((fromLat: number, fromLng: number, toLat: number, toLng: number) => {
-    const from = new google.maps.LatLng(fromLat, fromLng);
-    const to = new google.maps.LatLng(toLat, toLng);
-    return google.maps.geometry?.spherical
-      ? google.maps.geometry.spherical.computeHeading(from, to)
-      : 0;
+    const toRadians = (value: number) => value * Math.PI / 180;
+    const fromLatitude = toRadians(fromLat);
+    const toLatitude = toRadians(toLat);
+    const deltaLongitude = toRadians(toLng - fromLng);
+    const y = Math.sin(deltaLongitude) * Math.cos(toLatitude);
+    const x = Math.cos(fromLatitude) * Math.sin(toLatitude)
+      - Math.sin(fromLatitude) * Math.cos(toLatitude) * Math.cos(deltaLongitude);
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
   }, []);
 
   const init = useCallback(async () => {
