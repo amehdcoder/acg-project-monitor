@@ -51,8 +51,10 @@ async function authHeaders(db: ReturnType<typeof admin>, conn: Connection) {
   if (!secret) throw new Error("No credential saved for this connection.");
   if (conn.auth_type === "basic") {
     headers.Authorization = `Basic ${btoa(`${conn.username ?? ""}:${secret}`)}`;
-  } else if (conn.auth_type === "apitoken") {
-    headers.Authorization = `ApiToken ${secret}`;
+  } else if (conn.auth_type === "apitoken" || /^d2pat_/.test(secret.trim())) {
+    // DHIS2 personal access tokens must use the ApiToken scheme, even if
+    // the connection was saved with "bearer".
+    headers.Authorization = `ApiToken ${secret.trim()}`;
   } else if (conn.auth_type === "oauth2_client_credentials") {
     if (!conn.token_url || !conn.username) throw new Error("OAuth client ID and token URL are required.");
     const token = await remoteFetch(conn.token_url, {
