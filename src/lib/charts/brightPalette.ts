@@ -1,24 +1,19 @@
 /**
- * Shared bright, professional categorical palette for every chart in the app.
- *
- * Colours are high-chroma but WCAG-friendly against both light and dark card
- * surfaces, so the same hex works for slices, strokes and data labels.
+ * Shared chart palette: a cohesive navy-and-teal brand scale.
+ * Navy and teal alternate so neighbouring series stay distinguishable,
+ * stepping through lighter tints for longer category lists.
  */
 export const BRIGHT_CHART_PALETTE = [
-  "#1D4ED8", // vivid blue
-  "#059669", // emerald
-  "#F59E0B", // amber
-  "#DC2626", // red
-  "#7C3AED", // violet
-  "#0891B2", // cyan
-  "#65A30D", // lime
-  "#EA580C", // orange
-  "#DB2777", // pink
+  "#1E3A8A", // deep navy
   "#0D9488", // teal
-  "#4F46E5", // indigo
-  "#CA8A04", // gold
-  "#BE123C", // rose
-  "#2563EB", // azure
+  "#3B5BA9", // navy 400
+  "#14B8A6", // teal 400
+  "#6582C4", // navy 300
+  "#5ED3C4", // teal 300
+  "#172554", // navy 900
+  "#115E59", // teal 800
+  "#93A8D8", // navy 200
+  "#99E6DC", // teal 200
 ];
 
 /** Deterministic colour for an index. */

@@ -121,8 +121,10 @@ const Dashboard = ({ onOpenDashboardBuilder, onOpenDashboardStudio, initialProje
   const [selectedProjectName, setSelectedProjectName] = useState<string | null>(null);
 
   const dashboardSubTabs = new Set(["management", "operations"]);
-  const subtabParam = searchParams.get("subtab") || "management";
-  const activeSubTab = dashboardSubTabs.has(subtabParam) ? subtabParam : "management";
+  const [activeSubTab, setActiveSubTab] = useState(() => {
+    const s = searchParams.get("subtab") || "management";
+    return dashboardSubTabs.has(s) ? s : "management";
+  });
 
 
   const { pendingCount: offlinePending, syncPendingSubmissions, isSyncing, isOnline } = useOfflineStorage();
@@ -170,12 +172,7 @@ const Dashboard = ({ onOpenDashboardBuilder, onOpenDashboardStudio, initialProje
     if (initialProjectId) setSelectedProjectId(initialProjectId);
   }, [initialProjectId]);
 
-  const handleTabChangeInternal = (value: string) => {
-    const params = new URLSearchParams(searchParams);
-    params.set("tab", "dashboard");
-    params.set("subtab", value);
-    setSearchParams(params, { replace: true });
-  };
+  const handleTabChangeInternal = (value: string) => setActiveSubTab(value);
 
 
   const fetchTasksAndSubmissions = async () => {
