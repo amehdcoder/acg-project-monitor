@@ -96,6 +96,15 @@
     --health-surface: 210 45% 98%;
     --health-ink: 210 64% 22%;
 
+    /* Longitudinal records dashboard — CiSKuLA-style health spectrum */
+    --records-blue: 203 84% 44%;
+    --records-teal: 171 78% 34%;
+    --records-cyan: 182 78% 39%;
+    --records-green: 139 58% 40%;
+    --records-amber: 39 91% 51%;
+    --records-red: 351 75% 55%;
+    --records-purple: 267 57% 51%;
+
     /* KPI card gradients - Power BI-inspired vibrant palette */
     --kpi-submissions: 160 70% 38%;     /* emerald */
     --kpi-sync: 195 80% 42%;            /* cyan */
@@ -202,6 +211,13 @@
     --health-red: 356 72% 65%;
     --health-surface: 216 26% 13%;
     --health-ink: 210 30% 95%;
+    --records-blue: 202 82% 58%;
+    --records-teal: 169 65% 50%;
+    --records-cyan: 183 70% 52%;
+    --records-green: 139 55% 52%;
+    --records-amber: 40 88% 58%;
+    --records-red: 351 76% 64%;
+    --records-purple: 267 65% 66%;
 
     /* KPI card gradients (dark) */
     --kpi-submissions: 160 65% 42%;
@@ -261,6 +277,33 @@
   .collector-shell .collector-title {
     font-family: "Libre Baskerville", Georgia, serif;
     letter-spacing: 0;
+  }
+
+  .records-kpi-blue { border-color: hsl(var(--records-blue) / 0.22); }
+  .records-kpi-blue > div > span, .records-stage-blue { background: hsl(var(--records-blue)); }
+  .records-kpi-teal { border-color: hsl(var(--records-teal) / 0.22); }
+  .records-kpi-teal > div > span, .records-stage-teal { background: hsl(var(--records-teal)); }
+  .records-kpi-cyan { border-color: hsl(var(--records-cyan) / 0.22); }
+  .records-kpi-cyan > div > span, .records-stage-cyan { background: hsl(var(--records-cyan)); }
+  .records-kpi-green { border-color: hsl(var(--records-green) / 0.22); }
+  .records-kpi-green > div > span, .records-stage-green { background: hsl(var(--records-green)); }
+  .records-kpi-amber { border-color: hsl(var(--records-amber) / 0.26); }
+  .records-kpi-amber > div > span, .records-stage-amber { background: hsl(var(--records-amber)); }
+  .records-kpi-red { border-color: hsl(var(--records-red) / 0.22); }
+  .records-kpi-red > div > span, .records-stage-red { background: hsl(var(--records-red)); }
+  .records-kpi-purple { border-color: hsl(var(--records-purple) / 0.22); }
+  .records-kpi-purple > div > span, .records-stage-purple { background: hsl(var(--records-purple)); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .records-dashboard > * { animation: records-enter 220ms ease-out both; }
+    .records-dashboard > *:nth-child(2) { animation-delay: 40ms; }
+    .records-dashboard > *:nth-child(3) { animation-delay: 70ms; }
+    .records-dashboard > *:nth-child(4) { animation-delay: 100ms; }
+  }
+
+  @keyframes records-enter {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 }
 

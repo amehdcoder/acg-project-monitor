@@ -9,9 +9,13 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Plus, Settings2, CloudOff, RefreshCw, Layers, Users, Building2, ShieldAlert,
   LayoutGrid, CalendarClock, Hospital, Route, ShieldCheck, Home, Network, Activity,
-  Search, Briefcase, Share2,
+  Search, Briefcase, Share2, ChevronDown, SlidersHorizontal, BarChart3,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -42,6 +46,8 @@ import ClusterDashboard from "./ClusterDashboard";
 import CddCaseSearchPanel from "./CddCaseSearchPanel";
 import LivelihoodPanel from "./LivelihoodPanel";
 import HealthExchangePanel from "./HealthExchangePanel";
+import GeneralDashboard from "./GeneralDashboard";
+import WorkspaceNavigation, { type WorkspaceNavGroup, type WorkspaceView } from "./WorkspaceNavigation";
 import { useIsSafeguardingOfficer } from "@/lib/programmeModule/safeguarding";
 import { useMyFacilityAccess } from "@/lib/programmeModule/facilities";
 
@@ -85,15 +91,11 @@ const ProgrammeModuleWorkspace = ({
   const [officersOpen, setOfficersOpen] = useState(false);
   const [projectsOpen, setProjectsOpen] = useState(false);
   const { isOfficer, reload: reloadOfficerAccess } = useIsSafeguardingOfficer(projectId);
-  const [view, setView] = useState<
-    | "records" | "journey" | "facility" | "followups" | "households" | "clusters" | "network"
-    | "risk" | "casesearch" | "livelihood" | "safeguarding" | "safeguarding_dashboard" | "team"
-    | "exchange"
-  >("records");
 
   // What this person is allowed to see and do, from the project team register.
   // People who are not listed keep the access they already had.
-  const { can, listed: onTeamRegister } = useMyTeamPermissions(projectId, canConfigure);
+  const { can, listed: onTeamRegister, loading: permissionsLoading } = useMyTeamPermissions(projectId, canConfigure);
+  const [view, setView] = useState<WorkspaceView>(() => can("view_dashboards") ? "dashboard" : "records");
 
 
   const active: ProgrammeModuleRow | undefined = useMemo(
@@ -119,6 +121,49 @@ const ProgrammeModuleWorkspace = ({
     return beneficiaries.filter((b) =>
       Boolean(facilityLevels[(b as unknown as { facility_id?: string }).facility_id || ""]));
   }, [beneficiaries, facilityLevels, isFocalPerson]);
+
+  const navGroups: WorkspaceNavGroup[] = [
+    {
+      label: "Overview",
+      items: [
+        { key: "dashboard", label: "General dashboard", description: "Project-wide outcomes, alerts and service performance", icon: BarChart3, show: can("view_dashboards") },
+        { key: "journey", label: "Beneficiary journey", description: "Change, feedback and service reach", icon: Route, show: can("view_dashboards") },
+        { key: "facility", label: "Facility dashboard", description: "Facility caseloads and referral performance", icon: Hospital, show: can("view_dashboards") },
+        { key: "clusters", label: "Community clusters", description: "Geographic concentrations and community patterns", icon: Layers, show: can("view_dashboards") },
+      ],
+    },
+    {
+      label: "People & care",
+      items: [
+        { key: "records", label: "Beneficiary records", description: "Find, register and open individual records", icon: LayoutGrid, show: can("view_records") },
+        { key: "followups", label: "Follow-ups & referrals", description: "Upcoming visits and referral traffic", icon: CalendarClock, show: can("view_records") },
+        { key: "households", label: "Households & MDA", description: "Household members, treatment rounds and water points", icon: Home, show: can("manage_households") || can("view_dashboards") },
+        { key: "casesearch", label: "CDD case search", description: "MMDP case finding, review and registration", icon: Search, show: can("manage_cdds") || can("confirm_cases") || can("view_records") },
+        { key: "livelihood", label: "Livelihood & empowerment", description: "Assessments, shortlists and verification", icon: Briefcase, show: can("view_records") || can("view_dashboards") },
+      ],
+    },
+    {
+      label: "Intelligence",
+      items: [
+        { key: "network", label: "Transmission network", description: "Household, kinship and WASH relationships", icon: Network, show: can("view_dashboards") },
+        { key: "risk", label: "Follow-up risk & CHEW visits", description: "Prioritised risk and dispatched visits", icon: Activity, show: can("view_dashboards") },
+        { key: "exchange", label: "Data exchange", description: "DHIS2, LMIS, FHIR, ADX and SDMX", icon: Share2, show: canConfigure || can("view_dashboards") },
+      ],
+    },
+    {
+      label: "Protection",
+      items: [
+        { key: "safeguarding_dashboard", label: "Safeguarding dashboard", description: "Restricted caseload oversight and outcomes", icon: ShieldAlert, show: isOfficer && can("view_safeguarding") },
+        { key: "safeguarding", label: "Safeguarding cases", description: "Restricted concerns, actions and secure notes", icon: ShieldCheck, show: isOfficer && can("view_safeguarding") },
+      ],
+    },
+  ];
+
+  useEffect(() => {
+    if (permissionsLoading) return;
+    const visibleViews = navGroups.flatMap((group) => group.items).filter((item) => item.show).map((item) => item.key);
+    if (!visibleViews.includes(view)) setView(visibleViews.includes("records") ? "records" : visibleViews[0] || "records");
+  }, [permissionsLoading, view, canConfigure, isOfficer, onTeamRegister]);
 
   useEffect(() => {
     bindQueueAutoFlush();
@@ -193,19 +238,25 @@ const ProgrammeModuleWorkspace = ({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Layers className="h-5 w-5 text-primary" />
-        <h2 className="font-display text-lg font-semibold text-foreground">Longitudinal Beneficiary Records</h2>
+    <div className="space-y-3 font-report">
+      <div className="flex flex-col gap-3 rounded-lg border border-health-blue/15 bg-card p-3 shadow-soft lg:flex-row lg:items-center">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-health-blue text-primary-foreground"><Layers className="h-5 w-5" /></span>
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase text-health-blue">Integrated case and beneficiary management</p>
+            <h2 className="truncate font-report-display text-lg font-bold text-health-ink">Longitudinal Beneficiary Records</h2>
+          </div>
+        </div>
         {modules.length > 0 && (
           <Select value={active?.id || ""} onValueChange={setActiveId}>
-            <SelectTrigger className="w-[260px]"><SelectValue placeholder="Select module" /></SelectTrigger>
+            <SelectTrigger className="w-full bg-health-surface lg:w-[260px]"><SelectValue placeholder="Select module" /></SelectTrigger>
             <SelectContent className="z-[1200] bg-popover">
               {modules.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
             </SelectContent>
           </Select>
         )}
         <div className="flex-1" />
+        <div className="flex flex-wrap gap-2">
         {pending > 0 && (
           <Button variant="outline" size="sm" className="gap-1" onClick={sync}>
             <CloudOff className="h-4 w-4" /> {pending} queued — sync now
@@ -214,87 +265,29 @@ const ProgrammeModuleWorkspace = ({
         <Button variant="outline" size="sm" onClick={() => void reload()} aria-label="Reload modules">
           <RefreshCw className="h-4 w-4" />
         </Button>
-        <Button variant="outline" size="sm" className="gap-1" onClick={() => setRegistryOpen(true)}>
-          <Building2 className="h-4 w-4" /> Health facilities
-        </Button>
-        {canConfigure && (
-          <Button
-            variant="outline" size="sm" className="gap-1"
-            onClick={() => { setFocalFacilityId(undefined); setFocalOpen(true); }}
-          >
-            <Users className="h-4 w-4" /> Facility teams
-          </Button>
-        )}
-        {canConfigure && active && (
-          <Button variant="outline" size="sm" className="gap-1" onClick={() => setConfigOpen(true)}>
-            <Settings2 className="h-4 w-4" /> Configure
-          </Button>
-        )}
-        {isSuperAdmin && (
-          <Button variant="outline" size="sm" className="gap-1" onClick={() => setProjectsOpen(true)}>
-            <Layers className="h-4 w-4" /> Records on projects
-          </Button>
-        )}
-        {canConfigure && (
-          <Button variant="outline" size="sm" className="gap-1" onClick={() => setDeleteRequestsOpen(true)}>
-            <ShieldAlert className="h-4 w-4" /> Deletion requests
-          </Button>
-        )}
-        {canConfigure && (
-          <Button variant="outline" size="sm" className="gap-1" onClick={() => setOfficersOpen(true)}>
-            <ShieldCheck className="h-4 w-4" /> Safeguarding officers
-          </Button>
-        )}
         {canConfigure && (
           <Button size="sm" className="gap-1" onClick={() => setGalleryOpen(true)} aria-label="Add programme module">
             <Plus className="h-4 w-4" /> Add module
           </Button>
         )}
+        </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {([
-          { key: "records", label: "Beneficiary records", icon: LayoutGrid, show: can("view_records") },
-          { key: "journey", label: "Beneficiary journey", icon: Route, show: can("view_dashboards") },
-          { key: "facility", label: "Facility dashboard", icon: Hospital, show: can("view_dashboards") },
-          { key: "followups", label: "Follow-ups & referrals", icon: CalendarClock, show: can("view_records") },
-          { key: "households", label: "Households & MDA", icon: Home, show: can("manage_households") || can("view_dashboards") },
-          { key: "clusters", label: "Community clusters", icon: Layers, show: can("view_dashboards") },
-          { key: "network", label: "Transmission network", icon: Network, show: can("view_dashboards") },
-          { key: "risk", label: "Follow-up risk & CHEW visits", icon: Activity, show: can("view_dashboards") },
-          {
-            key: "casesearch", label: "CDD case search (MMDP)", icon: Search,
-            show: can("manage_cdds") || can("confirm_cases") || can("view_records"),
-          },
-          {
-            key: "livelihood", label: "Livelihood & empowerment", icon: Briefcase,
-            show: can("view_records") || can("view_dashboards"),
-          },
-          {
-            key: "exchange", label: "Data exchange (DHIS2/LMIS/FHIR)", icon: Share2,
-            show: canConfigure || can("view_dashboards"),
-          },
-          {
-            key: "team", label: "Project team", icon: Users,
-            show: canConfigure || can("manage_team") || onTeamRegister,
-          },
-          { key: "safeguarding", label: "Safeguarding", icon: ShieldCheck, show: isOfficer && can("view_safeguarding") },
-          {
-            key: "safeguarding_dashboard", label: "Safeguarding dashboard",
-            icon: ShieldAlert, show: isOfficer && can("view_safeguarding"),
-          },
-        ] as const).filter((t) => t.show).map((t) => (
-          <Button
-            key={t.key}
-            size="sm"
-            variant={view === t.key ? "default" : "outline"}
-            className="gap-1"
-            onClick={() => setView(t.key)}
-          >
-            <t.icon className="h-4 w-4" /> {t.label}
-          </Button>
-        ))}
-      </div>
+      {!permissionsLoading && <WorkspaceNavigation groups={navGroups} view={view} onViewChange={setView} administration={
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="gap-2"><SlidersHorizontal className="h-4 w-4" /> Manage<ChevronDown className="h-3.5 w-3.5" /></Button></DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-64">
+            <DropdownMenuLabel>Administration</DropdownMenuLabel><DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => setRegistryOpen(true)}><Building2 className="mr-2 h-4 w-4" /> Health facilities</DropdownMenuItem>
+            {canConfigure && <DropdownMenuItem onSelect={() => { setFocalFacilityId(undefined); setFocalOpen(true); }}><Users className="mr-2 h-4 w-4" /> Facility teams</DropdownMenuItem>}
+            {(canConfigure || can("manage_team") || onTeamRegister) && <DropdownMenuItem onSelect={() => setView("team")}><Users className="mr-2 h-4 w-4" /> Project team</DropdownMenuItem>}
+            {canConfigure && <DropdownMenuItem onSelect={() => setOfficersOpen(true)}><ShieldCheck className="mr-2 h-4 w-4" /> Safeguarding officers</DropdownMenuItem>}
+            {canConfigure && active && <DropdownMenuItem onSelect={() => setConfigOpen(true)}><Settings2 className="mr-2 h-4 w-4" /> Configure module</DropdownMenuItem>}
+            {isSuperAdmin && <DropdownMenuItem onSelect={() => setProjectsOpen(true)}><Layers className="mr-2 h-4 w-4" /> Records on projects</DropdownMenuItem>}
+            {canConfigure && <DropdownMenuItem onSelect={() => setDeleteRequestsOpen(true)} className="text-destructive"><ShieldAlert className="mr-2 h-4 w-4" /> Deletion requests</DropdownMenuItem>}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      } />}
 
 
 
@@ -313,7 +306,7 @@ const ProgrammeModuleWorkspace = ({
         </Card>
       )}
 
-      {active && view === "records" && (
+      {!permissionsLoading && active && view === "records" && (
         <BeneficiaryList
           beneficiaries={scopedBeneficiaries}
           config={normalizeConfig(active.config)}
@@ -323,6 +316,21 @@ const ProgrammeModuleWorkspace = ({
           onRegister={() => setRegisterOpen(true)}
           canRegister={can("edit_records")}
           onRefresh={() => void reloadBeneficiaries()}
+        />
+      )}
+
+      {!permissionsLoading && active && view === "dashboard" && (
+        <GeneralDashboard
+          projectId={projectId}
+          moduleId={active.id}
+          config={normalizeConfig(active.config)}
+          beneficiaries={scopedBeneficiaries}
+          allowedFacilityIds={isFocalPerson ? Object.keys(facilityLevels) : []}
+          isSafeguardingOfficer={isOfficer}
+          canRegister={can("edit_records")}
+          onNavigate={setView}
+          onRegister={() => setRegisterOpen(true)}
+          onOpenBeneficiary={(beneficiary) => { setSelected(beneficiary); setView("records"); }}
         />
       )}
 

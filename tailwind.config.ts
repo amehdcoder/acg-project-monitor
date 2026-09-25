@@ -102,6 +102,15 @@ export default {
           surface: "hsl(var(--health-surface))",
           ink: "hsl(var(--health-ink))",
         },
+        records: {
+          blue: "hsl(var(--records-blue))",
+          teal: "hsl(var(--records-teal))",
+          cyan: "hsl(var(--records-cyan))",
+          green: "hsl(var(--records-green))",
+          amber: "hsl(var(--records-amber))",
+          red: "hsl(var(--records-red))",
+          purple: "hsl(var(--records-purple))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
