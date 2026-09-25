@@ -3,7 +3,9 @@
 // edge function, which stores them server-side.
 import { supabase } from "@/integrations/supabase/client";
 
-export type ExchangeKind = "dhis2" | "fhir" | "lmis";
+export type ExchangeKind = "dhis2" | "fhir" | "lmis" | "sdmx";
+export type ExchangeFormat = "json" | "adx-xml" | "sdmx-json" | "sdmx-csv";
+export type ExchangeAuthType = "bearer" | "basic" | "none" | "apitoken" | "oauth2_client_credentials";
 
 export interface ExchangeConnection {
   id: string;
@@ -11,11 +13,18 @@ export interface ExchangeConnection {
   name: string;
   kind: ExchangeKind;
   base_url: string;
-  auth_type: "bearer" | "basic" | "none";
+  auth_type: ExchangeAuthType;
   username: string | null;
   org_unit_id: string | null;
   dataset_id: string | null;
   default_period_type: string;
+  exchange_format: ExchangeFormat;
+  token_url: string | null;
+  agency_id: string | null;
+  dataflow_id: string | null;
+  dataflow_version: string | null;
+  dsd_id: string | null;
+  default_dimensions: Record<string, string>;
   is_active: boolean;
   last_sync_at: string | null;
   last_status: string | null;
@@ -30,6 +39,7 @@ export interface ExchangeMapping {
   remote_id: string;
   remote_name: string | null;
   category_option_combo: string | null;
+  dimensions: Record<string, string>;
 }
 
 export interface ExchangeLog {
@@ -65,6 +75,7 @@ export const KIND_LABEL: Record<ExchangeKind, string> = {
   dhis2: "DHIS2 national database",
   fhir: "HL7 FHIR server",
   lmis: "Logistics (LMIS) server",
+  sdmx: "SDMX statistical exchange",
 };
 
 /** Indicators this programme can report upward. */
@@ -159,6 +170,15 @@ export const pullStock = (connection_id: string, path?: string) =>
   call({ action: "pull_stock", connection_id, ...(path ? { path } : {}) });
 export const pushIndicators = (connection_id: string, period: string, values: { indicator_key: string; value: number }[], org_unit?: string, dry_run = false) =>
   call({ action: "push_indicators", connection_id, period, values, dry_run, ...(org_unit ? { org_unit } : {}) });
+export const previewAggregatePayload = (connection_id: string, period: string, values: { indicator_key: string; value: number }[], format: ExchangeFormat, org_unit?: string) =>
+  call({ action: "preview_aggregate", connection_id, period, values, format, ...(org_unit ? { org_unit } : {}) });
+export const pushAggregatePayload = (connection_id: string, period: string, values: { indicator_key: string; value: number }[], format: ExchangeFormat, org_unit?: string, dry_run = false) =>
+  call({ action: "push_aggregate", connection_id, period, values, format, dry_run, ...(org_unit ? { org_unit } : {}) });
+export const pullSdmxStructure = (connection_id: string) => call({ action: "pull_sdmx_structure", connection_id });
+export const pullSdmxData = (connection_id: string, query?: string) =>
+  call({ action: "pull_sdmx", connection_id, ...(query ? { query } : {}) });
+export const validateImportedPayload = (connection_id: string, format: ExchangeFormat, content: string) =>
+  call({ action: "validate_import", connection_id, format, content });
 export const pushFhirPatients = (connection_id: string, beneficiary_ids: string[]) =>
   call({ action: "push_fhir", connection_id, beneficiary_ids });
 export const pullFhir = (connection_id: string, query?: string) =>
