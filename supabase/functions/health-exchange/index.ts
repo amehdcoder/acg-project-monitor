@@ -257,15 +257,20 @@ Deno.serve(async (req) => {
           method: "POST", headers, body: JSON.stringify({ dataValues }),
         });
         const importBody = res.body as Record<string, any> | null;
-        const conflicts = Number(importBody?.response?.conflicts?.length ?? importBody?.conflicts?.length ?? 0);
+        const conflictItems: any[] = importBody?.response?.conflicts ?? importBody?.conflicts ?? [];
+        const conflicts = conflictItems.length;
+        const summaryReturned = res.status === 409 && importBody?.response?.responseType === "ImportSummary";
         const ignored = Number(importBody?.response?.importCount?.ignored ?? importBody?.importCount?.ignored ?? 0);
-        const status = res.ok && conflicts === 0 && ignored === 0 ? "success" : res.ok ? "partial" : "error";
-        const importSummary = remoteMessage(res.body,
-          `${dryRun ? "Validated" : "Imported"} ${dataValues.length} values${conflicts || ignored ? `; ${conflicts} conflicts, ${ignored} ignored` : ""}`);
+        const reached = res.ok || summaryReturned;
+        const status = res.ok && conflicts === 0 && ignored === 0 ? "success" : reached ? "partial" : "error";
+        const counts = importBody?.response?.importCount ?? importBody?.importCount ?? {};
+        const importSummary = reached
+          ? `${dryRun ? "Dry run" : "Import"}: ${counts.imported ?? 0} imported, ${counts.updated ?? 0} updated, ${ignored} ignored.${conflicts ? " " + conflictItems.slice(0, 3).map((c) => c.value).join("; ") : ""}`
+          : remoteMessage(res.body, `HTTP ${res.status}`);
         await log(db, connection, "push", "dhis2_data_values", status, dataValues.length,
-          res.ok ? importSummary : `HTTP ${res.status}: ${importSummary}`,
+          reached ? importSummary : `HTTP ${res.status}: ${importSummary}`,
           guard.userId);
-        return json({ ok: res.ok, dryRun, sent: dataValues.length, status, message: importSummary, response: res.body }, res.ok ? 200 : 502);
+        return json({ ok: reached, dryRun, sent: dataValues.length, status, message: importSummary, conflicts: conflictItems, response: res.body }, reached ? 200 : 502);
       }
 
       /* ---------------------- ADX / SDMX exchange --------------------- */
@@ -290,7 +295,7 @@ Deno.serve(async (req) => {
         let contentType = "";
         let validation: { valid: boolean; errors: string[]; observationCount: number };
         if (format === "adx-xml") {
-          content = buildAdxXml({ orgUnit: String(payload.org_unit ?? connection.org_unit_id ?? ""), dataSet: connection.dataset_id ?? "", period, observations });
+          content = buildAdxXml({ orgUnit: String(payload.org_unit ?? connection.org_unit_id ?? ""), dataSet: String(payload.data_set ?? connection.dataset_id ?? ""), period, observations });
           contentType = "application/adx+xml";
           validation = validateAdxXml(content);
         } else {
@@ -316,21 +321,22 @@ Deno.serve(async (req) => {
           body: content,
         });
         const summary = (response.body as Record<string, any> | null) ?? {};
+        const adxReached = response.ok || (isDhisAdx && response.status === 409 && summary.response?.responseType === "ImportSummary");
         const counts = summary.response?.importCount ?? summary.importCount ?? {};
         const conflictList = summary.response?.conflicts ?? summary.conflicts ?? [];
         const ignored = Number(counts.ignored ?? 0);
-        const accepted = isDhisAdx && response.ok
-          ? Number(counts.imported ?? 0) + Number(counts.updated ?? 0) + (dryRun ? 0 : 0)
+        const accepted = isDhisAdx && adxReached
+          ? Number(counts.imported ?? 0) + Number(counts.updated ?? 0)
           : response.ok ? validation.observationCount : 0;
-        const status = !response.ok ? "error" : (ignored > 0 || conflictList.length > 0) ? "partial" : "success";
+        const status = !adxReached ? "error" : (ignored > 0 || conflictList.length > 0) ? "partial" : "success";
         const conflictText = Array.isArray(conflictList) && conflictList.length
           ? ` Conflicts: ${conflictList.slice(0, 3).map((c: any) => c.value ?? c.object ?? JSON.stringify(c)).join("; ")}`
           : "";
-        const message = response.ok
+        const message = adxReached
           ? `${format.toUpperCase()} ${dryRun ? "validated (dry run)" : "exchange accepted"}: ${isDhisAdx ? `${counts.imported ?? 0} imported, ${counts.updated ?? 0} updated, ${ignored} ignored` : `${validation.observationCount} observations`}.${conflictText}`
           : remoteMessage(response.body, `HTTP ${response.status}`);
         await log(db, connection, "push", format, status, validation.observationCount, message, guard.userId);
-        return json({ ok: response.ok, status, dryRun, message, accepted, rejected: ignored, response: response.body }, response.ok ? 200 : 502);
+        return json({ ok: adxReached, status, dryRun, message, accepted, rejected: ignored, conflicts: conflictList, response: response.body }, adxReached ? 200 : 502);
       }
 
       case "validate_import": {
