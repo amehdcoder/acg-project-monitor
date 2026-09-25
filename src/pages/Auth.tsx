@@ -101,6 +101,7 @@ const Auth = () => {
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [signupStep, setSignupStep] = useState<1 | 2 | 3>(1);
   const [isRecovering, setIsRecovering] = useState(false);
+  const [serviceUnavailable, setServiceUnavailable] = useState(false);
   const { trackFailedLogin, trackLoginLocation } = useSurveillanceTracking(user?.id);
 
   const handleRecoverApp = async () => {
@@ -157,6 +158,7 @@ const Auth = () => {
     setIsLoading(true);
     const { error } = await signIn(data.email, data.password);
     setIsLoading(false);
+    setServiceUnavailable(Boolean(error && /failed to fetch|network|timeout|connection|unreachable/i.test(error.message)));
 
     if (error) {
       const newCount = failedAttempts + 1;
@@ -291,14 +293,23 @@ const Auth = () => {
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/`,
-      },
-    });
+    setServiceUnavailable(false);
+    let error: Error | null = null;
+    try {
+      const result = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth`,
+          queryParams: { access_type: "offline", prompt: "select_account" },
+        },
+      });
+      error = result.error;
+    } catch (caught) {
+      error = caught instanceof Error ? caught : new Error("Google sign-in is temporarily unavailable.");
+    }
     
     if (error) {
+      setServiceUnavailable(/failed to fetch|network|timeout|connection|unreachable/i.test(error.message));
       toast({
         title: "Google Sign In Failed",
         description: error.message,
@@ -337,6 +348,11 @@ const Auth = () => {
             </TabsList>
 
             <TabsContent value="login" className="space-y-4 pt-4">
+              {serviceUnavailable && (
+                <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                  Sign-in service is temporarily unavailable. Your saved offline work remains safe; please retry shortly.
+                </div>
+              )}
               <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="login-email">Email</Label>

@@ -6,6 +6,7 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { guardRequest } from "../_shared/authGuard.ts";
+import { buildAdxXml, buildSdmxCsv, buildSdmxJson, validateAdxXml, validateSdmxPayload, type ExchangeObservation } from "../_shared/exchangeStandards.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -20,13 +21,20 @@ type Connection = {
   id: string;
   project_id: string;
   name: string;
-  kind: "dhis2" | "fhir" | "lmis";
+  kind: "dhis2" | "fhir" | "lmis" | "sdmx";
   base_url: string;
-  auth_type: "bearer" | "basic" | "none";
+  auth_type: "bearer" | "basic" | "none" | "apitoken" | "oauth2_client_credentials";
   username: string | null;
   org_unit_id: string | null;
   dataset_id: string | null;
   default_period_type: string;
+  exchange_format: "json" | "adx-xml" | "sdmx-json" | "sdmx-csv";
+  token_url: string | null;
+  agency_id: string | null;
+  dataflow_id: string | null;
+  dataflow_version: string | null;
+  dsd_id: string | null;
+  default_dimensions: Record<string, string> | null;
 };
 
 const admin = () => createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
@@ -43,6 +51,18 @@ async function authHeaders(db: ReturnType<typeof admin>, conn: Connection) {
   if (!secret) throw new Error("No credential saved for this connection.");
   if (conn.auth_type === "basic") {
     headers.Authorization = `Basic ${btoa(`${conn.username ?? ""}:${secret}`)}`;
+  } else if (conn.auth_type === "apitoken") {
+    headers.Authorization = `ApiToken ${secret}`;
+  } else if (conn.auth_type === "oauth2_client_credentials") {
+    if (!conn.token_url || !conn.username) throw new Error("OAuth client ID and token URL are required.");
+    const token = await remoteFetch(conn.token_url, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+      body: new URLSearchParams({ grant_type: "client_credentials", client_id: conn.username, client_secret: secret }),
+    });
+    const body = token.body as Record<string, unknown> | null;
+    if (!token.ok || !body?.access_token) throw new Error(remoteMessage(token.body, "OAuth token request failed"));
+    headers.Authorization = `${String(body.token_type ?? "Bearer")} ${String(body.access_token)}`;
   } else {
     headers.Authorization = `Bearer ${secret}`;
   }
@@ -242,6 +262,79 @@ Deno.serve(async (req) => {
           res.ok ? importSummary : `HTTP ${res.status}: ${importSummary}`,
           guard.userId);
         return json({ ok: res.ok, dryRun, sent: dataValues.length, status, message: importSummary, response: res.body }, res.ok ? 200 : 502);
+      }
+
+      /* ---------------------- ADX / SDMX exchange --------------------- */
+      case "preview_aggregate":
+      case "push_aggregate": {
+        if (connection.kind !== "dhis2" && connection.kind !== "sdmx") {
+          return json({ error: "Aggregate standards are available for DHIS2 and SDMX connections" }, 400);
+        }
+        const period = String(payload.period ?? "");
+        const format = String(payload.format ?? connection.exchange_format ?? "adx-xml") as "adx-xml" | "sdmx-json" | "sdmx-csv";
+        const values = Array.isArray(payload.values) ? payload.values as { indicator_key: string; value: number }[] : [];
+        const { data: maps } = await db.from("health_exchange_mappings")
+          .select("indicator_key, remote_id, category_option_combo, dimensions")
+          .eq("connection_id", connection.id);
+        const byKey = new Map((maps ?? []).map((mapping: any) => [mapping.indicator_key, mapping]));
+        const observations: ExchangeObservation[] = values.filter((value) => byKey.has(value.indicator_key)).map((value) => {
+          const mapping: any = byKey.get(value.indicator_key);
+          return { indicatorKey: value.indicator_key, remoteId: mapping.remote_id, value: Number(value.value), categoryOptionCombo: mapping.category_option_combo, dimensions: mapping.dimensions ?? {} };
+        });
+        if (!observations.length) return json({ error: "No mapped indicators to exchange" }, 400);
+        let content = "";
+        let contentType = "";
+        let validation: { valid: boolean; errors: string[]; observationCount: number };
+        if (format === "adx-xml") {
+          content = buildAdxXml({ orgUnit: String(payload.org_unit ?? connection.org_unit_id ?? ""), dataSet: connection.dataset_id ?? "", period, observations });
+          contentType = "application/adx+xml";
+          validation = validateAdxXml(content);
+        } else {
+          const sdmxInput = { agencyId: connection.agency_id ?? "HANDS", dataflowId: connection.dataflow_id ?? connection.dataset_id ?? "", dataflowVersion: connection.dataflow_version ?? "1.0", period, observations, defaults: connection.default_dimensions ?? {} };
+          if (!sdmxInput.dataflowId) return json({ error: "SDMX requires a dataflow ID" }, 400);
+          content = format === "sdmx-json" ? buildSdmxJson(sdmxInput) : buildSdmxCsv(sdmxInput);
+          contentType = format === "sdmx-json" ? "application/vnd.sdmx.data+json;version=2.0.0" : "application/vnd.sdmx.data+csv;version=2.0.0";
+          validation = validateSdmxPayload(content, format, Object.keys(connection.default_dimensions ?? {}));
+        }
+        if (!validation.valid) return json({ error: validation.errors.join(" "), validation }, 400);
+        if (action === "preview_aggregate") return json({ ok: true, content, contentType, format, validation });
+
+        const dryRun = payload.dry_run === true;
+        const target = format === "adx-xml" && connection.kind === "dhis2"
+          ? joinUrl(connection.base_url, `api/dataValueSets?dryRun=${String(dryRun)}&importStrategy=CREATE_AND_UPDATE`)
+          : connection.base_url;
+        const response = await remoteFetch(target, { method: "POST", headers: { ...headers, Accept: contentType, "Content-Type": contentType }, body: content });
+        const status = response.ok ? "success" : "error";
+        const message = response.ok ? `${format.toUpperCase()} exchange accepted (${validation.observationCount} observations)` : remoteMessage(response.body, `HTTP ${response.status}`);
+        await log(db, connection, "push", format, status, validation.observationCount, message, guard.userId);
+        return json({ ok: response.ok, status, message, accepted: response.ok ? validation.observationCount : 0, rejected: response.ok ? 0 : validation.observationCount, response: response.body }, response.ok ? 200 : 502);
+      }
+
+      case "validate_import": {
+        const format = String(payload.format ?? connection.exchange_format) as "adx-xml" | "sdmx-json" | "sdmx-csv";
+        const content = String(payload.content ?? "");
+        if (content.length > 5_000_000) return json({ error: "Import is larger than 5 MB" }, 413);
+        const validation = format === "adx-xml" ? validateAdxXml(content) : validateSdmxPayload(content, format);
+        await log(db, connection, "test", `${format}_validation`, validation.valid ? "success" : "error", validation.observationCount, validation.valid ? "Payload is structurally valid" : validation.errors.join(" "), guard.userId);
+        return json({ ok: validation.valid, validation }, validation.valid ? 200 : 400);
+      }
+
+      case "pull_sdmx_structure": {
+        if (connection.kind !== "sdmx") return json({ error: "Structure pull is for SDMX connections" }, 400);
+        const agency = connection.agency_id ?? "all";
+        const dataflow = connection.dataflow_id ?? "all";
+        const version = connection.dataflow_version ?? "latest";
+        const response = await remoteFetch(joinUrl(connection.base_url, `dataflow/${agency}/${dataflow}/${version}?references=all`), { headers: { ...headers, Accept: "application/vnd.sdmx.structure+json;version=2.0.0, application/vnd.sdmx.structure+xml;version=2.1" } });
+        await log(db, connection, "pull", "sdmx_structure", response.ok ? "success" : "error", 0, response.ok ? "SDMX structure received" : remoteMessage(response.body, `HTTP ${response.status}`), guard.userId);
+        return json({ ok: response.ok, message: response.ok ? "SDMX structure received" : remoteMessage(response.body, `HTTP ${response.status}`), body: response.body }, response.ok ? 200 : 502);
+      }
+
+      case "pull_sdmx": {
+        if (connection.kind !== "sdmx") return json({ error: "Data pull is for SDMX connections" }, 400);
+        const query = String(payload.query ?? `data/${connection.dataflow_id ?? "all"}/all`);
+        const response = await remoteFetch(joinUrl(connection.base_url, query), { headers: { ...headers, Accept: "application/vnd.sdmx.data+json;version=2.0.0, application/vnd.sdmx.data+csv;version=2.0.0" } });
+        await log(db, connection, "pull", "sdmx_data", response.ok ? "success" : "error", 0, response.ok ? "SDMX observations received" : remoteMessage(response.body, `HTTP ${response.status}`), guard.userId);
+        return json({ ok: response.ok, message: response.ok ? "SDMX observations received" : remoteMessage(response.body, `HTTP ${response.status}`), body: response.body }, response.ok ? 200 : 502);
       }
 
       /* ------------------------- LMIS stock pull ----------------------- */

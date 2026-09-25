@@ -11,7 +11,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Plus, RefreshCw, Trash2, KeyRound, PlugZap, Download, Upload, Boxes, ScrollText,
+  Plus, RefreshCw, Trash2, KeyRound, PlugZap, Download, Upload, Boxes, ScrollText, FileCheck2, Eye,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -19,9 +19,10 @@ import {
   listConnections, saveConnection, deleteConnection,
   listLogs, listStock, listMappings, saveMapping,
   saveCredential, testConnection, pullMetadata, pullStock, pushIndicators, pushFhirPatients,
-  pullFhir, computeIndicatorValues, listBeneficiariesForExchange,
+  pullFhir, computeIndicatorValues, listBeneficiariesForExchange, previewAggregatePayload,
+  pushAggregatePayload, pullSdmxStructure, pullSdmxData, validateImportedPayload,
   type ExchangeConnection, type ExchangeKind, type ExchangeLog,
-  type CommodityStock, type ExchangeMapping,
+  type CommodityStock, type ExchangeMapping, type ExchangeFormat, type ExchangeAuthType,
 } from "@/lib/programmeModule/healthExchange";
 
 interface Props {
@@ -34,8 +35,10 @@ type Tab = "connections" | "indicators" | "commodities" | "logs";
 
 const EMPTY = {
   name: "", kind: "dhis2" as ExchangeKind, base_url: "",
-  auth_type: "bearer" as "bearer" | "basic" | "none",
+  auth_type: "bearer" as ExchangeAuthType,
   username: "", org_unit_id: "", dataset_id: "", default_period_type: "Monthly", is_active: true,
+  exchange_format: "json" as ExchangeFormat, token_url: "", agency_id: "", dataflow_id: "",
+  dataflow_version: "1.0", dsd_id: "", default_dimensions: {} as Record<string, string>,
 };
 
 function currentPeriod() {
@@ -72,6 +75,10 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
   const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
   const [lmisPath, setLmisPath] = useState("api/stockCards");
   const [fhirQuery, setFhirQuery] = useState("Patient?_count=50");
+  const [standardFormat, setStandardFormat] = useState<ExchangeFormat>("adx-xml");
+  const [payloadPreview, setPayloadPreview] = useState("");
+  const [importResult, setImportResult] = useState("");
+  const [sdmxQuery, setSdmxQuery] = useState("");
 
   const active = useMemo(() => rows.find((r) => r.id === activeId) ?? null, [rows, activeId]);
 
@@ -131,6 +138,40 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
       await saveConnection({ ...editing, project_id: projectId });
       setEditing(null);
     }, "Server saved");
+  };
+
+  const aggregateValues = values.map((value) => ({ indicator_key: value.key, value: value.value }));
+
+  const previewStandard = async () => {
+    if (!activeId) return;
+    await run("preview-standard", async () => {
+      const result = await previewAggregatePayload(activeId, period, aggregateValues, standardFormat);
+      setPayloadPreview(result.content ?? "");
+      return result;
+    }, "Payload validated");
+  };
+
+  const downloadPreview = () => {
+    if (!payloadPreview) return;
+    const extension = standardFormat === "adx-xml" ? "xml" : standardFormat === "sdmx-json" ? "json" : "csv";
+    const blob = new Blob([payloadPreview], { type: standardFormat === "adx-xml" ? "application/xml" : "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `national-report-${period}.${extension}`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const validateImport = async (file: File) => {
+    if (!activeId) return;
+    const content = await file.text();
+    await run("import-standard", async () => {
+      const result = await validateImportedPayload(activeId, standardFormat, content);
+      setImportResult(`${result.validation?.observationCount ?? 0} observations passed validation`);
+      setPayloadPreview(content);
+      return result;
+    }, "Imported file is valid");
   };
 
   return (
@@ -200,6 +241,12 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
                     <Download className="h-4 w-4" /> Pull details
                   </Button>
                 )}
+                {c.kind === "sdmx" && (
+                  <Button size="sm" variant="outline" className="gap-1" disabled={busy === c.id}
+                    onClick={() => void run(c.id, () => pullSdmxStructure(c.id), "SDMX structure received")}>
+                    <Download className="h-4 w-4" /> Pull structure
+                  </Button>
+                )}
                 {c.kind === "lmis" && (
                   <Button size="sm" variant="outline" className="gap-1" disabled={busy === c.id}
                     onClick={() => void run(c.id, () => pullStock(c.id, lmisPath), "Stock updated")}>
@@ -212,7 +259,10 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
                       id: c.id, name: c.name, kind: c.kind, base_url: c.base_url,
                       auth_type: c.auth_type, username: c.username ?? "", org_unit_id: c.org_unit_id ?? "",
                       dataset_id: c.dataset_id ?? "", default_period_type: c.default_period_type,
-                      is_active: c.is_active,
+                      is_active: c.is_active, exchange_format: c.exchange_format ?? "json",
+                      token_url: c.token_url ?? "", agency_id: c.agency_id ?? "", dataflow_id: c.dataflow_id ?? "",
+                      dataflow_version: c.dataflow_version ?? "1.0", dsd_id: c.dsd_id ?? "",
+                      default_dimensions: c.default_dimensions ?? {},
                     })}>Edit</Button>
                     <Button size="sm" variant="ghost" className="text-destructive"
                       onClick={() => void run(c.id, () => deleteConnection(c.id), "Server removed")}>
@@ -293,6 +343,59 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
             </div>
           )}
 
+          {(active?.kind === "dhis2" || active?.kind === "sdmx") && (
+            <div className="space-y-3 border-t pt-4">
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="space-y-1">
+                  <Label>Exchange standard</Label>
+                  <Select value={standardFormat} onValueChange={(value) => { setStandardFormat(value as ExchangeFormat); setPayloadPreview(""); }}>
+                    <SelectTrigger className="w-[190px]"><SelectValue /></SelectTrigger>
+                    <SelectContent className="z-[60] bg-popover">
+                      {active.kind === "dhis2" && <SelectItem value="adx-xml">IHE ADX XML</SelectItem>}
+                      {active.kind === "sdmx" && <SelectItem value="sdmx-json">SDMX-JSON 2.0</SelectItem>}
+                      {active.kind === "sdmx" && <SelectItem value="sdmx-csv">SDMX-CSV 2.0</SelectItem>}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button variant="outline" className="gap-1" disabled={busy === "preview-standard"} onClick={() => void previewStandard()}>
+                  <Eye className="h-4 w-4" /> Validate &amp; preview
+                </Button>
+                <Button variant="outline" className="gap-1" disabled={!payloadPreview} onClick={downloadPreview}>
+                  <Download className="h-4 w-4" /> Download
+                </Button>
+                <Button asChild variant="outline" className="gap-1">
+                  <label>
+                    <FileCheck2 className="h-4 w-4" /> Import &amp; validate
+                    <input type="file" className="hidden" accept=".xml,.json,.csv,text/xml,application/json,text/csv"
+                      onChange={(event) => { const file = event.target.files?.[0]; if (file) void validateImport(file); event.target.value = ""; }} />
+                  </label>
+                </Button>
+                {canManage && (
+                  <Button className="gap-1" disabled={busy === "push-standard"}
+                    onClick={() => void run("push-standard", () => pushAggregatePayload(activeId, period, aggregateValues, standardFormat), "Standards report accepted")}>
+                    <Upload className="h-4 w-4" /> Transmit
+                  </Button>
+                )}
+              </div>
+              {importResult && <p className="text-xs text-muted-foreground">{importResult}</p>}
+              {payloadPreview && (
+                <pre className="max-h-72 overflow-auto rounded-md border bg-muted/30 p-3 text-xs whitespace-pre-wrap break-all">{payloadPreview}</pre>
+              )}
+              {active.kind === "sdmx" && (
+                <div className="flex flex-wrap items-end gap-2">
+                  <div className="min-w-[260px] flex-1 space-y-1">
+                    <Label>SDMX data query</Label>
+                    <Input value={sdmxQuery} onChange={(event) => setSdmxQuery(event.target.value)} placeholder={`data/${active.dataflow_id ?? "dataflow"}/all`} />
+                  </div>
+                  <Button variant="outline" className="gap-1" disabled={busy === "sdmx-pull"}
+                    onClick={() => void run("sdmx-pull", () => pullSdmxData(activeId, sdmxQuery || undefined), "SDMX observations received")}>
+                    <Download className="h-4 w-4" /> Pull observations
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-left text-muted-foreground">
@@ -321,6 +424,22 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
                             setMappings(await listMappings(activeId));
                           }}
                         />
+                        {(active?.kind === "sdmx" || standardFormat === "adx-xml") && (
+                          <Input
+                            className="mt-1 h-8 w-[220px]"
+                            placeholder={active?.kind === "sdmx" ? "Dimensions: FREQ=M,REF_AREA=NG" : "Disaggregation: sex=F,age=15-49"}
+                            defaultValue={Object.entries(m?.dimensions ?? {}).map(([key, value]) => `${key}=${value}`).join(",")}
+                            disabled={!canManage || !activeId}
+                            onBlur={async (event) => {
+                              const dimensions = Object.fromEntries(event.target.value.split(",").map((part) => part.trim()).filter(Boolean).map((part) => {
+                                const separator = part.indexOf("=");
+                                return separator > 0 ? [part.slice(0, separator).trim(), part.slice(separator + 1).trim()] : [part, ""];
+                              }).filter(([, value]) => value));
+                              await saveMapping({ connection_id: activeId, indicator_key: v.key, indicator_label: v.label, remote_id: m?.remote_id ?? "UNMAPPED", dimensions });
+                              setMappings(await listMappings(activeId));
+                            }}
+                          />
+                        )}
                       </td>
                     </tr>
                   );
@@ -451,11 +570,19 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent className="z-[60] bg-popover">
                     <SelectItem value="bearer">Personal access / OAuth token</SelectItem>
+                      <SelectItem value="apitoken">DHIS2 personal access token</SelectItem>
+                      <SelectItem value="oauth2_client_credentials">OpenLMIS OAuth client</SelectItem>
                       <SelectItem value="basic">Username &amp; password</SelectItem>
                       <SelectItem value="none">No sign-in</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
+                {editing.auth_type === "oauth2_client_credentials" && (
+                  <div className="space-y-1 sm:col-span-2">
+                    <Label>OAuth token address</Label>
+                    <Input value={editing.token_url} onChange={(e) => setEditing({ ...editing, token_url: e.target.value })} />
+                  </div>
+                )}
                 <div className="space-y-1">
                   <Label>Username (if needed)</Label>
                   <Input value={editing.username} onChange={(e) => setEditing({ ...editing, username: e.target.value })} />
@@ -469,6 +596,14 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
                   <Input value={editing.dataset_id} onChange={(e) => setEditing({ ...editing, dataset_id: e.target.value })} />
                 </div>
               </div>
+              {editing.kind === "sdmx" && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1"><Label>Agency ID</Label><Input value={editing.agency_id} onChange={(e) => setEditing({ ...editing, agency_id: e.target.value })} /></div>
+                  <div className="space-y-1"><Label>Dataflow ID</Label><Input value={editing.dataflow_id} onChange={(e) => setEditing({ ...editing, dataflow_id: e.target.value })} /></div>
+                  <div className="space-y-1"><Label>Dataflow version</Label><Input value={editing.dataflow_version} onChange={(e) => setEditing({ ...editing, dataflow_version: e.target.value })} /></div>
+                  <div className="space-y-1"><Label>DSD ID</Label><Input value={editing.dsd_id} onChange={(e) => setEditing({ ...editing, dsd_id: e.target.value })} /></div>
+                </div>
+              )}
             </div>
           )}
           <DialogFooter>
