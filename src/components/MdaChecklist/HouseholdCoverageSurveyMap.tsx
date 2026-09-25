@@ -970,7 +970,7 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <CardTitle className="flex items-center gap-2 font-display text-sm">
+            <CardTitle className="flex items-center gap-2">
               <Home className="h-4 w-4 text-primary" /> Household Coverage Survey Map
             </CardTitle>
             <CardDescription className="text-xs">

@@ -153,7 +153,7 @@ const TextAnalysis = ({ submissions, selectedForm, loading }: TextAnalysisProps)
     return (
       <Card className="border-0 shadow-card">
         <CardHeader>
-          <CardTitle className="font-display flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             <MessageSquareText className="h-5 w-5 text-primary" />
             Text Response Analysis
           </CardTitle>
@@ -168,7 +168,7 @@ const TextAnalysis = ({ submissions, selectedForm, loading }: TextAnalysisProps)
   return (
     <Card className="border-0 shadow-card">
       <CardHeader>
-        <CardTitle className="font-display flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2">
           <MessageSquareText className="h-5 w-5 text-primary" />
           Text Response Analysis
         </CardTitle>

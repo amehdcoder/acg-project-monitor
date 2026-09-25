@@ -487,7 +487,7 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
         <div className="space-y-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <Shield className="h-4 w-4 text-primary" />Risk Controls
               </CardTitle>
             </CardHeader>
@@ -512,7 +512,7 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Risk Factors</CardTitle>
+              <CardTitle>Risk Factors</CardTitle>
               <CardDescription className="text-xs">Weighted scoring model</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2 text-xs">
@@ -574,7 +574,7 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">High-Risk Zones</CardTitle>
+              <CardTitle>High-Risk Zones</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <div className="max-h-[200px] overflow-y-auto">
@@ -601,7 +601,7 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
       {riskChartData.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Risk Score Distribution</CardTitle>
+            <CardTitle>Risk Score Distribution</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={200}>

@@ -443,7 +443,7 @@ const FormDataKnowledgeGraph = ({
     <Card className="overflow-hidden">
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+          <CardTitle className="flex items-center gap-2">
             <Network className="h-4 w-4 text-primary shrink-0" />
             {title}
           </CardTitle>

@@ -140,7 +140,7 @@ export function StatusCommunityTables({ parents }: { parents: StatusRecord[] }) 
               className="py-3 px-4 border-b flex-row items-center justify-between space-y-0"
               style={{ background: `color-mix(in srgb, ${meta.color} 12%, transparent)` }}
             >
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <Icon className="h-4 w-4" style={{ color: meta.color }} />
                 Communities — MDA {meta.label}
               </CardTitle>

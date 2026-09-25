@@ -1007,7 +1007,7 @@ const QuizBuilder = () => {
 
           <Card className="form-card">
             <CardHeader>
-              <CardTitle className="text-lg">{selectedQuiz.title}</CardTitle>
+              <CardTitle>{selectedQuiz.title}</CardTitle>
               {selectedQuiz.description && <CardDescription>{selectedQuiz.description}</CardDescription>}
               {koboConfig && (
                 <KoboSyncStatusBar
@@ -1445,7 +1445,7 @@ const QuizBuilder = () => {
                       <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${accent} text-white shadow-sm`}>
                         <BookOpen className="h-5 w-5" />
                       </span>
-                      <CardTitle className="text-base leading-snug">{quiz.title}</CardTitle>
+                      <CardTitle className="leading-snug">{quiz.title}</CardTitle>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1">
                       {quiz.open_test_type ? (

@@ -344,7 +344,7 @@ const FieldActivityTracker = ({ selectedProjectId }: FieldActivityTrackerProps) 
   return (
     <Card className="border-0 shadow-card">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="flex items-center gap-2 font-display text-base sm:text-lg">
+        <CardTitle className="flex items-center gap-2">
           <Activity className="h-5 w-5 text-[hsl(142,60%,35%)]" />
           Field Activity
         </CardTitle>

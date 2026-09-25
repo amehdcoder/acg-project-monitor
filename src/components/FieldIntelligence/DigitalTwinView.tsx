@@ -517,7 +517,7 @@ const DigitalTwinView = ({ projectId, formId }: Props) => {
         <div className="space-y-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <Eye className="h-4 w-4 text-primary" />Twin Controls
               </CardTitle>
             </CardHeader>
@@ -556,7 +556,7 @@ const DigitalTwinView = ({ projectId, formId }: Props) => {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Top Zones</CardTitle>
+              <CardTitle>Top Zones</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <div className="max-h-[220px] overflow-y-auto">
@@ -586,7 +586,7 @@ const DigitalTwinView = ({ projectId, formId }: Props) => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-primary" />Hourly Activity Pattern
             </CardTitle>
             <CardDescription>Submission distribution across hours</CardDescription>
@@ -614,7 +614,7 @@ const DigitalTwinView = ({ projectId, formId }: Props) => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4 text-primary" />Collector Performance Map
             </CardTitle>
             <CardDescription>Submissions vs GPS accuracy per collector</CardDescription>

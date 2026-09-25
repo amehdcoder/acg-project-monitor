@@ -808,7 +808,7 @@ const ARDataVisualization3D = ({ realtimeKey = 0 }: ARDataVisualization3DProps) 
             {/* Field Quality Table */}
             <Card className="border-border/50">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2">
                   <Activity className="h-4 w-4 text-primary" />Field Quality Breakdown
                 </CardTitle>
               </CardHeader>
@@ -839,7 +839,7 @@ const ARDataVisualization3D = ({ realtimeKey = 0 }: ARDataVisualization3DProps) 
             {/* GPS Distribution */}
             <Card className="border-border/50">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2">
                   <MapPin className="h-4 w-4 text-primary" />GPS Data Distribution
                 </CardTitle>
               </CardHeader>

@@ -152,7 +152,7 @@ const DashboardCharts = () => {
       {projectData.length > 0 && (
         <Card className="border-0 shadow-card overflow-hidden">
           <CardHeader className="pb-2">
-            <CardTitle className="font-display text-sm sm:text-base flex items-center gap-2 text-[hsl(142,60%,35%)]">
+            <CardTitle className="flex items-center gap-2 text-[hsl(142,60%,35%)]">
               <FolderOpen className="h-4 w-4" />
               Submissions by Project
             </CardTitle>
@@ -283,7 +283,7 @@ const DashboardCharts = () => {
         {stateData.length > 0 && (
           <Card className="border-0 shadow-card overflow-hidden">
             <CardHeader className="pb-2">
-              <CardTitle className="font-display text-sm sm:text-base flex items-center gap-2 text-[hsl(142,60%,35%)]">
+              <CardTitle className="flex items-center gap-2 text-[hsl(142,60%,35%)]">
                 <MapPin className="h-4 w-4" />
                 Submissions by State
               </CardTitle>
@@ -376,7 +376,7 @@ const DailyReportingCard = () => {
   return (
     <Card className="border-0 shadow-card overflow-hidden">
       <CardHeader className="pb-2">
-        <CardTitle className="font-display text-sm sm:text-base flex items-center gap-2 text-[hsl(142,60%,35%)]">
+        <CardTitle className="flex items-center gap-2 text-[hsl(142,60%,35%)]">
           <Calendar className="h-4 w-4" />
           Daily Reporting Rate
         </CardTitle>

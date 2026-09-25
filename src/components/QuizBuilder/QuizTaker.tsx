@@ -278,7 +278,7 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-muted text-muted-foreground">
               <Lock className="h-8 w-8" />
             </div>
-            <CardTitle className="text-lg">This quiz is currently closed</CardTitle>
+            <CardTitle>This quiz is currently closed</CardTitle>
             <CardDescription className="max-w-sm mx-auto">
               An administrator has not opened this quiz yet. Please check back — the Pre-test or
               Post-test will appear here the moment it is opened.

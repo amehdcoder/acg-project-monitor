@@ -316,7 +316,7 @@ const StatisticalAnalysisView = () => {
       if (chart.type === "bar") {
         return (
           <Card key={key}>
-            <CardHeader><CardTitle className="text-base">{chart.title}</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{chart.title}</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={chart.data}>
@@ -337,7 +337,7 @@ const StatisticalAnalysisView = () => {
       if (chart.type === "pie") {
         return (
           <Card key={key}>
-            <CardHeader><CardTitle className="text-base">{chart.title}</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{chart.title}</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <RechartsPie>
@@ -357,7 +357,7 @@ const StatisticalAnalysisView = () => {
       if (chart.type === "scatter") {
         return (
           <Card key={key}>
-            <CardHeader><CardTitle className="text-base">{chart.title}</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{chart.title}</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <RechartsScatter>
@@ -375,7 +375,7 @@ const StatisticalAnalysisView = () => {
       if (chart.type === "line") {
         return (
           <Card key={key}>
-            <CardHeader><CardTitle className="text-base">{chart.title}</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{chart.title}</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={chart.data}>
@@ -396,7 +396,7 @@ const StatisticalAnalysisView = () => {
       if (chart.type === "area") {
         return (
           <Card key={key}>
-            <CardHeader><CardTitle className="text-base">{chart.title}</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{chart.title}</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <AreaChart data={chart.data}>
@@ -441,7 +441,7 @@ const StatisticalAnalysisView = () => {
       {/* Step 1: Select Project & Form */}
       <Card className="border-0 shadow-md">
         <CardHeader className="pb-4">
-          <CardTitle className="text-lg flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             <span className="flex items-center justify-center h-7 w-7 rounded-full bg-primary text-primary-foreground text-xs font-bold shadow-sm">1</span>
             Select Data Source
           </CardTitle>
@@ -473,7 +473,7 @@ const StatisticalAnalysisView = () => {
       {selectedForm && (
         <Card className="border-0 shadow-md">
           <CardHeader className="pb-4">
-            <CardTitle className="text-lg flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               <span className="flex items-center justify-center h-7 w-7 rounded-full bg-primary text-primary-foreground text-xs font-bold shadow-sm">2</span>
               Choose Analysis Type
             </CardTitle>
@@ -530,7 +530,7 @@ const StatisticalAnalysisView = () => {
       {selectedAnalysis && suitableQuestions.length > 0 && (
         <Card className="border-0 shadow-md">
           <CardHeader className="pb-4">
-            <CardTitle className="text-lg flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               <span className="flex items-center justify-center h-7 w-7 rounded-full bg-primary text-primary-foreground text-xs font-bold shadow-sm">3</span>
               Select Questions to Analyze
             </CardTitle>
@@ -602,7 +602,7 @@ const StatisticalAnalysisView = () => {
           {results.summary && (
             <Card className="border-0 shadow-md border-l-4 border-l-emerald-500">
               <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2">
                   <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
                     <CheckCircle className="h-5 w-5 text-emerald-600" />
                   </div>
@@ -619,7 +619,7 @@ const StatisticalAnalysisView = () => {
           {results.statistics && results.statistics.length > 0 && (
             <Card className="border-0 shadow-md">
               <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2">
                   <BarChart3 className="h-4 w-4 text-primary" />
                   Statistical Output
                 </CardTitle>
@@ -658,7 +658,7 @@ const StatisticalAnalysisView = () => {
           {results.interpretation && (
             <Card className="border-0 shadow-md bg-gradient-to-br from-primary/5 to-accent/5">
               <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2">
                   <div className="p-1.5 rounded-lg bg-primary/10">
                     <Lightbulb className="h-4 w-4 text-primary" />
                   </div>
@@ -675,7 +675,7 @@ const StatisticalAnalysisView = () => {
           {results.recommendations && results.recommendations.length > 0 && (
             <Card className="border-0 shadow-md">
               <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2">
                   <Info className="h-4 w-4 text-accent" />
                   Recommendations
                 </CardTitle>

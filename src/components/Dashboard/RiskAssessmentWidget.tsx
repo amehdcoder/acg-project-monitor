@@ -332,7 +332,7 @@ const RiskAssessmentWidget = ({ selectedProjectId }: RiskAssessmentWidgetProps) 
     <Card className="border border-border/30 shadow-card bg-card/95 backdrop-blur-sm h-full flex flex-col">
       <CardHeader className="pb-2 flex-shrink-0">
         <div className="flex items-center justify-between">
-          <CardTitle className="font-display text-sm sm:text-base flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             <ShieldAlert className="h-4 w-4 text-red-500" />
             Risk Assessment
           </CardTitle>

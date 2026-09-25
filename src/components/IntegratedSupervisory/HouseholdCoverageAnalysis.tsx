@@ -243,7 +243,7 @@ export default function HouseholdCoverageAnalysis({
   return (
     <Card className="overflow-hidden border-emerald-200/70">
       <CardHeader className="py-3 px-4 border-b bg-gradient-to-r from-emerald-50 to-sky-50 flex-row flex-wrap items-center justify-between gap-2 space-y-0">
-        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2">
           <Home className="h-4 w-4 text-emerald-700" />
           Household Survey Coverage &amp; Administrative Level Analytics
           <Badge variant="outline" className="ml-1 font-normal text-[10px]">design-based · 95% CI</Badge>

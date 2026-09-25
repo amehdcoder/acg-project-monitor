@@ -37,7 +37,7 @@ const AccessibilityStatementView = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2"><Eye className="h-4 w-4 text-primary" /> Visual Accessibility</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Eye className="h-4 w-4 text-primary" /> Visual Accessibility</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground space-y-2">
             <ul className="list-disc pl-4 space-y-1">
@@ -53,7 +53,7 @@ const AccessibilityStatementView = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2"><Ear className="h-4 w-4 text-primary" /> Hearing Accessibility</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Ear className="h-4 w-4 text-primary" /> Hearing Accessibility</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground space-y-2">
             <ul className="list-disc pl-4 space-y-1">
@@ -67,7 +67,7 @@ const AccessibilityStatementView = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2"><Hand className="h-4 w-4 text-primary" /> Motor Accessibility</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Hand className="h-4 w-4 text-primary" /> Motor Accessibility</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground space-y-2">
             <ul className="list-disc pl-4 space-y-1">
@@ -81,7 +81,7 @@ const AccessibilityStatementView = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2"><Globe className="h-4 w-4 text-primary" /> Language & Cognitive</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Globe className="h-4 w-4 text-primary" /> Language & Cognitive</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground space-y-2">
             <ul className="list-disc pl-4 space-y-1">

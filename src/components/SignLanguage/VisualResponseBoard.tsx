@@ -88,7 +88,7 @@ const VisualResponseBoard = () => {
     <div className="space-y-4">
       <Card className="border-primary/20">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             <ThumbsUp className="h-4 w-4 text-primary" />
             Visual Communication Board (AAC)
           </CardTitle>

@@ -145,7 +145,7 @@ export default function SupplyIntegrityPanel({
       {/* Shrinkage ledger */}
       <Card>
         <CardHeader className="py-3 px-4 border-b bg-muted/40">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             <ShieldAlert className="h-4 w-4 text-destructive" /> Transit shrinkage by cascade leg
           </CardTitle>
         </CardHeader>
@@ -223,7 +223,7 @@ export default function SupplyIntegrityPanel({
         {/* Expiry risk */}
         <Card>
           <CardHeader className="py-3 px-4 border-b bg-muted/40 flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               <CalendarClock className="h-4 w-4 text-amber-600" /> Expiry risk index — stock within {expiryRisk.windowDays} days of expiry
             </CardTitle>
             <Badge variant="outline" className="text-[10px]">{expiryRisk.batchesAtRisk.length} batches</Badge>
@@ -278,7 +278,7 @@ export default function SupplyIntegrityPanel({
         {/* Buffer retention */}
         <Card>
           <CardHeader className="py-3 px-4 border-b bg-muted/40">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               <Warehouse className="h-4 w-4 text-primary" /> Buffer retention — warehouse hold-back vs CDD deployment
             </CardTitle>
           </CardHeader>
@@ -322,7 +322,7 @@ export default function SupplyIntegrityPanel({
       {/* Equity */}
       <Card>
         <CardHeader className="py-3 px-4 border-b bg-muted/40 flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             <ArrowDownWideNarrow className="h-4 w-4 text-primary" /> Facility allocation equity within LGAs
           </CardTitle>
           <Badge variant="outline" className="text-[10px]">Weighted CV {equity.weightedCv.toFixed(2)}</Badge>

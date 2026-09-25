@@ -379,7 +379,7 @@ const DataQualityView = () => {
               {indicators.map(ind => (
                 <Card key={ind.id} className="border-0 shadow-card">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium flex items-center justify-between">
+                    <CardTitle className="flex items-center justify-between">
                       <span className="truncate">{formNames[ind.form_id] || ind.form_id.slice(0, 8)}</span>
                       <span className={`font-display text-xl font-bold ${scoreColor(Number(ind.overall_score))}`}>
                         {Number(ind.overall_score)}%
@@ -437,7 +437,7 @@ const DataQualityView = () => {
         <TabsContent value="ai-suggestions" className="space-y-4">
           <Card className="border-0 shadow-card">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
+              <CardTitle className="flex items-center gap-2">
                 <BrainCircuit className="h-5 w-5 text-primary" />
                 AI-Powered Data Quality Analysis
               </CardTitle>

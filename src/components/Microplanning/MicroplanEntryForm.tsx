@@ -104,9 +104,9 @@ const defaultFormData: MicroplanFormData = {
 const nativeSelectClass = "flex h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 
 const Section = memo(({ id, title, icon: Icon, children }: { id?: string; title: string; icon: any; children: React.ReactNode }) => (
-  <Card id={id ? `section-${id}` : undefined} className="scroll-mt-24 rounded-2xl border-border/40 bg-white shadow-sm">
+  <Card id={id ? `section-${id}` : undefined} className="scroll-mt-24 rounded-lg border-border/40 bg-white shadow-sm">
     <CardHeader className="pb-2 pt-3 px-3">
-      <CardTitle className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary">
+      <CardTitle className="flex items-center gap-2 uppercase tracking-wide text-primary">
         <Icon className="h-3.5 w-3.5" />
         {title}
       </CardTitle>
@@ -884,7 +884,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       <Card className="border-border/40 shadow-none">
         <CardHeader className="pb-2 pt-3 px-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary">
+            <CardTitle className="flex items-center gap-2 uppercase tracking-wide text-primary">
               <Eye className="h-3.5 w-3.5" />
               Trachoma Age Disaggregation (Optional)
             </CardTitle>

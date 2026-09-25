@@ -128,7 +128,7 @@ const AppVersionAuditView = () => {
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
           <div>
-            <CardTitle className="text-lg">App Version Audit</CardTitle>
+            <CardTitle>App Version Audit</CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
               Latest published version:{" "}
               <span className="font-mono font-semibold text-foreground">

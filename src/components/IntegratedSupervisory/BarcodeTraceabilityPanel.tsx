@@ -81,7 +81,7 @@ export default function BarcodeTraceabilityPanel({ trace }: { trace: BarcodeSumm
 
       <Card>
         <CardHeader className="py-3 px-4 border-b bg-muted/40">
-          <CardTitle className="text-sm font-semibold">Scan compliance by cascade tier</CardTitle>
+          <CardTitle>Scan compliance by cascade tier</CardTitle>
         </CardHeader>
         <CardContent className="p-4 space-y-3">
           {trace.byLevel.map((l) => (
@@ -104,7 +104,7 @@ export default function BarcodeTraceabilityPanel({ trace }: { trace: BarcodeSumm
       <Card>
         <CardHeader className="py-3 px-4 border-b bg-muted/40 space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle className="text-sm font-semibold">Unit-level chain of custody</CardTitle>
+            <CardTitle>Unit-level chain of custody</CardTitle>
             <Button variant="outline" size="sm" className="h-8 text-xs" onClick={download} disabled={!rows.length}>
               <Download className="h-3.5 w-3.5 mr-1" /> CSV
             </Button>

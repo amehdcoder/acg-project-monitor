@@ -71,7 +71,7 @@ const TerritoryMap = ({ users }: Props) => {
               <Layers className="h-4 w-4 text-primary" />
             </div>
             <div>
-              <CardTitle className="font-display text-lg">Territory Overview</CardTitle>
+              <CardTitle>Territory Overview</CardTitle>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {territories.length} territories · {usersWithLocation.length} with GPS
               </p>

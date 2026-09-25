@@ -324,7 +324,7 @@ const ReportGenerator = ({ formId, formName, projectId, projectName }: Props) =>
   return (
     <Card className="border-0 shadow-card">
       <CardHeader className="pb-3">
-        <CardTitle className="font-display text-lg flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2">
           <BarChart3 className="h-5 w-5 text-primary" />
           Report Generator
         </CardTitle>

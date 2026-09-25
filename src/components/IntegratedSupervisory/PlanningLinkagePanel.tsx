@@ -137,7 +137,7 @@ export default function PlanningLinkagePanel({
       {/* ── estimation assumptions ──────────────────────────────────────── */}
       <Card className="overflow-hidden border-primary/20">
         <CardHeader className="pb-3">
-          <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+          <CardTitle className="flex flex-wrap items-center gap-2">
             <Scale className="h-4 w-4 text-primary" />
             Plan-to-household linkage{projectName ? ` — ${projectName}` : ""}
             <Badge variant="outline" className="text-[10px] font-normal">Triangulated estimate</Badge>
@@ -209,7 +209,7 @@ export default function PlanningLinkagePanel({
           {/* ── linked intelligence answers ────────────────────────────── */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-sm">
+              <CardTitle className="flex items-center gap-2">
                 <Activity className="h-4 w-4 text-primary" /> End-to-end intelligence — planning to household
               </CardTitle>
             </CardHeader>
@@ -235,7 +235,7 @@ export default function PlanningLinkagePanel({
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-sm"><Layers className="h-4 w-4" /> Cascade funnel — where the cycle leaks</CardTitle>
+                <CardTitle className="flex items-center gap-2"><Layers className="h-4 w-4" /> Cascade funnel — where the cycle leaks</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 {link.funnel.map((f) => (
@@ -252,7 +252,7 @@ export default function PlanningLinkagePanel({
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Equity gradient — coverage by access conditions</CardTitle>
+                <CardTitle>Equity gradient — coverage by access conditions</CardTitle>
               </CardHeader>
               <CardContent className="overflow-x-auto">
                 <Table>
@@ -283,7 +283,7 @@ export default function PlanningLinkagePanel({
           {/* ── coverage by level ──────────────────────────────────────── */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="flex flex-wrap items-center gap-2 text-sm">
+              <CardTitle className="flex flex-wrap items-center gap-2">
                 <Target className="h-4 w-4" /> Expected treatment coverage by geography
                 <Select value={level} onValueChange={(v) => setLevel(v as GeoLevel)}>
                   <SelectTrigger className="h-7 w-36 text-xs"><SelectValue /></SelectTrigger>
@@ -358,7 +358,7 @@ export default function PlanningLinkagePanel({
           {/* ── actions ────────────────────────────────────────────────── */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Act now — corrections ranked by population still at risk</CardTitle>
+              <CardTitle>Act now — corrections ranked by population still at risk</CardTitle>
               <p className="text-[11px] text-muted-foreground">
                 Recomputed on every microplan, checklist and ledger sync, so the list reflects the field as it stands today.
               </p>

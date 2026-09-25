@@ -192,7 +192,7 @@ const AuditLogViewer = () => {
     <Card className="border-0 shadow-card">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <CardTitle className="font-display text-lg flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-primary" />
             Audit Log
             {isLive && (

@@ -136,7 +136,7 @@ const ExternalConnectorsView = () => {
       <CardHeader>
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
-            <CardTitle className="text-lg flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               <Plug className="h-5 w-5 text-primary" />
               External Data Connectors
             </CardTitle>

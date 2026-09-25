@@ -772,7 +772,7 @@ const CaseDetails = ({ open, onOpenChange, caseId, onLaunchFollowUp }: CaseDetai
                     {/* Activity Bar Chart */}
                     <Card className="border-0 shadow-card">
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-sm flex items-center gap-2">
+                        <CardTitle className="flex items-center gap-2">
                           <BarChart3 className="h-4 w-4 text-primary" />
                           Activity Over Time
                         </CardTitle>
@@ -802,7 +802,7 @@ const CaseDetails = ({ open, onOpenChange, caseId, onLaunchFollowUp }: CaseDetai
                     {/* Cumulative Activity Trend */}
                     <Card className="border-0 shadow-card">
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-sm flex items-center gap-2">
+                        <CardTitle className="flex items-center gap-2">
                           <TrendingUp className="h-4 w-4 text-primary" />
                           Cumulative Activity
                         </CardTitle>
@@ -869,7 +869,7 @@ const CaseDetails = ({ open, onOpenChange, caseId, onLaunchFollowUp }: CaseDetai
                       return (
                         <Card className="border-0 shadow-card overflow-hidden">
                           <CardHeader className="pb-2 bg-gradient-to-r from-primary/10 via-accent/5 to-transparent">
-                            <CardTitle className="text-sm flex items-center gap-2">
+                            <CardTitle className="flex items-center gap-2">
                               <TrendingUp className="h-4 w-4 text-primary" />
                               Longitudinal Tracking
                             </CardTitle>
@@ -959,7 +959,7 @@ const CaseDetails = ({ open, onOpenChange, caseId, onLaunchFollowUp }: CaseDetai
               <div className="space-y-4">
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Case Information</CardTitle>
+                    <CardTitle>Case Information</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="flex items-center justify-between">
@@ -993,7 +993,7 @@ const CaseDetails = ({ open, onOpenChange, caseId, onLaunchFollowUp }: CaseDetai
 
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Case Properties</CardTitle>
+                    <CardTitle>Case Properties</CardTitle>
                     <CardDescription>Saved data from form submissions</CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -1212,7 +1212,7 @@ const CaseDetails = ({ open, onOpenChange, caseId, onLaunchFollowUp }: CaseDetai
               <div className="space-y-4">
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm flex items-center gap-2">
+                    <CardTitle className="flex items-center gap-2">
                       <Users className="h-4 w-4 text-primary" />
                       Share this case
                     </CardTitle>
@@ -1255,7 +1255,7 @@ const CaseDetails = ({ open, onOpenChange, caseId, onLaunchFollowUp }: CaseDetai
 
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">People with access</CardTitle>
+                    <CardTitle>People with access</CardTitle>
                   </CardHeader>
                   <CardContent>
                     {permissions.length === 0 ? (

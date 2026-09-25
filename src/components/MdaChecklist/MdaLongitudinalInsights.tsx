@@ -54,7 +54,7 @@ export default function MdaLongitudinalInsights({ checklist, submissions, questi
       {/* ── Longitudinal follow-up outcome trend ── */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-1.5 text-sm">
+          <CardTitle className="flex items-center gap-1.5">
             <TrendingUp className="h-4 w-4 text-primary" /> Longitudinal Follow-up Outcomes
             <span className="ml-auto text-xs font-normal text-muted-foreground">by week</span>
           </CardTitle>
@@ -89,7 +89,7 @@ export default function MdaLongitudinalInsights({ checklist, submissions, questi
       {/* ── Duplicate community flag table ── */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-1.5 text-sm">
+          <CardTitle className="flex items-center gap-1.5">
             <CopyCheck className="h-4 w-4 text-primary" /> Duplicate Community Visits
             <Badge variant={duplicates.length ? "destructive" : "secondary"} className="ml-auto">
               {duplicates.length} flagged

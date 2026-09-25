@@ -235,7 +235,7 @@ const TargetCompletionReport = () => {
               <Target className="h-4 w-4 text-primary" />
             </div>
             <div>
-              <CardTitle className="font-display text-lg">Target Completion Report</CardTitle>
+              <CardTitle>Target Completion Report</CardTitle>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {format(dateRange.from, "MMM d")} – {format(dateRange.to, "MMM d, yyyy")}
               </p>

@@ -8,7 +8,7 @@ const CommunicationTips = () => {
       {/* Quick Etiquette */}
       <Card className="border-primary/20">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             🤝 Communication Etiquette
             <Badge variant="outline" className="text-[10px]">Essential Reading</Badge>
           </CardTitle>
@@ -40,7 +40,7 @@ const CommunicationTips = () => {
       {/* Levels of Hearing Impairment */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">🔊 Understanding Hearing Impairment Levels</CardTitle>
+          <CardTitle>🔊 Understanding Hearing Impairment Levels</CardTitle>
           <p className="text-xs text-muted-foreground">Adapt your communication approach based on the person's level of hearing ability</p>
         </CardHeader>
         <CardContent>
@@ -97,7 +97,7 @@ const CommunicationTips = () => {
       {/* Common mistakes */}
       <Card className="border-destructive/20 bg-destructive/5">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base text-destructive flex items-center gap-2">
+          <CardTitle className="text-destructive flex items-center gap-2">
             ⚠️ Common Mistakes to Avoid
           </CardTitle>
         </CardHeader>
@@ -124,7 +124,7 @@ const CommunicationTips = () => {
       {/* Field workflow */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">📋 Recommended Field Workflow</CardTitle>
+          <CardTitle>📋 Recommended Field Workflow</CardTitle>
         </CardHeader>
         <CardContent>
           <ol className="text-xs space-y-3">

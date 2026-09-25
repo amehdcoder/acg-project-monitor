@@ -34,7 +34,7 @@ export default function HubReconciliation({ rows, schema, apiCount, canExport }:
     <div className="space-y-4">
       <Card className="bg-slate-900/70 border-slate-800">
         <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
-          <CardTitle className="flex items-center gap-2 text-sm text-slate-100">
+          <CardTitle className="flex items-center gap-2 text-slate-100">
             <GitCompareArrows className="h-4 w-4 text-cyan-400" /> Reconciliation report
           </CardTitle>
           {canExport && (
@@ -72,7 +72,7 @@ export default function HubReconciliation({ rows, schema, apiCount, canExport }:
 
       <Card className="bg-slate-900/70 border-slate-800">
         <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
-          <CardTitle className="flex items-center gap-2 text-sm text-slate-100">
+          <CardTitle className="flex items-center gap-2 text-slate-100">
             <Info className="h-4 w-4 text-cyan-400" /> Data integrity findings
             <Badge variant="outline" className="border-slate-700 text-slate-400">score {integrity.score}/100</Badge>
           </CardTitle>

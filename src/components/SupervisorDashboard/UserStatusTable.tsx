@@ -114,7 +114,7 @@ const UserStatusTable = ({ users }: Props) => {
       <Card className="border-0 shadow-card">
         <CardHeader className="pb-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <CardTitle className="font-display text-lg">All Users Activity</CardTitle>
+            <CardTitle>All Users Activity</CardTitle>
             <div className="flex items-center gap-2 flex-wrap">
               <div className="relative flex-1 sm:w-56">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

@@ -460,7 +460,7 @@ const CaseManagementEditor = ({
                 {/* Case Type Selection */}
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
+                    <CardTitle className="flex items-center gap-2">
                       <Tag className="h-4 w-4 text-primary" />
                       Case Type
                     </CardTitle>
@@ -584,7 +584,7 @@ const CaseManagementEditor = ({
                 {localSettings.caseType && (
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-base">Form Action</CardTitle>
+                      <CardTitle>Form Action</CardTitle>
                       <CardDescription>
                         Define how this form interacts with cases
                       </CardDescription>
@@ -712,7 +712,7 @@ const CaseManagementEditor = ({
                 {localSettings.caseType && localSettings.action === "register" && (
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-base flex items-center gap-2">
+                      <CardTitle className="flex items-center gap-2">
                         <Briefcase className="h-4 w-4 text-primary" />
                         Case-Opening Triggers
                       </CardTitle>
@@ -879,7 +879,7 @@ const CaseManagementEditor = ({
                 {localSettings.caseType && (
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-base flex items-center gap-2">
+                      <CardTitle className="flex items-center gap-2">
                         <ArrowRight className="h-4 w-4 text-primary" />
                         Save to Case Properties
                       </CardTitle>
@@ -943,7 +943,7 @@ const CaseManagementEditor = ({
                     localSettings.action === "close") && (
                     <Card>
                       <CardHeader className="pb-3">
-                        <CardTitle className="text-base flex items-center gap-2">
+                        <CardTitle className="flex items-center gap-2">
                           <Database className="h-4 w-4 text-primary" />
                           Load from Case Properties
                         </CardTitle>

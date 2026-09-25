@@ -414,7 +414,7 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
     <>
     <Card className="overflow-hidden border-primary/30">
       <CardHeader className="border-b bg-gradient-to-r from-sky-500/10 via-emerald-500/5 to-transparent py-3 px-4">
-        <CardTitle className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+        <CardTitle className="flex flex-wrap items-center gap-2">
           <Compass className="h-4 w-4 text-sky-600" />
           GRID3 Coordinate Accuracy Audit — Community vs Registry ({radiusM / 1000} km standard)
           <Badge variant="outline" className="text-[10px] font-normal">

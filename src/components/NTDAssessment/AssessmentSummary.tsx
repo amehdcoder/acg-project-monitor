@@ -72,7 +72,7 @@ const AssessmentSummary = ({ protocol, answers, beneficiary, onEditField, onSave
       {/* Confidence & Classification */}
       <Card className="border-2">
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             <Activity className="h-5 w-5" /> Assessment Result
           </CardTitle>
         </CardHeader>

@@ -188,7 +188,7 @@ const RegistrationVsFollowUpChart = () => {
       <CardHeader>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div>
-            <CardTitle className="font-display text-base sm:text-lg">Registration vs Follow-Up Trends</CardTitle>
+            <CardTitle>Registration vs Follow-Up Trends</CardTitle>
             <CardDescription className="text-xs sm:text-sm">
               Cross-project submission breakdown over time
             </CardDescription>

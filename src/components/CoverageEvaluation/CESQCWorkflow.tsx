@@ -257,7 +257,7 @@ export default function CESQCWorkflow({ surveyId, onClose }: CESQCWorkflowProps)
         <CardHeader>
           <div className="flex justify-between items-start gap-2 flex-wrap">
             <div className="min-w-0">
-              <CardTitle className="flex items-center gap-2 text-base">
+              <CardTitle className="flex items-center gap-2">
                 <ShieldCheck className="h-5 w-5 text-primary" />
                 Peer Validation — choose mode per survey
               </CardTitle>

@@ -156,7 +156,7 @@ const LocationNotifications = ({ projectId }: Props) => {
       {sentAlerts.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Recently Sent Alerts</CardTitle>
+            <CardTitle>Recently Sent Alerts</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {sentAlerts.map(a => (

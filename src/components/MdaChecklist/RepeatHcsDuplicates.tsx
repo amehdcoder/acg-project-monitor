@@ -154,7 +154,7 @@ export default function RepeatHcsDuplicates({ surveys, onDeleted }: Props) {
     return (
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-1.5 text-sm">
+          <CardTitle className="flex items-center gap-1.5">
             <CopyCheck className="h-4 w-4 text-primary" /> Duplicate Household Coverage Surveys
             <Badge variant="secondary" className="ml-auto">0 flagged</Badge>
           </CardTitle>
@@ -172,7 +172,7 @@ export default function RepeatHcsDuplicates({ surveys, onDeleted }: Props) {
     <>
       <Card className="overflow-hidden">
         <CardHeader className="border-b bg-gradient-to-r from-rose-500/10 to-amber-500/10 pb-3">
-          <CardTitle className="flex flex-wrap items-center gap-1.5 text-sm">
+          <CardTitle className="flex flex-wrap items-center gap-1.5">
             <CopyCheck className="h-4 w-4 text-rose-500" /> Duplicate Household Coverage Surveys
             <Badge variant="destructive" className="ml-1">{groups.length} communit{groups.length === 1 ? "y" : "ies"}</Badge>
             <Badge variant="outline" className="border-rose-300 text-rose-600">{totalDupSurveys} submissions</Badge>

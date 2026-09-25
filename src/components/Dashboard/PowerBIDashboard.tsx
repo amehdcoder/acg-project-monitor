@@ -882,9 +882,9 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       {/* ── Row: concordance map · variance · gap map · insight ─────────────────── */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-3">
         {/* Concordance map */}
-        <Card className="xl:col-span-4 border-none shadow-lg bg-white rounded-2xl overflow-hidden">
+        <Card className="xl:col-span-4 border-none shadow-lg bg-white rounded-lg overflow-hidden">
           <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-sm font-black text-slate-900 flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" /> Concordance Map — Nigeria</CardTitle>
+            <CardTitle className="font-black text-slate-900 flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" /> Concordance Map — Nigeria</CardTitle>
             <CardDescription className="text-[11px]">LGA shaded by Microplanning &amp; Coverage Evaluation vs MDA concordance</CardDescription>
           </CardHeader>
           <CardContent className="p-3 pt-0">
@@ -900,9 +900,9 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
         </Card>
 
         {/* Source variance */}
-        <Card className="xl:col-span-3 border-none shadow-lg bg-white rounded-2xl overflow-hidden">
+        <Card className="xl:col-span-3 border-none shadow-lg bg-white rounded-lg overflow-hidden">
           <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-sm font-black text-slate-900">Source Variance</CardTitle>
+            <CardTitle>Source Variance</CardTitle>
             <CardDescription className="text-[11px]">Coverage spread between sources (percentage points)</CardDescription>
           </CardHeader>
           <CardContent className="p-4 pt-0">
@@ -911,9 +911,9 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
         </Card>
 
         {/* Supervision coverage gap map */}
-        <Card className="xl:col-span-3 border-none shadow-lg bg-white rounded-2xl overflow-hidden">
+        <Card className="xl:col-span-3 border-none shadow-lg bg-white rounded-lg overflow-hidden">
           <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-sm font-black text-slate-900">Supervision Coverage Gap Map</CardTitle>
+            <CardTitle>Supervision Coverage Gap Map</CardTitle>
             <CardDescription className="text-[11px]">Microplanned communities / settlements</CardDescription>
           </CardHeader>
           <CardContent className="p-3 pt-0">
@@ -938,9 +938,9 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
         </Card>
 
         {/* Executive insight + thresholds */}
-        <Card className="xl:col-span-2 border-none shadow-lg bg-white rounded-2xl overflow-hidden">
+        <Card className="xl:col-span-2 border-none shadow-lg bg-white rounded-lg overflow-hidden">
           <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-sm font-black text-slate-900 flex items-center gap-2"><Lightbulb className="h-4 w-4 text-amber-500" /> Executive Insight</CardTitle>
+            <CardTitle className="font-black text-slate-900 flex items-center gap-2"><Lightbulb className="h-4 w-4 text-amber-500" /> Executive Insight</CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0 space-y-2.5">
             {insights.map((ins, i) => {
@@ -968,9 +968,9 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       {/* ── Row: coverage by source · achievement maps · data quality ──────────── */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-3">
         {/* Therapeutic coverage by source */}
-        <Card className="xl:col-span-5 border-none shadow-lg bg-white rounded-2xl overflow-hidden">
+        <Card className="xl:col-span-5 border-none shadow-lg bg-white rounded-lg overflow-hidden">
           <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-sm font-black text-slate-900">Therapeutic Coverage by Source</CardTitle>
+            <CardTitle>Therapeutic Coverage by Source</CardTitle>
             <CardDescription className="text-[11px]">Triangulation of three data sources, top LGAs by activity</CardDescription>
           </CardHeader>
           <CardContent className="p-3">
@@ -995,9 +995,9 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
         </Card>
 
         {/* Achievement maps */}
-        <Card className="xl:col-span-4 border-none shadow-lg bg-white rounded-2xl overflow-hidden">
+        <Card className="xl:col-span-4 border-none shadow-lg bg-white rounded-lg overflow-hidden">
           <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-sm font-black text-slate-900">Therapeutic Coverage Achievement by Programme Threshold</CardTitle>
+            <CardTitle>Therapeutic Coverage Achievement by Programme Threshold</CardTitle>
             <CardDescription className="text-[11px]">LGAs achieving the disease-specific WHO/NTD target</CardDescription>
           </CardHeader>
           <CardContent className={`p-3 grid gap-2 ${diseaseScope.length === 1 ? "grid-cols-1" : "grid-cols-3"}`}>
@@ -1024,9 +1024,9 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
         </Card>
 
         {/* Data quality snapshot */}
-        <Card className="xl:col-span-3 border-none shadow-lg bg-white rounded-2xl overflow-hidden">
+        <Card className="xl:col-span-3 border-none shadow-lg bg-white rounded-lg overflow-hidden">
           <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-sm font-black text-slate-900 flex items-center gap-2"><Database className="h-4 w-4 text-primary" /> Data Quality Snapshot</CardTitle>
+            <CardTitle className="font-black text-slate-900 flex items-center gap-2"><Database className="h-4 w-4 text-primary" /> Data Quality Snapshot</CardTitle>
           </CardHeader>
           <CardContent className="p-3 grid grid-cols-2 gap-2">
             <MiniStat icon={FileText} tone="sky" label="Treatment Records" value={dataQuality.treatmentRecords.toLocaleString()} sub={selectedMonth === "All" ? "All sources" : monthLabel(selectedMonth)} />
@@ -1040,11 +1040,11 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       </div>
 
       {/* ── Triangulation ledger ─────────────────────────────────────────────── */}
-      <Card className="border-none shadow-lg bg-white rounded-2xl overflow-hidden">
+      <Card className="border-none shadow-lg bg-white rounded-lg overflow-hidden">
         <CardHeader className="p-4 pb-2">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <CardTitle className="text-sm font-black text-slate-900">Triangulation Ledger — Therapeutic &amp; Geographic Coverage</CardTitle>
+              <CardTitle>Triangulation Ledger — Therapeutic &amp; Geographic Coverage</CardTitle>
               <CardDescription className="text-[11px]">Three-source comparison per LGA. Use this ledger to validate differences between sources and drive coverage improvement.</CardDescription>
             </div>
             <div className="relative w-full sm:w-72 group">
@@ -1150,7 +1150,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       </Card>
 
       {/* ── Coverage & supervision gap register ──────────────────────────────── */}
-      <Card className="border-none shadow-lg bg-white rounded-2xl overflow-hidden">
+      <Card className="border-none shadow-lg bg-white rounded-lg overflow-hidden">
         <CardHeader className="p-4 pb-2">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-start gap-2.5">
@@ -1158,7 +1158,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
                 <AlertTriangle className="h-5 w-5" />
               </div>
               <div>
-                <CardTitle className="text-sm font-black text-slate-900">Coverage &amp; Supervision Gap Register</CardTitle>
+                <CardTitle>Coverage &amp; Supervision Gap Register</CardTitle>
                 <CardDescription className="text-[11px]">Microplanned communities not visited during supervision, or missing reported coverage (Microplan Coverage tab / Community Treatment Summary).</CardDescription>
               </div>
             </div>
@@ -1294,7 +1294,7 @@ function KPICard({ title, value, sub, icon: Icon, tone }: { title: string; value
     emerald: "bg-emerald-100 text-emerald-600", amber: "bg-amber-100 text-amber-600", rose: "bg-rose-100 text-rose-600",
   };
   return (
-    <Card className="border-none shadow-lg bg-white rounded-2xl overflow-hidden">
+    <Card className="border-none shadow-lg bg-white rounded-lg overflow-hidden">
       <CardContent className="p-3.5 flex items-start gap-3">
         <div className={`h-9 w-9 rounded-xl ${tones[tone]} flex items-center justify-center shrink-0`}><Icon className="h-5 w-5" /></div>
         <div className="min-w-0">

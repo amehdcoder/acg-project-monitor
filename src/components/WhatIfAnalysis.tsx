@@ -177,7 +177,7 @@ const WhatIfAnalysis = () => {
           {/* Parameters Panel */}
           <Card className="lg:col-span-1">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <FlaskConical className="h-4 w-4 text-primary" /> Scenario Parameters
               </CardTitle>
               <CardDescription>Adjust values to explore what-if scenarios</CardDescription>
@@ -273,7 +273,7 @@ const WhatIfAnalysis = () => {
             {/* Comparison Chart */}
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2">
                   <BarChart3 className="h-4 w-4 text-primary" /> Baseline vs. Projected
                 </CardTitle>
               </CardHeader>
@@ -315,7 +315,7 @@ const WhatIfAnalysis = () => {
             {scenarios.length > 0 && (
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Saved Scenarios ({scenarios.length})</CardTitle>
+                  <CardTitle>Saved Scenarios ({scenarios.length})</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ScrollArea className="max-h-[200px]">

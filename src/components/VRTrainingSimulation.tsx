@@ -342,7 +342,7 @@ const VRTrainingSimulation = () => {
       <CardHeader>
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
-            <CardTitle className="text-lg flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               <Glasses className="h-5 w-5 text-primary" />
               VR Training Simulation
             </CardTitle>

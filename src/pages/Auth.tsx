@@ -335,7 +335,7 @@ const Auth = () => {
           <div className="mx-auto mb-3 flex h-16 w-16 sm:h-20 sm:w-20 items-center justify-center rounded-full bg-card shadow-soft">
             <img src={acgLogo} alt="Amehnities Logo" className="h-12 w-12 sm:h-16 sm:w-16 rounded-full" />
           </div>
-          <CardTitle className="font-display text-2xl sm:text-3xl tracking-tight">
+          <CardTitle className="tracking-tight">
             Amehnities
           </CardTitle>
           <CardDescription className="text-xs sm:text-sm">Monitoring &amp; Supervision Platform</CardDescription>

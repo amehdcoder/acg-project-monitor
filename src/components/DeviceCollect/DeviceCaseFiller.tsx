@@ -75,7 +75,7 @@ const DeviceCaseFiller = ({ caseType, deviceId, projectId, collectorLabel, onClo
       <main className="mx-auto max-w-2xl px-4 py-5">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Case details</CardTitle>
+            <CardTitle>Case details</CardTitle>
             <CardDescription>Works offline — saved on this device until a connection returns.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

@@ -196,7 +196,7 @@ const AdminSurveillanceView = () => {
               <Lock className="h-5 w-5 text-destructive" />
             </div>
             <div>
-              <CardTitle className="text-xl font-display flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <Shield className="h-5 w-5 text-destructive" />
                 Admin Surveillance Log
               </CardTitle>
@@ -368,7 +368,7 @@ const AdminSurveillanceView = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
-              <CardHeader><CardTitle className="text-base flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-destructive" />Failed Login Attempts</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-destructive" />Failed Login Attempts</CardTitle></CardHeader>
               <CardContent>
                 {failedLogins.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No failed login attempts recorded.</p>
@@ -396,7 +396,7 @@ const AdminSurveillanceView = () => {
             </Card>
 
             <Card>
-              <CardHeader><CardTitle className="text-base flex items-center gap-2"><Activity className="h-4 w-4 text-green-600" />Successful Logins</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="flex items-center gap-2"><Activity className="h-4 w-4 text-green-600" />Successful Logins</CardTitle></CardHeader>
               <CardContent>
                 {successfulLogins.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No successful logins recorded yet.</p>
@@ -425,7 +425,7 @@ const AdminSurveillanceView = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
-              <CardHeader><CardTitle className="text-base flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" />Login Locations</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" />Login Locations</CardTitle></CardHeader>
               <CardContent>
                 {loginLocations.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No login locations recorded yet.</p>
@@ -449,7 +449,7 @@ const AdminSurveillanceView = () => {
             </Card>
 
             <Card>
-              <CardHeader><CardTitle className="text-base flex items-center gap-2"><Smartphone className="h-4 w-4" />SIM/Network Change Events</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="flex items-center gap-2"><Smartphone className="h-4 w-4" />SIM/Network Change Events</CardTitle></CardHeader>
               <CardContent>
                 {networkChanges.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No SIM or network changes detected.</p>
@@ -491,7 +491,7 @@ const AdminSurveillanceView = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
-              <CardHeader><CardTitle className="text-base flex items-center gap-2"><Clock className="h-4 w-4" />Form Completion Times</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="flex items-center gap-2"><Clock className="h-4 w-4" />Form Completion Times</CardTitle></CardHeader>
               <CardContent>
                 {trackingEvents.filter(e => e.event_type === "form_timing").length === 0 ? (
                   <p className="text-sm text-muted-foreground">No form timing data yet.</p>
@@ -526,7 +526,7 @@ const AdminSurveillanceView = () => {
             </Card>
 
             <Card>
-              <CardHeader><CardTitle className="text-base flex items-center gap-2"><FileWarning className="h-4 w-4 text-destructive" />Validation Failures</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="flex items-center gap-2"><FileWarning className="h-4 w-4 text-destructive" />Validation Failures</CardTitle></CardHeader>
               <CardContent>
                 {trackingEvents.filter(e => e.event_type === "validation_failure").length === 0 ? (
                   <p className="text-sm text-muted-foreground">No validation failures logged.</p>
@@ -560,7 +560,7 @@ const AdminSurveillanceView = () => {
             </Card>
 
             <Card>
-              <CardHeader><CardTitle className="text-base flex items-center gap-2"><Eye className="h-4 w-4" />Skipped Questions</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="flex items-center gap-2"><Eye className="h-4 w-4" />Skipped Questions</CardTitle></CardHeader>
               <CardContent>
                 {trackingEvents.filter(e => e.event_type === "question_skipped").length === 0 ? (
                   <p className="text-sm text-muted-foreground">No skipped questions logged.</p>
@@ -617,7 +617,7 @@ const AdminSurveillanceView = () => {
           </div>
 
           <Card>
-            <CardHeader><CardTitle className="text-base flex items-center gap-2"><Activity className="h-4 w-4" />External Service Communication Log</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="flex items-center gap-2"><Activity className="h-4 w-4" />External Service Communication Log</CardTitle></CardHeader>
             <CardContent>
               {externalServices.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No external service communications logged.</p>
@@ -681,7 +681,7 @@ const AdminSurveillanceView = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
               <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2"><Users className="h-4 w-4 text-destructive" />Similar/Duplicate Entries</CardTitle>
+                <CardTitle className="flex items-center gap-2"><Users className="h-4 w-4 text-destructive" />Similar/Duplicate Entries</CardTitle>
                 <CardDescription>Flagged form entries with high similarity that may indicate data inflation</CardDescription>
               </CardHeader>
               <CardContent>
@@ -716,7 +716,7 @@ const AdminSurveillanceView = () => {
             </Card>
 
             <Card>
-              <CardHeader><CardTitle className="text-base flex items-center gap-2"><AlertTriangle className="h-4 w-4" />Screenshot & Security Events</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="flex items-center gap-2"><AlertTriangle className="h-4 w-4" />Screenshot & Security Events</CardTitle></CardHeader>
               <CardContent>
                 {screenshotAttempts.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No screenshot attempts detected.</p>
@@ -738,7 +738,7 @@ const AdminSurveillanceView = () => {
         {/* Usage Heatmap Tab */}
         <TabsContent value="usage" className="space-y-4">
           <Card>
-            <CardHeader><CardTitle className="text-base flex items-center gap-2"><BarChart3 className="h-4 w-4" />App Usage Heatmap — Most Used Features</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="flex items-center gap-2"><BarChart3 className="h-4 w-4" />App Usage Heatmap — Most Used Features</CardTitle></CardHeader>
             <CardContent>
               {pageUsageCounts.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No usage data collected yet.</p>
@@ -763,7 +763,7 @@ const AdminSurveillanceView = () => {
         <TabsContent value="gdpr" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2"><Shield className="h-4 w-4 text-primary" />GDPR Compliance Assessment</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Shield className="h-4 w-4 text-primary" />GDPR Compliance Assessment</CardTitle>
               <CardDescription>Automated assessment of data protection compliance</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -795,7 +795,7 @@ const AdminSurveillanceView = () => {
         <TabsContent value="media" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
-              <CardHeader><CardTitle className="text-base flex items-center gap-2"><Mic className="h-4 w-4" />Audio Verification Clips</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="flex items-center gap-2"><Mic className="h-4 w-4" />Audio Verification Clips</CardTitle></CardHeader>
               <CardContent>
                 {audioClips.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No audio verification clips recorded yet.</p>
@@ -832,7 +832,7 @@ const AdminSurveillanceView = () => {
             </Card>
 
             <Card>
-              <CardHeader><CardTitle className="text-base flex items-center gap-2"><MapPin className="h-4 w-4" />Photo/Video Metadata</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="flex items-center gap-2"><MapPin className="h-4 w-4" />Photo/Video Metadata</CardTitle></CardHeader>
               <CardContent>
                 {photoMetadata.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No media metadata captured yet.</p>
@@ -866,7 +866,7 @@ const AdminSurveillanceView = () => {
         <TabsContent value="field-notes" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2"><FileWarning className="h-4 w-4" />Field Challenge Notes</CardTitle>
+              <CardTitle className="flex items-center gap-2"><FileWarning className="h-4 w-4" />Field Challenge Notes</CardTitle>
               <CardDescription>Reports from users about field challenges submitted alongside forms</CardDescription>
             </CardHeader>
             <CardContent>

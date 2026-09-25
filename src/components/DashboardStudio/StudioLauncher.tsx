@@ -146,7 +146,7 @@ export default function StudioLauncher({ onBack }: Props) {
             <Card key={d.id} className="group cursor-pointer transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md" onClick={() => setOpen(d)}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-2">
-                  <CardTitle className="text-base leading-tight">{d.name}</CardTitle>
+                  <CardTitle className="leading-tight">{d.name}</CardTitle>
                   <Badge variant={d.is_published ? "default" : "secondary"} className="shrink-0">{d.is_published ? "Published" : "Draft"}</Badge>
                 </div>
               </CardHeader>

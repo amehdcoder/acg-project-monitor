@@ -796,7 +796,7 @@ export default function EvidenceIntelligencePanel({
     <>
       <Card className="overflow-hidden border-primary/30">
       <CardHeader className="border-b bg-gradient-to-r from-primary/10 via-transparent to-transparent py-3 px-4">
-        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+        <CardTitle className="flex items-center gap-2">
           <Microscope className="h-4 w-4 text-primary" />
           Evidence &amp; Pattern Intelligence
           <Badge variant="outline" className="ml-1 text-[10px] font-normal">

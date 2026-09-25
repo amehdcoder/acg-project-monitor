@@ -750,7 +750,7 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
       {koboPairing.total > 0 && (
         <Card className={`form-card border-l-4 ${koboPairing.hasGaps ? "border-l-amber-500" : "border-l-emerald-500"}`}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               {koboPairing.hasGaps
                 ? <AlertTriangle className="h-4 w-4 text-amber-500" />
                 : <CheckCircle className="h-4 w-4 text-emerald-500" />}
@@ -824,7 +824,7 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
       {analysis.testResult && (
         <Card className={`form-card border-l-4 ${analysis.testResult.significant ? "border-l-emerald-500" : "border-l-amber-400"}`}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               {analysis.testResult.significant ? (
                 <CheckCircle className="h-5 w-5 text-emerald-600" />
               ) : (
@@ -909,7 +909,7 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
           {koboStats && (
             <Card className={`form-card border-l-4 ${koboStats.significant ? "border-l-emerald-500" : "border-l-amber-400"}`}>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2">
                   <Sigma className="h-4 w-4 text-primary" />
                   Paired t-test — KoboToolbox ({koboGroupLabel})
                   <Badge variant={koboStats.significant ? "default" : "secondary"} className="text-[10px]">
@@ -944,7 +944,7 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
 
             <Card className="form-card">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2">
                   <BarChart3 className="h-4 w-4 text-primary" />
                   Pre vs Post-test Scores by Participant
                 </CardTitle>
@@ -973,7 +973,7 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
 
             <Card className="form-card">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2">
                   <Award className="h-4 w-4 text-amber-500" />
                   Improvement Breakdown
                 </CardTitle>
@@ -995,7 +995,7 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
           {/* Pass Rate Stacked Bar */}
           <Card className="form-card">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <Percent className="h-4 w-4 text-violet-500" />
                 Pass / Fail Rate Comparison
               </CardTitle>
@@ -1027,7 +1027,7 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
               ].map((b) => (
                 <Card key={b.title} className="form-card">
                   <CardHeader className="pb-1">
-                    <CardTitle className="text-sm">{b.title}</CardTitle>
+                    <CardTitle>{b.title}</CardTitle>
                     <CardDescription className="text-[11px]">
                       Excellent ≥80% · Good ≥70% · Moderate ≥60% · below 60% needs additional training
                     </CardDescription>
@@ -1043,7 +1043,7 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
           <Card className="form-card">
 
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <Activity className="h-4 w-4 text-primary" />
                 Score Distribution (Area Chart)
               </CardTitle>
@@ -1076,7 +1076,7 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
           {/* Descriptive statistics table */}
           <Card className="form-card">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <BookOpen className="h-4 w-4 text-primary" />
                 Descriptive Statistics
               </CardTitle>
@@ -1110,7 +1110,7 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
         <TabsContent value="scatter" className="mt-4">
           <Card className="form-card">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <Target className="h-4 w-4 text-primary" />
                 Pre vs Post-test Score Scatter
               </CardTitle>
@@ -1143,7 +1143,7 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
         <TabsContent value="individual" className="mt-4">
           <Card className="form-card">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <Users className="h-4 w-4 text-primary" />
                 Individual Results — {koboGroupLabel}
               </CardTitle>
@@ -1239,7 +1239,7 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
                 {/* Most Passed */}
                 <Card className="form-card border-l-4 border-l-emerald-500 overflow-hidden">
                   <CardHeader className="pb-3 bg-gradient-to-r from-emerald-50 to-transparent dark:from-emerald-950/30">
-                    <CardTitle className="text-sm flex items-center gap-2">
+                    <CardTitle className="flex items-center gap-2">
                       <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-900/40">
                         <CheckCircle className="h-4 w-4 text-emerald-600" />
                       </div>
@@ -1276,7 +1276,7 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
                 {/* Most Failed */}
                 <Card className="form-card border-l-4 border-l-rose-500 overflow-hidden">
                   <CardHeader className="pb-3 bg-gradient-to-r from-rose-50 to-transparent dark:from-rose-950/30">
-                    <CardTitle className="text-sm flex items-center gap-2">
+                    <CardTitle className="flex items-center gap-2">
                       <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-100 dark:bg-rose-900/40">
                         <XCircle className="h-4 w-4 text-rose-600" />
                       </div>
@@ -1314,7 +1314,7 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
               {/* Full ranking chart */}
               <Card className="form-card">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm flex items-center gap-2">
+                  <CardTitle className="flex items-center gap-2">
                     <BarChart3 className="h-4 w-4 text-primary" />
                     Correct-Answer Rate by Question
                   </CardTitle>
@@ -1341,7 +1341,7 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
           {interpretation ? (
             <Card className="form-card">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2">
                   <Brain className="h-4 w-4 text-primary" />
                   Inferential Analysis & Interpretation
                 </CardTitle>
@@ -1399,7 +1399,7 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
                   return (
                     <Card key={type} className="form-card">
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-sm flex items-center justify-between">
+                        <CardTitle className="flex items-center justify-between">
                           <span>{title}</span>
                           {d ? (
                             <Badge variant="secondary" className="font-mono text-[10px]">
@@ -1446,7 +1446,7 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
 
                 <Card className="form-card">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Submission timeline</CardTitle>
+                    <CardTitle>Submission timeline</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-1.5 pt-0">
                     {drill.submissions.map((s) => (

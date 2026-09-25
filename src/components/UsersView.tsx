@@ -1696,7 +1696,7 @@ const UsersView = () => {
       <Card className="border-0 shadow-card">
         <CardHeader className="space-y-3">
           <div className="flex items-center justify-between gap-2">
-            <CardTitle className="font-display flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setUsersListCollapsed((c) => !c)}

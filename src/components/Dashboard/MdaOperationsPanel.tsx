@@ -80,7 +80,7 @@ function KPI({ icon: Icon, label, value, sub, tone = "primary" }: any) {
     good: "bg-emerald-100 text-emerald-600",
   };
   return (
-    <Card className="border-none shadow-xl bg-white rounded-3xl overflow-hidden">
+    <Card className="border-none shadow-xl bg-white rounded-lg overflow-hidden">
       <CardContent className="p-5">
         <div className={`h-11 w-11 rounded-2xl ${tones[tone]} flex items-center justify-center mb-4`}>
           <Icon className="h-6 w-6" />
@@ -286,7 +286,7 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
       </div>
 
       {filtered.length === 0 && !loading ? (
-        <Card className="border-dashed border-2 border-slate-200 bg-white/60 rounded-3xl">
+        <Card className="border-dashed border-2 border-slate-200 bg-white/60 rounded-lg">
           <CardContent className="p-10 text-center">
             <ClipboardCheck className="h-10 w-10 text-slate-300 mx-auto mb-3" />
             <p className="text-sm font-bold text-slate-500">No MDA supervisory submissions in the selected scope yet.</p>
@@ -306,9 +306,9 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="border-none shadow-xl bg-white rounded-3xl">
+            <Card className="border-none shadow-xl bg-white rounded-lg">
               <CardHeader>
-                <CardTitle className="text-base font-black text-slate-900">Implementation Score by LGA</CardTitle>
+                <CardTitle>Implementation Score by LGA</CardTitle>
                 <CardDescription className="text-xs">Mean supervisory implementation score (top LGAs)</CardDescription>
               </CardHeader>
               <CardContent>
@@ -324,9 +324,9 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
               </CardContent>
             </Card>
 
-            <Card className="border-none shadow-xl bg-white rounded-3xl">
+            <Card className="border-none shadow-xl bg-white rounded-lg">
               <CardHeader>
-                <CardTitle className="text-base font-black text-slate-900">Risk Categorisation</CardTitle>
+                <CardTitle>Risk Categorisation</CardTitle>
                 <CardDescription className="text-xs">Distribution of supervisory risk ratings</CardDescription>
               </CardHeader>
               <CardContent>
@@ -344,9 +344,9 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
           </div>
 
           {/* Triangulation: MDA vs CES vs Microplanning */}
-          <Card className="border-none shadow-xl bg-white rounded-3xl">
+          <Card className="border-none shadow-xl bg-white rounded-lg">
             <CardHeader>
-              <CardTitle className="text-base font-black text-slate-900 flex items-center gap-2">
+              <CardTitle className="font-black text-slate-900 flex items-center gap-2">
                 <GitCompareArrows className="h-4 w-4 text-primary" /> Coverage Triangulation
               </CardTitle>
               <CardDescription className="text-xs">

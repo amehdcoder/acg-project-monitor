@@ -64,7 +64,7 @@ const DataQualityPanel = ({ formId, formName }: Props) => {
     <Card className="border-0 shadow-card">
       <CardHeader className="pb-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <CardTitle className="font-display text-lg flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-acg-gold" />
             AI Data Quality
           </CardTitle>

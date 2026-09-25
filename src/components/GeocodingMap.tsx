@@ -115,7 +115,7 @@ export default function GeocodingMap({ points }: { points: GeoPoint[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2">
           <MapPinned className="h-4 w-4 text-primary" /> Geocoded points map
         </CardTitle>
         <CardDescription>

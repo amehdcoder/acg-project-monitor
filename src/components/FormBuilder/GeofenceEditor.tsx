@@ -430,7 +430,7 @@ const GeofenceEditor = ({ geofence, onGeofenceChange }: GeofenceEditorProps) => 
     <div className="space-y-5">
       <Card className="border border-border/50 shadow-card overflow-hidden">
         <CardHeader className="bg-gradient-to-r from-primary/5 via-primary/3 to-transparent border-b border-border/30 pb-4">
-          <CardTitle className="flex items-center gap-3 font-display text-lg">
+          <CardTitle className="flex items-center gap-3">
             <div className="p-2 rounded-xl bg-primary/10 ring-1 ring-primary/20">
               <MapPin className="h-5 w-5 text-primary" />
             </div>
@@ -565,7 +565,7 @@ const GeofenceEditor = ({ geofence, onGeofenceChange }: GeofenceEditorProps) => 
 
       <Card className="overflow-hidden border border-border/50 shadow-card">
         <CardHeader className="pb-2 bg-muted/30 border-b border-border/30">
-          <CardTitle className="font-display text-base flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             <div className="p-1.5 rounded-lg bg-primary/10">
               <MapPin className="h-4 w-4 text-primary" />
             </div>

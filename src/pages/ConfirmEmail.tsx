@@ -131,7 +131,7 @@ const ConfirmEmail = () => {
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-card shadow-soft">
             <img src={acgLogo} alt="Amehnities Logo" className="h-12 w-12 rounded-full" />
           </div>
-          <CardTitle className="font-display text-xl">
+          <CardTitle>
             {phase === "verifying" && "Confirming your email…"}
             {phase === "success" && "Email confirmed"}
             {phase === "error" && "Confirmation link issue"}

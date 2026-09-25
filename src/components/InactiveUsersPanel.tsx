@@ -347,7 +347,7 @@ const InactiveUsersPanel = () => {
         >
           <ChevronDown className={`mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform ${collapsed ? "-rotate-90" : ""}`} />
           <div>
-            <CardTitle className="flex items-center gap-2 text-base">
+            <CardTitle className="flex items-center gap-2">
               <Archive className="h-4 w-4 text-destructive" />
               Deactivated / Pending Accounts & Sign-in Audit Log
             </CardTitle>

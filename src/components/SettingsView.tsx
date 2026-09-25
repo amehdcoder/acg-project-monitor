@@ -198,7 +198,7 @@ const SettingsView = () => {
         <TabsContent value="general" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg"><Palette className="h-5 w-5 text-primary" />Appearance</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Palette className="h-5 w-5 text-primary" />Appearance</CardTitle>
               <CardDescription>Customize the look and feel of your workspace</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -309,7 +309,7 @@ const SettingsView = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg"><Globe className="h-5 w-5 text-primary" />Language & Regional</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Globe className="h-5 w-5 text-primary" />Language & Regional</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <SettingRow label="Language" description="Application display language" icon={Globe}>
@@ -351,7 +351,7 @@ const SettingsView = () => {
         <TabsContent value="notifications" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg"><Bell className="h-5 w-5 text-primary" />Notification Preferences</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Bell className="h-5 w-5 text-primary" />Notification Preferences</CardTitle>
               <CardDescription>Control how and when you receive alerts</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -382,7 +382,7 @@ const SettingsView = () => {
         <TabsContent value="data-sync" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg"><Wifi className="h-5 w-5 text-primary" />Synchronization</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Wifi className="h-5 w-5 text-primary" />Synchronization</CardTitle>
               <CardDescription>Configure how data syncs between your device and the server</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -408,7 +408,7 @@ const SettingsView = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg"><Database className="h-5 w-5 text-primary" />Offline Storage</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5 text-primary" />Offline Storage</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <SettingRow label="Storage Limit" description="Maximum offline cache size in MB" icon={Database}>
@@ -432,7 +432,7 @@ const SettingsView = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg"><Download className="h-5 w-5 text-primary" />Export Defaults</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Download className="h-5 w-5 text-primary" />Export Defaults</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <SettingRow label="Default Export Format" description="Preferred file format when exporting data" icon={FileText}>
@@ -452,7 +452,7 @@ const SettingsView = () => {
         <TabsContent value="collection" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg"><MapPin className="h-5 w-5 text-primary" />Location & GPS</CardTitle>
+              <CardTitle className="flex items-center gap-2"><MapPin className="h-5 w-5 text-primary" />Location & GPS</CardTitle>
               <CardDescription>Configure geolocation capture for form submissions</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -484,7 +484,7 @@ const SettingsView = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg"><Smartphone className="h-5 w-5 text-primary" />Media Capture</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Smartphone className="h-5 w-5 text-primary" />Media Capture</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <SettingRow label="Photo Quality" description="Resolution quality for captured photos" icon={Smartphone}>
@@ -512,7 +512,7 @@ const SettingsView = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg"><Smartphone className="h-5 w-5 text-primary" />Advanced Features</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Smartphone className="h-5 w-5 text-primary" />Advanced Features</CardTitle>
               <CardDescription>Toggle advanced data collection capabilities</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -533,7 +533,7 @@ const SettingsView = () => {
         <TabsContent value="security" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg"><Shield className="h-5 w-5 text-primary" />Account Security</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5 text-primary" />Account Security</CardTitle>
               <CardDescription>Manage session and authentication settings</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -560,7 +560,7 @@ const SettingsView = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Login Information</CardTitle>
+              <CardTitle>Login Information</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="rounded-lg border border-border p-4 space-y-2">
@@ -586,7 +586,7 @@ const SettingsView = () => {
           <TabsContent value="admin" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg"><Shield className="h-5 w-5 text-destructive" />Administration</CardTitle>
+                <CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5 text-destructive" />Administration</CardTitle>
                 <CardDescription>Platform-wide settings (admin only)</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -606,7 +606,7 @@ const SettingsView = () => {
 
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg"><Eye className="h-5 w-5 text-primary" />Field Monitoring</CardTitle>
+                <CardTitle className="flex items-center gap-2"><Eye className="h-5 w-5 text-primary" />Field Monitoring</CardTitle>
                 <CardDescription>Advanced monitoring features for data collection verification</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -626,7 +626,7 @@ const SettingsView = () => {
             <VoiceCloningManager />
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
+                <CardTitle className="flex items-center gap-2">
                   <Megaphone className="h-5 w-5 text-primary" />
                   Broadcast App Update
                 </CardTitle>
@@ -700,7 +700,7 @@ const SettingsView = () => {
 
             <Card className="border-destructive/30">
               <CardHeader>
-                <CardTitle className="text-destructive text-lg">Danger Zone</CardTitle>
+                <CardTitle className="text-destructive">Danger Zone</CardTitle>
                 <CardDescription>Irreversible actions that affect all platform data</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">

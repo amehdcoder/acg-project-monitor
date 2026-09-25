@@ -274,7 +274,7 @@ const StateAnalyticsChart = ({ users }: Props) => {
                 <Users className="h-4 w-4 text-primary" />
               </div>
               <div>
-                <CardTitle className="font-display text-base">
+                <CardTitle>
                   Team Reporting by State
                 </CardTitle>
                 <p className="text-[10px] text-muted-foreground mt-0.5">
@@ -426,7 +426,7 @@ const StateAnalyticsChart = ({ users }: Props) => {
               <ShieldCheck className="h-4 w-4 text-green-600" />
             </div>
             <div>
-              <CardTitle className="font-display text-base">
+              <CardTitle>
                 Geofence Compliance by State
               </CardTitle>
               <p className="text-[10px] text-muted-foreground mt-0.5">

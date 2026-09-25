@@ -245,7 +245,7 @@ const RouteOptimizerMap = ({ projectId, formId, forms }: Props) => {
           {/* Controls */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <Route className="h-4 w-4 text-primary" />Route Controls
               </CardTitle>
             </CardHeader>

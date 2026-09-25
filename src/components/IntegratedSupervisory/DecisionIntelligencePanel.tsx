@@ -39,7 +39,7 @@ export default function DecisionIntelligencePanel({ di }: Props) {
     <div className="space-y-4">
       <Card className="border-primary/30">
         <CardHeader className="pb-2">
-          <CardTitle className="flex flex-wrap items-center gap-2 text-sm">
+          <CardTitle className="flex flex-wrap items-center gap-2">
             <Gauge className="h-4 w-4 text-primary" /> Decision intelligence
             <Badge variant="outline" className="text-[10px] font-normal">Centrality · Regression · Z-score · Bayes</Badge>
           </CardTitle>
@@ -53,7 +53,7 @@ export default function DecisionIntelligencePanel({ di }: Props) {
       {/* 1 — Who delays us? */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-sm">
+          <CardTitle className="flex items-center gap-2">
             <Activity className="h-4 w-4 text-sky-600" /> Who delays us?
             <Badge variant="outline" className="text-[10px] font-normal">Betweenness centrality</Badge>
           </CardTitle>
@@ -108,7 +108,7 @@ export default function DecisionIntelligencePanel({ di }: Props) {
       {/* 2 — Why coverage low? */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-sm">
+          <CardTitle className="flex items-center gap-2">
             <TrendingDown className="h-4 w-4 text-amber-600" /> Why is coverage low?
             <Badge variant="outline" className="text-[10px] font-normal">OLS multiple regression</Badge>
           </CardTitle>
@@ -159,7 +159,7 @@ export default function DecisionIntelligencePanel({ di }: Props) {
       {/* 3 — Is this diversion? */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-sm">
+          <CardTitle className="flex items-center gap-2">
             <ShieldAlert className="h-4 w-4 text-destructive" /> Is this diversion?
             <Badge variant="outline" className="text-[10px] font-normal">Z-score + unaccounted foil %</Badge>
           </CardTitle>
@@ -216,7 +216,7 @@ export default function DecisionIntelligencePanel({ di }: Props) {
       {/* 4 — Will we fail? */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-sm">
+          <CardTitle className="flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-destructive" /> Will we fail?
             <Badge variant="outline" className="text-[10px] font-normal">Bayesian risk</Badge>
           </CardTitle>

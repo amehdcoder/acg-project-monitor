@@ -84,7 +84,7 @@ export default function OfflineAuditLogPanel() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg">
+        <CardTitle className="flex items-center gap-2">
           <ShieldAlert className="h-5 w-5 text-primary" />Offline Login Audit Trail
         </CardTitle>
         <CardDescription>

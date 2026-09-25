@@ -153,7 +153,7 @@ const ImageRecognitionCapture = ({ onDataExtracted, context = "standalone" }: Im
       <div className={context === "standalone" ? "grid grid-cols-1 lg:grid-cols-2 gap-6" : ""}>
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               <Camera className="h-4 w-4 text-primary" />
               Capture & Extract
             </CardTitle>
@@ -208,7 +208,7 @@ const ImageRecognitionCapture = ({ onDataExtracted, context = "standalone" }: Im
         {context === "standalone" && (
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <FileText className="h-4 w-4 text-primary" />
                 Extraction Results
                 {results.length > 0 && <Badge variant="secondary" className="ml-1">{results.length}</Badge>}

@@ -281,7 +281,7 @@ const CaseAgingAnalytics = ({ cases }: CaseAgingAnalyticsProps) => {
         {/* Case Duration Distribution (Closed) */}
         <Card className="border-0 shadow-card">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               <Timer className="h-4 w-4 text-primary" />
               Time-to-Close Distribution
             </CardTitle>
@@ -319,7 +319,7 @@ const CaseAgingAnalytics = ({ cases }: CaseAgingAnalyticsProps) => {
         {/* Open Case Aging */}
         <Card className="border-0 shadow-card">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               <Hourglass className="h-4 w-4 text-amber-600" />
               Open Case Aging
             </CardTitle>
@@ -359,7 +359,7 @@ const CaseAgingAnalytics = ({ cases }: CaseAgingAnalyticsProps) => {
         {/* Monthly Trend */}
         <Card className="border-0 shadow-card">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-primary" />
               Monthly Case Flow
             </CardTitle>
@@ -420,7 +420,7 @@ const CaseAgingAnalytics = ({ cases }: CaseAgingAnalyticsProps) => {
         {/* Avg Duration by Case Type */}
         <Card className="border-0 shadow-card">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-primary" />
               Avg Duration by Case Type
             </CardTitle>

@@ -279,7 +279,7 @@ export default function GeocodingView() {
         <TabsContent value="forward" className="space-y-3">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Batch address geocoding</CardTitle>
+              <CardTitle>Batch address geocoding</CardTitle>
               <CardDescription>
                 Enter addresses manually or <span className="font-medium text-foreground">import a CSV</span> to load many at once, then extract real
                 GPS coordinates. Data source: OpenStreetMap (Nominatim), cross-usable with Google Maps, Bolt and GRID3
@@ -382,7 +382,7 @@ export default function GeocodingView() {
         <TabsContent value="reverse" className="space-y-3">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Reverse geocoding</CardTitle>
+              <CardTitle>Reverse geocoding</CardTitle>
               <CardDescription>Enter GPS coordinates to fetch the real-world address.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -421,7 +421,7 @@ export default function GeocodingView() {
         <TabsContent value="ip" className="space-y-3">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">IP address geolocation</CardTitle>
+              <CardTitle>IP address geolocation</CardTitle>
               <CardDescription>Leave blank to locate your own connection, or enter any IP address.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">

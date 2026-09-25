@@ -548,7 +548,7 @@ export default function HouseholdCoverageAnalysis({ points, loading, error, onRe
     return (
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-1.5 text-sm"><Activity className="h-4 w-4 text-primary" />Household Coverage Analysis</CardTitle>
+          <CardTitle className="flex items-center gap-1.5"><Activity className="h-4 w-4 text-primary" />Household Coverage Analysis</CardTitle>
         </CardHeader>
         <CardContent className="py-6 text-center text-xs text-muted-foreground">
           No linked Household Coverage Survey data yet. As Coverage Evaluation 3D visits are captured against these communities, this analysis populates automatically.

@@ -63,7 +63,7 @@ const FingerspellingChart = ({ signLanguage }: FingerspellingChartProps) => {
       {/* Alphabet */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             🔤 Fingerspelling Alphabet
             <Badge variant="outline" className="text-[10px]">ASL Standard</Badge>
           </CardTitle>
@@ -93,7 +93,7 @@ const FingerspellingChart = ({ signLanguage }: FingerspellingChartProps) => {
       {/* Numbers */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             🔢 Number Signs (0–10)
             <Badge variant="outline" className="text-[10px]">Essential</Badge>
           </CardTitle>

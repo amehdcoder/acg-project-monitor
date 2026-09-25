@@ -77,7 +77,7 @@ const TeamPerformanceScorecard = ({ users, weeklyTarget = WEEKLY_TARGET_DEFAULT 
               <Trophy className="h-4 w-4 text-acg-gold" />
             </div>
             <div>
-              <CardTitle className="font-display text-lg">Team Performance</CardTitle>
+              <CardTitle>Team Performance</CardTitle>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Weekly target: {weeklyTarget} submissions/person
               </p>

@@ -448,7 +448,7 @@ export default function QuizKoboSyncDialog({ open, onClose, quizId, quizTitle, c
           <TabsContent value="webhook" className="space-y-4 pt-4">
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2">
                   <Webhook className="h-4 w-4 text-primary" /> REST Service endpoint
                 </CardTitle>
               </CardHeader>

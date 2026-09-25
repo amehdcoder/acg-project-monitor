@@ -245,7 +245,7 @@ const ResearchInsightsTab = ({
       {/* ───────── Toolbar ───────── */}
       <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
+          <CardTitle className="flex items-center gap-2">
             <FlaskConical className="h-5 w-5 text-primary" /> Research Insights · SEITF Schistosomiasis
           </CardTitle>
           <CardDescription>
@@ -298,7 +298,7 @@ const ResearchInsightsTab = ({
       {/* ───────── Q1 ───────── */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
+          <CardTitle className="flex items-center gap-2">
             <Users className="h-4 w-4 text-primary" />
             Q1 · Never-treated sub-population
           </CardTitle>
@@ -357,7 +357,7 @@ const ResearchInsightsTab = ({
       {/* ───────── Q2 ───────── */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
+          <CardTitle className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-primary" />
             Q2 · Systematic non-adherence × coverage × frequency
           </CardTitle>
@@ -398,7 +398,7 @@ const ResearchInsightsTab = ({
       {/* ───────── Q3 ───────── */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
+          <CardTitle className="flex items-center gap-2">
             <Users className="h-4 w-4 text-primary" />
             Q3 · Exposure heterogeneity (children vs adults)
           </CardTitle>
@@ -457,7 +457,7 @@ const ResearchInsightsTab = ({
       {/* ───────── Q4 ───────── */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
+          <CardTitle className="flex items-center gap-2">
             <Target className="h-4 w-4 text-primary" />
             Q4 · Optimal combination to reach &lt;1% SAC by horizon
           </CardTitle>
@@ -507,7 +507,7 @@ const ResearchInsightsTab = ({
       {/* ───────── Q5 ───────── */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
+          <CardTitle className="flex items-center gap-2">
             <Snowflake className="h-4 w-4 text-primary" />
             Q5 · Snail dynamics & seasonality
           </CardTitle>
