@@ -193,6 +193,13 @@ export const monthlyValues = (connection_id: string, period: string) =>
   call({ action: "monthly_values", connection_id, period });
 export const pushMonthly = (connection_id: string, period: string, dry_run = false) =>
   call({ action: "push_monthly", connection_id, period, dry_run });
+export const scopedMonthlyValues = (connection_id: string, period: string, state: string, lga: string) =>
+  call({ action: "scoped_monthly_values", connection_id, period, state, lga }) as Promise<{
+    ok: boolean; period: string; geography: { state: string; lga: string; beneficiaryCount: number };
+    values: { indicator_key: string; value: number }[];
+  }>;
+export const pushScopedMonthly = (connection_id: string, period: string, state: string, lga: string, org_unit: string, dry_run = false) =>
+  call({ action: "push_scoped_monthly", connection_id, period, state, lga, org_unit, dry_run });
 export const pullStockCategory = (connection_id: string, path: string, category?: string) =>
   call({ action: "pull_stock", connection_id, path, ...(category ? { category } : {}) });
 export const pushStock = (connection_id: string, category?: string) =>
@@ -269,7 +276,7 @@ export async function computeIndicatorValues(projectId: string, period: string) 
   return REPORTABLE_INDICATORS.map((i) => ({ ...i, value: map[i.key] ?? 0 }));
 }
 
-export interface Dhis2OrgUnit { id: string; name: string; level?: number; childCount?: number; path?: string }
+export interface Dhis2OrgUnit { id: string; name: string; level?: number; childCount?: number; path?: string; ancestors?: { id: string; name: string; level?: number }[] }
 export interface Dhis2DataElement { id: string; name: string; valueType?: string; categoryCombo: string | null; categoryOptionCombos: { id: string; name: string }[] }
 export interface Dhis2DataSet { id: string; name: string; periodType: string; canWrite: boolean; dataElements: Dhis2DataElement[] }
 export interface Dhis2Catalog {
