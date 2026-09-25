@@ -304,14 +304,33 @@ Deno.serve(async (req) => {
         if (action === "preview_aggregate") return json({ ok: true, content, contentType, format, validation });
 
         const dryRun = payload.dry_run === true;
-        const target = format === "adx-xml" && connection.kind === "dhis2"
-          ? joinUrl(connection.base_url, `api/dataValueSets?dryRun=${String(dryRun)}&importStrategy=CREATE_AND_UPDATE`)
+        const isDhisAdx = format === "adx-xml" && connection.kind === "dhis2";
+        // DHIS2 ADX import defaults to CODE identifiers; our mappings hold UIDs.
+        const target = isDhisAdx
+          ? joinUrl(connection.base_url, `api/dataValueSets?dryRun=${String(dryRun)}&importStrategy=CREATE_AND_UPDATE&idScheme=UID&dataElementIdScheme=UID&orgUnitIdScheme=UID&categoryOptionComboIdScheme=UID`)
           : connection.base_url;
-        const response = await remoteFetch(target, { method: "POST", headers: { ...headers, Accept: contentType, "Content-Type": contentType }, body: content });
-        const status = response.ok ? "success" : "error";
-        const message = response.ok ? `${format.toUpperCase()} exchange accepted (${validation.observationCount} observations)` : remoteMessage(response.body, `HTTP ${response.status}`);
+        const response = await remoteFetch(target, {
+          method: "POST",
+          // DHIS2 answers with a JSON import summary, not ADX.
+          headers: { ...headers, Accept: isDhisAdx ? "application/json" : contentType, "Content-Type": contentType },
+          body: content,
+        });
+        const summary = (response.body as Record<string, any> | null) ?? {};
+        const counts = summary.response?.importCount ?? summary.importCount ?? {};
+        const conflictList = summary.response?.conflicts ?? summary.conflicts ?? [];
+        const ignored = Number(counts.ignored ?? 0);
+        const accepted = isDhisAdx && response.ok
+          ? Number(counts.imported ?? 0) + Number(counts.updated ?? 0) + (dryRun ? 0 : 0)
+          : response.ok ? validation.observationCount : 0;
+        const status = !response.ok ? "error" : (ignored > 0 || conflictList.length > 0) ? "partial" : "success";
+        const conflictText = Array.isArray(conflictList) && conflictList.length
+          ? ` Conflicts: ${conflictList.slice(0, 3).map((c: any) => c.value ?? c.object ?? JSON.stringify(c)).join("; ")}`
+          : "";
+        const message = response.ok
+          ? `${format.toUpperCase()} ${dryRun ? "validated (dry run)" : "exchange accepted"}: ${isDhisAdx ? `${counts.imported ?? 0} imported, ${counts.updated ?? 0} updated, ${ignored} ignored` : `${validation.observationCount} observations`}.${conflictText}`
+          : remoteMessage(response.body, `HTTP ${response.status}`);
         await log(db, connection, "push", format, status, validation.observationCount, message, guard.userId);
-        return json({ ok: response.ok, status, message, accepted: response.ok ? validation.observationCount : 0, rejected: response.ok ? 0 : validation.observationCount, response: response.body }, response.ok ? 200 : 502);
+        return json({ ok: response.ok, status, dryRun, message, accepted, rejected: ignored, response: response.body }, response.ok ? 200 : 502);
       }
 
       case "validate_import": {
