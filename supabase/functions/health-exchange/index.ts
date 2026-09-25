@@ -347,6 +347,51 @@ Deno.serve(async (req) => {
         });
       }
 
+      /* ------------------ DHIS2 live instance browser ------------------ */
+      case "dhis2_browse": {
+        if (connection.kind !== "dhis2") return json({ error: "Browsing is for DHIS2 connections" }, 400);
+        const mode = String(payload.mode ?? "overview");
+        const base = connection.base_url;
+        if (mode === "children" || mode === "search") {
+          const q = mode === "children"
+            ? `api/organisationUnits/${encodeURIComponent(String(payload.parent ?? ""))}?fields=id,children[id,name,level,childCount:children~size]`
+            : `api/organisationUnits?fields=id,name,level,path,childCount:children~size&filter=name:ilike:${encodeURIComponent(String(payload.q ?? ""))}&withinUserHierarchy=true&pageSize=40`;
+          const res = await remoteFetch(joinUrl(base, q), { headers }, 30000);
+          if (!res.ok) return json({ error: remoteMessage(res.body, `HTTP ${res.status}`) }, 502);
+          const body: any = res.body;
+          const units = mode === "children" ? (body?.children ?? []) : (body?.organisationUnits ?? []);
+          return json({ ok: true, orgUnits: units.sort((a: any, b: any) => String(a.name).localeCompare(String(b.name))) });
+        }
+        const [info, me, sets] = await Promise.all([
+          remoteFetch(joinUrl(base, "api/system/info"), { headers }, 30000),
+          remoteFetch(joinUrl(base, "api/me?fields=username,displayName,organisationUnits[id,name,level,childCount:children~size],dataSets"), { headers }, 30000),
+          remoteFetch(joinUrl(base, "api/dataSets?fields=id,name,periodType,dataSetElements[dataElement[id,name,shortName,valueType,categoryCombo[id,name,categoryOptionCombos[id,name]]]]&paging=false"), { headers }, 60000),
+        ]);
+        if (!info.ok || !me.ok || !sets.ok) {
+          const bad = [info, me, sets].find((r) => !r.ok)!;
+          return json({ error: remoteMessage(bad.body, `HTTP ${bad.status}`) }, 502);
+        }
+        const i: any = info.body; const u: any = me.body;
+        const writable = new Set<string>(Array.isArray(u?.dataSets) ? u.dataSets : []);
+        const dataSets = ((sets.body as any)?.dataSets ?? []).map((d: any) => ({
+          id: d.id, name: d.name, periodType: d.periodType, canWrite: writable.size === 0 || writable.has(d.id),
+          dataElements: (d.dataSetElements ?? []).map((x: any) => x.dataElement).filter(Boolean).map((e: any) => ({
+            id: e.id, name: e.name, valueType: e.valueType,
+            categoryCombo: e.categoryCombo?.name ?? null,
+            categoryOptionCombos: e.categoryCombo?.categoryOptionCombos ?? [],
+          })),
+        })).sort((a: any, b: any) => a.name.localeCompare(b.name));
+        await log(db, connection, "pull", "dhis2_browse", "success", dataSets.length, "Live instance browsed", guard.userId);
+        return json({
+          ok: true,
+          system: { name: i?.systemName ?? null, version: i?.version ?? null, serverDate: i?.serverDate ?? null, contextPath: i?.contextPath ?? base },
+          user: { username: u?.username ?? null, displayName: u?.displayName ?? null },
+          roots: u?.organisationUnits ?? [],
+          dataSets,
+        });
+      }
+
+
       /* --------------------- DHIS2 indicator push ---------------------- */
       case "push_indicators": {
         if (connection.kind !== "dhis2") return json({ error: "Indicator push is for DHIS2 connections" }, 400);
