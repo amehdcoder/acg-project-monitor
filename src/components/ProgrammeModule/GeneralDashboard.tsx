@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity, ArrowRightLeft, BarChart3, Brain, Building2,
   CalendarDays, CheckCircle2, Database, Droplets, Eye, FileText, HeartPulse, Hospital,
-  Leaf, MapPinned, Pill, Plus, RefreshCw, Search, ShieldAlert, Sparkles, UserPlus, Users, Zap,
+  Leaf, LocateFixed, Map as MapIcon, MapPin, MapPinned, Navigation, Pill, Plus, RefreshCw, Search,
+  ShieldAlert, Sparkles, UserPlus, Users, Zap,
 } from "lucide-react";
 import { Bar, BarChart, Cell, Pie, PieChart, Tooltip, XAxis, YAxis } from "recharts";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,8 @@ import { useBeneficiaryJourneys } from "@/lib/programmeModule/journey";
 import { useFacilities } from "@/lib/programmeModule/facilities";
 import { useSafeguardingConcerns } from "@/lib/programmeModule/safeguarding";
 import type { BeneficiaryReferralRow, BeneficiaryRow, ProgrammeModuleConfig } from "@/lib/programmeModule/types";
+import NigeriaChoropleth, { type ChoroCell } from "@/components/Dashboard/ops/NigeriaChoropleth";
+import { lgaKey } from "@/components/Dashboard/ops/lgaGeo";
 import { cn } from "@/lib/utils";
 
 type Destination = "records" | "journey" | "facility" | "followups" | "clusters" | "safeguarding";
@@ -39,6 +42,17 @@ const COLORS = [
 const normalized = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
 const includesAny = (values: string[], keys: string[]) => values.some((value) => keys.some((key) => normalized(value).includes(key)));
 const pct = (part: number, whole: number) => whole ? Math.round((part / whole) * 100) : 0;
+const escapeHtml = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, (character) => ({
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+}[character] || character));
+
+const MAP_SCALE = [
+  { fill: "hsl(var(--records-cyan))", label: "Lowest" },
+  { fill: "hsl(var(--records-green))", label: "Low" },
+  { fill: "hsl(var(--records-amber))", label: "Moderate" },
+  { fill: "hsl(var(--records-purple))", label: "High" },
+  { fill: "hsl(var(--records-red))", label: "Highest" },
+];
 
 const Panel = ({ title, subtitle, className, children, action, icon: Icon, tone = "teal" }: {
   title: string; subtitle?: string; className?: string; children: React.ReactNode; action?: React.ReactNode;
@@ -69,6 +83,7 @@ const GeneralDashboard = ({
   const { facilities } = useFacilities(projectId);
   const { concerns } = useSafeguardingConcerns(projectId, isSafeguardingOfficer);
   const [referrals, setReferrals] = useState<BeneficiaryReferralRow[]>([]);
+  const [selectedGeography, setSelectedGeography] = useState<{ state: string; lga: string } | null>(null);
 
   const loadReferrals = useCallback(async () => {
     const { data } = await supabase.from("beneficiary_referrals").select("*")
@@ -117,10 +132,41 @@ const GeneralDashboard = ({
       const served = people.filter((person) => scopedRows.find((row) => row.beneficiary.id === person.id)?.serviceCount).length;
       return { name: facility.name, people: people.length, rate: pct(served, people.length) };
     }).filter((item) => item.people > 0).sort((left, right) => right.people - left.people).slice(0, 5);
-  const lgaData = Object.entries(beneficiaries.reduce<Record<string, number>>((acc, beneficiary) => {
-    const key = beneficiary.lga || "Not recorded"; acc[key] = (acc[key] || 0) + 1; return acc;
-  }, {})).sort(([, left], [, right]) => right - left).slice(0, 5);
-  const maxLga = Math.max(...lgaData.map(([, value]) => value), 1);
+  const geography = useMemo(() => {
+    const locations = new Map<string, { state: string; lga: string; wards: Set<string>; value: number }>();
+    const states = new Set<string>();
+    const wards = new Set<string>();
+    let mapped = 0;
+    beneficiaries.forEach((beneficiary) => {
+      const state = beneficiary.state?.trim();
+      const lga = beneficiary.lga?.trim();
+      if (!state || !lga) return;
+      mapped += 1;
+      states.add(state);
+      if (beneficiary.ward?.trim()) wards.add(`${state}|${lga}|${beneficiary.ward.trim()}`);
+      const key = lgaKey(state, lga);
+      const current = locations.get(key) || { state, lga, wards: new Set<string>(), value: 0 };
+      current.value += 1;
+      if (beneficiary.ward?.trim()) current.wards.add(beneficiary.ward.trim());
+      locations.set(key, current);
+    });
+    const ranked = [...locations.values()].sort((left, right) => right.value - left.value);
+    const maximum = Math.max(...ranked.map((item) => item.value), 1);
+    const cells = new Map<string, ChoroCell>();
+    locations.forEach((location, key) => {
+      const scaleIndex = Math.min(MAP_SCALE.length - 1, Math.ceil((location.value / maximum) * MAP_SCALE.length) - 1);
+      const tone = MAP_SCALE[Math.max(scaleIndex, 0)];
+      cells.set(key, {
+        fill: tone.fill,
+        opacity: 0.84,
+        popupHtml: `<div><strong>${escapeHtml(location.lga)}, ${escapeHtml(location.state)}</strong><br/>${location.value.toLocaleString()} beneficiar${location.value === 1 ? "y" : "ies"}<br/>${location.wards.size.toLocaleString()} ward${location.wards.size === 1 ? "" : "s"}<br/>${pct(location.value, mapped)}% of mapped records</div>`,
+      });
+    });
+    return { cells, ranked, mapped, stateCount: states.size, wardCount: wards.size, lgaCount: locations.size };
+  }, [beneficiaries]);
+  const selectedGeographyData = selectedGeography
+    ? geography.ranked.find((item) => lgaKey(item.state, item.lga) === lgaKey(selectedGeography.state, selectedGeography.lga))
+    : undefined;
   const recent = beneficiaries.slice().sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 5);
   const active = beneficiaries.filter((beneficiary) => !["inactive", "closed", "deceased"].includes(beneficiary.status.toLowerCase())).length;
   const newThisMonth = beneficiaries.filter((beneficiary) => beneficiary.created_at >= monthStart).length;
@@ -191,12 +237,71 @@ const GeneralDashboard = ({
         <Panel icon={Hospital} tone="blue" title="Facility Performance"><div className="space-y-3 p-3">{facilityData.length ? facilityData.map((facility) => <div key={facility.name}><div className="mb-1 flex justify-between gap-2 text-[10px]"><span className="truncate font-semibold text-health-ink">{facility.name}</span><span>{facility.rate}%</span></div><div className="h-2 overflow-hidden rounded-sm bg-muted"><div className="h-full bg-records-blue" style={{ width: `${facility.rate}%` }} /></div></div>) : <Empty label="No facility-linked records yet" />}</div></Panel>
       </div>
 
+      <Panel
+        icon={MapPinned}
+        tone="green"
+        title="Geographic Distribution"
+        subtitle="Live beneficiary concentration by Local Government Area"
+        action={<Button variant="ghost" size="sm" onClick={() => onNavigate("clusters")}><MapIcon className="h-4 w-4" /> Explore clusters</Button>}
+      >
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,2.2fr)_minmax(270px,0.8fr)]">
+          <div className="relative min-h-[390px] overflow-hidden border-b border-health-blue/10 bg-health-surface lg:border-b-0 lg:border-r">
+            {geography.mapped > 0 ? (
+              <NigeriaChoropleth
+                cells={geography.cells}
+                height={390}
+                showBasemap={false}
+                className="z-0 !bg-card"
+                onSelectUnit={(state, lga) => setSelectedGeography({ state, lga })}
+              />
+            ) : (
+              <div className="flex h-[390px] flex-col items-center justify-center gap-3 px-6 text-center">
+                <span className="records-stage-green flex h-14 w-14 items-center justify-center rounded-full text-primary-foreground shadow-card"><MapPinned className="h-7 w-7" /></span>
+                <div><p className="text-sm font-bold text-health-ink">No mapped beneficiary locations yet</p><p className="mt-1 text-xs text-muted-foreground">State and LGA details will automatically populate this map.</p></div>
+              </div>
+            )}
+            {geography.mapped > 0 && (
+              <div className="pointer-events-none absolute bottom-3 left-3 z-[500] rounded-md border border-health-blue/10 bg-card/95 p-2 shadow-card backdrop-blur-sm">
+                <p className="mb-1.5 text-[9px] font-bold uppercase text-health-ink">Beneficiary concentration</p>
+                <div className="flex flex-wrap gap-x-3 gap-y-1">
+                  <span className="flex items-center gap-1 text-[9px] text-muted-foreground"><span className="h-2.5 w-2.5 rounded-sm border border-border bg-muted" />No records</span>
+                  {MAP_SCALE.map((item) => <span key={item.label} className="flex items-center gap-1 text-[9px] text-muted-foreground"><span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: item.fill }} />{item.label}</span>)}
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="p-3">
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { label: "Mapped records", value: geography.mapped, icon: MapPin, tone: "green" },
+                { label: "States covered", value: geography.stateCount, icon: MapIcon, tone: "blue" },
+                { label: "LGAs covered", value: geography.lgaCount, icon: LocateFixed, tone: "purple" },
+                { label: "Wards covered", value: geography.wardCount, icon: Navigation, tone: "amber" },
+              ].map((item) => <div key={item.label} className="rounded-md border border-health-blue/10 bg-health-surface p-2.5"><div className="flex items-center gap-2"><span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-primary-foreground", `records-stage-${item.tone}`)}><item.icon className="h-4 w-4" /></span><div><p className="font-report-display text-lg font-bold leading-none text-health-ink">{item.value.toLocaleString()}</p><p className="mt-1 text-[9px] font-semibold text-muted-foreground">{item.label}</p></div></div></div>)}
+            </div>
+
+            {selectedGeography && (
+              <div className="mt-3 rounded-md border border-records-green/25 bg-records-green/5 p-3">
+                <div className="flex items-start gap-2"><span className="records-stage-green flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-primary-foreground"><MapPin className="h-4 w-4" /></span><div className="min-w-0"><p className="truncate text-xs font-bold text-health-ink">{selectedGeography.lga}, {selectedGeography.state}</p><p className="text-[10px] text-muted-foreground">{selectedGeographyData ? `${selectedGeographyData.value.toLocaleString()} beneficiaries · ${selectedGeographyData.wards.size.toLocaleString()} wards · ${pct(selectedGeographyData.value, geography.mapped)}% of mapped records` : "No beneficiary records in this LGA"}</p></div></div>
+              </div>
+            )}
+
+            <div className="mt-3">
+              <p className="mb-2 text-[10px] font-bold uppercase text-health-ink">Leading locations</p>
+              <div className="space-y-2">
+                {geography.ranked.slice(0, 5).map((location, index) => <button key={lgaKey(location.state, location.lga)} type="button" className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-2 text-left" onClick={() => setSelectedGeography({ state: location.state, lga: location.lga })}><span className="flex h-6 w-6 items-center justify-center rounded-md text-[9px] font-bold text-primary-foreground" style={{ backgroundColor: MAP_SCALE[Math.min(index, MAP_SCALE.length - 1)].fill }}>{index + 1}</span><span className="min-w-0"><span className="block truncate text-[10px] font-bold text-health-ink">{location.lga}</span><span className="block truncate text-[9px] text-muted-foreground">{location.state} · {location.wards.size} ward{location.wards.size === 1 ? "" : "s"}</span></span><span className="font-report-display text-sm font-bold tabular-nums text-health-ink">{location.value}</span></button>)}
+                {!geography.ranked.length && <Empty label="No geographic data recorded" />}
+              </div>
+            </div>
+          </div>
+        </div>
+      </Panel>
+
       <div className="grid gap-2 xl:grid-cols-[2fr_1.05fr]">
         <Panel icon={FileText} tone="teal" title="Recent Beneficiary Records" subtitle="Latest enrolments and updates across all components">
           <div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left text-[10px]"><thead className="bg-health-surface text-muted-foreground"><tr><th className="px-3 py-2">Case ID</th><th className="px-3 py-2">Name</th><th className="px-3 py-2">Location</th><th className="px-3 py-2">Components</th><th className="px-3 py-2">Last update</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Action</th></tr></thead><tbody className="divide-y">{recent.map((beneficiary) => { const row = scopedRows.find((item) => item.beneficiary.id === beneficiary.id); return <tr key={beneficiary.id}><td className="px-3 py-2 font-mono text-health-blue">{beneficiary.case_id}</td><td className="px-3 py-2 font-semibold text-health-ink">{beneficiary.full_name}</td><td className="px-3 py-2">{[beneficiary.lga, beneficiary.ward].filter(Boolean).join(" / ") || "Not recorded"}</td><td className="px-3 py-2"><div className="flex max-w-52 flex-wrap gap-1">{(row?.components || []).slice(0, 2).map((component) => <Badge key={component} variant="secondary" className="text-[9px]">{config?.components.find((item) => item.key === component)?.label || component}</Badge>)}</div></td><td className="px-3 py-2">{new Date(beneficiary.updated_at).toLocaleDateString()}</td><td className="px-3 py-2"><Badge variant="outline" className="border-records-green/30 bg-records-green/10 text-records-green">{beneficiary.status}</Badge></td><td className="px-3 py-2"><Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => onOpenBeneficiary(beneficiary)}>View</Button></td></tr>; })}</tbody></table>{!recent.length && <Empty label="No beneficiaries registered yet" />}</div>
         </Panel>
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-          <Panel icon={MapPinned} tone="green" title="Geographic Distribution" action={<Button variant="ghost" size="sm" onClick={() => onNavigate("clusters")}><MapPinned className="h-4 w-4" /> Explore</Button>}><div className="space-y-2 p-3">{lgaData.map(([lga, value], index) => <div key={lga} className="grid grid-cols-[1fr_2fr_auto] items-center gap-2 text-[10px]"><span className="truncate font-semibold text-health-ink">{lga}</span><div className="h-2 overflow-hidden rounded-sm bg-muted"><div className="h-full" style={{ width: `${pct(value, maxLga)}%`, backgroundColor: COLORS[index % COLORS.length] }} /></div><span className="font-bold tabular-nums">{value}</span></div>)}{!lgaData.length && <Empty label="No geographic data recorded" />}</div></Panel>
           <Panel icon={Zap} tone="amber" title="Quick Actions"><div className="grid grid-cols-2 gap-2 p-2">{canRegister && <Button variant="outline" className="h-auto justify-start gap-2.5 px-2 py-3 text-xs" onClick={onRegister}><span className="records-stage-teal flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-primary-foreground"><Plus className="h-4 w-4" /></span> Add beneficiary</Button>}<Button variant="outline" className="h-auto justify-start gap-2.5 px-2 py-3 text-xs" onClick={() => onNavigate("records")}><span className="records-stage-blue flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-primary-foreground"><Search className="h-4 w-4" /></span> Search records</Button><Button variant="outline" className="h-auto justify-start gap-2.5 px-2 py-3 text-xs" onClick={() => onNavigate("facility")}><span className="records-stage-amber flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-primary-foreground"><Building2 className="h-4 w-4" /></span> Facilities</Button><Button variant="outline" className="h-auto justify-start gap-2.5 px-2 py-3 text-xs" onClick={() => onNavigate("journey")}><span className="records-stage-purple flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-primary-foreground"><FileText className="h-4 w-4" /></span> Generate report</Button></div></Panel>
         </div>
       </div>
