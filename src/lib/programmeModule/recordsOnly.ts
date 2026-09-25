@@ -36,14 +36,21 @@ export function useRecordsOnlyProjects() {
     let cancelled = false;
     if (authLoading || !user?.id) return;
     void (async () => {
-      const { data, error } = await supabase
-        .from("projects")
-        .select("id, name, description, records_only")
-        .order("name", { ascending: true });
+      const [{ data, error }, modules] = await Promise.all([
+        supabase
+          .from("projects")
+          .select("id, name, description, records_only")
+          .order("name", { ascending: true }),
+        supabase.from("programme_modules").select("project_id").limit(5000),
+      ]);
       if (cancelled) return;
       if (!error && data) {
+        // Any project with Beneficiary Records configured is records-only.
+        const moduleProjects = new Set(
+          ((modules.data as any[]) || []).map((m) => m.project_id).filter(Boolean),
+        );
         const lockedRows = data
-          .filter((row: any) => row.records_only)
+          .filter((row: any) => row.records_only || moduleProjects.has(row.id))
           .map((row: any) => ({ id: row.id, name: row.name, description: row.description ?? null }));
         setLocked(lockedRows);
         setTotalProjects(data.length);
