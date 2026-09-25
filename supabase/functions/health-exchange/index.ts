@@ -51,8 +51,10 @@ async function authHeaders(db: ReturnType<typeof admin>, conn: Connection) {
   if (!secret) throw new Error("No credential saved for this connection.");
   if (conn.auth_type === "basic") {
     headers.Authorization = `Basic ${btoa(`${conn.username ?? ""}:${secret}`)}`;
-  } else if (conn.auth_type === "apitoken") {
-    headers.Authorization = `ApiToken ${secret}`;
+  } else if (conn.auth_type === "apitoken" || /^d2pat_/.test(secret.trim())) {
+    // DHIS2 personal access tokens must use the ApiToken scheme, even if
+    // the connection was saved with "bearer".
+    headers.Authorization = `ApiToken ${secret.trim()}`;
   } else if (conn.auth_type === "oauth2_client_credentials") {
     if (!conn.token_url || !conn.username) throw new Error("OAuth client ID and token URL are required.");
     const token = await remoteFetch(conn.token_url, {
@@ -199,10 +201,12 @@ Deno.serve(async (req) => {
       case "pull_metadata": {
         if (connection.kind !== "dhis2") return json({ error: "Metadata pull is for DHIS2 connections" }, 400);
         const [orgUnits, dataElements, dataSets, categoryCombos] = await Promise.all([
-          remoteFetch(joinUrl(connection.base_url, "api/organisationUnits?fields=id,name,level&pageSize=200"), { headers }),
-          remoteFetch(joinUrl(connection.base_url, "api/dataElements?fields=id,name&pageSize=500"), { headers }),
-          remoteFetch(joinUrl(connection.base_url, "api/dataSets?fields=id,name,periodType,dataSetElements[dataElement[id,name]]&pageSize=200"), { headers }),
-          remoteFetch(joinUrl(connection.base_url, "api/categoryOptionCombos?fields=id,name&filter=ignoreApproval:neq:true&pageSize=500"), { headers }),
+          // National instances hold 100k+ org units (down to wards/facilities);
+          // pull all State/LGA/Ward levels (1-4) and everything else unpaged.
+          remoteFetch(joinUrl(connection.base_url, `api/organisationUnits?fields=id,name,level&filter=level:le:${Number(payload.max_level ?? 4) || 4}&paging=false`), { headers }, 60000),
+          remoteFetch(joinUrl(connection.base_url, "api/dataElements?fields=id,name&paging=false"), { headers }, 60000),
+          remoteFetch(joinUrl(connection.base_url, "api/dataSets?fields=id,name,periodType,dataSetElements[dataElement[id,name]]&paging=false"), { headers }, 60000),
+          remoteFetch(joinUrl(connection.base_url, "api/categoryOptionCombos?fields=id,name&paging=false"), { headers }, 60000),
         ]);
         const ok = orgUnits.ok && dataElements.ok && dataSets.ok && categoryCombos.ok;
         await log(db, connection, "pull", "dhis2_metadata", ok ? "success" : "error", 0,
@@ -253,15 +257,20 @@ Deno.serve(async (req) => {
           method: "POST", headers, body: JSON.stringify({ dataValues }),
         });
         const importBody = res.body as Record<string, any> | null;
-        const conflicts = Number(importBody?.response?.conflicts?.length ?? importBody?.conflicts?.length ?? 0);
+        const conflictItems: any[] = importBody?.response?.conflicts ?? importBody?.conflicts ?? [];
+        const conflicts = conflictItems.length;
+        const summaryReturned = res.status === 409 && importBody?.response?.responseType === "ImportSummary";
         const ignored = Number(importBody?.response?.importCount?.ignored ?? importBody?.importCount?.ignored ?? 0);
-        const status = res.ok && conflicts === 0 && ignored === 0 ? "success" : res.ok ? "partial" : "error";
-        const importSummary = remoteMessage(res.body,
-          `${dryRun ? "Validated" : "Imported"} ${dataValues.length} values${conflicts || ignored ? `; ${conflicts} conflicts, ${ignored} ignored` : ""}`);
+        const reached = res.ok || summaryReturned;
+        const status = res.ok && conflicts === 0 && ignored === 0 ? "success" : reached ? "partial" : "error";
+        const counts = importBody?.response?.importCount ?? importBody?.importCount ?? {};
+        const importSummary = reached
+          ? `${dryRun ? "Dry run" : "Import"}: ${counts.imported ?? 0} imported, ${counts.updated ?? 0} updated, ${ignored} ignored.${conflicts ? " " + conflictItems.slice(0, 3).map((c) => c.value).join("; ") : ""}`
+          : remoteMessage(res.body, `HTTP ${res.status}`);
         await log(db, connection, "push", "dhis2_data_values", status, dataValues.length,
-          res.ok ? importSummary : `HTTP ${res.status}: ${importSummary}`,
+          reached ? importSummary : `HTTP ${res.status}: ${importSummary}`,
           guard.userId);
-        return json({ ok: res.ok, dryRun, sent: dataValues.length, status, message: importSummary, response: res.body }, res.ok ? 200 : 502);
+        return json({ ok: reached, dryRun, sent: dataValues.length, status, message: importSummary, conflicts: conflictItems, response: res.body }, reached ? 200 : 502);
       }
 
       /* ---------------------- ADX / SDMX exchange --------------------- */
@@ -286,7 +295,7 @@ Deno.serve(async (req) => {
         let contentType = "";
         let validation: { valid: boolean; errors: string[]; observationCount: number };
         if (format === "adx-xml") {
-          content = buildAdxXml({ orgUnit: String(payload.org_unit ?? connection.org_unit_id ?? ""), dataSet: connection.dataset_id ?? "", period, observations });
+          content = buildAdxXml({ orgUnit: String(payload.org_unit ?? connection.org_unit_id ?? ""), dataSet: String(payload.data_set ?? connection.dataset_id ?? ""), period, observations });
           contentType = "application/adx+xml";
           validation = validateAdxXml(content);
         } else {
@@ -300,14 +309,34 @@ Deno.serve(async (req) => {
         if (action === "preview_aggregate") return json({ ok: true, content, contentType, format, validation });
 
         const dryRun = payload.dry_run === true;
-        const target = format === "adx-xml" && connection.kind === "dhis2"
-          ? joinUrl(connection.base_url, `api/dataValueSets?dryRun=${String(dryRun)}&importStrategy=CREATE_AND_UPDATE`)
+        const isDhisAdx = format === "adx-xml" && connection.kind === "dhis2";
+        // DHIS2 ADX import defaults to CODE identifiers; our mappings hold UIDs.
+        const target = isDhisAdx
+          ? joinUrl(connection.base_url, `api/dataValueSets?dryRun=${String(dryRun)}&importStrategy=CREATE_AND_UPDATE&idScheme=UID&dataElementIdScheme=UID&orgUnitIdScheme=UID&categoryOptionComboIdScheme=UID`)
           : connection.base_url;
-        const response = await remoteFetch(target, { method: "POST", headers: { ...headers, Accept: contentType, "Content-Type": contentType }, body: content });
-        const status = response.ok ? "success" : "error";
-        const message = response.ok ? `${format.toUpperCase()} exchange accepted (${validation.observationCount} observations)` : remoteMessage(response.body, `HTTP ${response.status}`);
+        const response = await remoteFetch(target, {
+          method: "POST",
+          // DHIS2 answers with a JSON import summary, not ADX.
+          headers: { ...headers, Accept: isDhisAdx ? "application/json" : contentType, "Content-Type": contentType },
+          body: content,
+        });
+        const summary = (response.body as Record<string, any> | null) ?? {};
+        const adxReached = response.ok || (isDhisAdx && response.status === 409 && summary.response?.responseType === "ImportSummary");
+        const counts = summary.response?.importCount ?? summary.importCount ?? {};
+        const conflictList = summary.response?.conflicts ?? summary.conflicts ?? [];
+        const ignored = Number(counts.ignored ?? 0);
+        const accepted = isDhisAdx && adxReached
+          ? Number(counts.imported ?? 0) + Number(counts.updated ?? 0)
+          : response.ok ? validation.observationCount : 0;
+        const status = !adxReached ? "error" : (ignored > 0 || conflictList.length > 0) ? "partial" : "success";
+        const conflictText = Array.isArray(conflictList) && conflictList.length
+          ? ` Conflicts: ${conflictList.slice(0, 3).map((c: any) => c.value ?? c.object ?? JSON.stringify(c)).join("; ")}`
+          : "";
+        const message = adxReached
+          ? `${format.toUpperCase()} ${dryRun ? "validated (dry run)" : "exchange accepted"}: ${isDhisAdx ? `${counts.imported ?? 0} imported, ${counts.updated ?? 0} updated, ${ignored} ignored` : `${validation.observationCount} observations`}.${conflictText}`
+          : remoteMessage(response.body, `HTTP ${response.status}`);
         await log(db, connection, "push", format, status, validation.observationCount, message, guard.userId);
-        return json({ ok: response.ok, status, message, accepted: response.ok ? validation.observationCount : 0, rejected: response.ok ? 0 : validation.observationCount, response: response.body }, response.ok ? 200 : 502);
+        return json({ ok: adxReached, status, dryRun, message, accepted, rejected: ignored, conflicts: conflictList, response: response.body }, adxReached ? 200 : 502);
       }
 
       case "validate_import": {
