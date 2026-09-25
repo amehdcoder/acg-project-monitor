@@ -115,8 +115,10 @@ export default function GoogleStreetViewPanel({
         [500, google.maps.StreetViewSource.GOOGLE],
         [1000, google.maps.StreetViewSource.GOOGLE],
         [5000, google.maps.StreetViewSource.GOOGLE],
+        [25000, google.maps.StreetViewSource.GOOGLE],
         [1000, google.maps.StreetViewSource.DEFAULT],
         [5000, google.maps.StreetViewSource.DEFAULT],
+        [25000, google.maps.StreetViewSource.DEFAULT],
       ];
       for (const [radius, source] of searches) {
         try {
@@ -238,6 +240,9 @@ export default function GoogleStreetViewPanel({
   const gmapsLink = hasCoords
     ? `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}${panoId ? `&pano=${encodeURIComponent(panoId)}` : ""}&heading=${heading}&pitch=0&fov=80`
     : "#";
+  const googleStreetLink = hasCoords
+    ? `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`
+    : "#";
 
   const mapillaryEmbed = hasCoords
     ? `https://www.mapillary.com/embed?map_style=Mapillary+streets&x=${lng}&y=${lat}&z=17&style=photo`
@@ -326,7 +331,7 @@ export default function GoogleStreetViewPanel({
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#202124] text-white">
               <Loader2 className="h-8 w-8 animate-spin text-[#FBBC05]" />
               <p className="text-sm text-white/70">Finding nearest Street View…</p>
-              <p className="text-xs text-white/40">Searching up to 5 km for imagery</p>
+              <p className="text-xs text-white/40">Searching nearby official and contributed panoramas</p>
             </div>
           )}
 
@@ -348,6 +353,9 @@ export default function GoogleStreetViewPanel({
               <div className="flex flex-wrap items-center gap-3">
                 <a href={mapillaryAppLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-[#8ab4f8] hover:underline">
                   <Eye className="h-3 w-3" /> Open in Mapillary
+                </a>
+                <a href={googleStreetLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-[#8ab4f8] hover:underline">
+                  <ExternalLink className="h-3 w-3" /> Try Google Street View
                 </a>
                 <a href={googleSatLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-[#8ab4f8] hover:underline">
                   <MapIcon className="h-3 w-3" /> Satellite
