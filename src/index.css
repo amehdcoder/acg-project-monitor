@@ -31,11 +31,11 @@
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 13% 88%;
+    --border: 220 16% 91%;
     --input: 220 13% 88%;
     --ring: 220 70% 45%;
 
-    --radius: 0.625rem;
+    --radius: 0.5rem;
 
     /* WhatsApp-style chat palette (HSL channels) */
     --wa-header: 174 100% 19%;          /* teal-green header #075E54 */
@@ -345,7 +345,7 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
     overscroll-behavior-x: none;
@@ -418,7 +418,7 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
     font-weight: 600;
     letter-spacing: -0.02em;
   }
@@ -916,13 +916,13 @@ button.animate-bounce:active,
   opacity: 0.9;
 }
 .paper-form h1, .paper-form h2, .paper-form h3, .paper-form .font-display {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
   letter-spacing: -0.015em;
   color: hsl(var(--paper-ink));
 }
 .paper-form .form-card label,
 .paper-form .form-card .form-label {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
   color: hsl(var(--paper-ink) / 0.75);
   font-weight: 500;
   letter-spacing: 0.005em;
@@ -1307,4 +1307,10 @@ select option {
 @media (max-width: 480px) {
   .sv-control-btn .sv-label { display: none; }
   .sv-control-btn { padding: 0 8px; }
+}
+
+/* Enterprise foundation */
+@layer base {
+  h1, h2, h3, h4 { letter-spacing: -0.015em; }
+  .lucide { stroke-width: 1.75; }
 }
