@@ -117,6 +117,7 @@ export async function listMappings(connectionId: string) {
 export async function saveMapping(row: {
   connection_id: string; indicator_key: string; indicator_label?: string | null;
   remote_id: string; remote_name?: string | null; category_option_combo?: string | null;
+  dimensions?: Record<string, string>;
 }) {
   const { error } = await T("health_exchange_mappings")
     .upsert(row, { onConflict: "connection_id,indicator_key" });
