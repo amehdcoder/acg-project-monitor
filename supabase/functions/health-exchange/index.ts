@@ -196,34 +196,42 @@ const ScopedMonthlySchema = z.object({
 /** Monthly totals restricted to beneficiaries in one State/LGA. */
 async function computeScopedMonthlyValues(db: ReturnType<typeof admin>, projectId: string, period: string, state: string, lga: string) {
   const { start, end } = monthRange(period);
-  const scopedBeneficiaries = () => db.from("beneficiaries").select("id", { count: "exact", head: true })
-    .eq("project_id", projectId).ilike("state", state).ilike("lga", lga);
-  const scopedLinkedCount = async (table: string, dateColumn: string, dated = true, extra?: (query: any) => any) => {
-    let query: any = db.from(table).select("id,beneficiaries!inner(id,state,lga)", { count: "exact", head: true })
-      .eq("project_id", projectId).ilike("beneficiaries.state", state).ilike("beneficiaries.lga", lga);
-    if (dated) query = query.gte(dateColumn, start).lt(dateColumn, end);
-    if (extra) query = extra(query);
-    const { count, error } = await query;
-    return error ? 0 : count ?? 0;
+  const beneficiaries: any[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await db.from("beneficiaries").select("id,status,profile,created_at")
+      .eq("project_id", projectId).ilike("state", state).ilike("lga", lga).range(from, from + 999);
+    if (error) throw error;
+    beneficiaries.push(...(data ?? []));
+    if (!data || data.length < 1000) break;
+  }
+  const ids = beneficiaries.map((beneficiary) => beneficiary.id);
+  const linkedCount = async (table: string, dateColumn = "created_at", extra?: (query: any) => any) => {
+    if (!ids.length) return 0;
+    let total = 0;
+    for (let offset = 0; offset < ids.length; offset += 250) {
+      let query: any = db.from(table).select("id", { count: "exact", head: true })
+        .eq("project_id", projectId).in("beneficiary_id", ids.slice(offset, offset + 250))
+        .gte(dateColumn, start).lt(dateColumn, end);
+      if (extra) query = extra(query);
+      const { count, error } = await query;
+      if (error) throw error;
+      total += count ?? 0;
+    }
+    return total;
   };
-  const scopedBeneficiaryCount = async (dated: boolean, extra?: (query: any) => any) => {
-    let query: any = scopedBeneficiaries();
-    if (dated) query = query.gte("created_at", start).lt("created_at", end);
-    if (extra) query = extra(query);
-    const { count, error } = await query;
-    return error ? 0 : count ?? 0;
-  };
-  const sexCount = (sex: "f" | "m", dated: boolean, active = false) => scopedBeneficiaryCount(dated, (query) => {
-    let next = query.or(`profile->>sex.ilike.${sex}*,profile->>gender.ilike.${sex}*`);
-    if (active) next = next.eq("status", "active");
-    return next;
-  });
+  const inMonth = (value: string) => value >= start && value < end;
+  const sex = (beneficiary: any) => String(beneficiary.profile?.sex ?? beneficiary.profile?.gender ?? "").toLowerCase();
+  const registeredRows = beneficiaries.filter((beneficiary) => inMonth(beneficiary.created_at));
+  const activeRows = beneficiaries.filter((beneficiary) => beneficiary.status === "active");
   const [registered, active, confirmed, referrals, visits, treatments, morbidity, regF, regM, actF, actM] = await Promise.all([
-    scopedBeneficiaryCount(true), scopedBeneficiaryCount(false, (query) => query.eq("status", "active")),
-    scopedLinkedCount("mmdp_potential_cases", "created_at", true, (query) => query.not("confirmed_at", "is", null)),
-    scopedLinkedCount("beneficiary_referrals", "created_at"), scopedLinkedCount("beneficiary_home_visits", "created_at"),
-    scopedLinkedCount("household_mda_treatments", "created_at"), scopedLinkedCount("ntd_morbidity_records", "created_at"),
-    sexCount("f", true), sexCount("m", true), sexCount("f", false, true), sexCount("m", false, true),
+    Promise.resolve(registeredRows.length), Promise.resolve(activeRows.length),
+    linkedCount("mmdp_potential_cases", "created_at", (query) => query.not("confirmed_at", "is", null)),
+    linkedCount("beneficiary_referrals"), linkedCount("beneficiary_home_visits"),
+    linkedCount("household_mda_treatments"), linkedCount("ntd_morbidity_records"),
+    Promise.resolve(registeredRows.filter((beneficiary) => sex(beneficiary).startsWith("f")).length),
+    Promise.resolve(registeredRows.filter((beneficiary) => sex(beneficiary).startsWith("m")).length),
+    Promise.resolve(activeRows.filter((beneficiary) => sex(beneficiary).startsWith("f")).length),
+    Promise.resolve(activeRows.filter((beneficiary) => sex(beneficiary).startsWith("m")).length),
   ]);
   const totals: Record<string, number> = {
     beneficiaries_registered: registered, beneficiaries_active: active, cases_confirmed: confirmed,
@@ -231,8 +239,7 @@ async function computeScopedMonthlyValues(db: ReturnType<typeof admin>, projectI
     "beneficiaries_registered:female": regF, "beneficiaries_registered:male": regM,
     "beneficiaries_active:female": actF, "beneficiaries_active:male": actM,
   };
-  const beneficiaryCount = await scopedBeneficiaryCount(false);
-  return { beneficiaryCount, values: Object.entries(totals).map(([indicator_key, value]) => ({ indicator_key, value })) };
+  return { beneficiaryCount: beneficiaries.length, values: Object.entries(totals).map(([indicator_key, value]) => ({ indicator_key, value })) };
 }
 
 /** Send mapped values to DHIS2 /api/dataValueSets and log the import summary. */
