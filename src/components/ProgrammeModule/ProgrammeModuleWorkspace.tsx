@@ -331,7 +331,7 @@ const ProgrammeModuleWorkspace = ({
               <button key={k} role="tab" aria-selected={on} onClick={() => openTab(k)}
                 className={`-mb-px flex items-center gap-2 border-b-2 px-1 pb-2.5 pt-1 text-sm font-semibold transition-colors ${on ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
                 <Icon className="h-4 w-4" />{l}
-                {k === "brain" && <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">On-device</span>}
+                {k === "brain" && <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Shared brain</span>}
               </button>
             );
           })}

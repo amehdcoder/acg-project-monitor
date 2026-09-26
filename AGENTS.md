@@ -5,3 +5,4 @@
 - Self-hosting ships the static build via Dockerfile + nginx.conf while the backend stays on Lovable Cloud — why: removes hosting badge without migrating data.
 - Route every in-app Street View through the shared Google panorama viewer, with official imagery preferred and street-level fallback — why: keeps map drill-down quality and failure handling consistent.
 - Data Cleaner has no hand-written validation rules; all flags come from the on-device autoencoder + transformer brain worker (dataCleanerBrain.worker.ts) with IndexedDB memory — why: "normal" is learned cumulatively from cleaned history.
+- Record quality brain trains in the browser worker but its checkpoint lives in `brain_models` (most-trained copy wins via trigger) and flags/resolutions in `brain_flags` — why: edge functions lack the CPU budget for training; the server copy persists and is shared per module.
