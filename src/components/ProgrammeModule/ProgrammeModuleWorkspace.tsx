@@ -154,7 +154,6 @@ const ProgrammeModuleWorkspace = ({
       label: "Intelligence",
       items: [
         { key: "network", label: "Transmission network", description: "Household, kinship and WASH relationships", icon: Network, show: can("view_dashboards") },
-        { key: "brain", label: "Record quality brain", description: "On-device models flag records they can't reconstruct", icon: Brain, show: can("view_dashboards") || can("view_records") },
         { key: "risk", label: "Follow-up risk & CHEW visits", description: "Prioritised risk and dispatched visits", icon: Activity, show: can("view_dashboards") },
         { key: "exchange", label: "Data exchange", description: "DHIS2, LMIS, FHIR, ADX and SDMX", icon: Share2, show: canConfigure || can("view_dashboards") },
       ],
@@ -168,9 +167,18 @@ const ProgrammeModuleWorkspace = ({
     },
   ];
 
+  const canBrain = can("view_dashboards") || can("view_records");
+  const [brainMounted, setBrainMounted] = useState(false);
+  const [lastRecordsView, setLastRecordsView] = useState<WorkspaceView>("records");
+  const openTab = (t: "records" | "brain") => {
+    if (t === "brain") { if (view !== "brain") setLastRecordsView(view); setBrainMounted(true); setView("brain"); }
+    else if (view === "brain") setView(lastRecordsView);
+  };
+
   useEffect(() => {
     if (permissionsLoading) return;
     const visibleViews = navGroups.flatMap((group) => group.items).filter((item) => item.show).map((item) => item.key);
+    if (view === "brain") return;
     if (!visibleViews.includes(view)) setView(visibleViews.includes("records") ? "records" : visibleViews[0] || "records");
   }, [permissionsLoading, view, canConfigure, isOfficer, onTeamRegister]);
 
@@ -315,7 +323,22 @@ const ProgrammeModuleWorkspace = ({
         </div>
       </div>
 
-      {!permissionsLoading && <WorkspaceNavigation groups={navGroups} view={view} onViewChange={setView} administration={
+      {!permissionsLoading && canBrain && active && (
+        <div role="tablist" aria-label="Cases workspace" className="flex items-end gap-6 border-b border-border/60 px-1">
+          {([["records", "Beneficiary records", Layers], ["brain", "Record quality brain", Brain]] as const).map(([k, l, Icon]) => {
+            const on = (view === "brain") === (k === "brain");
+            return (
+              <button key={k} role="tab" aria-selected={on} onClick={() => openTab(k)}
+                className={`-mb-px flex items-center gap-2 border-b-2 px-1 pb-2.5 pt-1 text-sm font-semibold transition-colors ${on ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+                <Icon className="h-4 w-4" />{l}
+                {k === "brain" && <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">On-device</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {!permissionsLoading && view !== "brain" && <WorkspaceNavigation groups={navGroups} view={view} onViewChange={setView} administration={
         <DropdownMenu>
           <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="gap-2"><SlidersHorizontal className="h-4 w-4" /> Manage<ChevronDown className="h-3.5 w-3.5" /></Button></DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64">
@@ -430,7 +453,12 @@ const ProgrammeModuleWorkspace = ({
         />
       )}
 
-      {view === "brain" && <BeneficiaryBrainPanel moduleId={active?.id} />}
+      {brainMounted && canBrain && (
+        <div className={view === "brain" ? "" : "hidden"}>
+          <BeneficiaryBrainPanel moduleId={active?.id} visible={view === "brain"}
+            onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }} />
+        </div>
+      )}
       {view === "network" && (
         <KinshipGraphPanel
           projectId={projectId}
