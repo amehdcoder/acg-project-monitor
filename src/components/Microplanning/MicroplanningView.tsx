@@ -2451,6 +2451,22 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         </div>
       </div>
 
+      {!entryOnly && (
+        <div className="grid gap-3 md:grid-cols-[2fr_1fr]">
+          <Dhis2MicroplanEngine
+            projectId={selectedProjectId}
+            projectName={projects.find(p => p.id === selectedProjectId)?.name ?? null}
+            canUse={isAdmin || isOwner || isSuperAdmin}
+            onPulled={fetchEntries}
+          />
+          <KoboToolboxCard
+            projectId={selectedProjectId}
+            canUse={isAdmin || isOwner}
+            onOpen={() => setShowKoboSettings(true)}
+            onNewSuccess={fetchEntries}
+          />
+        </div>
+      )}
 
       {!entryOnly && (
         <>

@@ -1,0 +1,2 @@
+alter table public.microplan_entries add column if not exists external_ref text;
+create unique index if not exists microplan_entries_project_external_ref_key on public.microplan_entries (project_id, external_ref);
