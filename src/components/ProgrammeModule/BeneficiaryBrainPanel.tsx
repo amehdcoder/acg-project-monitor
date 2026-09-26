@@ -246,7 +246,7 @@ export default function BeneficiaryBrainPanel({ moduleId, projectId, visible = t
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-lg font-semibold tracking-tight">Record quality brain</h2>
-          <p className="text-sm text-muted-foreground">Two in-app models (no AI credits) learn what normal records look like and flag the ones they can't rebuild. What they learn is saved to the server and shared by everyone on this project.</p>
+          <p className="text-sm text-muted-foreground">Two in-app models learn what normal records look like and flag the ones they can't rebuild. What they learn is saved to the server and shared by everyone on this project.</p>
         </div>
         <div className="flex items-center gap-2">
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">

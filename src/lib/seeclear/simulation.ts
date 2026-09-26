@@ -1,7 +1,7 @@
 // Owner-only simulation for the See Clear Eye Health Facility Monitoring dashboard.
 // Generates a realistic synthetic dataset matching the shape returned by
 // useSeeClearDashboard so the Owner can preview the full dashboard exactly as it
-// would look with real field monitoring — no backend writes, no AI credits,
+// would look with real field monitoring — no backend writes,
 // deterministic per seed.
 
 import type { MonitoringRow } from "@/hooks/useSeeClearDashboard";

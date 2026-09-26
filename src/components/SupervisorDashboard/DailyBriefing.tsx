@@ -69,7 +69,7 @@ const DailyBriefing = ({ users, dailySummary, projectSummaries, scopeLabel, scop
         setInsightFeedback(restored);
         toast({
           title: "Briefing Ready",
-          description: "Generated on-device — no AI credits used.",
+          description: "Generated on-device.",
         });
       } catch (err) {
         console.error("Briefing generation error:", err);
@@ -129,7 +129,7 @@ const DailyBriefing = ({ users, dailySummary, projectSummaries, scopeLabel, scop
             </div>
             <div>
               <CardTitle>Daily Briefing</CardTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">Adaptive on-device engine · no AI credits</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Adaptive on-device engine</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -258,7 +258,7 @@ const DailyBriefing = ({ users, dailySummary, projectSummaries, scopeLabel, scop
             <Cpu className="h-8 w-8 mx-auto text-muted-foreground/30 mb-3" />
             <p className="text-sm text-muted-foreground">
               Generate a precise, role- and project-aware summary of today's data collection activity.
-              Runs entirely on-device with statistical models and an adaptive learning loop — no AI credits required.
+              Runs entirely on-device with statistical models and an adaptive learning loop.
             </p>
           </div>
         )}

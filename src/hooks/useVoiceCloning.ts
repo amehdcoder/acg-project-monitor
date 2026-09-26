@@ -5,7 +5,7 @@ import { toast } from "@/hooks/use-toast";
 /**
  * Browser-native voice cloning using Web Audio API + Web Speech Synthesis.
  *
- * Approach (offline-friendly, no AI credits):
+ * Approach (offline-friendly):
  * 1. Donor records 3 seconds of speech.
  * 2. We extract pitch (mean F0), formant brightness, speaking rate, and energy
  *    using FFT analysis on the raw PCM data.

@@ -372,7 +372,7 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
         }
       }
 
-      // 2) OCR each page with Tesseract.js (in-browser, no AI credits)
+      // 2) OCR each page with Tesseract.js (in-browser)
       const ocrPages = [];
       for (let i = 0; i < enhanced.length; i++) {
         setPageProgress({ current: i, total: pages.length, phase: "ocr" });
@@ -964,7 +964,7 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
               <p className="text-xs text-muted-foreground mt-4">
                 {aiEnhance
                   ? "On-device OCR + DSS Internal AI Gateway (Gemini). If AI is unavailable, the local parser kicks in automatically — you'll never get stuck."
-                  : "Running fully on-device with Tesseract OCR + heuristic parser. No AI credits used. First page is slower while the OCR engine warms up; subsequent pages are fast."}
+                  : "Running fully on-device with Tesseract OCR + heuristic parser. First page is slower while the OCR engine warms up; subsequent pages are fast."}
               </p>
             </div>
           </div>

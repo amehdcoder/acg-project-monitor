@@ -1,5 +1,5 @@
 /**
- * Smart Daily Briefing Engine — 100% on-device, ZERO AI credits.
+ * Smart Daily Briefing Engine — 100% on-device.
  *
  * This is a deterministic analytics + lightweight online-learning engine that
  * replaces the paid LLM call for the Supervisor "Daily Briefing". It is:
@@ -332,7 +332,7 @@ export function generateSmartBriefing(input: SmartBriefingInput): SmartBriefingR
   // ---- Compose plain-text brief ------------------------------------------
   const scopeLabel = scope?.label ? ` — ${scope.label}` : "";
   let brief = `📋 DAILY BRIEFING${scopeLabel} — ${date}\n\n`;
-  brief += `🤖 Generated on-device by the adaptive briefing engine (learning pass #${policy.runs}). No AI credits used.\n\n`;
+  brief += `🤖 Generated on-device by the adaptive briefing engine (learning pass #${policy.runs}).\n\n`;
 
   brief += `🚦 OVERALL STATUS: ${riskLevel.toUpperCase()} (risk index ${Math.round(riskScore)}/100)\n`;
   brief += `${activeNow} of ${users.length} users active • ${fieldWorkers.length} field workers deployed • ${totalSubs} submissions today.\n\n`;

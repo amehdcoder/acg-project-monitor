@@ -177,7 +177,7 @@ const VoiceCloningManager = () => {
         </CardTitle>
         <CardDescription>
           Record a 3-second voice sample from any user (with their consent) and use it as the app's text-to-speech voice.
-          Runs fully in-browser — no AI credits required.
+          Runs fully in-browser.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

@@ -417,7 +417,7 @@ export function useDataQualityManagement() {
         return;
       }
 
-      // Use local data quality check (no AI credits needed)
+      // Use local data quality check
       const localResult = localDataQualityCheck(submissions);
       setAiSuggestions(localResult);
       toast({

@@ -250,7 +250,7 @@ const ResearchInsightsTab = ({
           </CardTitle>
           <CardDescription>
             Targeted simulation sweeps that answer the five research questions. All runs are local
-            (no AI credits used) unless you click "Generate AI interpretation".
+            unless you click "Generate AI interpretation".
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
