@@ -662,3 +662,100 @@ function FeedbackDialog({ open, onOpenChange, mda, batchId, reviewer, score }: a
     </Dialog>
   );
 }
+
+/* ── Neural brain panels ─────────────────────────────────────────────────── */
+const STATE_LABEL: Record<string, [string, string]> = {
+  cold: ["Needs data", "#94A3B8"], learning: ["Learning", "#16A34A"], consolidating: ["Thinking / consolidating", "#2563EB"],
+  "overfit-guard": ["Overfitting guard active", "#F59E0B"], paused: ["Paused", "#64748B"],
+};
+function BrainPill({ stats, onClick }: { stats: BrainStats | null; onClick: () => void }) {
+  const [label, color] = STATE_LABEL[stats?.state ?? "cold"];
+  return (
+    <button onClick={onClick} className="h-9 mt-4 flex items-center gap-2 rounded-md border border-[#E2E8F0] px-3 text-xs">
+      <span className="relative flex h-2.5 w-2.5">
+        {stats?.state === "learning" || stats?.state === "consolidating" ? <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" style={{ background: color }} /> : null}
+        <span className="relative inline-flex h-2.5 w-2.5 rounded-full" style={{ background: color }} />
+      </span>
+      <Brain className="h-3.5 w-3.5" style={{ color }} />{label}
+    </button>
+  );
+}
+
+function BrainSection({ stats, onToggle, onReset }: { stats: BrainStats | null; onToggle: () => void; onReset: () => void }) {
+  if (!stats) return <RefCard title="Live Brain" desc="Waking the brain…" />;
+  const [label, color] = STATE_LABEL[stats.state];
+  const gap = stats.trainLoss ? stats.valLoss / stats.trainLoss : 0;
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge style={{ background: color + "1a", color }}>{label}</Badge>
+        <span className="text-xs text-slate-500">Last knowledge save: {stats.lastCheckpointAt ? new Date(stats.lastCheckpointAt).toLocaleTimeString() : "not yet"} · saves every minute</span>
+        <div className="ml-auto flex gap-2">
+          <Button size="sm" variant="outline" onClick={onToggle}>{stats.running ? <><Pause className="h-3.5 w-3.5 mr-1" />Pause</> : <><Play className="h-3.5 w-3.5 mr-1" />Resume</>}</Button>
+          <Button size="sm" variant="outline" onClick={onReset}><RotateCcw className="h-3.5 w-3.5 mr-1" />Forget</Button>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <KpiCard label="Rows remembered" value={stats.corpusRows.toLocaleString()} sub={stats.bootstrapRows ? `+${stats.bootstrapRows} from current file (bootstrap)` : `${stats.trainRows} train · ${stats.valRows} held-out`} color="#2563EB" icon={Database} />
+        <KpiCard label="Learning steps" value={stats.steps.toLocaleString()} sub={`${stats.columns} columns modelled`} color="#7C3AED" icon={Brain} />
+        <KpiCard label="Held-out loss" value={stats.valLoss.toFixed(4)} sub={`best ${stats.bestVal.toFixed(4)} · train ${stats.trainLoss.toFixed(4)}`} color="#16A34A" icon={Activity} />
+        <KpiCard label="Generalisation gap" value={gap ? gap.toFixed(2) + "×" : "—"} sub={`${stats.overfitEvents} overfitting roll-backs`} color={gap > 1.25 ? "#F59E0B" : "#0B2E6D"} icon={ShieldCheck} />
+      </div>
+      <Panel title="Training vs held-out loss (lower = better understanding of normal)">
+        {stats.lossHistory.length > 1 ? (
+          <ResponsiveContainer width="100%" height={240}><LineChart data={stats.lossHistory}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" /><XAxis dataKey="t" tick={{ fontSize: 10 }} /><YAxis tick={{ fontSize: 10 }} /><RTooltip />
+            <Line type="monotone" dataKey="train" stroke="#2563EB" dot={false} strokeWidth={2} name="Training" />
+            <Line type="monotone" dataKey="val" stroke="#16A34A" dot={false} strokeWidth={2} name="Held-out" />
+          </LineChart></ResponsiveContainer>
+        ) : <p className="text-sm text-slate-500">Waiting for enough data to learn from.</p>}
+      </Panel>
+      <div className="grid lg:grid-cols-2 gap-4">
+        <Panel title="How the brain works">
+          <ul className="text-xs text-slate-600 space-y-1.5 list-disc pl-4">
+            <li><b>Denoising autoencoder</b> squeezes each row through a small bottleneck and rebuilds it; values it cannot rebuild are unusual.</li>
+            <li><b>Column transformer</b> predicts every column from the other columns using attention, catching broken relationships (totals, stock, coverage).</li>
+            <li><b>No rules:</b> "normal" is whatever the cleaned history shows; cut-offs are learned from held-out data.</li>
+            <li><b>Always thinking:</b> keeps training on its memory with fresh corruption, and re-checks old rows so doubtful history counts less ({stats.distrustedRows} down-weighted).</li>
+            <li><b>Overfitting guard:</b> 15% held-out rows, weight decay {stats.weightDecay.toFixed(4)}, dropout {stats.dropout.toFixed(2)}, noise {stats.noise.toFixed(2)}, best-weights roll-back, learning rate {stats.lr.toExponential(1)}.</li>
+          </ul>
+        </Panel>
+        <Panel title="Knowledge log">
+          <div className="max-h-60 overflow-auto space-y-1 text-[11px] text-slate-600">
+            {stats.log.length ? stats.log.map((l, i) => <p key={i}>{l}</p>) : <p>No entries yet.</p>}
+          </div>
+        </Panel>
+      </div>
+    </div>
+  );
+}
+
+function HistoricalSection({ stats, onUpload, config }: { stats: BrainStats | null; onUpload: () => void; config: any }) {
+  return (
+    <div className="space-y-4 max-w-4xl">
+      <Panel title={`Teach the brain — ${config.label}`} action={<Button size="sm" onClick={onUpload} className="bg-[#16A34A] hover:bg-[#15803d]"><Upload className="h-4 w-4 mr-1" />Add cleaned files</Button>}>
+        <p className="text-sm text-slate-600">Upload as many previously <b>cleaned</b> workbooks as you have (several at once is fine). Every row is added to the brain's permanent memory for this MDA type; duplicates are skipped and rows marked "Critical Alert" in exported files are left out. Each concluded cleaning run is also added automatically.</p>
+      </Panel>
+      <Panel title={`Learned sources (${stats?.corpusRows.toLocaleString() ?? 0} rows in memory)`}>
+        {stats?.sources.length ? (
+          <table className="w-full text-xs"><thead className="text-slate-500"><tr><th className="text-left py-1">Source</th><th className="text-left py-1">New rows</th><th className="text-left py-1">When</th></tr></thead>
+            <tbody>{stats.sources.map((s, i) => <tr key={i} className="border-t border-[#E2E8F0]"><td className="py-1.5">{s.name}</td><td>{s.rows}</td><td>{new Date(s.at).toLocaleString()}</td></tr>)}</tbody></table>
+        ) : <p className="text-sm text-slate-500">Nothing learned yet. Until 30 rows are remembered, the brain learns "normal" from the file you're cleaning.</p>}
+      </Panel>
+    </div>
+  );
+}
+
+function ColumnGroupSection({ result, title, match }: { result: ValidationResult | null; title: string; match: RegExp }) {
+  if (!result) return <p className="text-sm text-slate-500">Import a dataset first.</p>;
+  const data = Object.entries(result.kpis.columnAnomalyCounts).filter(([k]) => match.test(k)).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 15);
+  return (
+    <Panel title={title}>
+      {data.length ? (
+        <ResponsiveContainer width="100%" height={Math.max(200, data.length * 28)}><BarChart data={data} layout="vertical" margin={{ left: 40 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" /><XAxis type="number" allowDecimals={false} /><YAxis type="category" dataKey="name" width={220} tick={{ fontSize: 10 }} /><RTooltip />
+          <Bar dataKey="value" fill="#2563EB" radius={[0, 4, 4, 0]} /></BarChart></ResponsiveContainer>
+      ) : <p className="text-sm text-slate-500">No anomalies in these columns — they reconstruct like normal data.</p>}
+    </Panel>
+  );
+}
