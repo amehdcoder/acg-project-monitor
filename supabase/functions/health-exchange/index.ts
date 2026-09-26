@@ -517,6 +517,198 @@ Deno.serve(async (req) => {
       }
 
 
+      /* ------------------ Microplanning exchange engine ----------------- */
+      case "mp_schema": {
+        if (connection.kind !== "dhis2") return json({ error: "Microplanning exchange needs a DHIS2 connection" }, 400);
+        const base = connection.base_url;
+        const [sets, inds, levels, programs, info] = await Promise.all([
+          remoteFetch(joinUrl(base, "api/dataSets?fields=id,name,periodType,dataSetElements[dataElement[id,name,valueType,categoryCombo[id,name,categoryOptionCombos[id,name]]]]&paging=false"), { headers }, 60000),
+          remoteFetch(joinUrl(base, "api/indicators?fields=id,name&paging=false"), { headers }, 60000),
+          remoteFetch(joinUrl(base, "api/organisationUnitLevels?fields=level,name&paging=false"), { headers }, 30000),
+          remoteFetch(joinUrl(base, "api/programs?fields=id~size&paging=false"), { headers }, 30000),
+          remoteFetch(joinUrl(base, "api/system/info"), { headers }, 30000),
+        ]);
+        if (!sets.ok) return json({ error: remoteMessage(sets.body, `HTTP ${sets.status}`) }, 502);
+        const seen = new Map<string, RemoteElement>();
+        const dataSets = ((sets.body as any)?.dataSets ?? []).map((d: any) => {
+          const els = (d.dataSetElements ?? []).map((x: any) => x.dataElement).filter(Boolean);
+          for (const e of els) if (!seen.has(e.id)) seen.set(e.id, { id: e.id, name: e.name, kind: "dataElement", dataSet: d.id, categoryOptionCombos: e.categoryCombo?.categoryOptionCombos ?? [] });
+          return { id: d.id, name: d.name, periodType: d.periodType, elementCount: els.length };
+        }).sort((a: any, b: any) => a.name.localeCompare(b.name));
+        const indicators = inds.ok ? ((inds.body as any)?.indicators ?? []) : [];
+        const elements: RemoteElement[] = [...seen.values(), ...indicators.map((i: any) => ({ id: i.id, name: i.name, kind: "indicator" as const }))];
+        const { data: saved } = await db.from("health_exchange_mappings").select("*").eq("connection_id", connection.id).like("indicator_key", "mp:%");
+        await log(db, connection, "pull", "microplan_schema", "success", elements.length, "Microplanning schema detected", guard.userId);
+        return json({
+          ok: true,
+          system: { name: (info.body as any)?.systemName ?? null, version: (info.body as any)?.version ?? null },
+          kpis: MICROPLAN_KPIS.map(({ key, label }) => ({ key, label })),
+          dataSets, elements,
+          levels: levels.ok ? ((levels.body as any)?.organisationUnitLevels ?? []).sort((a: any, b: any) => a.level - b.level) : [],
+          counts: { dataSets: dataSets.length, dataElements: seen.size, indicators: indicators.length, programs: programs.ok ? ((programs.body as any)?.programs ?? []).length : 0 },
+          suggestions: suggestMappings(elements),
+          mappings: saved ?? [],
+        });
+      }
+
+      case "mp_save_mappings": {
+        const rows = z.array(z.object({
+          kpi: z.string().min(1).max(60), label: z.string().max(120).optional(),
+          remote_id: z.string().min(1).max(60), remote_name: z.string().max(300).optional(),
+          coc_id: z.string().max(60).nullable().optional(), kind: z.enum(["dataElement", "indicator"]).default("dataElement"),
+        })).max(100).safeParse(payload.mappings);
+        if (!rows.success) return json({ error: "Invalid mappings" }, 400);
+        const clear = z.array(z.string().max(60)).max(100).safeParse(payload.clear ?? []);
+        if (clear.success && clear.data.length) await db.from("health_exchange_mappings").delete().eq("connection_id", connection.id).in("indicator_key", clear.data.map((k) => `mp:${k}`));
+        if (rows.data.length) {
+          const { error } = await db.from("health_exchange_mappings").upsert(rows.data.map((m) => ({
+            connection_id: connection.id, indicator_key: `mp:${m.kpi}`, indicator_label: m.label ?? m.kpi,
+            remote_id: m.remote_id, remote_name: m.remote_name ?? null, category_option_combo: m.coc_id ?? null,
+            dimensions: { kind: m.kind },
+          })), { onConflict: "connection_id,indicator_key" });
+          if (error) return json({ error: error.message }, 400);
+        }
+        return json({ ok: true, saved: rows.data.length });
+      }
+
+      case "mp_push": {
+        if (connection.kind !== "dhis2") return json({ error: "DHIS2 connection required" }, 400);
+        const p = z.object({
+          project_id: z.string().uuid(), period: z.string().regex(/^\d{4}(\d{2}|Q[1-4])?$/),
+          level: z.enum(["lga", "state"]).default("lga"), dry_run: z.boolean().default(true),
+        }).safeParse(payload);
+        if (!p.success) return json({ error: "project_id and a DHIS2 period (YYYY, YYYYMM or YYYYQn) are required" }, 400);
+        const { project_id, period, level, dry_run } = p.data;
+        const { data: maps } = await db.from("health_exchange_mappings").select("*").eq("connection_id", connection.id).like("indicator_key", "mp:%");
+        const pushable = (maps ?? []).filter((m: any) => (m.dimensions?.kind ?? "dataElement") === "dataElement");
+        if (!pushable.length) return json({ error: "Map at least one KPI to a DHIS2 data element first." }, 400);
+        const cols = ["state", "lga", "ward", ...MICROPLAN_KPIS.map((k) => k.column).filter(Boolean)] as string[];
+        const rows: any[] = [];
+        for (let from = 0; ; from += 1000) {
+          const { data, error } = await db.from("microplan_entries").select(cols.join(",")).eq("project_id", project_id).range(from, from + 999);
+          if (error) return json({ error: error.message }, 400);
+          rows.push(...(data ?? []));
+          if (!data || data.length < 1000) break;
+        }
+        if (!rows.length) return json({ error: "This project has no microplanning entries to send." }, 400);
+        const groups = aggregateEntries(rows, level);
+        const ouLevel = level === "lga" ? 3 : 2;
+        const ous = await remoteFetch(joinUrl(connection.base_url, `api/organisationUnits?fields=id,name,parent[name]&filter=level:eq:${ouLevel}&withinUserHierarchy=true&paging=false`), { headers }, 60000);
+        if (!ous.ok) return json({ error: remoteMessage(ous.body, `HTTP ${ous.status}`) }, 502);
+        const units: any[] = (ous.body as any)?.organisationUnits ?? [];
+        const index = new Map<string, string>();
+        for (const u of units) {
+          index.set(level === "lga" ? `${norm(u.parent?.name)}|${norm(u.name)}` : norm(u.name), u.id);
+          if (level === "lga" && !index.has(`*|${norm(u.name)}`)) index.set(`*|${norm(u.name)}`, u.id);
+        }
+        const dataValues: any[] = []; const unmatched: string[] = []; const matched: { area: string; orgUnit: string }[] = [];
+        for (const g of groups) {
+          const ou = level === "lga" ? index.get(`${norm(g.state)}|${norm(g.lga)}`) ?? index.get(`*|${norm(g.lga)}`) : index.get(norm(g.state));
+          const area = level === "lga" ? `${g.lga}, ${g.state}` : g.state;
+          if (!ou) { unmatched.push(area); continue; }
+          matched.push({ area, orgUnit: ou });
+          for (const m of pushable) {
+            const v = g.values[String(m.indicator_key).slice(3)];
+            if (v == null || !Number.isFinite(v)) continue;
+            dataValues.push({ dataElement: m.remote_id, orgUnit: ou, period, value: String(Math.round(v * 100) / 100), ...(m.category_option_combo ? { categoryOptionCombo: m.category_option_combo } : {}) });
+          }
+        }
+        if (!dataValues.length) return json({ ok: false, error: "No areas matched DHIS2 locations your account can report for.", unmatched }, 400);
+        const res = await remoteFetch(joinUrl(connection.base_url, `api/dataValueSets?dryRun=${dry_run}&importStrategy=CREATE_AND_UPDATE`), { method: "POST", headers, body: JSON.stringify({ dataValues }) }, 120000);
+        const b: any = res.body; const r = b?.response ?? b;
+        const counts = r?.importCount ?? {};
+        const conflicts = (r?.conflicts ?? []).slice(0, 50).map((c: any) => `${c.object ?? ""}: ${c.value ?? ""}`);
+        const status = res.ok && !conflicts.length ? "success" : res.ok ? "partial" : "error";
+        await log(db, connection, "push", dry_run ? "microplan_push_dry_run" : "microplan_push", status, dataValues.length,
+          `${dry_run ? "Checked" : "Sent"} ${dataValues.length} values for ${matched.length} areas (${period}); ${unmatched.length} unmatched`, guard.userId);
+        return json({ ok: res.ok, dry_run, period, sent: dataValues.length, matched: matched.length, unmatched, counts, conflicts, message: remoteMessage(b, `HTTP ${res.status}`) }, res.ok ? 200 : 502);
+      }
+
+      case "mp_pull": {
+        if (connection.kind !== "dhis2") return json({ error: "DHIS2 connection required" }, 400);
+        const p = z.object({
+          project_id: z.string().uuid(), period: z.string().regex(/^\d{4}(\d{2}|Q[1-4])?$/),
+          org_unit: z.string().min(1).max(60).optional(), level: z.number().int().min(2).max(6).default(3),
+        }).safeParse(payload);
+        if (!p.success) return json({ error: "project_id and a DHIS2 period are required" }, 400);
+        const { project_id, period, level } = p.data;
+        // Silent background mapping: saved mappings first, strong suggestions fill gaps.
+        const { data: maps } = await db.from("health_exchange_mappings").select("*").eq("connection_id", connection.id).like("indicator_key", "mp:%");
+        const byKpi = new Map<string, { dx: string; name: string }>();
+        for (const m of maps ?? []) byKpi.set(String(m.indicator_key).slice(3), { dx: m.category_option_combo ? `${m.remote_id}.${m.category_option_combo}` : m.remote_id, name: m.remote_name ?? m.remote_id });
+        let autoMapped = 0;
+        if (byKpi.size < MICROPLAN_KPIS.length) {
+          const [des, inds] = await Promise.all([
+            remoteFetch(joinUrl(connection.base_url, "api/dataElements?fields=id,name,categoryCombo[categoryOptionCombos[id,name]]&filter=domainType:eq:AGGREGATE&paging=false"), { headers }, 60000),
+            remoteFetch(joinUrl(connection.base_url, "api/indicators?fields=id,name&paging=false"), { headers }, 60000),
+          ]);
+          const els: RemoteElement[] = [
+            ...(((des.body as any)?.dataElements ?? []).map((e: any) => ({ id: e.id, name: e.name, kind: "dataElement" as const, categoryOptionCombos: e.categoryCombo?.categoryOptionCombos ?? [] }))),
+            ...(((inds.body as any)?.indicators ?? []).map((i: any) => ({ id: i.id, name: i.name, kind: "indicator" as const }))),
+          ];
+          const sug = suggestMappings(els, 1);
+          for (const k of MICROPLAN_KPIS) {
+            const s = sug[k.key]?.[0];
+            if (!byKpi.has(k.key) && s && s.score >= 0.6) {
+              byKpi.set(k.key, { dx: s.coc_id && s.coc_name !== "default" ? `${s.remote_id}.${s.coc_id}` : s.remote_id, name: s.remote_name });
+              autoMapped++;
+            }
+          }
+        }
+        if (!byKpi.size) return json({ error: "No DHIS2 data matched the microplanning KPIs. Map them in the engine first." }, 400);
+        let root = p.data.org_unit;
+        if (!root) {
+          const me = await remoteFetch(joinUrl(connection.base_url, "api/me?fields=organisationUnits[id]"), { headers }, 30000);
+          root = ((me.body as any)?.organisationUnits ?? []).map((o: any) => o.id).join(";");
+        }
+        if (!root) return json({ error: "Your DHIS2 account has no assigned locations." }, 400);
+        const dx = [...new Set([...byKpi.values()].map((v) => v.dx))].join(";");
+        const an = await remoteFetch(joinUrl(connection.base_url, `api/analytics?dimension=dx:${dx}&dimension=ou:${root};LEVEL-${level}&filter=pe:${period}&skipMeta=true&ignoreLimit=true`), { headers }, 120000);
+        if (!an.ok) return json({ error: `DHIS2 analytics: ${remoteMessage(an.body, `HTTP ${an.status}`)}` }, 502);
+        const a: any = an.body;
+        const hdr = (a?.headers ?? []).map((h: any) => h.name);
+        const iDx = hdr.indexOf("dx"), iOu = hdr.indexOf("ou"), iV = hdr.indexOf("value");
+        const perOu = new Map<string, Record<string, number>>();
+        for (const row of a?.rows ?? []) {
+          const vals = perOu.get(row[iOu]) ?? {};
+          for (const [k, v] of byKpi) if (v.dx === row[iDx]) vals[k] = Number(row[iV]);
+          perOu.set(row[iOu], vals);
+        }
+        const ids = [...perOu.keys()];
+        const meta = new Map<string, any>();
+        for (let i = 0; i < ids.length; i += 150) {
+          const r = await remoteFetch(joinUrl(connection.base_url, `api/organisationUnits?fields=id,name,level,ancestors[name,level]&filter=id:in:[${ids.slice(i, i + 150).join(",")}]&paging=false`), { headers }, 60000);
+          for (const u of (r.body as any)?.organisationUnits ?? []) meta.set(u.id, u);
+        }
+        const year = Number(period.slice(0, 4));
+        const kpiCol = new Map(MICROPLAN_KPIS.filter((k) => k.column).map((k) => [k.key, k.column!]));
+        const upserts = ids.map((id) => {
+          const u = meta.get(id) ?? { name: id, ancestors: [] };
+          const anc = (lv: number) => (u.ancestors ?? []).find((x: any) => x.level === lv)?.name;
+          const rec: Record<string, unknown> = {
+            project_id, external_ref: `dhis2:${connection.id}:${id}:${period}`,
+            state: String(anc(2) ?? u.name).replace(/\s+state$/i, ""),
+            lga: String(level >= 3 ? (level === 3 ? u.name : anc(3) ?? u.name) : "All LGAs"),
+            ward: String(level >= 4 ? (level === 4 ? u.name : anc(4) ?? u.name) : "All wards"),
+            flhf_name: level >= 5 ? u.name : "DHIS2 aggregate",
+            community_name: `${u.name} (DHIS2)`,
+            status: "draft", year_of_microplanning: year, population_source: "DHIS2",
+            notes: `Pulled from DHIS2 ${connection.name} for ${period}`, created_by: guard.userId, updated_by: guard.userId,
+          };
+          for (const [k, v] of Object.entries(perOu.get(id) ?? {})) {
+            const col = kpiCol.get(k);
+            if (col && Number.isFinite(v)) rec[col] = /medicine_used/.test(col) ? v : Math.round(v);
+          }
+          return rec;
+        });
+        for (let i = 0; i < upserts.length; i += 500) {
+          const { error } = await db.from("microplan_entries").upsert(upserts.slice(i, i + 500), { onConflict: "project_id,external_ref" });
+          if (error) return json({ error: error.message }, 400);
+        }
+        await log(db, connection, "pull", "microplan_pull", "success", upserts.length, `Pulled ${upserts.length} areas for ${period} (${byKpi.size} KPIs, ${autoMapped} auto-mapped)`, guard.userId);
+        return json({ ok: true, period, areas: upserts.length, kpis: byKpi.size, autoMapped, mapped: Object.fromEntries([...byKpi].map(([k, v]) => [k, v.name])) });
+      }
+
       /* --------------------- DHIS2 indicator push ---------------------- */
       case "push_indicators": {
         if (connection.kind !== "dhis2") return json({ error: "Indicator push is for DHIS2 connections" }, 400);
