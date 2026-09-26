@@ -222,7 +222,6 @@ export default function BeneficiaryBrainPanel({ moduleId, projectId, visible = t
   // Human review feedback outweighs the model's own fit once enough flags are resolved.
   const fbWeight = precision === null ? 0 : Math.min(0.7, resolved.length / 30);
   const confidenceRaw = stats?.ready ? Math.round(100 * ((1 - fbWeight) * modelFit + fbWeight * (precision ?? 0))) : 0;
-  const _unusedConfidence = stats?.ready ? Math.round(100 * Math.exp(-Math.max(0, stats.valLoss)) * Math.min(1, (stats.corpusRows || stats.bootstrapRows) / 300 + 0.4)) : 0;
   const learned = stats ? Math.min(100, Math.round(100 * (Math.min(1, stats.corpusRows / 1000) * 0.5 + Math.min(1, stats.steps / 20000) * 0.5))) : 0;
   const colRates = useMemo(() => {
     if (!scored?.length) return [];

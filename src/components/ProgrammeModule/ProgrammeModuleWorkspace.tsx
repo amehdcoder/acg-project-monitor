@@ -455,7 +455,7 @@ const ProgrammeModuleWorkspace = ({
 
       {brainMounted && canBrain && (
         <div className={view === "brain" ? "" : "hidden"}>
-          <BeneficiaryBrainPanel moduleId={active?.id} visible={view === "brain"}
+          <BeneficiaryBrainPanel moduleId={active?.id} projectId={projectId} visible={view === "brain"}
             onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }} />
         </div>
       )}
