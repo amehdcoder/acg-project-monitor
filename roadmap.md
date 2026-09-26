@@ -8,3 +8,4 @@
 - [x] Unify every Street View entry point on real high-quality Google panoramas with street-level fallback.
 - [x] Remove the blank longitudinal-register option from Add Module.
 - [x] Add guarded deletion for an active Comprehensive NTD programme module.
+- [x] Add 30-day KPI change indicators and recorded activity dates to the General Dashboard journey.

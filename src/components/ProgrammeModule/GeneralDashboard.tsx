@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Activity, ArrowRightLeft, BarChart3, Brain, Building2,
+  Activity, ArrowDownRight, ArrowRightLeft, ArrowUpRight, BarChart3, Brain, Building2,
   CalendarDays, CheckCircle2, Database, Droplets, Eye, FileText, HeartPulse, Hospital,
   Leaf, LocateFixed, Map as MapIcon, MapPin, MapPinned, Navigation, Pill, Plus, RefreshCw, Search,
   ShieldAlert, Sparkles, UserPlus, Users, Zap,
@@ -44,6 +44,8 @@ const COLORS = [
 const normalized = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
 const includesAny = (values: string[], keys: string[]) => values.some((value) => keys.some((key) => normalized(value).includes(key)));
 const pct = (part: number, whole: number) => whole ? Math.round((part / whole) * 100) : 0;
+const dateKey = (value: string) => value.slice(0, 10);
+const formatRangeDate = (value: string) => new Date(`${dateKey(value)}T12:00:00`).toLocaleDateString(undefined, { month: "short", year: "numeric" });
 const escapeHtml = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, (character) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
 }[character] || character));
@@ -109,6 +111,19 @@ const GeneralDashboard = ({
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const periodStart = new Date(now);
+  periodStart.setDate(periodStart.getDate() - 29);
+  const priorPeriodStart = new Date(now);
+  priorPeriodStart.setDate(priorPeriodStart.getDate() - 59);
+  const currentStart = periodStart.toISOString().slice(0, 10);
+  const previousStart = priorPeriodStart.toISOString().slice(0, 10);
+  const inCurrentPeriod = (value?: string | null) => Boolean(value && dateKey(value) >= currentStart && dateKey(value) <= today);
+  const inPreviousPeriod = (value?: string | null) => Boolean(value && dateKey(value) >= previousStart && dateKey(value) < currentStart);
+  const trend = (current: number, previous: number) => ({
+    delta: previous === 0 ? (current === 0 ? 0 : 100) : Math.round(((current - previous) / previous) * 100),
+    current,
+    previous,
+  });
   const due = beneficiaries.filter((beneficiary) => beneficiary.next_follow_up_date && beneficiary.next_follow_up_date <= today).length;
   const pendingReferrals = scopedReferrals.filter((referral) => !["completed", "declined"].includes(referral.status)).length;
   const serviceCount = scopedRows.reduce((sum, row) => sum + row.serviceCount, 0);
@@ -179,18 +194,49 @@ const GeneralDashboard = ({
   const newThisMonth = beneficiaries.filter((beneficiary) => beneficiary.created_at >= monthStart).length;
   const flags = isSafeguardingOfficer ? concerns.filter((concern) => concern.status !== "closed").length : scopedRows.filter((row) => row.safeguardingFlags > 0).length;
   const dataExceptions = beneficiaries.filter((beneficiary) => !beneficiary.facility_id || !beneficiary.lga || !beneficiary.state).length;
+  const serviceDates = scopedRows.flatMap((row) => row.serviceDates);
+  const componentPeriodCount = (keys: string[], currentPeriod: boolean) => scopedRows.reduce((total, row) => total + Object.entries(row.componentServiceDates)
+    .filter(([key]) => includesAny([key], keys))
+    .flatMap(([, dates]) => dates)
+    .filter(currentPeriod ? inCurrentPeriod : inPreviousPeriod).length, 0);
+  const enrolmentTrend = trend(
+    beneficiaries.filter((beneficiary) => inCurrentPeriod(beneficiary.created_at)).length,
+    beneficiaries.filter((beneficiary) => inPreviousPeriod(beneficiary.created_at)).length,
+  );
+  const dueTrend = trend(
+    beneficiaries.filter((beneficiary) => inCurrentPeriod(beneficiary.next_follow_up_date)).length,
+    beneficiaries.filter((beneficiary) => inPreviousPeriod(beneficiary.next_follow_up_date)).length,
+  );
+  const referralTrend = trend(
+    scopedReferrals.filter((referral) => inCurrentPeriod(referral.referral_date)).length,
+    scopedReferrals.filter((referral) => inPreviousPeriod(referral.referral_date)).length,
+  );
+  const serviceTrend = trend(serviceDates.filter(inCurrentPeriod).length, serviceDates.filter(inPreviousPeriod).length);
+  const componentTrend = (keys: string[]) => trend(componentPeriodCount(keys, true), componentPeriodCount(keys, false));
+  const activeTrend = trend(
+    beneficiaries.filter((beneficiary) => !["inactive", "closed", "deceased"].includes(beneficiary.status.toLowerCase()) && inCurrentPeriod(beneficiary.created_at)).length,
+    beneficiaries.filter((beneficiary) => !["inactive", "closed", "deceased"].includes(beneficiary.status.toLowerCase()) && inPreviousPeriod(beneficiary.created_at)).length,
+  );
+  const activityDates = [
+    ...beneficiaries.map((beneficiary) => beneficiary.created_at),
+    ...serviceDates,
+    ...scopedReferrals.map((referral) => referral.referral_date),
+  ].filter(Boolean).sort();
+  const journeyDateRange = activityDates.length
+    ? `${formatRangeDate(activityDates[0])} – ${formatRangeDate(activityDates[activityDates.length - 1])}`
+    : "No activity dates yet";
 
   const kpis = [
-    { label: "Active beneficiaries", value: active, icon: Users, tone: "blue" },
-    { label: "New enrolments", value: newThisMonth, icon: UserPlus, tone: "teal" },
-    { label: "Follow-ups due", value: due, icon: CalendarDays, tone: "amber" },
-    { label: "Referrals pending", value: pendingReferrals, icon: ArrowRightLeft, tone: "red" },
-    { label: "Services delivered", value: serviceCount, icon: Activity, tone: "purple" },
-    { label: "MMDP / NTD cases", value: componentCount(["mmdp", "ntd", "lymphatic", "onchocerciasis"]), icon: Pill, tone: "teal" },
-    { label: "Eye health services", value: componentCount(["eye", "vision", "trachoma"]), icon: Eye, tone: "blue" },
-    { label: "Mental health support", value: componentCount(["mental", "psychosocial", "mhpss"]), icon: Brain, tone: "purple" },
-    { label: "WASH interventions", value: componentCount(["wash", "water", "sanitation"]), icon: Droplets, tone: "cyan" },
-    { label: "Livelihood support", value: componentCount(["livelihood", "empowerment"]), icon: Leaf, tone: "green" },
+    { label: "Active beneficiaries", value: active, icon: Users, tone: "blue", trend: activeTrend },
+    { label: "New enrolments", value: newThisMonth, icon: UserPlus, tone: "teal", trend: enrolmentTrend },
+    { label: "Follow-ups due", value: due, icon: CalendarDays, tone: "amber", trend: dueTrend, inverse: true },
+    { label: "Referrals pending", value: pendingReferrals, icon: ArrowRightLeft, tone: "red", trend: referralTrend, inverse: true },
+    { label: "Services delivered", value: serviceCount, icon: Activity, tone: "purple", trend: serviceTrend },
+    { label: "MMDP / NTD cases", value: componentCount(["mmdp", "ntd", "lymphatic", "onchocerciasis"]), icon: Pill, tone: "teal", trend: componentTrend(["mmdp", "ntd", "lymphatic", "onchocerciasis"]) },
+    { label: "Eye health services", value: componentCount(["eye", "vision", "trachoma"]), icon: Eye, tone: "blue", trend: componentTrend(["eye", "vision", "trachoma"]) },
+    { label: "Mental health support", value: componentCount(["mental", "psychosocial", "mhpss"]), icon: Brain, tone: "purple", trend: componentTrend(["mental", "psychosocial", "mhpss"]) },
+    { label: "WASH interventions", value: componentCount(["wash", "water", "sanitation"]), icon: Droplets, tone: "cyan", trend: componentTrend(["wash", "water", "sanitation"]) },
+    { label: "Livelihood support", value: componentCount(["livelihood", "empowerment"]), icon: Leaf, tone: "green", trend: componentTrend(["livelihood", "empowerment"]) },
   ];
   const journey = [
     { label: "Enrolment", value: beneficiaries.length, icon: Pill, tone: "teal" },
@@ -216,13 +262,17 @@ const GeneralDashboard = ({
       </header>
 
       <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
-        {kpis.map((item) => <div key={item.label} className={cn("records-kpi rounded-md border bg-card p-3 shadow-soft", `records-kpi-${item.tone}`)}><div className="flex items-start gap-3"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-primary-foreground shadow-card"><item.icon className="h-6 w-6" /></span><div><p className="text-[10px] font-bold text-health-ink">{item.label}</p><p className="font-report-display text-2xl font-bold tabular-nums text-health-ink">{item.value.toLocaleString()}</p><p className="text-[9px] font-semibold text-records-green">Current project total</p></div></div></div>)}
+        {kpis.map((item) => {
+          const improving = item.inverse ? item.trend.delta <= 0 : item.trend.delta >= 0;
+          const TrendIcon = item.trend.delta >= 0 ? ArrowUpRight : ArrowDownRight;
+          return <div key={item.label} className={cn("records-kpi rounded-md border bg-card p-3 shadow-soft", `records-kpi-${item.tone}`)}><div className="flex items-start gap-3"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-primary-foreground shadow-card"><item.icon className="h-6 w-6" /></span><div className="min-w-0"><p className="text-[10px] font-bold text-health-ink">{item.label}</p><p className="font-report-display text-2xl font-bold tabular-nums text-health-ink">{item.value.toLocaleString()}</p><p className={cn("flex items-center gap-0.5 text-[9px] font-semibold", improving ? "text-records-green" : "text-destructive")} title={`${item.trend.current} in the latest 30 days; ${item.trend.previous} in the preceding 30 days`}><TrendIcon className="h-3 w-3 shrink-0" /><span>{item.trend.delta > 0 ? "+" : ""}{item.trend.delta}%</span><span className="truncate font-normal text-muted-foreground">vs prior 30 days</span></p></div></div></div>;
+        })}
       </div>
 
       <div className="grid gap-2 xl:grid-cols-[2fr_1fr]">
         <Panel icon={Activity} tone="teal" title="Beneficiary Journey" subtitle="From enrolment to better health and inclusion" action={<Button variant="ghost" size="sm" onClick={() => onNavigate("journey")}>View report</Button>}>
           <div className="grid grid-cols-2 gap-y-6 px-3 py-5 sm:grid-cols-3 lg:grid-cols-6">
-            {journey.map((item, index) => <div key={item.label} className="relative text-center"><div className={cn("mx-auto flex h-12 w-12 items-center justify-center rounded-full border-4 border-card text-primary-foreground shadow-card", `records-stage-${item.tone}`)}><item.icon className="h-6 w-6" /></div>{index < journey.length - 1 && <span className="absolute left-[60%] top-6 hidden h-0.5 w-[80%] bg-records-teal/55 lg:block" />}<p className="mt-2 text-[10px] font-bold text-health-ink">{item.label}</p><p className="font-report-display text-lg font-bold text-health-ink">{item.value.toLocaleString()}</p><p className="text-[9px] text-muted-foreground">Current project</p></div>)}
+            {journey.map((item, index) => <div key={item.label} className="relative text-center"><div className={cn("mx-auto flex h-12 w-12 items-center justify-center rounded-full border-4 border-card text-primary-foreground shadow-card", `records-stage-${item.tone}`)}><item.icon className="h-6 w-6" /></div>{index < journey.length - 1 && <span className="absolute left-[60%] top-6 hidden h-0.5 w-[80%] bg-records-teal/55 lg:block" />}<p className="mt-2 text-[10px] font-bold text-health-ink">{item.label}</p><p className="font-report-display text-lg font-bold text-health-ink">{item.value.toLocaleString()}</p><p className="whitespace-nowrap text-[9px] text-muted-foreground">{journeyDateRange}</p></div>)}
           </div>
         </Panel>
         <Panel icon={ShieldAlert} tone="amber" title="Key Alerts & Actions" action={<Button variant="ghost" size="sm" onClick={() => onNavigate("followups")}>View all</Button>}>
