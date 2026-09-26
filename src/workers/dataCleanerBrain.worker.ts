@@ -47,6 +47,7 @@ let s = {
 };
 let running = true, hidden = false;
 let loopTimer: any = null;
+let lastCustom: { columns: any[] } | undefined;
 
 const post = (m: any) => (self as any).postMessage(m);
 const log = (msg: string) => { s.log.unshift(`${new Date().toLocaleTimeString()} — ${msg}`); s.log = s.log.slice(0, 60); };
@@ -58,9 +59,9 @@ function mkItem(raw: Record<string, any>): Item {
   return { raw, e, val: hashVal(e.hash), w: 1 };
 }
 
-async function init(id: MdaTypeId) {
+async function init(id: MdaTypeId, custom?: { columns: any[] }) {
   mda = id;
-  const cfg = MDA_CONFIGS[id];
+  const cfg = (custom ?? MDA_CONFIGS[id]) as any;
   space = featureSpace(cfg); T = space.numeric.length;
   ae = new DenoisingAutoencoder(T); tf = new ColumnTransformer(T);
   opt = new AdamW([...ae.params(), ...tf.params()]);
@@ -326,12 +327,12 @@ function scoreRows(rows: Record<string, any>[]): ScoredRow[] {
 self.onmessage = async (ev: MessageEvent) => {
   const m = ev.data;
   try {
-    if (m.type === "init") await init(m.mda);
+    if (m.type === "init") { lastCustom = m.config; await init(m.mda, m.config); }
     else if (m.type === "addCorpus") await addCorpus(m.rows, m.source);
     else if (m.type === "score") post({ type: "scored", id: m.id, rows: scoreRows(m.rows) });
     else if (m.type === "setRunning") { running = m.on; post({ type: "stats", stats: stats() }); }
     else if (m.type === "hidden") hidden = m.hidden;
-    else if (m.type === "reset" && mda) { await idbDel(`corpus:${mda}`); await idbDel(`ckpt:${mda}`); await init(mda); }
+    else if (m.type === "reset" && mda) { await idbDel(`corpus:${mda}`); await idbDel(`ckpt:${mda}`); await init(mda, lastCustom); }
   } catch (e: any) {
     post({ type: "error", id: m.id, message: e?.message || String(e) });
   }
