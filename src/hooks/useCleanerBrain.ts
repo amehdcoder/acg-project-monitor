@@ -5,7 +5,7 @@ import type { BrainStats, ScoredRow } from "@/lib/dataCleaner/neural/protocol";
 /** Owns the always-on Data Cleaner brain worker for the chosen MDA type. */
 export interface BrainServerSync {
   load: () => Promise<any | null>;
-  save: (m: { data: any; steps: number; valLoss: number; corpusRows: number; columns: number }) => Promise<void> | void;
+  save: (m: { key: string; data: any; steps: number; valLoss: number; corpusRows: number; columns: number }) => Promise<void> | void;
 }
 export function useCleanerBrain(mda: MdaTypeId | string, config?: { columns: { key: string; type: string }[] } | null, server?: BrainServerSync) {
   const serverRef = useRef(server); serverRef.current = server;

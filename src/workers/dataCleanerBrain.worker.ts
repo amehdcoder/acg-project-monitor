@@ -228,7 +228,7 @@ async function checkpoint() {
     lossHistory: s.lossHistory.slice(-150), log: s.log.slice(0, 30), sources: s.sources.slice(0, 30),
   };
   await idbSet(`ckpt:${mda}`, ckData);
-  post({ type: "checkpoint", data: ckData, steps: s.steps, valLoss: s.valLoss, corpusRows: corpus.length, columns: T });
+  post({ type: "checkpoint", key: mda, data: ckData, steps: s.steps, valLoss: s.valLoss, corpusRows: corpus.length, columns: T });
   s.lastCheckpointAt = at;
 }
 // Persist the best-generalising weights, not merely the latest.
