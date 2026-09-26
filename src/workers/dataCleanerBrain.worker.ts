@@ -59,7 +59,7 @@ function mkItem(raw: Record<string, any>): Item {
   return { raw, e, val: hashVal(e.hash), w: 1 };
 }
 
-async function init(id: MdaTypeId, custom?: { columns: any[] }) {
+async function init(id: MdaTypeId, custom?: { columns: any[] }, serverCk?: any) {
   mda = id;
   const cfg = (custom ?? MDA_CONFIGS[id]) as any;
   space = featureSpace(cfg); T = space.numeric.length;
@@ -70,7 +70,9 @@ async function init(id: MdaTypeId, custom?: { columns: any[] }) {
   hp = { lr: BASE_LR, wd: 0.001, noise: 0.15, dropout: 0.1 };
   s = { ...s, steps: 0, overfitEvents: 0, patience: 0, lossHistory: [], log: [], sources: [], newSinceMinute: 0, reviewedDown: 0 };
   cal.ready = false;
-  const [rows, ck] = await Promise.all([idbGet<any[]>(`corpus:${id}`), idbGet<any>(`ckpt:${id}`)]);
+  const [rows, localCk] = await Promise.all([idbGet<any[]>(`corpus:${id}`), idbGet<any>(`ckpt:${id}`)]);
+  // Prefer whichever copy (this device or the shared server brain) has learned more.
+  const ck = serverCk && (!localCk || (serverCk.steps || 0) >= (localCk.steps || 0)) ? serverCk : localCk;
   for (const r of rows || []) { const it = mkItem(r.raw ?? r); it.w = r.w ?? 1; corpus.push(it); norm.update(it.e); cats.update(space, it.raw); }
   if (ck && ck.T === T) {
     deserialize([...ae.params(), ...tf.params()], ck.weights);
@@ -220,11 +222,13 @@ async function checkpoint() {
   const drop = isFinite(s.minuteStartVal) ? s.minuteStartVal - s.valLoss : 0;
   log(`Knowledge update: ${s.newSinceMinute ? `absorbed ${s.newSinceMinute} new rows, ` : "no new data — kept thinking, "}val loss ${s.valLoss.toFixed(4)}${drop ? ` (${drop > 0 ? "↓" : "↑"}${Math.abs(drop).toFixed(4)})` : ""}.`);
   s.newSinceMinute = 0; s.minuteStartVal = s.valLoss;
-  await idbSet(`ckpt:${mda}`, {
-    T, at, weights: serialize(best.snap.length && best.val <= s.valLoss ? (restoreTmp()) : opt.params),
+  const ckData = {
+    T, at, weights: serialize(best.snap.length && best.val <= s.valLoss ? (restoreTmp()) : opt.params).map((a) => a.map((v) => Math.round(v * 1e5) / 1e5)),
     norm: norm.toJSON(), hp, steps: s.steps, overfitEvents: s.overfitEvents,
-    lossHistory: s.lossHistory, log: s.log, sources: s.sources,
-  });
+    lossHistory: s.lossHistory.slice(-150), log: s.log.slice(0, 30), sources: s.sources.slice(0, 30),
+  };
+  await idbSet(`ckpt:${mda}`, ckData);
+  post({ type: "checkpoint", data: ckData, steps: s.steps, valLoss: s.valLoss, corpusRows: corpus.length, columns: T });
   s.lastCheckpointAt = at;
 }
 // Persist the best-generalising weights, not merely the latest.
@@ -327,7 +331,8 @@ function scoreRows(rows: Record<string, any>[]): ScoredRow[] {
 self.onmessage = async (ev: MessageEvent) => {
   const m = ev.data;
   try {
-    if (m.type === "init") { lastCustom = m.config; await init(m.mda, m.config); }
+    if (m.type === "init") { lastCustom = m.config; await init(m.mda, m.config, m.serverCkpt); }
+    else if (m.type === "checkpointNow") await checkpoint();
     else if (m.type === "addCorpus") await addCorpus(m.rows, m.source);
     else if (m.type === "score") post({ type: "scored", id: m.id, rows: scoreRows(m.rows) });
     else if (m.type === "setRunning") { running = m.on; post({ type: "stats", stats: stats() }); }
