@@ -6,10 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Brain, Cpu, Gauge, Pause, Play, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useCleanerBrain, type BrainServerSync } from "@/hooks/useCleanerBrain";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { toast } from "sonner";
+import { RESOLVE_REASONS, ResolveFlagDialog, useBrainFlags, type BrainFlag } from "./BrainFlagDialogs";
 import type { ScoredRow } from "@/lib/dataCleaner/neural/protocol";
 import type { BeneficiaryRow } from "@/lib/programmeModule/types";
 
@@ -58,14 +55,7 @@ function inferSchema(rows: Record<string, any>[]): Col[] {
   }
   return [...fixed, ...extra.slice(0, 40)];
 }
-export const RESOLVE_REASONS: { code: string; label: string; realError: boolean }[] = [
-  { code: "corrected", label: "Error found and record corrected", realError: true },
-  { code: "duplicate", label: "Duplicate or invalid record removed", realError: true },
-  { code: "confirmed_correct", label: "Checked — values are correct (false alarm)", realError: false },
-  { code: "expected_rare", label: "Genuinely rare but valid case", realError: false },
-  { code: "other", label: "Other (explain below)", realError: false },
-];
-type FlagRow = { id: string; beneficiary_id: string; status: string; reason_code: string | null; reason_note: string | null; resolved_at: string | null; level: string; last_flagged_at: string };
+type FlagRow = BrainFlag;
 const sig = (cols: Col[]) => cols.map((c) => `${c.key}:${c.type}`).join("|");
 const label = (k: string) => (k.startsWith("p:") ? k.slice(2).replace(/_/g, " ") : k);
 
@@ -99,26 +89,12 @@ export default function BeneficiaryBrainPanel({ moduleId, projectId, visible = t
   const flat = useMemo(() => (records ?? []).map(flatten), [records]);
   const config = useMemo(() => (records ? { columns: inferSchema(flat) } : null), [records, flat]);
   const brainKey = `BENEFICIARY:${moduleId ?? "none"}`;
-  const [flags, setFlags] = useState<Map<string, FlagRow>>(new Map());
+  const { flags, reload: loadFlags } = useBrainFlags(moduleId);
   const [serverSavedAt, setServerSavedAt] = useState<Date | null>(null);
   const [resolving, setResolving] = useState<BeneficiaryRow | null>(null);
-  const [reason, setReason] = useState("corrected");
-  const [note, setNote] = useState("");
   const [showResolved, setShowResolved] = useState(false);
   const colSig = config ? sig(config.columns as Col[]) : "";
 
-  const loadFlags = async () => {
-    if (!moduleId) return;
-    const out = new Map<string, FlagRow>();
-    for (let from = 0; from < 50000; from += 1000) {
-      const { data } = await supabase.from("brain_flags" as never).select("id,beneficiary_id,status,reason_code,reason_note,resolved_at,level,last_flagged_at").eq("module_id", moduleId).range(from, from + 999);
-      const rows = (data as unknown as FlagRow[]) || [];
-      rows.forEach((r) => out.set(r.beneficiary_id, r));
-      if (rows.length < 1000) break;
-    }
-    setFlags(out);
-  };
-  useEffect(() => { void loadFlags(); /* eslint-disable-next-line */ }, [moduleId]);
 
   const server: BrainServerSync = {
     load: async () => {
@@ -178,20 +154,6 @@ export default function BeneficiaryBrainPanel({ moduleId, projectId, visible = t
     void loadFlags();
   };
 
-  const resolve = async () => {
-    if (!resolving) return;
-    const f = flags.get(resolving.id);
-    if (reason === "other" && !note.trim()) { toast.error("Please explain the reason."); return; }
-    const { data: u } = await supabase.auth.getUser();
-    const patch = { status: "resolved", reason_code: reason, reason_note: note.trim() || null, resolved_by: u.user?.id, resolved_at: new Date().toISOString() };
-    const { error } = f
-      ? await supabase.from("brain_flags" as never).update(patch as never).eq("id", f.id)
-      : await supabase.from("brain_flags" as never).insert({ ...patch, module_id: moduleId, project_id: projectId, beneficiary_id: resolving.id, case_id: resolving.case_id } as never);
-    if (error) { toast.error(`Could not resolve: ${error.message}`); return; }
-    toast.success(`${resolving.case_id} marked resolved`);
-    setResolving(null); setNote(""); setReason("corrected");
-    void loadFlags();
-  };
   const reopenFlag = async (b: BeneficiaryRow) => {
     const f = flags.get(b.id); if (!f) return;
     await supabase.from("brain_flags" as never).update({ status: "open", reason_code: null, reason_note: null, resolved_at: null, resolved_by: null } as never).eq("id", f.id);
@@ -199,11 +161,16 @@ export default function BeneficiaryBrainPanel({ moduleId, projectId, visible = t
   };
 
   const flagged = useMemo(() => {
-    if (!scored || !records) return [];
-    return scored.map((s, i) => {
-      const crit = s.cells.some((c) => c.severity === "critical") || s.rowScore > s.rowQ995;
-      const review = crit || s.rowScore > s.rowQ95 || s.cells.some((c) => c.severity === "high");
-      return { s, b: records[i], level: crit ? "critical" : review ? "review" : s.cells.length ? "minor" : "ok" };
+    if (!records) return [];
+    const blank: ScoredRow = { rowScore: 0, rowQ95: 1, rowQ995: 2, cells: [] };
+    return records.map((b, i) => {
+      const s = scored?.[i] ?? blank;
+      const crit = s.cells.some((c) => c.severity === "critical") || (!!scored && s.rowScore > s.rowQ995);
+      const review = crit || (!!scored && s.rowScore > s.rowQ95) || s.cells.some((c) => c.severity === "high");
+      const f = flags.get(b.id);
+      // Team flags and past resolutions always show, even when the brain no longer flags the row.
+      const level = crit ? "critical" : review ? "review" : f ? (f.level === "critical" ? "critical" : "review") : "ok";
+      return { s, b, level, manual: f?.source === "manual" };
     }).filter((x) => (x.level === "critical" || x.level === "review"))
       .filter((x) => showResolved ? flags.get(x.b.id)?.status === "resolved" : flags.get(x.b.id)?.status !== "resolved")
       .sort((a, b) => b.s.rowScore - a.s.rowScore);
@@ -328,6 +295,7 @@ export default function BeneficiaryBrainPanel({ moduleId, projectId, visible = t
                         : <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => setResolving(b)}>Resolve</Button>}
                     </span>
                   </div>
+                  {flags.get(b.id)?.source === "manual" && flags.get(b.id)?.flag_note && <p className="mt-1 text-xs text-muted-foreground">Flagged by team: <span className="font-medium text-foreground">{flags.get(b.id)!.flag_note}</span></p>}
                   {showResolved && flags.get(b.id) && <p className="mt-1 text-xs text-muted-foreground">Resolved: <span className="font-medium text-foreground">{RESOLVE_REASONS.find((r) => r.code === flags.get(b.id)!.reason_code)?.label ?? flags.get(b.id)!.reason_code}</span>{flags.get(b.id)!.reason_note ? ` — ${flags.get(b.id)!.reason_note}` : ""}</p>}
                   <ul className="mt-1.5 space-y-0.5">
                     {s.cells.slice(0, 6).map((c, i) => (
@@ -337,7 +305,7 @@ export default function BeneficiaryBrainPanel({ moduleId, projectId, visible = t
                         {c.kind === "category" && <> — {c.message.replace(/p:/g, "")}</>}
                       </li>
                     ))}
-                    {!s.cells.length && <li className="text-xs text-muted-foreground">The whole record is unusual compared with normal records.</li>}
+                    {!s.cells.length && flags.get(b.id)?.source !== "manual" && <li className="text-xs text-muted-foreground">The whole record is unusual compared with normal records.</li>}
                   </ul>
                 </div>
               ))}
@@ -345,25 +313,8 @@ export default function BeneficiaryBrainPanel({ moduleId, projectId, visible = t
           {scannedAt && <p className="border-t border-border/60 px-4 py-2 text-xs text-muted-foreground">Last scanned {scannedAt.toLocaleTimeString()} · re-scans every 3 minutes while this page is open.</p>}
         </CardContent>
       </Card>
-      <Dialog open={!!resolving} onOpenChange={(o) => !o && setResolving(null)}>
-        <DialogContent className="z-[1300]">
-          <DialogHeader>
-            <DialogTitle>Resolve flag</DialogTitle>
-            <DialogDescription>{resolving?.case_id} · {resolving?.full_name}. Your answer teaches the brain how often its flags are real errors.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <Select value={reason} onValueChange={setReason}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent className="z-[1400]">{RESOLVE_REASONS.map((r) => <SelectItem key={r.code} value={r.code}>{r.label}</SelectItem>)}</SelectContent>
-            </Select>
-            <Textarea placeholder="Note (optional, required for Other)" value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setResolving(null)}>Cancel</Button>
-            <Button onClick={resolve}>Mark resolved</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ResolveFlagDialog record={resolving} flag={resolving ? flags.get(resolving.id) : undefined} moduleId={moduleId} projectId={projectId}
+        onClose={() => setResolving(null)} onDone={() => void loadFlags()} />
     </div>
   );
 }
