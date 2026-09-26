@@ -58,6 +58,29 @@ const MAP_SCALE = [
   { fill: "hsl(var(--records-red))", label: "Highest" },
 ];
 
+const wrapAxisLabel = (label: string, limit = 18) => {
+  const words = label.split(/\s+/).filter(Boolean);
+  return words.reduce<string[]>((lines, word) => {
+    const last = lines[lines.length - 1];
+    if (!last || `${last} ${word}`.length > limit) lines.push(word);
+    else lines[lines.length - 1] = `${last} ${word}`;
+    return lines;
+  }, []);
+};
+
+const ComponentAxisTick = ({ x = 0, y = 0, payload }: { x?: number; y?: number; payload?: { value?: string } }) => {
+  const lines = wrapAxisLabel(String(payload?.value || ""));
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text x={-8} y={0} textAnchor="end" fill="hsl(var(--muted-foreground))" fontSize={9}>
+        {lines.map((line, index) => (
+          <tspan key={`${line}-${index}`} x={-8} dy={index === 0 ? `${-(lines.length - 1) * 0.55}em` : "1.1em"}>{line}</tspan>
+        ))}
+      </text>
+    </g>
+  );
+};
+
 const Panel = ({ title, subtitle, className, children, action, icon: Icon, tone = "teal" }: {
   title: string; subtitle?: string; className?: string; children: React.ReactNode; action?: React.ReactNode;
   icon?: React.ElementType; tone?: string;
@@ -288,7 +311,18 @@ const GeneralDashboard = ({
       </div>
 
       <div className="grid gap-2 lg:grid-cols-2 xl:grid-cols-4">
-        <Panel icon={BarChart3} tone="blue" title="Service Uptake by Component"><div className="h-44 p-2"><ChartContainer config={{ value: { label: "Beneficiaries", color: "hsl(var(--records-teal))" } }} className="h-full w-full"><BarChart data={componentData} margin={{ bottom: 34 }}><XAxis dataKey="name" tick={{ fontSize: 9 }} interval={0} angle={-35} textAnchor="end" height={52} tickFormatter={(v: string) => (v.length > 14 ? `${v.slice(0, 13)}…` : v)} /><YAxis hide domain={[0, maxComponent]} /><Tooltip content={<ChartTooltipContent />} /><Bar dataKey="value" radius={[3, 3, 0, 0]}>{componentData.map((_, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}</Bar></BarChart></ChartContainer></div></Panel>
+        <Panel icon={BarChart3} tone="blue" title="Service Uptake by Component">
+          <div className="min-h-56 p-2" style={{ height: `${Math.max(224, componentData.length * 48)}px` }}>
+            <ChartContainer config={{ value: { label: "Beneficiaries", color: "hsl(var(--records-teal))" } }} className="h-full w-full">
+              <BarChart data={componentData} layout="vertical" margin={{ top: 8, right: 18, bottom: 8, left: 8 }}>
+                <XAxis type="number" domain={[0, maxComponent]} allowDecimals={false} tick={{ fontSize: 9 }} tickMargin={6} />
+                <YAxis type="category" dataKey="name" width={124} interval={0} tick={<ComponentAxisTick />} tickLine={false} axisLine={false} />
+                <Tooltip content={<ChartTooltipContent />} />
+                <Bar dataKey="value" radius={[0, 3, 3, 0]} barSize={18}>{componentData.map((_, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}</Bar>
+              </BarChart>
+            </ChartContainer>
+          </div>
+        </Panel>
         <Panel icon={HeartPulse} tone="purple" title="Beneficiary Outcomes"><RingChart data={outcomes} total={outcomes.reduce((sum, item) => sum + item.value, 0)} label="with outcome" /></Panel>
         <Panel icon={ArrowRightLeft} tone="red" title="Referral Status"><RingChart data={referralData} total={scopedReferrals.length} label="total referrals" /></Panel>
         <Panel icon={Hospital} tone="blue" title="Facility Performance"><div className="space-y-3 p-3">{facilityData.length ? facilityData.map((facility) => <div key={facility.name}><div className="mb-1 flex justify-between gap-2 text-[10px]"><span className="truncate font-semibold text-health-ink">{facility.name}</span><span>{facility.rate}%</span></div><div className="h-2 overflow-hidden rounded-sm bg-muted"><div className="h-full bg-records-blue" style={{ width: `${facility.rate}%` }} /></div></div>) : <Empty label="No facility-linked records yet" />}</div></Panel>
