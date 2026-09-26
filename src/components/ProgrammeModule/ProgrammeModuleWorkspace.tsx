@@ -1,5 +1,6 @@
 import BeneficiaryBrainPanel from "./BeneficiaryBrainPanel";
-import { Brain } from "lucide-react";
+import { Brain, BookOpenCheck } from "lucide-react";
+import FieldGuidePanel from "./FieldGuidePanel";
 import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -170,15 +171,18 @@ const ProgrammeModuleWorkspace = ({
   const canBrain = can("view_dashboards") || can("view_records");
   const [brainMounted, setBrainMounted] = useState(false);
   const [lastRecordsView, setLastRecordsView] = useState<WorkspaceView>("records");
-  const openTab = (t: "records" | "brain") => {
-    if (t === "brain") { if (view !== "brain") setLastRecordsView(view); setBrainMounted(true); setView("brain"); }
-    else if (view === "brain") setView(lastRecordsView);
+  const isSide = (v: WorkspaceView) => v === "brain" || v === "guide";
+  const openTab = (t: "records" | "brain" | "guide") => {
+    if (t === "records") { if (isSide(view)) setView(lastRecordsView); return; }
+    if (!isSide(view)) setLastRecordsView(view);
+    if (t === "brain") setBrainMounted(true);
+    setView(t);
   };
 
   useEffect(() => {
     if (permissionsLoading) return;
     const visibleViews = navGroups.flatMap((group) => group.items).filter((item) => item.show).map((item) => item.key);
-    if (view === "brain") return;
+    if (view === "brain" || view === "guide") return;
     if (!visibleViews.includes(view)) setView(visibleViews.includes("records") ? "records" : visibleViews[0] || "records");
   }, [permissionsLoading, view, canConfigure, isOfficer, onTeamRegister]);
 
@@ -325,8 +329,8 @@ const ProgrammeModuleWorkspace = ({
 
       {!permissionsLoading && canBrain && active && (
         <div role="tablist" aria-label="Cases workspace" className="flex items-end gap-6 border-b border-border/60 px-1">
-          {([["records", "Beneficiary records", Layers], ["brain", "Record quality brain", Brain]] as const).map(([k, l, Icon]) => {
-            const on = (view === "brain") === (k === "brain");
+          {([["records", "Beneficiary records", Layers], ["brain", "Record quality brain", Brain], ["guide", "Field guide", BookOpenCheck]] as const).map(([k, l, Icon]) => {
+            const on = k === "records" ? !isSide(view) : view === k;
             return (
               <button key={k} role="tab" aria-selected={on} onClick={() => openTab(k)}
                 className={`-mb-px flex items-center gap-2 border-b-2 px-1 pb-2.5 pt-1 text-sm font-semibold transition-colors ${on ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
@@ -338,7 +342,7 @@ const ProgrammeModuleWorkspace = ({
         </div>
       )}
 
-      {!permissionsLoading && view !== "brain" && <WorkspaceNavigation groups={navGroups} view={view} onViewChange={setView} administration={
+      {!permissionsLoading && !isSide(view) && <WorkspaceNavigation groups={navGroups} view={view} onViewChange={setView} administration={
         <DropdownMenu>
           <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="gap-2"><SlidersHorizontal className="h-4 w-4" /> Manage<ChevronDown className="h-3.5 w-3.5" /></Button></DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64">
@@ -454,6 +458,7 @@ const ProgrammeModuleWorkspace = ({
         />
       )}
 
+      {view === "guide" && canBrain && <FieldGuidePanel moduleId={active?.id} />}
       {brainMounted && canBrain && (
         <div className={view === "brain" ? "" : "hidden"}>
           <BeneficiaryBrainPanel moduleId={active?.id} projectId={projectId} visible={view === "brain"}
