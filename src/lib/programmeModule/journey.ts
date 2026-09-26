@@ -22,6 +22,8 @@ export interface JourneyRow {
   components: string[];
   firstServiceDate: string | null;
   lastServiceDate: string | null;
+  serviceDates: string[];
+  componentServiceDates: Record<string, string[]>;
   perceivedChange: string | null;
   improvementAreas: string[];
   satisfaction: string | null;
@@ -116,6 +118,12 @@ export const useBeneficiaryJourneys = (projectId?: string, moduleId?: string) =>
         components: Array.from(new Set(own.map((s) => s.component_key))),
         firstServiceDate: own[0]?.service_date || null,
         lastServiceDate: own[own.length - 1]?.service_date || null,
+        serviceDates: own.map((service) => service.service_date),
+        componentServiceDates: own.reduce<Record<string, string[]>>((dates, service) => {
+          const current = dates[service.component_key] || [];
+          dates[service.component_key] = [...current, service.service_date];
+          return dates;
+        }, {}),
         perceivedChange,
         improvementAreas,
         satisfaction,
