@@ -9,3 +9,4 @@
 - [x] Remove the blank longitudinal-register option from Add Module.
 - [x] Add guarded deletion for an active Comprehensive NTD programme module.
 - [x] Add 30-day KPI change indicators and recorded activity dates to the General Dashboard journey.
+- [ ] Make the Service Uptake chart and every axis label fully visible at all dashboard widths.
