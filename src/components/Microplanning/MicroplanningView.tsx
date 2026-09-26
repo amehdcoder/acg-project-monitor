@@ -41,6 +41,8 @@ import AllocationHistoryDialog from "./AllocationHistoryDialog";
 import MicroplanDeleteRequestDialog from "./MicroplanDeleteRequestDialog";
 import MicroplanDeleteRequestsPanel from "./MicroplanDeleteRequestsPanel";
 import KoboSyncSettingsDialog from "./KoboSyncSettingsDialog";
+import Dhis2MicroplanEngine from "./Dhis2MicroplanEngine";
+import KoboToolboxCard from "./KoboToolboxCard";
 import KoboSyncStatusChip from "./KoboSyncStatusChip";
 import { TabSyncStatus } from "./TabSyncStatus";
 import useRealtimeMicroplanEntries from "@/hooks/useRealtimeMicroplanEntries";

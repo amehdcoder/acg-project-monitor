@@ -82,7 +82,7 @@ const KoboSyncStatusChip = ({ projectId, onNewSuccess }: Props) => {
   // Realtime subscription.
   useEffect(() => {
     const channel = supabase
-      .channel(`kobo_sync_events_${projectId ?? "all"}`)
+      .channel(`kobo_sync_events_${projectId ?? "all"}_${Math.random().toString(36).slice(2, 10)}`)
       .on(
         "postgres_changes",
         {
