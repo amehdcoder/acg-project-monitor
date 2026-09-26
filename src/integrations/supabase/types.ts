@@ -2734,6 +2734,122 @@ export type Database = {
           },
         ]
       }
+      brain_flags: {
+        Row: {
+          beneficiary_id: string
+          case_id: string | null
+          cells: Json
+          first_flagged_at: string
+          id: string
+          last_flagged_at: string
+          level: string
+          module_id: string
+          project_id: string
+          reason_code: string | null
+          reason_note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          row_score: number
+          status: string
+        }
+        Insert: {
+          beneficiary_id: string
+          case_id?: string | null
+          cells?: Json
+          first_flagged_at?: string
+          id?: string
+          last_flagged_at?: string
+          level?: string
+          module_id: string
+          project_id: string
+          reason_code?: string | null
+          reason_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          row_score?: number
+          status?: string
+        }
+        Update: {
+          beneficiary_id?: string
+          case_id?: string | null
+          cells?: Json
+          first_flagged_at?: string
+          id?: string
+          last_flagged_at?: string
+          level?: string
+          module_id?: string
+          project_id?: string
+          reason_code?: string | null
+          reason_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          row_score?: number
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brain_flags_beneficiary_id_fkey"
+            columns: ["beneficiary_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brain_flags_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "programme_modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brain_models: {
+        Row: {
+          brain_key: string
+          checkpoint: Json
+          columns: number
+          corpus_rows: number
+          module_id: string
+          project_id: string
+          steps: number
+          updated_at: string
+          updated_by: string | null
+          val_loss: number | null
+        }
+        Insert: {
+          brain_key: string
+          checkpoint: Json
+          columns?: number
+          corpus_rows?: number
+          module_id: string
+          project_id: string
+          steps?: number
+          updated_at?: string
+          updated_by?: string | null
+          val_loss?: number | null
+        }
+        Update: {
+          brain_key?: string
+          checkpoint?: Json
+          columns?: number
+          corpus_rows?: number
+          module_id?: string
+          project_id?: string
+          steps?: number
+          updated_at?: string
+          updated_by?: string | null
+          val_loss?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brain_models_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "programme_modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       case_activities: {
         Row: {
           activity_type: string
