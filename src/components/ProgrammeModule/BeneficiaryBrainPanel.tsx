@@ -91,6 +91,7 @@ export default function BeneficiaryBrainPanel({ moduleId, projectId, visible = t
   const brainKey = `BENEFICIARY:${moduleId ?? "none"}`;
   const { flags, reload: loadFlags } = useBrainFlags(moduleId);
   const [serverSavedAt, setServerSavedAt] = useState<Date | null>(null);
+  const [serverLearn, setServerLearn] = useState<{ steps: number; at: string | null }>({ steps: 0, at: null });
   const [resolving, setResolving] = useState<BeneficiaryRow | null>(null);
   const [showResolved, setShowResolved] = useState(false);
   const colSig = config ? sig(config.columns as Col[]) : "";
@@ -99,9 +100,10 @@ export default function BeneficiaryBrainPanel({ moduleId, projectId, visible = t
   const server: BrainServerSync = {
     load: async () => {
       if (!moduleId) return null;
-      const { data } = await supabase.from("brain_models" as never).select("checkpoint, updated_at").eq("brain_key", brainKey).maybeSingle();
+      const { data } = await supabase.from("brain_models" as never).select("checkpoint, updated_at, server_steps, server_trained_at").eq("brain_key", brainKey).maybeSingle();
       const ck = (data as any)?.checkpoint;
       if ((data as any)?.updated_at) setServerSavedAt(new Date((data as any).updated_at));
+      setServerLearn({ steps: (data as any)?.server_steps ?? 0, at: (data as any)?.server_trained_at ?? null });
       return ck && ck.colSig === colSig ? ck : null; // field layout changed → start fresh
     },
     save: async (m) => {
@@ -253,9 +255,9 @@ export default function BeneficiaryBrainPanel({ moduleId, projectId, visible = t
         </CardContent></Card>
       </div>
 
-      <Card><CardContent className="grid gap-3 p-4 text-sm sm:grid-cols-3 lg:grid-cols-6">
+      <Card><CardContent className="grid gap-3 p-4 text-sm sm:grid-cols-3 lg:grid-cols-7">
         {[["Fields watched", cols], ["Records scanned", n], ["Held-out test rows", stats?.valRows ?? 0], ["Overfit guards fired", stats?.overfitEvents ?? 0],
-          ["Doubtful rows trusted less", stats?.distrustedRows ?? 0], ["Saved to server", serverSavedAt ? serverSavedAt.toLocaleTimeString() : "not yet"]].map(([a, b]) => (
+          ["Doubtful rows trusted less", stats?.distrustedRows ?? 0], ["Saved to server", serverSavedAt ? serverSavedAt.toLocaleTimeString() : "not yet"], ["Learned while offline", serverLearn.at ? `${serverLearn.steps.toLocaleString()} steps · ${new Date(serverLearn.at).toLocaleString()}` : (stats && stats.steps >= 5000 ? "starts within 30 min" : "starts at 5,000 steps")]].map(([a, b]) => (
           <div key={a as string}><div className="text-xs text-muted-foreground">{a}</div><div className="font-semibold">{b}</div></div>
         ))}
       </CardContent></Card>
