@@ -1,7 +1,7 @@
 // Owner/Admin simulation for the ACSM Advocacy Dashboard. Generates a realistic
 // synthetic dataset matching the shape returned by useAcsmDashboard so the full
 // dashboard can be previewed exactly as it would look with real reporting —
-// no backend writes, no AI credits, deterministic per seed.
+// no backend writes, deterministic per seed.
 
 import type { AcsmRow } from "@/hooks/useAcsmDashboard";
 import {

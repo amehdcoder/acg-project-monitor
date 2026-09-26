@@ -1,7 +1,7 @@
 // Owner/Admin simulation for the Social & Behaviour Change Dashboard. Generates
 // a realistic synthetic dataset matching the shape returned by useSbcDashboard so
 // the full dashboard can be previewed exactly as it would look with real
-// reporting — no backend writes, no AI credits, deterministic per seed.
+// reporting — no backend writes, deterministic per seed.
 
 import type { SbcRow } from "@/hooks/useSbcDashboard";
 import {

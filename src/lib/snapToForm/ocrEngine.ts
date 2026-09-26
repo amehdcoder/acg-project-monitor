@@ -1,4 +1,4 @@
-// Tesseract.js wrapper — fully in-browser OCR. No AI credits.
+// Tesseract.js wrapper — fully in-browser OCR.
 // Caches the worker across pages in a session for speed.
 
 import Tesseract, { createWorker, Worker } from "tesseract.js";

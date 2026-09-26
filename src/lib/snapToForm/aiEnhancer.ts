@@ -156,7 +156,7 @@ export async function enhanceWithAI(input: AIEnhanceInput): Promise<AIEnhanceRes
     // PERPETUAL FREE CREDITS: when cloud AI is rate-limited or out of credits,
     // silently fall back to the local heuristic result so form creation never breaks.
     if (status === 429 || status === 402) {
-      onProgress?.("Cloud AI credits replenishing — completed with local engine.");
+      onProgress?.("Completed with the local engine.");
       return {
         form: localForm,
         model: "dss-local-heuristic (fallback)",

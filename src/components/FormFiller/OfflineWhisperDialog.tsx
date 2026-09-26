@@ -122,7 +122,7 @@ export const OfflineWhisperDialog = ({
           </DialogTitle>
           <DialogDescription>
             Use an on-device Whisper model for offline, multilingual voice input.
-            Works without internet after the first download. No AI credits used.
+            Works without internet after the first download.
           </DialogDescription>
         </DialogHeader>
 

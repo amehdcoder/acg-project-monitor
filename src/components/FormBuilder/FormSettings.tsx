@@ -408,7 +408,7 @@ const FormSettings = ({
             </CardTitle>
             <CardDescription>
               Let enumerators answer many questions in one spoken sentence using an in-app
-              language model. No AI credits are used — runs entirely on the device.
+              language model. Runs entirely on the device.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

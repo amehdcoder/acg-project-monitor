@@ -2740,6 +2740,8 @@ export type Database = {
           case_id: string | null
           cells: Json
           first_flagged_at: string
+          flag_note: string | null
+          flagged_by: string | null
           id: string
           last_flagged_at: string
           level: string
@@ -2750,6 +2752,7 @@ export type Database = {
           resolved_at: string | null
           resolved_by: string | null
           row_score: number
+          source: string
           status: string
         }
         Insert: {
@@ -2757,6 +2760,8 @@ export type Database = {
           case_id?: string | null
           cells?: Json
           first_flagged_at?: string
+          flag_note?: string | null
+          flagged_by?: string | null
           id?: string
           last_flagged_at?: string
           level?: string
@@ -2767,6 +2772,7 @@ export type Database = {
           resolved_at?: string | null
           resolved_by?: string | null
           row_score?: number
+          source?: string
           status?: string
         }
         Update: {
@@ -2774,6 +2780,8 @@ export type Database = {
           case_id?: string | null
           cells?: Json
           first_flagged_at?: string
+          flag_note?: string | null
+          flagged_by?: string | null
           id?: string
           last_flagged_at?: string
           level?: string
@@ -2784,6 +2792,7 @@ export type Database = {
           resolved_at?: string | null
           resolved_by?: string | null
           row_score?: number
+          source?: string
           status?: string
         }
         Relationships: [
@@ -2811,6 +2820,9 @@ export type Database = {
           corpus_rows: number
           module_id: string
           project_id: string
+          server_lease_until: string | null
+          server_steps: number
+          server_trained_at: string | null
           steps: number
           updated_at: string
           updated_by: string | null
@@ -2823,6 +2835,9 @@ export type Database = {
           corpus_rows?: number
           module_id: string
           project_id: string
+          server_lease_until?: string | null
+          server_steps?: number
+          server_trained_at?: string | null
           steps?: number
           updated_at?: string
           updated_by?: string | null
@@ -2835,6 +2850,9 @@ export type Database = {
           corpus_rows?: number
           module_id?: string
           project_id?: string
+          server_lease_until?: string | null
+          server_steps?: number
+          server_trained_at?: string | null
           steps?: number
           updated_at?: string
           updated_by?: string | null
@@ -13194,6 +13212,30 @@ export type Database = {
           _to_peer: string
         }
         Returns: boolean
+      }
+      claim_brain_for_training: {
+        Args: { _limit: number; _min_steps: number }
+        Returns: {
+          brain_key: string
+          checkpoint: Json
+          columns: number
+          corpus_rows: number
+          module_id: string
+          project_id: string
+          server_lease_until: string | null
+          server_steps: number
+          server_trained_at: string | null
+          steps: number
+          updated_at: string
+          updated_by: string | null
+          val_loss: number | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "brain_models"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       current_user_can_build_mda_followups: { Args: never; Returns: boolean }
       current_user_can_build_mda_followups_for_project: {

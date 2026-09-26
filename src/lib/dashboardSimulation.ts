@@ -4,7 +4,7 @@
  * Generates a large, realistic synthetic dataset that matches the shape of a
  * form's real submissions so the Owner can preview the FULL potential of a
  * custom dashboard with high data volume — without touching real data and
- * without spending any AI credits. Generation is 100% local & deterministic
+ *  Generation is 100% local & deterministic
  * per seed so charts look stable while toggled on.
  */
 

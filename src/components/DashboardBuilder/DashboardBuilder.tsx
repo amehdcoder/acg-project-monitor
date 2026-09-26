@@ -188,7 +188,7 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
 
   // Filter submissions based on filter state
   // Owner-only synthetic dataset to showcase the dashboard's full potential
-  // at scale. Generated locally — never persisted, never costs AI credits.
+  // at scale. Generated locally — never persisted.
   const simulatedSubmissions = useMemo(() => {
     if (!simulate) return [];
     return generateSimulatedSubmissions({ formId, formName, questions, count: simCount, days: simDays, seed: simSeed });

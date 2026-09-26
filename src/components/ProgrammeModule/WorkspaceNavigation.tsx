@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 
 export type WorkspaceView =
   | "brain"
+  | "guide"
   | "dashboard" | "records" | "journey" | "facility" | "followups" | "households"
   | "clusters" | "network" | "risk" | "casesearch" | "livelihood" | "safeguarding"
   | "safeguarding_dashboard" | "team" | "exchange";

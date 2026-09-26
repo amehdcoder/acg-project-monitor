@@ -5,7 +5,7 @@
  *
  * Lets the user describe many fields in one sentence. The model returns a JSON
  * object mapping question `id -> value`, which the form engine then writes in
- * one pass. No AI credits, no network round-trip after the first download.
+ * one pass. No network round-trip after the first download.
  *
  * Status flow:
  *   "idle" → "loading" (with progress) → "ready" → "extracting" → "ready"

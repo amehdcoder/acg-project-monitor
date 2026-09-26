@@ -10,6 +10,8 @@ import {
   Search, UserPlus, CloudOff, RefreshCw, Building2, MapPin, Users, ChevronRight, ArrowLeft, Hospital,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Flag } from "lucide-react";
+import { FlagRecordDialog, ResolveFlagDialog, useBrainFlags } from "./BrainFlagDialogs";
 import type { BeneficiaryRow, ProgrammeModuleConfig } from "@/lib/programmeModule/types";
 import { evaluateDataQuality, labelFor, toneClasses, toneFor } from "@/lib/programmeModule/defaults";
 import { FACILITY_TYPE_LABEL, useFacilities, type FacilityRow } from "@/lib/programmeModule/facilities";
@@ -24,6 +26,7 @@ interface Props {
   canRegister?: boolean;
   onRefresh: () => void;
   projectId?: string;
+  moduleId?: string;
 }
 
 /** Rotating token-based accents so the facility wall is colourful but themable. */
@@ -39,8 +42,11 @@ const facilityIdOf = (b: BeneficiaryRow) =>
   (b as unknown as { facility_id?: string | null }).facility_id || null;
 
 const BeneficiaryList = ({
-  beneficiaries, config, loading, onOpen, onRegister, onRefresh, projectId, canRegister = true,
+  beneficiaries, config, loading, onOpen, onRegister, onRefresh, projectId, moduleId, canRegister = true,
 }: Props) => {
+  const { flags: brainFlags, reload: reloadFlags } = useBrainFlags(moduleId);
+  const [flagging, setFlagging] = useState<BeneficiaryRow | null>(null);
+  const [resolvingRow, setResolvingRow] = useState<BeneficiaryRow | null>(null);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [lga, setLga] = useState("all");
@@ -174,9 +180,23 @@ const BeneficiaryList = ({
                     <h3 className="truncate font-semibold text-foreground">{b.full_name}</h3>
                     <p className="text-xs text-muted-foreground">{b.case_id}</p>
                   </div>
-                  <Badge variant="outline" className={cn("border", toneClasses[toneFor(config.workflow.statuses, b.status)])}>
-                    {labelFor(config.workflow.statuses, b.status)}
-                  </Badge>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <Badge variant="outline" className={cn("border", toneClasses[toneFor(config.workflow.statuses, b.status)])}>
+                      {labelFor(config.workflow.statuses, b.status)}
+                    </Badge>
+                    {moduleId && (() => {
+                      const f = brainFlags.get(b.id); const open = f?.status === "open";
+                      return (
+                        <Button type="button" size="icon" variant={open ? "destructive" : "ghost"} className="h-7 w-7"
+                          aria-label={open ? `Resolve flag on ${b.case_id}` : `Flag ${b.case_id}`}
+                          title={open ? "Flagged — click to resolve" : "Flag this record for review"}
+                          onClick={(e) => { e.stopPropagation(); open ? setResolvingRow(b) : setFlagging(b); }}
+                          onKeyDown={(e) => e.stopPropagation()}>
+                          <Flag className="h-3.5 w-3.5" />
+                        </Button>
+                      );
+                    })()}
+                  </div>
                 </div>
                 <p className="mt-2 text-sm text-muted-foreground">
                   {[b.village, b.lga, b.state].filter(Boolean).join(" · ") || "Location not recorded"}
@@ -198,6 +218,9 @@ const BeneficiaryList = ({
           })}
         </div>
 
+        <FlagRecordDialog record={flagging} moduleId={moduleId} projectId={projectId} onClose={() => setFlagging(null)} onDone={() => void reloadFlags()} />
+        <ResolveFlagDialog record={resolvingRow} flag={resolvingRow ? brainFlags.get(resolvingRow.id) : undefined} moduleId={moduleId} projectId={projectId}
+          onClose={() => setResolvingRow(null)} onDone={() => void reloadFlags()} />
         {!loading && rows.length === 0 && (
           <Card className="p-10 text-center text-muted-foreground">
             No beneficiaries in this facility yet. Use “Register beneficiary” to create the first record.

@@ -50,7 +50,7 @@ export function useDataQuality() {
         return;
       }
 
-      // Use local data quality check (no AI credits needed)
+      // Use local data quality check
       const localResult = localDataQualityCheck(submissions);
       setReport(localResult as DataQualityReport);
       setLastAnalyzed(new Date());

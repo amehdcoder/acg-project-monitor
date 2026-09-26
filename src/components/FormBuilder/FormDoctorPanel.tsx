@@ -48,7 +48,7 @@ const FormDoctorPanel = ({ form, onApplyAll, onApplyOne }: FormDoctorPanelProps)
           <div>
             <div className="font-semibold text-sm">Form Doctor</div>
             <div className="text-[11px] text-muted-foreground">
-              Runs entirely in-app — no AI credits used
+              Runs entirely in-app
             </div>
           </div>
         </div>
