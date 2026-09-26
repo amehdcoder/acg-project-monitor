@@ -56,7 +56,8 @@ function inferSchema(rows: Record<string, any>[]): Col[] {
 }
 const label = (k: string) => (k.startsWith("p:") ? k.slice(2).replace(/_/g, " ") : k);
 
-export default function BeneficiaryBrainPanel({ moduleId }: { moduleId?: string }) {
+export default function BeneficiaryBrainPanel({ moduleId, visible = true, onOpenBeneficiary }: { moduleId?: string; visible?: boolean; onOpenBeneficiary?: (b: BeneficiaryRow) => void }) {
+  const [level, setLevel] = useState<"all" | "critical" | "review">("all");
   const [records, setRecords] = useState<BeneficiaryRow[] | null>(null);
   const [scored, setScored] = useState<ScoredRow[] | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -98,7 +99,7 @@ export default function BeneficiaryBrainPanel({ moduleId }: { moduleId?: string 
   };
   // First scan once the brain has loaded; re-scan every 3 minutes while open so flags track what it learns.
   useEffect(() => { if (stats && records && !scored && !scanning) void scan(); /* eslint-disable-next-line */ }, [stats?.mda, records]);
-  useEffect(() => { const t = setInterval(() => { if (!document.hidden) void scan(); }, 180000); return () => clearInterval(t); /* eslint-disable-next-line */ }, [flat]);
+  useEffect(() => { const t = setInterval(() => { if (!document.hidden && visible) void scan(); }, 180000); return () => clearInterval(t); /* eslint-disable-next-line */ }, [flat]);
 
   const flagged = useMemo(() => {
     if (!scored || !records) return [];
@@ -110,7 +111,7 @@ export default function BeneficiaryBrainPanel({ moduleId }: { moduleId?: string 
       .sort((a, b) => b.s.rowScore - a.s.rowScore);
   }, [scored, records]);
 
-  const shown = flagged.filter((f) => !q || `${f.b.case_id} ${f.b.full_name} ${f.b.lga ?? ""}`.toLowerCase().includes(q.toLowerCase()));
+  const shown = flagged.filter((f) => (level === "all" || f.level === level)).filter((f) => !q || `${f.b.case_id} ${f.b.full_name} ${f.b.lga ?? ""}`.toLowerCase().includes(q.toLowerCase()));
   const n = records?.length ?? 0;
   const cellsFlagged = scored?.reduce((a, s) => a + s.cells.length, 0) ?? 0;
   const cols = config?.columns.length ?? 0;
@@ -188,14 +189,21 @@ export default function BeneficiaryBrainPanel({ moduleId }: { moduleId?: string 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
           <CardTitle>Records it can't reconstruct ({flagged.length})</CardTitle>
-          <Input className="h-8 max-w-xs" placeholder="Search Case ID, name, LGA" value={q} onChange={(e) => setQ(e.target.value)} />
+          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex rounded-md border border-border/60 p-0.5 text-xs">
+            {([["all", `All ${flagged.length}`], ["critical", `Critical ${flagged.filter((f) => f.level === "critical").length}`], ["review", `Review ${flagged.filter((f) => f.level === "review").length}`]] as const).map(([k, l]) => (
+              <button key={k} onClick={() => setLevel(k)} className={`rounded px-2 py-1 font-medium ${level === k ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>{l}</button>
+            ))}
+          </div>
+          <Input className="h-8 w-56" placeholder="Search Case ID, name, LGA" value={q} onChange={(e) => setQ(e.target.value)} />
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {records === null ? <p className="p-4 text-sm text-muted-foreground">Loading records…</p>
             : !scored ? <p className="p-4 text-sm text-muted-foreground">{scanning ? "Scanning records…" : "Waiting for the brain to wake up…"}</p>
             : !shown.length ? <p className="flex items-center gap-2 p-4 text-sm text-muted-foreground"><ShieldCheck className="h-4 w-4 text-primary" />Every record reconstructs within normal range.</p>
             : <div className="max-h-[560px] overflow-auto divide-y divide-border/60">
-              {shown.slice(0, 200).map(({ s, b, level }) => (
+              {shown.slice(0, 300).map(({ s, b, level }) => (
                 <div key={b.id} className={`border-l-2 p-3 hover:bg-muted/40 ${level === "critical" ? "border-l-destructive" : "border-l-primary"}`}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
@@ -206,6 +214,7 @@ export default function BeneficiaryBrainPanel({ moduleId }: { moduleId?: string 
                     <span className="flex items-center gap-1.5 text-xs">
                       <span className={`h-2 w-2 rounded-full ${level === "critical" ? "bg-destructive" : "bg-primary"}`} />
                       {level === "critical" ? "Critical" : "Needs review"} · score {s.rowScore.toFixed(2)}
+                      {onOpenBeneficiary && <Button size="sm" variant="ghost" className="ml-2 h-7 px-2 text-xs" onClick={() => onOpenBeneficiary(b)}>Open record</Button>}
                     </span>
                   </div>
                   <ul className="mt-1.5 space-y-0.5">
