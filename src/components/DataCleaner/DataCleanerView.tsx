@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Upload, Table2, ShieldCheck, AlertTriangle, BarChart3,
   Target, Pill, MapPinned, Download, History, ScrollText, MessageSquareHeart,
   Activity, Globe2, FlaskConical, ListChecks, ArrowLeft, CheckCircle2, XCircle,
-  Wand2, FileSpreadsheet, Database,
+  Wand2, FileSpreadsheet, Database, Brain, Sparkles, Pause, Play, RotateCcw, Layers,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -12,7 +12,9 @@ import {
   PieChart, Pie, Cell, LineChart, Line,
 } from "recharts";
 import { MDA_CONFIGS, MDA_LIST, MdaTypeId, FEEDBACK_AREAS, FeedbackArea } from "@/lib/dataCleaner/schemas";
-import { validateDataset, ValidationResult, RowResult, CellIssue } from "@/lib/dataCleaner/engine";
+import { buildResult, applySuggestions, ValidationResult, RowResult, CellIssue } from "@/lib/dataCleaner/engine";
+import { useCleanerBrain } from "@/hooks/useCleanerBrain";
+import type { BrainStats } from "@/lib/dataCleaner/neural/protocol";
 import { importWorkbook, exportTemplate, exportCleaned, newBatchId } from "@/lib/dataCleaner/io";
 import {
   getSessions, saveSession, getAudit, appendAudit, getFeedback, saveFeedback,
@@ -29,7 +31,7 @@ import { Badge } from "@/components/ui/badge";
 type SectionId =
   | "dashboard" | "import" | "preview" | "validation" | "issues" | "kpis"
   | "coverage" | "drug" | "geo" | "export" | "history" | "audit"
-  | "feedback" | "performance" | "geoRegistry" | "drugRules" | "valRules";
+  | "feedback" | "performance" | "brain" | "historyData";
 
 const NAV: { group: string; items: { id: SectionId; label: string; icon: any }[] }[] = [
   { group: "Data Workflow", items: [
@@ -52,10 +54,9 @@ const NAV: { group: string; items: { id: SectionId; label: string; icon: any }[]
     { id: "feedback", label: "User Feedback", icon: MessageSquareHeart },
     { id: "performance", label: "System Performance", icon: Activity },
   ]},
-  { group: "Reference Data", items: [
-    { id: "geoRegistry", label: "Geography Registry", icon: Globe2 },
-    { id: "drugRules", label: "Drug & Ratio Rules", icon: FlaskConical },
-    { id: "valRules", label: "Validation Rules", icon: ListChecks },
+  { group: "Neural Brain", items: [
+    { id: "brain", label: "Live Brain", icon: Brain },
+    { id: "historyData", label: "Historical Training Data", icon: Layers },
   ]},
 ];
 
@@ -85,23 +86,48 @@ export default function DataCleanerView() {
 
   const config = MDA_CONFIGS[mda];
   const kpis = result?.kpis;
+  const brain = useCleanerBrain(mda);
+  const [scoring, setScoring] = useState(false);
+  const histRef = useRef<HTMLInputElement>(null);
 
   const handleFile = useCallback(async (file: File) => {
     try {
       const imp = await importWorkbook(file, config);
       if (!imp.rows.length) { toast.error("No data rows found in the workbook."); return; }
-      const res = validateDataset(config, imp.rows, { autoApply: true });
+      setScoring(true);
+      const scored = await brain.score(imp.rows).finally(() => setScoring(false));
+      const res = buildResult(config, imp.rows, scored);
       setResult(res);
       setBatchId(imp.batchId);
       setFileName(imp.fileName);
       setSection("validation");
       if (imp.missingColumns.length)
         toast.warning(`${imp.missingColumns.length} expected column(s) missing for ${config.label}.`);
-      toast.success(`Imported ${res.rows.length} rows · ${res.kpis.autoCorrections} auto-corrected.`);
+      toast.success(`Scored ${res.rows.length} rows · ${res.kpis.anomalousCells} cells don't reconstruct like normal data.`);
     } catch (e: any) {
+      setScoring(false);
       toast.error("Import failed: " + (e?.message || "invalid file"));
     }
-  }, [config]);
+  }, [config, brain]);
+
+  const acceptSuggestions = () => {
+    if (!result) return;
+    const next = applySuggestions(config, result);
+    setResult(next);
+    toast.success(`Applied the model's reconstructions to ${next.kpis.autoCorrections} row(s).`);
+  };
+
+  const handleHistorical = async (files: FileList) => {
+    let total = 0;
+    for (const f of Array.from(files)) {
+      try {
+        const imp = await importWorkbook(f, config);
+        const clean = imp.rows.filter((r) => String(r["Validation_Status"] ?? "") !== "Critical Alert");
+        brain.addCorpus(clean, f.name); total += clean.length;
+      } catch (e: any) { toast.error(`${f.name}: ${e?.message || "could not read"}`); }
+    }
+    if (total) toast.success(`Feeding ${total.toLocaleString()} cleaned historical rows to the brain.`);
+  };
 
   const onImportClick = () => fileRef.current?.click();
 
@@ -115,7 +141,7 @@ export default function DataCleanerView() {
     if (!result) return;
     // persist audit + session
     const audit: AuditEntry[] = [];
-    result.rows.forEach((r) => r.issues.filter((i) => i.autoFix !== undefined).forEach((i) => {
+    result.rows.filter((r) => r.autoCorrected).forEach((r) => Object.keys(r.values).filter((k) => r.values[k] !== r.original[k]).map((k) => ({ col: k, original: r.original[k], category: "Model reconstruction" })).forEach((i) => {
       audit.push({
         id: crypto.randomUUID(), batchId, date: new Date().toISOString(),
         rowRef: `${batchId}-R${r.index + 1}`, field: i.col,
@@ -124,6 +150,9 @@ export default function DataCleanerView() {
       });
     }));
     appendAudit(audit);
+    // Cumulative learning: the cleaned, non-critical rows become new "normal" knowledge.
+    const learned = result.rows.filter((r) => r.status !== "Critical Alert").map((r) => r.values);
+    if (learned.length) brain.addCorpus(learned, `${fileName || batchId} (concluded)`);
     const session: CleaningSession = {
       id: batchId || newBatchId(), batchId, mdaType: mda, fileName,
       date: new Date().toISOString(), totalRows: kpis!.totalRows, validRows: kpis!.validRows,
@@ -188,9 +217,12 @@ export default function DataCleanerView() {
                 <label className="text-[10px] font-medium text-slate-500">Reporting Year</label>
                 <Input value={reportingYear} onChange={(e) => setReportingYear(e.target.value)} className="h-9 w-24 text-sm" />
               </div>
+              <input ref={histRef} type="file" multiple accept=".xlsx,.xls" className="hidden"
+                onChange={(e) => { const f = e.target.files; if (f?.length) handleHistorical(f); e.currentTarget.value = ""; }} />
               <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.currentTarget.value = ""; }} />
-              <Button onClick={onImportClick} className="h-9 mt-4 bg-[#16A34A] hover:bg-[#15803d]"><Upload className="h-4 w-4 mr-1" />Import Data</Button>
+              <Button onClick={onImportClick} disabled={scoring} className="h-9 mt-4 bg-[#16A34A] hover:bg-[#15803d]"><Upload className="h-4 w-4 mr-1" />{scoring ? "Brain scoring…" : "Import Data"}</Button>
+              <BrainPill stats={brain.stats} onClick={() => setSection("brain")} />
               <Button onClick={handleExportCleaned} className="h-9 mt-4 bg-[#7C3AED] hover:bg-[#6d28d9]"><Download className="h-4 w-4 mr-1" />Export Cleaned</Button>
               <Button variant="outline" onClick={() => exportTemplate(config)} className="h-9 mt-4"><FileSpreadsheet className="h-4 w-4 mr-1" />Template</Button>
             </div>
@@ -211,20 +243,19 @@ export default function DataCleanerView() {
       case "dashboard": return <DashboardSection />;
       case "import": return <ImportSection onImportClick={onImportClick} config={config} />;
       case "preview":
-      case "validation": return <ValidationSection result={result} config={config} review={section === "validation"} onConclude={concludeCleaning} />;
+      case "validation": return <ValidationSection result={result} config={config} review={section === "validation"} onConclude={concludeCleaning} onAccept={acceptSuggestions} />;
       case "issues": return <IssuesSection result={result} />;
       case "kpis": return <DashboardSection />;
       case "coverage": return <CoverageSection result={result} config={config} />;
-      case "drug": return <DrugSection result={result} />;
-      case "geo": return <GeoSection result={result} />;
+      case "drug": return <ColumnGroupSection result={result} title="Drug & inventory anomalies" match={/IVM|ALB|PZQ|MEB|AZT|POS|TEO|Ratio/i} />;
+      case "geo": return <ColumnGroupSection result={result} title="Geographic & category anomalies" match={/State|LGA|Ward|FLHF|Community|Disease|Geographic/i} />;
       case "export": return <ExportSection onExport={handleExportCleaned} onTemplate={() => exportTemplate(config)} config={config} result={result} onConclude={concludeCleaning} />;
       case "history": return <HistorySection />;
       case "audit": return <AuditSection />;
       case "feedback": return <FeedbackSection onNew={() => setFeedbackOpen(true)} hasResult={!!result} />;
       case "performance": return <PerformanceSection />;
-      case "geoRegistry": return <RefCard title="Geography Registry" desc="State → LGA → Ward → Community master registry powers geographic validation. Geographic columns are matched against official Nigerian administrative hierarchy; mismatches are flagged with a suggested registry correction." />;
-      case "drugRules": return <DrugRulesSection />;
-      case "valRules": return <ValRulesSection config={config} />;
+      case "brain": return <BrainSection stats={brain.stats} onToggle={() => brain.setRunning(!(brain.stats?.running ?? true))} onReset={() => { if (confirm("Erase everything the brain has learned for this MDA type?")) brain.reset(); }} />;
+      case "historyData": return <HistoricalSection stats={brain.stats} onUpload={() => histRef.current?.click()} config={config} />;
       default: return null;
     }
   }
@@ -236,18 +267,18 @@ export default function DataCleanerView() {
       { label: "Rows Valid", value: kpis.validRows, sub: pct(kpis.validRows, kpis.totalRows), color: "#16A34A", icon: CheckCircle2 },
       { label: "Rows with Issues", value: kpis.rowsWithIssues, sub: pct(kpis.rowsWithIssues, kpis.totalRows), color: "#F59E0B", icon: AlertTriangle },
       { label: "Critical Issues", value: kpis.criticalIssues, sub: pct(kpis.criticalIssues, kpis.totalRows), color: "#EF4444", icon: XCircle },
-      { label: "Auto-Corrections Applied", value: kpis.autoCorrections, sub: pct(kpis.autoCorrections, kpis.totalRows), color: "#7C3AED", icon: Wand2 },
+      { label: "Rows Corrected by Model", value: kpis.autoCorrections, sub: pct(kpis.autoCorrections, kpis.totalRows), color: "#7C3AED", icon: Wand2 },
       { label: "Data Quality Score", value: kpis.dataQualityScore + "%", sub: scoreLabel(kpis.dataQualityScore), color: "#0B2E6D", icon: ShieldCheck },
       { label: "Data Completeness", value: kpis.completeness + "%", sub: scoreLabel(kpis.completeness), color: "#06B6D4", icon: BarChart3 },
     ];
     const mini = [
-      { label: "Geographic Integrity", value: kpis.geographicIntegrity + "%" },
-      { label: "Drug Ratio Compliance", value: kpis.drugRatioCompliance + "%" },
-      { label: "Inventory Balance Compliance", value: kpis.inventoryBalanceCompliance + "%" },
-      { label: "Duplicate Rows Detected", value: String(kpis.duplicatesMerged) },
+      { label: "Anomalous Cells", value: String(kpis.anomalousCells) },
+      { label: "Critical Rows", value: String(kpis.criticalRows) },
+      { label: "Mean Row Anomaly Score", value: String(kpis.meanRowScore) },
+      { label: "Learned Review Cut-off", value: kpis.rowQ95.toFixed(2) },
       { label: "Therapeutic Coverage Pass Rate", value: kpis.coveragePassRate + "%" },
-      { label: "Drug Wastage Rate", value: kpis.drugWastageRate + "%" },
-      { label: "Audit Trail Completeness", value: kpis.auditTrailCompleteness + "%" },
+      { label: "Brain Memory (rows)", value: (brain.stats?.corpusRows ?? 0).toLocaleString() },
+      { label: "Brain Val. Loss", value: (brain.stats?.valLoss ?? 0).toFixed(3) },
     ];
     const issueData = Object.entries(kpis.issueCategoryCounts).map(([k, v]) => ({ name: k, value: v })).sort((a, b) => b.value - a.value).slice(0, 8);
     const covData = [
@@ -269,7 +300,7 @@ export default function DataCleanerView() {
           ))}
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Panel title="Issue Type Breakdown">
+          <Panel title="Anomaly Type Breakdown">
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={issueData} margin={{ left: -10, bottom: 40 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
@@ -330,7 +361,7 @@ function EmptyState({ onImport }: { onImport: () => void }) {
       <div className="max-w-md">
         <div className="mx-auto h-16 w-16 rounded-2xl bg-[#2563EB]/10 grid place-items-center mb-4"><Upload className="h-7 w-7 text-[#2563EB]" /></div>
         <h2 className="text-lg font-bold text-[#0B2E6D]">No dataset loaded</h2>
-        <p className="text-sm text-slate-500 mt-1 mb-4">Select an MDA type, then import the matching Excel template. The cleaner validates every column, flags issues and suggests fixes automatically.</p>
+        <p className="text-sm text-slate-500 mt-1 mb-4">Select an MDA type, then import the matching Excel template. The neural brain flags cells that don't reconstruct like normal data and proposes its reconstruction.</p>
         <Button onClick={onImport} className="bg-[#16A34A] hover:bg-[#15803d]"><Upload className="h-4 w-4 mr-1" />Import Data</Button>
       </div>
     </div>
@@ -343,18 +374,18 @@ function ImportSection({ onImportClick, config }: any) {
   return (
     <div className="max-w-2xl space-y-4">
       <Panel title={`Import — ${config.label}`}>
-        <p className="text-sm text-slate-600 mb-3">Upload the Excel workbook for the selected MDA type. The cleaner auto-detects the <strong>{config.sheet}</strong> sheet, maps its {config.columns.length} columns and runs the full validation engine on import.</p>
+        <p className="text-sm text-slate-600 mb-3">Upload the Excel workbook for the selected MDA type. The cleaner auto-detects the <strong>{config.sheet}</strong> sheet, maps its {config.columns.length} columns and scores every cell with the autoencoder + transformer brain.</p>
         <div onClick={onImportClick} className="cursor-pointer rounded-xl border-2 border-dashed border-[#2563EB]/40 bg-[#2563EB]/5 p-10 text-center hover:bg-[#2563EB]/10">
           <Upload className="h-8 w-8 mx-auto text-[#2563EB] mb-2" />
           <p className="text-sm font-medium text-[#0B2E6D]">Click to upload .xlsx / .xls</p>
-          <p className="text-xs text-slate-500">Validation rules apply automatically per MDA type</p>
+          <p className="text-xs text-slate-500">No rules — the neural brain scores every cell against what it has learned is normal</p>
         </div>
       </Panel>
     </div>
   );
 }
 
-function ValidationSection({ result, config, review, onConclude }: { result: ValidationResult | null; config: any; review: boolean; onConclude: () => void }) {
+function ValidationSection({ result, config, review, onConclude, onAccept }: { result: ValidationResult | null; config: any; review: boolean; onConclude: () => void; onAccept: () => void }) {
   if (!result) return <p className="text-sm text-slate-500">Import a dataset to preview and clean.</p>;
   const keyCols = ["State", "LGA", "Ward", "Community", "Total Census", "Total Treated", "Therapeutic Coverage (%)"].filter((k) => config.columns.some((c: any) => c.key === k));
   const issueMap = (r: RowResult, col: string) => r.issues.find((i) => i.col === col);
@@ -362,8 +393,8 @@ function ValidationSection({ result, config, review, onConclude }: { result: Val
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-600">Showing {shown.length} of {result.rows.length} rows · failed cells highlighted with suggested fixes.</p>
-        {review && <Button onClick={onConclude} className="bg-[#0B2E6D] hover:bg-[#0a275c]"><CheckCircle2 className="h-4 w-4 mr-1" />Conclude Cleaning & Rate</Button>}
+        <p className="text-sm text-slate-600">Showing {shown.length} of {result.rows.length} rows · cells that don't reconstruct like learned normal data are highlighted with the model's reconstruction.</p>
+        {review && <div className="flex gap-2"><Button variant="outline" onClick={onAccept} disabled={!result.issues.some((i) => i.autoFix !== undefined)}><Sparkles className="h-4 w-4 mr-1" />Accept model reconstructions</Button><Button onClick={onConclude} className="bg-[#0B2E6D] hover:bg-[#0a275c]"><CheckCircle2 className="h-4 w-4 mr-1" />Conclude Cleaning & Rate</Button></div>}
       </div>
       <div className="rounded-xl bg-white border border-[#E2E8F0] overflow-auto">
         <table className="w-full text-xs">
@@ -446,23 +477,6 @@ function CoverageSection({ result, config }: any) {
       </ResponsiveContainer>
     </Panel>
   );
-}
-
-function DrugSection({ result }: { result: ValidationResult | null }) {
-  if (!result) return <p className="text-sm text-slate-500">Import a dataset to analyse drug ratios & inventory.</p>;
-  const k = result.kpis;
-  return (
-    <div className="grid md:grid-cols-3 gap-4">
-      <KpiCard label="Drug Ratio Compliance" value={k.drugRatioCompliance + "%"} sub={scoreLabel(k.drugRatioCompliance)} color="#2563EB" icon={Pill} />
-      <KpiCard label="Inventory Balance Compliance" value={k.inventoryBalanceCompliance + "%"} sub={scoreLabel(k.inventoryBalanceCompliance)} color="#16A34A" icon={Database} />
-      <KpiCard label="Drug Wastage Rate" value={k.drugWastageRate + "%"} sub="lost ÷ received" color="#EF4444" icon={FlaskConical} />
-    </div>
-  );
-}
-
-function GeoSection({ result }: { result: ValidationResult | null }) {
-  if (!result) return <p className="text-sm text-slate-500">Import a dataset to analyse geographic coverage.</p>;
-  return <KpiCard label="Geographic Integrity Score" value={result.kpis.geographicIntegrity + "%"} sub={scoreLabel(result.kpis.geographicIntegrity)} color="#06B6D4" icon={Globe2} />;
 }
 
 function ExportSection({ onExport, onTemplate, config, result, onConclude }: any) {
@@ -573,56 +587,6 @@ function PerformanceSection() {
       {!sum.count && <RefCard title="System Performance" desc="The learning model adjusts its per-area confidence based on user feedback. Conclude a cleaning run and submit a rating to begin training." />}
     </div>
   );
-}
-
-function DrugRulesSection() {
-  const rows = [
-    ["ONCHO Only", "IVM ratio 1.0–3.5", "≥ 80%"],
-    ["LF Only", "IVM 1.0–3.5; ALB ≈ 1.0", "≥ 65%"],
-    ["ONCHOLF", "IVM 1.0–3.5; ALB ≈ 1.0", "≥ 65%"],
-    ["SCH Only", "PZQ 2.0–3.0", "≥ 75%"],
-    ["SCHSTH", "PZQ 2.0–3.0; MEB ≈ 1.0", "≥ 75%"],
-    ["Trachoma", "AZT Tabs 3.0–4.0; AZT POS 4–10 ml; TEO ≈ 2.0", "≥ 80%"],
-  ];
-  return (
-    <Panel title="Drug & Ratio Rules (SOP)">
-      <table className="w-full text-sm"><thead className="text-slate-500"><tr><th className="text-left py-1">MDA Type</th><th className="text-left py-1">Drug ratio rule</th><th className="text-left py-1">Coverage threshold</th></tr></thead>
-        <tbody>{rows.map((r) => <tr key={r[0]} className="border-t border-[#E2E8F0]"><td className="py-1.5 font-medium">{r[0]}</td><td className="py-1.5">{r[1]}</td><td className="py-1.5">{r[2]}</td></tr>)}</tbody></table>
-      <p className="text-xs text-slate-500 mt-3">SCHSTH templates exported by this cleaner include the missing <strong>MEB Received/Used/Lost/Balance</strong> columns so the MEB ratio can be validated against a real source field.</p>
-    </Panel>
-  );
-}
-
-function ValRulesSection({ config }: { config: any }) {
-  return (
-    <Panel title={`Validation Rules — ${config.label} (${config.rules.length} active checks across ${config.columns.length} columns)`}>
-      <div className="max-h-[60vh] overflow-auto text-xs">
-        <table className="w-full"><thead className="bg-[#F8FAFC] text-slate-600 sticky top-0"><tr><th className="px-2 py-2 text-left">Column / Target</th><th className="px-2 py-2 text-left">Rule</th></tr></thead>
-          <tbody>{config.rules.map((r: any, i: number) => (
-            <tr key={i} className="border-t border-[#E2E8F0]"><td className="px-2 py-1.5">{r.col || r.bal || r.used || "—"}</td><td className="px-2 py-1.5 text-slate-600">{describeRule(r)}</td></tr>
-          ))}</tbody></table>
-      </div>
-    </Panel>
-  );
-}
-function describeRule(r: any): string {
-  switch (r.t) {
-    case "required": return "Required field";
-    case "year": return "Valid 4-digit year (2020–2035)";
-    case "date": return "Valid date";
-    case "dateGte": return `Must be ≥ ${r.ref}`;
-    case "int": return "Integer ≥ 0";
-    case "num": return "Numeric ≥ 0";
-    case "sum": return `Must equal sum of: ${r.parts.join(" + ")}`;
-    case "lte": return `Should not exceed ${r.ref}`;
-    case "usedLteRec": return `${r.drug} Used ≤ Received`;
-    case "balance": return `${r.drug} Balance = Received − Used − Lost`;
-    case "ratio": return `${r.drug} ratio = Used ÷ Total Treated; range ${r.min}–${r.max}`;
-    case "coverage": return `= Treated ÷ Census × 100; flag if < ${r.threshold}%`;
-    case "geocov": return "Should be 100% where treatment occurred";
-    case "disease": return `Must be one of: ${r.accepted.join(", ")}`;
-    default: return r.t;
-  }
 }
 
 function RefCard({ title, desc }: { title: string; desc: string }) {
