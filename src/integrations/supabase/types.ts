@@ -8297,6 +8297,7 @@ export type Database = {
           estimated_children_0_4: number | null
           estimated_children_5_14: number | null
           estimated_total_population: number | null
+          external_ref: string | null
           extra_metadata: Json
           flhf_incharge_name: string | null
           flhf_incharge_phone: string | null
@@ -8374,6 +8375,7 @@ export type Database = {
           estimated_children_0_4?: number | null
           estimated_children_5_14?: number | null
           estimated_total_population?: number | null
+          external_ref?: string | null
           extra_metadata?: Json
           flhf_incharge_name?: string | null
           flhf_incharge_phone?: string | null
@@ -8451,6 +8453,7 @@ export type Database = {
           estimated_children_0_4?: number | null
           estimated_children_5_14?: number | null
           estimated_total_population?: number | null
+          external_ref?: string | null
           extra_metadata?: Json
           flhf_incharge_name?: string | null
           flhf_incharge_phone?: string | null
