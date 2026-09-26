@@ -377,6 +377,7 @@ const ProgrammeModuleWorkspace = ({
           config={normalizeConfig(active.config)}
           loading={loadingBeneficiaries}
           projectId={projectId}
+          moduleId={active.id}
           onOpen={setSelected}
           onRegister={() => setRegisterOpen(true)}
           canRegister={can("edit_records")}
