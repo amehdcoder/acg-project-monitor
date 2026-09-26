@@ -8,6 +8,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export type WorkspaceView =
+  | "brain"
   | "dashboard" | "records" | "journey" | "facility" | "followups" | "households"
   | "clusters" | "network" | "risk" | "casesearch" | "livelihood" | "safeguarding"
   | "safeguarding_dashboard" | "team" | "exchange";

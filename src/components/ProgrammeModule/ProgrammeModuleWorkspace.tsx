@@ -1,3 +1,5 @@
+import BeneficiaryBrainPanel from "./BeneficiaryBrainPanel";
+import { Brain } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -152,6 +154,7 @@ const ProgrammeModuleWorkspace = ({
       label: "Intelligence",
       items: [
         { key: "network", label: "Transmission network", description: "Household, kinship and WASH relationships", icon: Network, show: can("view_dashboards") },
+        { key: "brain", label: "Record quality brain", description: "On-device models flag records they can't reconstruct", icon: Brain, show: can("view_dashboards") || can("view_records") },
         { key: "risk", label: "Follow-up risk & CHEW visits", description: "Prioritised risk and dispatched visits", icon: Activity, show: can("view_dashboards") },
         { key: "exchange", label: "Data exchange", description: "DHIS2, LMIS, FHIR, ADX and SDMX", icon: Share2, show: canConfigure || can("view_dashboards") },
       ],
@@ -427,6 +430,7 @@ const ProgrammeModuleWorkspace = ({
         />
       )}
 
+      {view === "brain" && <BeneficiaryBrainPanel moduleId={active?.id} />}
       {view === "network" && (
         <KinshipGraphPanel
           projectId={projectId}

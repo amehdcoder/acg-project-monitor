@@ -3,7 +3,7 @@ import type { MdaTypeId } from "@/lib/dataCleaner/schemas";
 import type { BrainStats, ScoredRow } from "@/lib/dataCleaner/neural/protocol";
 
 /** Owns the always-on Data Cleaner brain worker for the chosen MDA type. */
-export function useCleanerBrain(mda: MdaTypeId) {
+export function useCleanerBrain(mda: MdaTypeId | string, config?: { columns: { key: string; type: string }[] } | null) {
   const ref = useRef<Worker | null>(null);
   const pending = useRef(new Map<number, { res: (r: ScoredRow[]) => void; rej: (e: Error) => void }>());
   const seq = useRef(0);
@@ -23,7 +23,12 @@ export function useCleanerBrain(mda: MdaTypeId) {
     return () => { document.removeEventListener("visibilitychange", vis); w.terminate(); ref.current = null; };
   }, []);
 
-  useEffect(() => { setStats(null); ref.current?.postMessage({ type: "init", mda }); }, [mda]);
+  const cfgKey = config ? JSON.stringify(config.columns) : "";
+  useEffect(() => {
+    if (config === null) return; // caller still preparing its schema
+    setStats(null); ref.current?.postMessage({ type: "init", mda, config });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mda, cfgKey]);
 
   const score = useCallback((rows: Record<string, any>[]) => new Promise<ScoredRow[]>((res, rej) => {
     const id = ++seq.current; pending.current.set(id, { res, rej });
