@@ -6083,6 +6083,7 @@ export type Database = {
           name: string
           org_unit_id: string | null
           project_id: string
+          scope: string
           token_url: string | null
           updated_at: string
           username: string | null
@@ -6113,6 +6114,7 @@ export type Database = {
           name: string
           org_unit_id?: string | null
           project_id: string
+          scope?: string
           token_url?: string | null
           updated_at?: string
           username?: string | null
@@ -6143,6 +6145,7 @@ export type Database = {
           name?: string
           org_unit_id?: string | null
           project_id?: string
+          scope?: string
           token_url?: string | null
           updated_at?: string
           username?: string | null
