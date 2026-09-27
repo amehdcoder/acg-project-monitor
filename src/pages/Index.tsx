@@ -86,13 +86,15 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import { ProximityProvider } from "@/hooks/useProximity";
 import ProximityHub from "@/components/Proximity/ProximityHub";
 // framer-motion no longer needed at this level (tab-switch wrapper removed to kill blink)
-import { Loader2, HeartPulse } from "lucide-react";
+import { Loader2, HeartPulse, MapPinned } from "lucide-react";
 
 
 import { toast } from "@/hooks/use-toast";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useRecordsOnlyProjects } from "@/lib/programmeModule/recordsOnly";
 import RecordsOnlyShell from "@/components/ProgrammeModule/RecordsOnlyShell";
+import GeoWorkspaceShell from "@/components/Microplanning/GeoWorkspaceShell";
+import { useGeoWorkspaceLock } from "@/lib/microplanning/geoWorkspaceLock";
 import ProgrammeModuleWorkspace from "@/components/ProgrammeModule/ProgrammeModuleWorkspace";
 
 const Index = () => {
@@ -121,6 +123,7 @@ const Index = () => {
   usePushNotifications();
   const { trackPageVisit } = useSurveillanceTracking(user?.id);
   const recordsLock = useRecordsOnlyProjects();
+  const geoLock = useGeoWorkspaceLock();
   const [ownerRecordsMode, setOwnerRecordsModeState] = useState<boolean>(() => {
     try { return localStorage.getItem("amehnities:owner-records-mode") === "1"; } catch { return false; }
   });
@@ -429,6 +432,15 @@ const Index = () => {
     );
   }
 
+  // Geo Microplanning workspace lock (project-wide or per user).
+  if (geoLock.active) {
+    return (
+      <ErrorBoundary name="GeoWorkspace">
+        <GeoWorkspaceShell onSwitchToFullApp={geoLock.canManage ? () => geoLock.setOwnerMode(false) : undefined} />
+      </ErrorBoundary>
+    );
+  }
+
   return (
     <GeoSetupGate>
     <ProximityProvider>
@@ -453,6 +465,22 @@ const Index = () => {
           onToggleCollapse={() => setSidebarCollapsed(prev => !prev)}
         />
 
+        {geoLock.canManage && geoLock.anyLocks && (
+          <button
+            type="button"
+            onClick={() => geoLock.setOwnerMode(true)}
+            title="Open the app exactly as Geo Microplanning-locked users see it"
+            className={`fixed right-5 z-[60] flex items-center gap-3 rounded-full border border-primary/20 bg-primary py-2 pl-2 pr-4 text-left text-primary-foreground shadow-lg transition-transform hover:-translate-y-0.5 ${ownerCanSwitch ? "bottom-20" : "bottom-5"}`}
+          >
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-foreground/15">
+              <MapPinned className="h-5 w-5" />
+            </span>
+            <span className="leading-tight">
+              <span className="block text-[10px] font-bold uppercase tracking-wide text-primary-foreground/75">Admin view</span>
+              <span className="block text-sm font-semibold">Switch to Geo workspace</span>
+            </span>
+          </button>
+        )}
         {ownerCanSwitch && (
           <button
             type="button"

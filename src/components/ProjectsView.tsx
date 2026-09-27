@@ -20,6 +20,8 @@ import {
   Lock,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { MapPinned } from "lucide-react";
+import GeoLockDialog from "@/components/Microplanning/GeoLockDialog";
 import ProjectAccessDialog from "@/components/DeviceCollect/ProjectAccessDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -114,6 +116,7 @@ const ProjectsView = ({ onSelectProject, onOpenRecords }: ProjectsViewProps) => 
   const [loadError, setLoadError] = useState<string | null>(null);
   const [accessProject, setAccessProject] = useState<{ id: string; name: string } | null>(null);
   const { user, role, isSuperAdmin, isOwnerLevel, loading: authLoading } = useAuth();
+  const [geoLockProject, setGeoLockProject] = useState<{ id: string; name: string } | null>(null);
   const { logAction } = useAdminSurveillance();
 
   const projectCacheKey = user?.id ? `amehnities:projects:list:${user.id}` : null;
@@ -666,6 +669,16 @@ const ProjectsView = ({ onSelectProject, onOpenRecords }: ProjectsViewProps) => 
                   {project.records_only ? <HeartPulse className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
                   {project.records_only ? "Open Records" : "Open Project"}
                 </Button>
+                {(isSuperAdmin || isOwnerLevel) && (
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    title="Geo Microplanning workspace lock"
+                    onClick={() => setGeoLockProject({ id: project.id, name: project.name })}
+                  >
+                    <MapPinned className="h-4 w-4" />
+                  </Button>
+                )}
                 <ProjectChatButton 
                   projectId={project.id} 
                   projectName={project.name}
@@ -828,6 +841,7 @@ const ProjectsView = ({ onSelectProject, onOpenRecords }: ProjectsViewProps) => 
           onOpenChange={(o) => { if (!o) setAccessProject(null); }}
         />
       )}
+    <GeoLockDialog project={geoLockProject} onClose={() => setGeoLockProject(null)} />
     </div>
   );
 };
