@@ -8847,6 +8847,38 @@ export type Database = {
         }
         Relationships: []
       }
+      microplan_workspace_locks: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          project_id: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          project_id: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          project_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "microplan_workspace_locks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       microplan_xlsform_versions: {
         Row: {
           changelog: string
