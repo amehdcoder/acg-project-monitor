@@ -1,0 +1,2 @@
+ALTER TABLE public.health_exchange_connections ADD COLUMN IF NOT EXISTS scope text NOT NULL DEFAULT 'cases';
+CREATE INDEX IF NOT EXISTS health_exchange_connections_scope_idx ON public.health_exchange_connections (scope, project_id);
