@@ -45,8 +45,8 @@ async function call<T = any>(body: Record<string, unknown>): Promise<T> {
 const NONE = "__none";
 const defaultPeriod = () => String(new Date().getFullYear());
 
-export default function Dhis2MicroplanEngine({ projectId, projectName, canUse, onPulled }: {
-  projectId: string; projectName?: string | null; canUse: boolean; onPulled?: () => void;
+export default function Dhis2MicroplanEngine({ projectId, projectName, canUse, onPulled, scope = "microplanning" }: {
+  projectId: string; projectName?: string | null; canUse: boolean; onPulled?: () => void; scope?: "microplanning" | "integrations";
 }) {
   const [conns, setConns] = useState<Conn[]>([]);
   const [connId, setConnId] = useState("");
@@ -82,14 +82,14 @@ export default function Dhis2MicroplanEngine({ projectId, projectName, canUse, o
   const loadConns = useCallback((prefer?: string) => {
     if (!projectId) { setConns([]); setConnId(""); return; }
     supabase.from("health_exchange_connections").select("id,name,base_url,project_id,last_sync_at,last_status")
-      .eq("kind", "dhis2").eq("is_active", true).eq("scope", "microplanning").eq("project_id", projectId)
+      .eq("kind", "dhis2").eq("is_active", true).eq("scope", scope).eq("project_id", projectId)
       .order("created_at", { ascending: false })
       .then(({ data }) => {
         const list = (data ?? []) as Conn[];
         setConns(list); setSchema(null);
         setConnId(prefer && list.some((c) => c.id === prefer) ? prefer : list[0]?.id || "");
       });
-  }, [projectId]);
+  }, [projectId, scope]);
   useEffect(() => { loadConns(); }, [loadConns]);
 
   const disconnect = async () => {
