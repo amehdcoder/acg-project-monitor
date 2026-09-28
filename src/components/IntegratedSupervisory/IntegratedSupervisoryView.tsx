@@ -131,6 +131,17 @@ export default function IntegratedSupervisoryView() {
   }, []);
   useEffect(() => { cacheRef.current = cache; }, [cache]);
 
+  /* "Last updated" = the newest real submission in KoboToolbox (falls back to
+     the last sync time when no submission carries a timestamp). */
+  const latestUpdateAt = useMemo(() => {
+    let best = 0;
+    for (const r of (cache?.results ?? []) as any[]) {
+      const t = Date.parse(r?._submission_time ?? r?.end ?? "");
+      if (Number.isFinite(t) && t > best) best = t;
+    }
+    return best ? new Date(best).toISOString() : (cache?.fetchedAt ?? null);
+  }, [cache]);
+
 
 
   /** Pull live submissions through the server feed — filtered server-side to scope. */
@@ -330,7 +341,7 @@ export default function IntegratedSupervisoryView() {
 
             <KoboSyncStatus
               phase={syncing ? "syncing" : syncError ? "error" : "synced"}
-              lastSyncedAt={cache?.fetchedAt ?? null}
+              lastSyncedAt={latestUpdateAt}
               live={connected}
               lastEventAt={lastEventAt}
               recordCount={cache?.count ?? null}
