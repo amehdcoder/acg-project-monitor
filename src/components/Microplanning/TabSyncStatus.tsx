@@ -50,10 +50,13 @@ export function TabSyncStatus({ projectId, table, syncEventStatus, label, onResy
         .select("created_at,status")
         .order("created_at", { ascending: false })
         .limit(20);
+      // Use created_at (when the submission actually arrived from KoboToolbox),
+      // not updated_at — edits and re-upserts bump updated_at and would show a
+      // misleading "last synced" long after the real last sync.
       let rowQuery = supabase
         .from(table)
-        .select("updated_at")
-        .order("updated_at", { ascending: false })
+        .select("created_at")
+        .order("created_at", { ascending: false })
         .limit(1);
       if (projectId) {
         evQuery = evQuery.eq("project_id", projectId);
