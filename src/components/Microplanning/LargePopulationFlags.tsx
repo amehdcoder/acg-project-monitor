@@ -1,3 +1,4 @@
+import { useSharedMicroplanSetting } from "@/lib/microplanning/sharedSettings";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Users, Accessibility, Home, Settings2, Save, Download, Filter } from "lucide-react";
 import * as XLSX from "xlsx";
@@ -74,7 +75,11 @@ type FlagRow = {
  * (auto age-disaggregated 20 / 28 / 52 %) and household counts.
  */
 const LargePopulationFlags = ({ entries, readOnly = false, onRefresh }: Props) => {
-  const [settings, setSettings] = useState<Thresholds>(readSettings);
+  const [settings, setSharedSettings] = useSharedMicroplanSetting<Thresholds>("all", "flag_thresholds", readSettings(), (v: any) =>
+    v && Number(v.householdFlag) > 0 && ["greater", "greater_equal", "off"].includes(v.hhRule)
+      ? { householdFlag: Number(v.householdFlag), hhRule: v.hhRule } : undefined);
+  const setSettings = (next: Thresholds | ((p: Thresholds) => Thresholds)) =>
+    setSharedSettings(typeof next === "function" ? (next as (p: Thresholds) => Thresholds)(settings) : next);
   const [hhOnly, setHhOnly] = useState(false);
   const [sortDesc, setSortDesc] = useState<boolean | null>(null);
   const [drafts, setDrafts] = useState<Record<string, { pop?: string; hh?: string }>>({});
