@@ -68,7 +68,7 @@ export function TabSyncStatus({ projectId, table, syncEventStatus, label, onResy
         const s = (e as { status?: string }).status;
         return s === syncEventStatus || s === "success";
       });
-      const times = [matching[0]?.created_at, row?.[0]?.updated_at]
+      const times = [matching[0]?.created_at, row?.[0]?.created_at]
         .filter(Boolean)
         .map((t) => new Date(t as string).getTime())
         .filter((t) => Number.isFinite(t));
