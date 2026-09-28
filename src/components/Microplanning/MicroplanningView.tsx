@@ -853,6 +853,9 @@ interface MicroplanningViewProps {
   entryOnly?: boolean;
 }
 
+// Session cache of loaded entries per project (instant re-open of a project).
+const microplanEntriesCache = new Map<string, any[]>();
+
 const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const { user, isOwner, isSuperAdmin, isAdmin } = useAuth();
   const [entries, setEntries] = useState<any[]>([]);
@@ -1008,12 +1011,26 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     }
   }, [selectedProjectId, entryOnly, isAdmin, user?.id, lens]);
 
+  // Per-project cache + request guard so switching projects shows data instantly
+  // and a slower, older request can never overwrite the newly selected project.
+  const entriesReqRef = useRef(0);
+  const entriesKey = selectedProjectId ? `${selectedProjectId}|${entryOnly && user?.id ? user.id : "all"}` : "";
+  useEffect(() => {
+    if (!entriesKey) return;
+    const cached = microplanEntriesCache.get(entriesKey);
+    setEntries(cached ?? []);
+    setLoading(!cached);
+  }, [entriesKey]);
+
   const fetchEntries = useCallback(async () => {
     if (!selectedProjectId) return;
-    setLoading(true);
+    const reqId = ++entriesReqRef.current;
+    const key = `${selectedProjectId}|${entryOnly && user?.id ? user.id : "all"}`;
+    if (!microplanEntriesCache.has(key)) setLoading(true);
     try {
-      // Keyset-paginate ALL rows so KPIs/coverage are never silently truncated
-      // and the scan scales past the offset cap on very large projects.
+      // Keyset-paginate ALL rows so KPIs/coverage are never silently truncated.
+      // The first page renders immediately; later pages stream in.
+      let firstPaint = !microplanEntriesCache.has(key);
       const data = await fetchAllRowsKeyset<any>((limit, afterId) => {
         let query = supabase
           .from("microplan_entries")
@@ -1024,13 +1041,22 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         }
         if (afterId) query = query.gt("id", afterId);
         return query.order("id", { ascending: true }).limit(limit);
+      }, 1000, 100000, (rows) => {
+        if (firstPaint && reqId === entriesReqRef.current) {
+          firstPaint = false;
+          setEntries(rows);
+          setLoading(false);
+        }
       });
+      if (reqId !== entriesReqRef.current) return;
+      microplanEntriesCache.set(key, data || []);
       setEntries(data || []);
     } catch (error: any) {
+      if (reqId !== entriesReqRef.current) return;
       toast({ title: "Error loading entries", description: error.message, variant: "destructive" });
-      setEntries([]);
+      if (!microplanEntriesCache.has(key)) setEntries([]);
     } finally {
-      setLoading(false);
+      if (reqId === entriesReqRef.current) setLoading(false);
     }
   }, [selectedProjectId, entryOnly, user?.id]);
 
