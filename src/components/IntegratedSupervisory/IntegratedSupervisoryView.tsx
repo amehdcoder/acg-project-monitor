@@ -50,6 +50,9 @@ export default function IntegratedSupervisoryView() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [cache, setCache] = useState<KoboCache | null>(() => loadKoboCache());
   const [syncing, setSyncing] = useState(false);
+  /* Only a user-initiated sync spins the UI. Silent background syncs update the
+     data in place without ever disturbing the dashboard. */
+  const [manualSyncing, setManualSyncing] = useState(false);
   const [syncError, setSyncError] = useState<{ message: string; hint?: string } | null>(null);
   const [openAccess, setOpenAccess] = useState(false);
 
@@ -164,6 +167,7 @@ export default function IntegratedSupervisoryView() {
     if (sharedInFlight.current) return sharedInFlight.current;
     const job = (async () => {
       setSyncing(true);
+      if (!silent) setManualSyncing(true);
       try {
         // Delta sync: only submissions newer than what we already hold.
         const prev = silent ? cacheRef.current : null;
@@ -183,7 +187,7 @@ export default function IntegratedSupervisoryView() {
         if (!silent) {
           toast({ title: "Refresh failed", description: e?.message ?? "Unable to load live data.", variant: "destructive" });
         }
-      } finally { setSyncing(false); sharedInFlight.current = null; }
+      } finally { setSyncing(false); setManualSyncing(false); sharedInFlight.current = null; }
     })();
     sharedInFlight.current = job;
     return job;
@@ -200,6 +204,7 @@ export default function IntegratedSupervisoryView() {
       return;
     }
     setSyncing(true);
+    if (!silent) setManualSyncing(true);
     try {
       // A user-triggered refresh re-downloads everything so deletions/edits land.
       const c = await fetchSubmissions(cfg, id, { full: !silent });
@@ -219,7 +224,7 @@ export default function IntegratedSupervisoryView() {
     } catch (e: any) {
       setSyncError({ message: e?.message || "Unable to reach KoboToolbox.", hint: e?.hint });
       if (!silent) toast({ title: "Refresh failed", description: e?.hint || e?.message || "Unable to reach KoboToolbox.", variant: "destructive" });
-    } finally { setSyncing(false); }
+    } finally { setSyncing(false); setManualSyncing(false); }
   }, [perms.canManageIntegrations, feeds, refreshShared, applyCache]);
 
   /* Load the shared feed registry once the user is known, then hydrate any
@@ -354,7 +359,7 @@ export default function IntegratedSupervisoryView() {
             )}
 
             <KoboSyncStatus
-              phase={syncing ? "syncing" : syncError ? "error" : "synced"}
+              phase={manualSyncing ? "syncing" : syncError ? "error" : "synced"}
               lastSyncedAt={latestUpdateAt}
               live={connected}
               lastEventAt={lastEventAt}
@@ -401,7 +406,7 @@ export default function IntegratedSupervisoryView() {
             )}
 
             <Button onClick={() => refresh(false)} disabled={syncing}>
-              {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Server className="h-4 w-4 mr-1" />}
+              {manualSyncing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Server className="h-4 w-4 mr-1" />}
               Sync Now
             </Button>
 
@@ -470,7 +475,7 @@ export default function IntegratedSupervisoryView() {
         {showTab("checklist") && (
           <TabsContent value="checklist" className="mt-4">
             <Suspense fallback={<TabFallback />}>
-              <ChecklistDashboard cache={scopedCache} onRefresh={() => refresh(false)} syncing={syncing} />
+              <ChecklistDashboard cache={scopedCache} onRefresh={() => refresh(false)} syncing={manualSyncing} />
             </Suspense>
           </TabsContent>
         )}
@@ -485,7 +490,7 @@ export default function IntegratedSupervisoryView() {
         {showTab("studio") && (
           <TabsContent value="studio" className="mt-4">
             <Suspense fallback={<TabFallback />}>
-              <SupervisoryDashboardView cache={scopedCache} onRefresh={() => refresh(false)} syncing={syncing} />
+              <SupervisoryDashboardView cache={scopedCache} onRefresh={() => refresh(false)} syncing={manualSyncing} />
             </Suspense>
           </TabsContent>
         )}
