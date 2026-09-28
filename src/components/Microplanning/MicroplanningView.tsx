@@ -3625,7 +3625,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
           {/* Coverage View */}
           {activeView === "coverage" && (
-            <CoverageView entries={displayEntries} onRefresh={fetchEntries} projectId={selectedProjectId || null} />
+            <CoverageView entries={displayEntries} onRefresh={fetchEntries} projectId={selectedProjectId || null} projectName={selectedProjectName} />
           )}
 
           {/* Reconciliation View — Balance of medicine + reversal destination */}
