@@ -24,6 +24,8 @@ export async function fetchAllRowsKeyset<T extends { id?: string | number } = an
   pageSize = 1000,
   // Generous safety bound (pages, not rows) to avoid an accidental infinite loop.
   maxPages = 100000,
+  /** Optional: called after every page with all rows so far (for progressive rendering). */
+  onPage?: (rowsSoFar: T[]) => void,
 ): Promise<T[]> {
   const out: T[] = [];
   let afterId: string | number | null = null;
@@ -34,6 +36,7 @@ export async function fetchAllRowsKeyset<T extends { id?: string | number } = an
     const batch: T[] = (data as T[]) ?? [];
     if (batch.length === 0) break;
     out.push(...batch);
+    onPage?.(out.slice());
     if (batch.length < pageSize) break;
     const last = batch[batch.length - 1] as any;
     const nextId = last?.id;
