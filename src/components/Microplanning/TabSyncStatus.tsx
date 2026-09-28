@@ -22,10 +22,15 @@ export interface TabSyncStatusProps {
 function formatRelative(ts: number | null): string {
   if (!ts) return "not yet";
   const diff = Math.max(0, Date.now() - ts);
+  const d = new Date(ts);
+  const dateTime =
+    d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) +
+    ", " +
+    d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
   if (diff < 5_000) return "just now";
-  if (diff < 60_000) return `${Math.floor(diff / 1000)}s ago`;
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
-  return new Date(ts).toLocaleTimeString();
+  if (diff < 60_000) return `${Math.floor(diff / 1000)}s ago · ${dateTime}`;
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago · ${dateTime}`;
+  return dateTime;
 }
 
 export function TabSyncStatus({ projectId, table, syncEventStatus, label, onResync }: TabSyncStatusProps) {
