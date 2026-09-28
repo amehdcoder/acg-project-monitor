@@ -396,8 +396,12 @@ Deno.serve(async (req) => {
         ? { survey: [], choices: [], title: feed.name ?? null }
         : await loadAsset(feed);
 
+      // Memory-safe chunking: each call returns at most CHUNK rows and a
+      // `next_start` cursor. Loading 50k rows in one isolate exceeded the edge
+      // worker's memory limit (WORKER_RESOURCE_LIMIT / 546).
       const PAGE = 1000;
-      const HARD_CAP = 50_000;
+      const CHUNK = 3000;
+      const startAt = Math.max(0, Math.floor(Number(body?.start ?? 0)) || 0);
       const dataPath = (start: number) => {
         const parts = [`format=json`, `limit=${PAGE}`, `start=${start}`, `sort=${encodeURIComponent('{"_submission_time":-1}')}`];
         if (since) {
@@ -409,26 +413,17 @@ Deno.serve(async (req) => {
       };
 
       const results: Record<string, unknown>[] = [];
-      const firstPage = await koboFetch(feed.server_url, dataPath(0), feed.api_token);
-      const firstChunk = Array.isArray(firstPage?.results) ? firstPage.results : [];
-      results.push(...firstChunk);
-      const totalAvailable = Number(firstPage?.count) || firstChunk.length;
-
-      if (firstChunk.length === PAGE && totalAvailable > PAGE) {
-        // Fetch remaining pages concurrently (bounded) instead of serially.
-        const starts: number[] = [];
-        for (let s = PAGE; s < Math.min(totalAvailable, HARD_CAP); s += PAGE) starts.push(s);
-        const CONCURRENCY = 4;
-        for (let i = 0; i < starts.length; i += CONCURRENCY) {
-          const batch = await Promise.all(
-            starts.slice(i, i + CONCURRENCY).map((s) => koboFetch(feed.server_url, dataPath(s), feed.api_token)),
-          );
-          for (const p of batch) {
-            const chunk = Array.isArray(p?.results) ? p.results : [];
-            results.push(...chunk);
-          }
-        }
+      let totalAvailable = 0;
+      let cursor = startAt;
+      while (cursor < startAt + CHUNK) {
+        const p = await koboFetch(feed.server_url, dataPath(cursor), feed.api_token);
+        const chunk = Array.isArray(p?.results) ? p.results : [];
+        totalAvailable = Number(p?.count) || totalAvailable;
+        for (const r of chunk) results.push(r);
+        cursor += chunk.length;
+        if (chunk.length < PAGE) break;
       }
+      const nextStart = cursor < totalAvailable && results.length > 0 ? cursor : null;
 
       // Server-side State scoping — a granted user can never receive rows
       // outside the State(s) their grant allows.
