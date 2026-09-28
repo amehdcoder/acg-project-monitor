@@ -27,7 +27,7 @@ const TabFallback = () => (
 );
 
 import {
-  deleteConnection, fetchSubmissions, getActiveConnectionId, listConnections, loadKoboCache,
+  deleteConnection, fetchSubmissions, getActiveConnectionId, listConnections, loadKoboCache, loadKoboCacheAsync,
   loadKoboConfig, setActiveConnectionId, type KoboCache, type KoboConnection,
 } from "./koboClient";
 import { useChecklistPermissions } from "@/hooks/useChecklistPermissions";
