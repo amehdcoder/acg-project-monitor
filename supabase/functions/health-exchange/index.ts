@@ -616,6 +616,18 @@ Deno.serve(async (req) => {
         const a = await remoteFetch(joinUrl(connection.base_url, `api/analytics?${qs}&displayProperty=NAME&skipRounding=false`), { headers }, 60000);
         if (!a.ok) return json({ ok: true, viz: { id, name: vb.displayName, type: kind === "MAP" ? "MAP" : vb.type }, layout: { columns, rows, filters }, analytics: null, note: remoteMessage(a.body, `DHIS2 could not compute this item (HTTP ${a.status})`) });
         const ab: any = a.body;
+        const ouIndex = (ab.headers ?? []).findIndex((h: any) => h.name === "ou");
+        const ouIds = ouIndex >= 0 ? [...new Set((ab.rows ?? []).map((row: any[]) => row[ouIndex]).filter(Boolean))] : [];
+        let organisationUnits: any[] = [];
+        if (ouIds.length) {
+          const chunks: string[][] = [];
+          for (let i = 0; i < ouIds.length; i += 150) chunks.push(ouIds.slice(i, i + 150) as string[]);
+          const responses = await Promise.all(chunks.map((ids) => remoteFetch(joinUrl(connection.base_url, `api/organisationUnits?filter=id:in:[${ids.join(",")}]&fields=id,displayName,level,path,ancestors[id,displayName,level]&paging=false`), { headers }, 45000)));
+          organisationUnits = responses.flatMap((response) => response.ok ? ((response.body as any)?.organisationUnits ?? []) : []).map((unit: any) => ({
+            id: unit.id, name: unit.displayName, level: unit.level, path: unit.path,
+            ancestors: (unit.ancestors ?? []).map((ancestor: any) => ({ id: ancestor.id, name: ancestor.displayName, level: ancestor.level })),
+          }));
+        }
         return json({
           ok: true,
           viz: { id, name: vb.displayName, type: kind === "MAP" ? "MAP" : vb.type, showData: !!vb.showData, hideLegend: !!vb.hideLegend, targetLine: vb.targetLineValue ?? null, baseLine: vb.baseLineValue ?? null },
@@ -625,6 +637,7 @@ Deno.serve(async (req) => {
             rows: ab.rows ?? [],
             items: Object.fromEntries(Object.entries(ab.metaData?.items ?? {}).map(([k, x]: any) => [k, x?.name ?? k])),
             dimensions: ab.metaData?.dimensions ?? {},
+            organisationUnits,
           },
         });
       }

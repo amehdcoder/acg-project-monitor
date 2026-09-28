@@ -4,6 +4,7 @@ export type Analytics = {
   rows: string[][];
   items: Record<string, string>;
   dimensions: Record<string, string[]>;
+  organisationUnits?: { id: string; name: string; level?: number; path?: string; ancestors?: { id: string; name: string; level?: number }[] }[];
 };
 
 export const DIM_LABEL: Record<string, string> = { dx: "Data", pe: "Period", ou: "Org unit", co: "Disaggregation" };
