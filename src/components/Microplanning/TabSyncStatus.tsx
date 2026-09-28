@@ -40,50 +40,56 @@ export function TabSyncStatus({ projectId, table, syncEventStatus, label, onResy
   const [, forceTick] = useState(0);
 
   // Seed from the actual last sync recorded in the database so the
-  // indicator shows the real last sync time instead of "not yet".
+  // indicator shows the real last sync time instead of "not yet" — even
+  // when no project is selected (dashboard view) or the page just opened.
   useEffect(() => {
-    if (!projectId) { setLastSyncedAt(null); return; }
     let cancelled = false;
     (async () => {
-      const [{ data: ev }, { data: row }] = await Promise.all([
-        supabase
-          .from("kobo_sync_events")
-          .select("created_at")
-          .eq("project_id", projectId)
-          .eq("status", syncEventStatus)
-          .order("created_at", { ascending: false })
-          .limit(1),
-        supabase
-          .from(table)
-          .select("updated_at")
-          .eq("project_id", projectId)
-          .order("updated_at", { ascending: false })
-          .limit(1),
-      ]);
+      let evQuery = supabase
+        .from("kobo_sync_events")
+        .select("created_at,status")
+        .order("created_at", { ascending: false })
+        .limit(20);
+      let rowQuery = supabase
+        .from(table)
+        .select("updated_at")
+        .order("updated_at", { ascending: false })
+        .limit(1);
+      if (projectId) {
+        evQuery = evQuery.eq("project_id", projectId);
+        rowQuery = rowQuery.eq("project_id", projectId);
+      }
+      const [{ data: evs }, { data: row }] = await Promise.all([evQuery, rowQuery]);
       if (cancelled) return;
-      const times = [ev?.[0]?.created_at, row?.[0]?.updated_at]
+      const matching = (evs ?? []).filter((e) => {
+        const s = (e as { status?: string }).status;
+        return s === syncEventStatus || s === "success";
+      });
+      const times = [matching[0]?.created_at, row?.[0]?.updated_at]
         .filter(Boolean)
         .map((t) => new Date(t as string).getTime())
         .filter((t) => Number.isFinite(t));
-      if (times.length) setLastSyncedAt(Math.max(...times));
+      setLastSyncedAt(times.length ? Math.max(...times) : null);
     })();
     return () => { cancelled = true; };
   }, [projectId, table, syncEventStatus]);
 
   useEffect(() => {
-    if (!projectId) { setStatus("offline"); return; }
+    const scope = projectId ?? "all";
+    const tableFilter = projectId ? `project_id=eq.${projectId}` : undefined;
     const channel = supabase
-      .channel(`tab-sync-${table}-${projectId}-${Math.random().toString(36).slice(2, 10)}`)
+      .channel(`tab-sync-${table}-${scope}-${Math.random().toString(36).slice(2, 10)}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table, filter: `project_id=eq.${projectId}` },
+        { event: "*", schema: "public", table, ...(tableFilter ? { filter: tableFilter } : {}) },
         () => setLastSyncedAt(Date.now()),
       )
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "kobo_sync_events", filter: `project_id=eq.${projectId}` },
+        { event: "INSERT", schema: "public", table: "kobo_sync_events", ...(tableFilter ? { filter: tableFilter } : {}) },
         (payload: { new?: { status?: string } }) => {
-          if (payload?.new?.status === syncEventStatus) setLastSyncedAt(Date.now());
+          const s = payload?.new?.status;
+          if (s === syncEventStatus || s === "success") setLastSyncedAt(Date.now());
         },
       )
       .subscribe((s) => {
