@@ -409,7 +409,7 @@ Deno.serve(async (req) => {
     const today = new Date();
     const period = String(payload.period ?? previousPeriod(today));
     const { data: due } = await db.from("health_exchange_connections")
-      .select("*").eq("kind", "dhis2").eq("is_active", true).eq("auto_push_enabled", true);
+      .select("*").eq("kind", "dhis2").eq("is_active", true).eq("auto_push_enabled", true).neq("scope", "microplanning");
     const results: unknown[] = [];
     for (const c of (due ?? []) as Connection[]) {
       if (payload.force !== true && (today.getUTCDate() < Number(c.auto_push_day ?? 5) || c.last_auto_period === period)) continue;
@@ -438,6 +438,12 @@ Deno.serve(async (req) => {
     .maybeSingle();
   if (connErr || !conn) return json({ error: "Connection not found" }, 404);
   const connection = conn as Connection;
+
+  // Microplanning and Cases DHIS2 setups never share connections.
+  const connScope = (connection as unknown as { scope?: string }).scope ?? "cases";
+  if (action.startsWith("mp_") !== (connScope === "microplanning") && ["test", "pull_metadata", "dhis2_browse"].indexOf(action) < 0) {
+    return json({ error: action.startsWith("mp_") ? "Connect DHIS2 on the Geo Microplanning page first." : "This DHIS2 connection belongs to Geo Microplanning." }, 400);
+  }
 
   let headers: Record<string, string>;
   try {
