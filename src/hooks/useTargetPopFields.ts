@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { fetchSharedSetting, projectKeyFor, saveSharedSetting, subscribeSharedSetting } from "@/lib/microplanning/sharedSettings";
 
 export const TARGET_POP_DISAGGREGATION_FIELDS: { key: string; label: string; field: string }[] = [
   { key: "total_population", label: "Total Population (whole community)", field: "estimated_total_population" },
@@ -73,6 +74,21 @@ export function useTargetPopFields(projectName?: string | null) {
     };
   }, [storageKey, readCurrent]);
 
+  // Shared configuration: Owner/Super Admin choice applies to every user.
+  const projectKey = projectKeyFor(projectName);
+  useEffect(() => {
+    let cancelled = false;
+    const apply = (raw: unknown) => {
+      if (cancelled || !Array.isArray(raw)) return;
+      const next = validate(raw, fallback);
+      try { window.localStorage.setItem(storageKey, JSON.stringify(next)); } catch {}
+      setFieldsState(prev => (prev.length === next.length && prev.every((v, i) => v === next[i]) ? prev : next));
+    };
+    fetchSharedSetting(projectKey, "target_pop_fields").then(apply);
+    const off = subscribeSharedSetting(projectKey, "target_pop_fields", apply);
+    return () => { cancelled = true; off(); };
+  }, [projectKey, storageKey, fallback]);
+
   const setFields = useCallback((next: string[] | ((prev: string[]) => string[])) => {
     setFieldsState(prev => {
       const value = typeof next === "function" ? (next as (p: string[]) => string[])(prev) : next;
@@ -81,9 +97,10 @@ export function useTargetPopFields(projectName?: string | null) {
         window.localStorage.setItem(storageKey, JSON.stringify(cleaned));
         window.dispatchEvent(new Event(EVENT_NAME));
       } catch {}
+      void saveSharedSetting(projectKey, "target_pop_fields", cleaned);
       return cleaned;
     });
-  }, [storageKey, fallback]);
+  }, [storageKey, fallback, projectKey]);
 
   const calcTargetPop = useCallback(
     (entry: Record<string, any> | null | undefined): number => {

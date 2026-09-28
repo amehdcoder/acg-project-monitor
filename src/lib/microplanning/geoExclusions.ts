@@ -73,6 +73,9 @@ export async function fetchRemoteExclusions(scopeId: string): Promise<ExcludedRe
   return (data || []).map(rowToRef);
 }
 
+const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+const scopeProjectId = (scopeId: string) => scopeId.match(UUID_RE)?.[0] ?? null;
+
 /** Replace the shared archive for a scope. Silently no-ops when not permitted. */
 async function pushRemoteExclusions(scopeId: string, refs: ExcludedRef[]) {
   try {
@@ -94,6 +97,7 @@ async function pushRemoteExclusions(scopeId: string, refs: ExcludedRef[]) {
           population: r.population,
           archived_at: r.archivedAt,
           created_by: u?.user?.id ?? null,
+          project_id: scopeProjectId(scopeId),
         })),
         { onConflict: "scope_id,ex_key" },
       );

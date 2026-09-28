@@ -55,6 +55,7 @@ import LensScopeBanner, { lensScopeSummary } from "@/components/MdaLens/LensScop
 import MdaLensExportButton from "@/components/UserManagement/MdaLensExportButton";
 import { useProjectScope } from "@/hooks/useProjectScope";
 import { rowInScope } from "@/lib/projectScope";
+import { projectKeyFor, useSharedMicroplanSetting, validNumber } from "@/lib/microplanning/sharedSettings";
 import { useTargetPopFields } from "@/hooks/useTargetPopFields";
 import { fetchAllRowsKeyset } from "@/lib/fetchAllRowsKeyset";
 import { ShieldCheck, History as HistoryIcon, Layers as LayersIcon, ChevronDown, Accessibility, ArrowUpDown } from "lucide-react";
@@ -913,11 +914,6 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const [uploadingAlloc, setUploadingAlloc] = useState(false);
   const allocUploadRef = useRef<HTMLInputElement>(null);
   // % of total population that should be computed as the target population
-  const [medTargetPct, setMedTargetPct] = useState<number>(() => {
-    const v = parseFloat(localStorage.getItem("microplanning.medTargetPct") || "");
-    return Number.isFinite(v) && v > 0 && v <= 100 ? v : 100;
-  });
-  useEffect(() => { localStorage.setItem("microplanning.medTargetPct", String(medTargetPct)); }, [medTargetPct]);
   // Adoption flow: prompt admin to use uploaded population as project microplan data
   const [showAdoptDialog, setShowAdoptDialog] = useState(false);
   const [adopting, setAdopting] = useState(false);
@@ -970,6 +966,11 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     [projects, selectedProjectId],
   );
   const { calcTargetPop } = useTargetPopFields(selectedProjectName);
+  // Project-wide settings: Owner / Super Admin changes apply to every user.
+  const sharedProjectKey = projectKeyFor(selectedProjectName);
+  const [medTargetPct, setMedTargetPct] = useSharedMicroplanSetting<number>(sharedProjectKey, "med_target_pct", 100, validNumber(0.01, 100));
+  const [targetRatioMin, setTargetRatioMin] = useSharedMicroplanSetting<number>(sharedProjectKey, "target_ratio_min", 2.5, validNumber(0.01, 1000));
+  const [targetRatioMax, setTargetRatioMax] = useSharedMicroplanSetting<number>(sharedProjectKey, "target_ratio_max", 3.0, validNumber(0.01, 1000));
 
   const fetchProjects = useCallback(async () => {
     let data: { id: string; name: string }[] | null = null;
@@ -1757,16 +1758,6 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   };
 
   // User-configurable target drug-per-person ratio band (persisted)
-  const [targetRatioMin, setTargetRatioMin] = useState<number>(() => {
-    const v = parseFloat(localStorage.getItem("microplanning.targetRatioMin") || "");
-    return Number.isFinite(v) && v > 0 ? v : 2.5;
-  });
-  const [targetRatioMax, setTargetRatioMax] = useState<number>(() => {
-    const v = parseFloat(localStorage.getItem("microplanning.targetRatioMax") || "");
-    return Number.isFinite(v) && v > 0 ? v : 3.0;
-  });
-  useEffect(() => { localStorage.setItem("microplanning.targetRatioMin", String(targetRatioMin)); }, [targetRatioMin]);
-  useEffect(() => { localStorage.setItem("microplanning.targetRatioMax", String(targetRatioMax)); }, [targetRatioMax]);
   const TARGET_RATIO_MIN = targetRatioMin;
   const TARGET_RATIO_MAX = targetRatioMax;
   const TARGET_RATIO_MID = (TARGET_RATIO_MIN + TARGET_RATIO_MAX) / 2;
