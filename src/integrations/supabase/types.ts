@@ -8766,6 +8766,33 @@ export type Database = {
           },
         ]
       }
+      microplan_project_settings: {
+        Row: {
+          created_at: string
+          project_key: string
+          setting_key: string
+          updated_at: string
+          updated_by: string | null
+          value: Json
+        }
+        Insert: {
+          created_at?: string
+          project_key: string
+          setting_key: string
+          updated_at?: string
+          updated_by?: string | null
+          value: Json
+        }
+        Update: {
+          created_at?: string
+          project_key?: string
+          setting_key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
       microplan_reconciliation: {
         Row: {
           administered_quantity: number | null
