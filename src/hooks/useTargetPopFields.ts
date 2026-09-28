@@ -15,20 +15,28 @@ export const DEFAULT_TARGET_POP_FIELDS = ["children_5_14", "adults_15_plus"];
 export const TARGET_POP_STORAGE_KEY = "microplan-target-pop-fields";
 const EVENT_NAME = "microplan-target-pop-fields:changed";
 
-const validate = (arr: unknown): string[] => {
-  if (!Array.isArray(arr)) return DEFAULT_TARGET_POP_FIELDS;
+/** Per-project storage key so each project can remember its own selection. */
+export const targetPopStorageKeyFor = (projectName?: string | null): string =>
+  projectName ? `${TARGET_POP_STORAGE_KEY}:p:${projectName.trim().toLowerCase()}` : TARGET_POP_STORAGE_KEY;
+
+/** GiveWell projects target the 5–14 yrs cohort by default. */
+export const defaultTargetPopFieldsFor = (projectName?: string | null): string[] =>
+  projectName && /givewell/i.test(projectName) ? ["children_5_14"] : DEFAULT_TARGET_POP_FIELDS;
+
+const validate = (arr: unknown, fallback: string[]): string[] => {
+  if (!Array.isArray(arr)) return fallback;
   const valid = arr.filter((f): f is string => typeof f === "string" && TARGET_POP_DISAGGREGATION_FIELDS.some(o => o.key === f));
-  return valid.length > 0 ? valid : DEFAULT_TARGET_POP_FIELDS;
+  return valid.length > 0 ? valid : fallback;
 };
 
-const read = (): string[] => {
-  if (typeof window === "undefined") return DEFAULT_TARGET_POP_FIELDS;
+const read = (storageKey: string, fallback: string[]): string[] => {
+  if (typeof window === "undefined") return fallback;
   try {
-    const raw = window.localStorage.getItem(TARGET_POP_STORAGE_KEY);
-    if (!raw) return DEFAULT_TARGET_POP_FIELDS;
-    return validate(JSON.parse(raw));
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return fallback;
+    return validate(JSON.parse(raw), fallback);
   } catch {
-    return DEFAULT_TARGET_POP_FIELDS;
+    return fallback;
   }
 };
 
