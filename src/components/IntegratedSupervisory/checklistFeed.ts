@@ -143,15 +143,29 @@ export async function fetchScopedSubmissions(
   const since = latestSubmissionTime(prev);
   const canDelta = !!since && !!prev?.survey?.length;
 
+  // The server returns data in memory-safe chunks with a `next_start` cursor.
   const d = await callFeed({
     action: "fetch",
     feed_id: feedId ?? undefined,
     since: canDelta ? since : undefined,
     skip_schema: canDelta || undefined,
   });
+  const raw: any[] = Array.isArray(d?.results) ? [...d.results] : [];
+  let next: number | null = typeof d?.next_start === "number" ? d.next_start : null;
+  let guard = 0;
+  while (next !== null && guard++ < 40) {
+    const page = await callFeed({
+      action: "fetch",
+      feed_id: d?.feed?.id ?? feedId ?? undefined,
+      since: canDelta ? since : undefined,
+      skip_schema: true,
+      start: next,
+    });
+    if (Array.isArray(page?.results)) for (const r of page.results) raw.push(r);
+    next = typeof page?.next_start === "number" && page.next_start > next ? page.next_start : null;
+  }
 
   const scopeStates = (d?.scope_states ?? []) as string[];
-  const raw: any[] = Array.isArray(d?.results) ? d.results : [];
   // Defence-in-depth: the server already filtered, but every payload —
   // including realtime-triggered refetches and cached responses — is re-checked
   // against the caller's granted State(s) before it reaches the dashboard.
