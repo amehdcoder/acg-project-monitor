@@ -290,8 +290,8 @@ function classifyCommodity(name: string, fallback?: unknown) {
 
 async function resolveMicroplanDx(db: any, connection: any, headers: Record<string, string>) {
   const { data: maps } = await db.from("health_exchange_mappings").select("*").eq("connection_id", connection.id).like("indicator_key", "mp:%");
-  const byKpi = new Map<string, { dx: string; name: string }>();
-  for (const m of maps ?? []) byKpi.set(String(m.indicator_key).slice(3), { dx: m.category_option_combo ? `${m.remote_id}.${m.category_option_combo}` : m.remote_id, name: m.remote_name ?? m.remote_id });
+  const byKpi = new Map<string, { dx: string; name: string; id: string; coc: string | null; kind: string; auto?: boolean }>();
+  for (const m of maps ?? []) byKpi.set(String(m.indicator_key).slice(3), { dx: m.category_option_combo ? `${m.remote_id}.${m.category_option_combo}` : m.remote_id, name: m.remote_name ?? m.remote_id, id: m.remote_id, coc: m.category_option_combo ?? null, kind: m.dimensions?.kind ?? "dataElement" });
   let autoMapped = 0;
   if (byKpi.size < MICROPLAN_KPIS.length) {
     const [des, inds] = await Promise.all([
@@ -306,7 +306,8 @@ async function resolveMicroplanDx(db: any, connection: any, headers: Record<stri
     for (const k of MICROPLAN_KPIS) {
       const s = sug[k.key]?.[0];
       if (!byKpi.has(k.key) && s && s.score >= 0.6) {
-        byKpi.set(k.key, { dx: s.coc_id && s.coc_name !== "default" ? `${s.remote_id}.${s.coc_id}` : s.remote_id, name: s.remote_name });
+        const coc = s.coc_id && s.coc_name !== "default" ? s.coc_id : null;
+        byKpi.set(k.key, { dx: coc ? `${s.remote_id}.${coc}` : s.remote_id, name: s.remote_name, id: s.remote_id, coc, kind: s.kind, auto: true });
         autoMapped++;
       }
     }
@@ -675,9 +676,11 @@ Deno.serve(async (req) => {
         }).safeParse(payload);
         if (!p.success) return json({ error: "project_id and a DHIS2 period (YYYY, YYYYMM or YYYYQn) are required" }, 400);
         const { project_id, period, level, dry_run } = p.data;
-        const { data: maps } = await db.from("health_exchange_mappings").select("*").eq("connection_id", connection.id).like("indicator_key", "mp:%");
-        const pushable = (maps ?? []).filter((m: any) => (m.dimensions?.kind ?? "dataElement") === "dataElement");
-        if (!pushable.length) return json({ error: "Map at least one KPI to a DHIS2 data element first." }, 400);
+        // Saved mappings first; confident data-element matches fill the gaps silently.
+        const { byKpi: resolved } = await resolveMicroplanDx(db, connection, headers);
+        const pushable = [...resolved].filter(([, v]) => v.kind === "dataElement")
+          .map(([k, v]) => ({ indicator_key: `mp:${k}`, remote_id: v.id, category_option_combo: v.coc }));
+        if (!pushable.length) return json({ ok: false, error: "No microplanning KPI could be matched to a DHIS2 data element. Open the engine, choose a data element for at least one KPI and save the mappings." }, 200);
         const cols = ["state", "lga", "ward", ...MICROPLAN_KPIS.map((k) => k.column).filter(Boolean)] as string[];
         const rows: any[] = [];
         for (let from = 0; ; from += 1000) {
@@ -686,7 +689,7 @@ Deno.serve(async (req) => {
           rows.push(...(data ?? []));
           if (!data || data.length < 1000) break;
         }
-        if (!rows.length) return json({ error: "This project has no microplanning entries to send." }, 400);
+        if (!rows.length) return json({ ok: false, error: "This project has no microplanning entries to send." }, 200);
         const groups = aggregateEntries(rows, level);
         const ouLevel = level === "lga" ? 3 : 2;
         const ous = await remoteFetch(joinUrl(connection.base_url, `api/organisationUnits?fields=id,name,parent[name]&filter=level:eq:${ouLevel}&withinUserHierarchy=true&paging=false`), { headers }, 60000);
@@ -709,7 +712,7 @@ Deno.serve(async (req) => {
             dataValues.push({ dataElement: m.remote_id, orgUnit: ou, period, value: String(Math.round(v * 100) / 100), ...(m.category_option_combo ? { categoryOptionCombo: m.category_option_combo } : {}) });
           }
         }
-        if (!dataValues.length) return json({ ok: false, error: "No areas matched DHIS2 locations your account can report for.", unmatched }, 400);
+        if (!dataValues.length) return json({ ok: false, error: "No areas matched DHIS2 locations your account can report for.", unmatched }, 200);
         const res = await remoteFetch(joinUrl(connection.base_url, `api/dataValueSets?dryRun=${dry_run}&importStrategy=CREATE_AND_UPDATE`), { method: "POST", headers, body: JSON.stringify({ dataValues }) }, 120000);
         const b: any = res.body; const r = b?.response ?? b;
         const counts = r?.importCount ?? {};
