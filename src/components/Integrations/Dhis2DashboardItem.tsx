@@ -6,6 +6,7 @@ import {
 import { Loader2, Table2, Maximize2, FileText, AlertCircle } from "lucide-react";
 import { Analytics, DHIS2_COLORS, dataDims, fmt, nameOf, pivot } from "./dhis2Pivot";
 import { dhis2Call } from "./dhis2Api";
+import Dhis2NigeriaMap from "./Dhis2NigeriaMap";
 
 export type DashItem = { id: string; type: string; x: number; y: number; w: number; h: number; text: string | null; ref: { id: string; name: string; vizType: string | null } | null };
 export type VizResult = {
@@ -72,6 +73,7 @@ function ChartBody({ r }: { r: VizResult }) {
   if (type === "PIVOT_TABLE" || type === "REPORT_TABLE") {
     return <PivotTable compact a={a} rowDims={r.layout.rows.map((d) => d.dimension).filter((d) => dims.includes(d))} colDims={r.layout.columns.map((d) => d.dimension).filter((d) => dims.includes(d))} />;
   }
+  if (type === "MAP") return <Dhis2NigeriaMap analytics={a} />;
   const p = pivot(a, catDim === seriesDim ? [] : [catDim], [seriesDim]);
   const series = p.colKeys.map((k) => ({ key: k[0], name: nameOf(a, k[0]) }));
   const data = (p.rowKeys.length ? p.rowKeys : [[]]).map((rk) => {
@@ -110,7 +112,7 @@ function ChartBody({ r }: { r: VizResult }) {
   if (type.includes("AREA")) {
     return <ResponsiveContainer><AreaChart data={data} margin={{ top: 8, right: 12 }}>{grid}{axes()}{tip}{legend}{refs}{series.map((s, i) => <Area key={s.key} dataKey={s.key} name={s.name} stackId={stacked ? "s" : undefined} stroke={DHIS2_COLORS[i % 12]} fill={DHIS2_COLORS[i % 12]} fillOpacity={0.5} />)}</AreaChart></ResponsiveContainer>;
   }
-  const horizontal = type.includes("BAR") || type === "MAP";
+  const horizontal = type.includes("BAR");
   return (
     <ResponsiveContainer>
       <BarChart data={data} layout={horizontal ? "vertical" : "horizontal"} margin={{ top: 8, right: 16 }}>
