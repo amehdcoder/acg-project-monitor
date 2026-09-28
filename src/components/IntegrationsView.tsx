@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import GoogleAccountConnect from "@/components/Integrations/GoogleAccountConnect";
+import Dhis2IntegrationsHub from "@/components/Integrations/Dhis2IntegrationsHub";
 
 interface Form {
   id: string;
@@ -511,6 +512,8 @@ const IntegrationsView = () => {
           Connect your data with Google Sheets and Looker Studio
         </p>
       </div>
+
+      <Dhis2IntegrationsHub projects={projects} />
 
       {/* Integration Cards */}
       <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
