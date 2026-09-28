@@ -40,32 +40,36 @@ export function TabSyncStatus({ projectId, table, syncEventStatus, label, onResy
   const [, forceTick] = useState(0);
 
   // Seed from the actual last sync recorded in the database so the
-  // indicator shows the real last sync time instead of "not yet".
+  // indicator shows the real last sync time instead of "not yet" — even
+  // when no project is selected (dashboard view) or the page just opened.
   useEffect(() => {
-    if (!projectId) { setLastSyncedAt(null); return; }
     let cancelled = false;
     (async () => {
-      const [{ data: ev }, { data: row }] = await Promise.all([
-        supabase
-          .from("kobo_sync_events")
-          .select("created_at")
-          .eq("project_id", projectId)
-          .eq("status", syncEventStatus)
-          .order("created_at", { ascending: false })
-          .limit(1),
-        supabase
-          .from(table)
-          .select("updated_at")
-          .eq("project_id", projectId)
-          .order("updated_at", { ascending: false })
-          .limit(1),
-      ]);
+      let evQuery = supabase
+        .from("kobo_sync_events")
+        .select("created_at")
+        .order("created_at", { ascending: false })
+        .limit(20);
+      let rowQuery = supabase
+        .from(table)
+        .select("updated_at")
+        .order("updated_at", { ascending: false })
+        .limit(1);
+      if (projectId) {
+        evQuery = evQuery.eq("project_id", projectId);
+        rowQuery = rowQuery.eq("project_id", projectId);
+      }
+      const [{ data: evs }, { data: row }] = await Promise.all([evQuery, rowQuery]);
       if (cancelled) return;
-      const times = [ev?.[0]?.created_at, row?.[0]?.updated_at]
+      const matching = (evs ?? []).filter((e) => {
+        const s = (e as { status?: string }).status;
+        return s === syncEventStatus || s === "success";
+      });
+      const times = [matching[0]?.created_at, row?.[0]?.updated_at]
         .filter(Boolean)
         .map((t) => new Date(t as string).getTime())
         .filter((t) => Number.isFinite(t));
-      if (times.length) setLastSyncedAt(Math.max(...times));
+      setLastSyncedAt(times.length ? Math.max(...times) : null);
     })();
     return () => { cancelled = true; };
   }, [projectId, table, syncEventStatus]);
