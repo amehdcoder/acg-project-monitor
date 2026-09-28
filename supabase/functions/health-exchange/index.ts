@@ -288,6 +288,32 @@ function classifyCommodity(name: string, fallback?: unknown) {
     ? "surgical_consumable" : "morbidity_kit";
 }
 
+async function resolveMicroplanDx(db: any, connection: any, headers: Record<string, string>) {
+  const { data: maps } = await db.from("health_exchange_mappings").select("*").eq("connection_id", connection.id).like("indicator_key", "mp:%");
+  const byKpi = new Map<string, { dx: string; name: string }>();
+  for (const m of maps ?? []) byKpi.set(String(m.indicator_key).slice(3), { dx: m.category_option_combo ? `${m.remote_id}.${m.category_option_combo}` : m.remote_id, name: m.remote_name ?? m.remote_id });
+  let autoMapped = 0;
+  if (byKpi.size < MICROPLAN_KPIS.length) {
+    const [des, inds] = await Promise.all([
+      remoteFetch(joinUrl(connection.base_url, "api/dataElements?fields=id,name,categoryCombo[categoryOptionCombos[id,name]]&filter=domainType:eq:AGGREGATE&paging=false"), { headers }, 60000),
+      remoteFetch(joinUrl(connection.base_url, "api/indicators?fields=id,name&paging=false"), { headers }, 60000),
+    ]);
+    const els: RemoteElement[] = [
+      ...(((des.body as any)?.dataElements ?? []).map((e: any) => ({ id: e.id, name: e.name, kind: "dataElement" as const, categoryOptionCombos: e.categoryCombo?.categoryOptionCombos ?? [] }))),
+      ...(((inds.body as any)?.indicators ?? []).map((i: any) => ({ id: i.id, name: i.name, kind: "indicator" as const }))),
+    ];
+    const sug = suggestMappings(els, 1);
+    for (const k of MICROPLAN_KPIS) {
+      const s = sug[k.key]?.[0];
+      if (!byKpi.has(k.key) && s && s.score >= 0.6) {
+        byKpi.set(k.key, { dx: s.coc_id && s.coc_name !== "default" ? `${s.remote_id}.${s.coc_id}` : s.remote_id, name: s.remote_name });
+        autoMapped++;
+      }
+    }
+  }
+  return { byKpi, autoMapped };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -548,34 +574,77 @@ Deno.serve(async (req) => {
       case "mp_schema": {
         if (connection.kind !== "dhis2") return json({ error: "Microplanning exchange needs a DHIS2 connection" }, 400);
         const base = connection.base_url;
-        const [sets, inds, levels, programs, info] = await Promise.all([
-          remoteFetch(joinUrl(base, "api/dataSets?fields=id,name,periodType,dataSetElements[dataElement[id,name,valueType,categoryCombo[id,name,categoryOptionCombos[id,name]]]]&paging=false"), { headers }, 60000),
-          remoteFetch(joinUrl(base, "api/indicators?fields=id,name&paging=false"), { headers }, 60000),
+        const [sets, inds, levels, programs, info, combos, deGroups, ouGroups, meRes, indGroups] = await Promise.all([
+          remoteFetch(joinUrl(base, "api/dataSets?fields=id,name,shortName,periodType,openFuturePeriods,timelyDays,categoryCombo[name],organisationUnits~size,dataSetElements[dataElement[id,name,shortName,code,valueType,aggregationType,domainType,zeroIsSignificant,categoryCombo[id,name,categoryOptionCombos[id,name]]]]&paging=false"), { headers }, 60000),
+          remoteFetch(joinUrl(base, "api/indicators?fields=id,name,shortName,code,indicatorType[name],numeratorDescription,denominatorDescription,annualized,indicatorGroups[name]&paging=false"), { headers }, 60000),
           remoteFetch(joinUrl(base, "api/organisationUnitLevels?fields=level,name&paging=false"), { headers }, 30000),
-          remoteFetch(joinUrl(base, "api/programs?fields=id~size&paging=false"), { headers }, 30000),
+          remoteFetch(joinUrl(base, "api/programs?fields=id,name,programType,trackedEntityType[name],programStages[name]&paging=false"), { headers }, 30000),
           remoteFetch(joinUrl(base, "api/system/info"), { headers }, 30000),
+          remoteFetch(joinUrl(base, "api/categoryCombos?fields=id,name,dataDimensionType,categories[name],categoryOptionCombos~size&paging=false"), { headers }, 30000),
+          remoteFetch(joinUrl(base, "api/dataElementGroups?fields=id,name,dataElements~size&paging=false"), { headers }, 30000),
+          remoteFetch(joinUrl(base, "api/organisationUnitGroups?fields=id,name,organisationUnits~size&paging=false"), { headers }, 30000),
+          remoteFetch(joinUrl(base, "api/me?fields=username,displayName,userRoles[name],organisationUnits[id,name,level]"), { headers }, 30000),
+          remoteFetch(joinUrl(base, "api/indicatorGroups?fields=id,name,indicators~size&paging=false"), { headers }, 30000),
         ]);
         if (!sets.ok) return json({ error: remoteMessage(sets.body, `HTTP ${sets.status}`) }, 502);
         const seen = new Map<string, RemoteElement>();
         const dataSets = ((sets.body as any)?.dataSets ?? []).map((d: any) => {
           const els = (d.dataSetElements ?? []).map((x: any) => x.dataElement).filter(Boolean);
-          for (const e of els) if (!seen.has(e.id)) seen.set(e.id, { id: e.id, name: e.name, kind: "dataElement", dataSet: d.id, categoryOptionCombos: e.categoryCombo?.categoryOptionCombos ?? [] });
-          return { id: d.id, name: d.name, periodType: d.periodType, elementCount: els.length };
+          for (const e of els) if (!seen.has(e.id)) seen.set(e.id, { id: e.id, name: e.name, kind: "dataElement", dataSet: d.id, categoryOptionCombos: e.categoryCombo?.categoryOptionCombos ?? [], shortName: e.shortName ?? null, code: e.code ?? null, valueType: e.valueType ?? null, aggregationType: e.aggregationType ?? null, categoryCombo: e.categoryCombo?.name ?? null } as RemoteElement);
+          return { id: d.id, name: d.name, shortName: d.shortName ?? null, periodType: d.periodType, elementCount: els.length, elementIds: els.map((e: any) => e.id), orgUnitCount: d.organisationUnits ?? null, categoryCombo: d.categoryCombo?.name ?? null, openFuturePeriods: d.openFuturePeriods ?? 0, timelyDays: d.timelyDays ?? null };
         }).sort((a: any, b: any) => a.name.localeCompare(b.name));
         const indicators = inds.ok ? ((inds.body as any)?.indicators ?? []) : [];
-        const elements: RemoteElement[] = [...seen.values(), ...indicators.map((i: any) => ({ id: i.id, name: i.name, kind: "indicator" as const }))];
+        const elements: RemoteElement[] = [...seen.values(), ...indicators.map((i: any) => ({ id: i.id, name: i.name, kind: "indicator" as const, shortName: i.shortName ?? null, code: i.code ?? null, indicatorType: i.indicatorType?.name ?? null, numerator: i.numeratorDescription ?? null, denominator: i.denominatorDescription ?? null, groups: (i.indicatorGroups ?? []).map((g: any) => g.name) } as RemoteElement))];
+        const ok = (r: any, key: string) => (r.ok ? ((r.body as any)?.[key] ?? []) : []);
+        const programList = ok(programs, "programs").map((pr: any) => ({ id: pr.id, name: pr.name, programType: pr.programType, trackedEntityType: pr.trackedEntityType?.name ?? null, stages: (pr.programStages ?? []).map((st: any) => st.name) }));
+        const meB: any = meRes.ok ? meRes.body : {};
         const { data: saved } = await db.from("health_exchange_mappings").select("*").eq("connection_id", connection.id).like("indicator_key", "mp:%");
         await log(db, connection, "pull", "microplan_schema", "success", elements.length, "Microplanning schema detected", guard.userId);
         return json({
           ok: true,
-          system: { name: (info.body as any)?.systemName ?? null, version: (info.body as any)?.version ?? null },
+          system: { name: (info.body as any)?.systemName ?? null, version: (info.body as any)?.version ?? null, serverDate: (info.body as any)?.serverDate ?? null, lastAnalytics: (info.body as any)?.lastAnalyticsTableSuccess ?? null, calendar: (info.body as any)?.calendar ?? null },
+          user: { username: meB?.username ?? null, displayName: meB?.displayName ?? null, roles: (meB?.userRoles ?? []).map((r: any) => r.name), orgUnits: meB?.organisationUnits ?? [] },
+          programs: programList,
+          categoryCombos: ok(combos, "categoryCombos").map((c: any) => ({ id: c.id, name: c.name, type: c.dataDimensionType, categories: (c.categories ?? []).map((x: any) => x.name), cocCount: c.categoryOptionCombos ?? 0 })),
+          dataElementGroups: ok(deGroups, "dataElementGroups").map((g: any) => ({ id: g.id, name: g.name, size: g.dataElements ?? 0 })),
+          indicatorGroups: ok(indGroups, "indicatorGroups").map((g: any) => ({ id: g.id, name: g.name, size: g.indicators ?? 0 })),
+          orgUnitGroups: ok(ouGroups, "organisationUnitGroups").map((g: any) => ({ id: g.id, name: g.name, size: g.organisationUnits ?? 0 })),
           kpis: MICROPLAN_KPIS.map(({ key, label }) => ({ key, label })),
           dataSets, elements,
           levels: levels.ok ? ((levels.body as any)?.organisationUnitLevels ?? []).sort((a: any, b: any) => a.level - b.level) : [],
-          counts: { dataSets: dataSets.length, dataElements: seen.size, indicators: indicators.length, programs: programs.ok ? ((programs.body as any)?.programs ?? []).length : 0 },
+          counts: { dataSets: dataSets.length, dataElements: seen.size, indicators: indicators.length, programs: programList.length, categoryCombos: ok(combos, "categoryCombos").length, orgUnitGroups: ok(ouGroups, "organisationUnitGroups").length },
           suggestions: suggestMappings(elements),
           mappings: saved ?? [],
         });
+      }
+
+      case "mp_years": {
+        if (connection.kind !== "dhis2") return json({ error: "DHIS2 connection required" }, 400);
+        const { byKpi } = await resolveMicroplanDx(db, connection, headers);
+        const now = new Date().getFullYear();
+        const candidates = Array.from({ length: 12 }, (_, i) => String(now - i));
+        if (!byKpi.size) return json({ ok: true, years: [], candidates, reason: "No DHIS2 items matched the microplanning KPIs yet." });
+        const me = await remoteFetch(joinUrl(connection.base_url, "api/me?fields=organisationUnits[id]"), { headers }, 30000);
+        const root = ((me.body as any)?.organisationUnits ?? []).map((o: any) => o.id).join(";");
+        if (!root) return json({ ok: true, years: [], candidates, reason: "Your DHIS2 account has no assigned locations." });
+        const dx = [...new Set([...byKpi.values()].map((v) => v.dx))].slice(0, 40).join(";");
+        const an = await remoteFetch(joinUrl(connection.base_url, `api/analytics?dimension=dx:${dx}&dimension=pe:${candidates.join(";")}&filter=ou:${root}&skipMeta=true&ignoreLimit=true`), { headers }, 90000);
+        if (!an.ok) return json({ ok: true, years: [], candidates, reason: `DHIS2 analytics: ${remoteMessage(an.body, `HTTP ${an.status}`)}` });
+        const a: any = an.body;
+        const hdr = (a?.headers ?? []).map((h: any) => h.name);
+        const iDx = hdr.indexOf("dx"), iPe = hdr.indexOf("pe"), iV = hdr.indexOf("value");
+        const per = new Map<string, { values: number; kpis: Set<string>; total: number }>();
+        const dxToKpi = new Map<string, string[]>();
+        for (const [k, v] of byKpi) dxToKpi.set(v.dx, [...(dxToKpi.get(v.dx) ?? []), k]);
+        for (const row of a?.rows ?? []) {
+          const y = String(row[iPe]); const g = per.get(y) ?? { values: 0, kpis: new Set<string>(), total: 0 };
+          g.values++; g.total += Number(row[iV]) || 0;
+          for (const k of dxToKpi.get(row[iDx]) ?? []) g.kpis.add(k);
+          per.set(y, g);
+        }
+        const out = [...per].map(([year, g]) => ({ year, values: g.values, kpis: g.kpis.size, total: Math.round(g.total) }))
+          .sort((x, y) => y.year.localeCompare(x.year));
+        return json({ ok: true, years: out, candidates, kpisChecked: byKpi.size });
       }
 
       case "mp_save_mappings": {
@@ -660,28 +729,7 @@ Deno.serve(async (req) => {
         if (!p.success) return json({ error: "project_id and a DHIS2 period are required" }, 400);
         const { project_id, period, level } = p.data;
         // Silent background mapping: saved mappings first, strong suggestions fill gaps.
-        const { data: maps } = await db.from("health_exchange_mappings").select("*").eq("connection_id", connection.id).like("indicator_key", "mp:%");
-        const byKpi = new Map<string, { dx: string; name: string }>();
-        for (const m of maps ?? []) byKpi.set(String(m.indicator_key).slice(3), { dx: m.category_option_combo ? `${m.remote_id}.${m.category_option_combo}` : m.remote_id, name: m.remote_name ?? m.remote_id });
-        let autoMapped = 0;
-        if (byKpi.size < MICROPLAN_KPIS.length) {
-          const [des, inds] = await Promise.all([
-            remoteFetch(joinUrl(connection.base_url, "api/dataElements?fields=id,name,categoryCombo[categoryOptionCombos[id,name]]&filter=domainType:eq:AGGREGATE&paging=false"), { headers }, 60000),
-            remoteFetch(joinUrl(connection.base_url, "api/indicators?fields=id,name&paging=false"), { headers }, 60000),
-          ]);
-          const els: RemoteElement[] = [
-            ...(((des.body as any)?.dataElements ?? []).map((e: any) => ({ id: e.id, name: e.name, kind: "dataElement" as const, categoryOptionCombos: e.categoryCombo?.categoryOptionCombos ?? [] }))),
-            ...(((inds.body as any)?.indicators ?? []).map((i: any) => ({ id: i.id, name: i.name, kind: "indicator" as const }))),
-          ];
-          const sug = suggestMappings(els, 1);
-          for (const k of MICROPLAN_KPIS) {
-            const s = sug[k.key]?.[0];
-            if (!byKpi.has(k.key) && s && s.score >= 0.6) {
-              byKpi.set(k.key, { dx: s.coc_id && s.coc_name !== "default" ? `${s.remote_id}.${s.coc_id}` : s.remote_id, name: s.remote_name });
-              autoMapped++;
-            }
-          }
-        }
+        const { byKpi, autoMapped } = await resolveMicroplanDx(db, connection, headers);
         if (!byKpi.size) return json({ error: "No DHIS2 data matched the microplanning KPIs. Map them in the engine first." }, 400);
         let root = p.data.org_unit;
         if (!root) {
