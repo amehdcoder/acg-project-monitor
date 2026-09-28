@@ -34,6 +34,37 @@ export function TabSyncStatus({ projectId, table, syncEventStatus, label, onResy
   const [resyncing, setResyncing] = useState(false);
   const [, forceTick] = useState(0);
 
+  // Seed from the actual last sync recorded in the database so the
+  // indicator shows the real last sync time instead of "not yet".
+  useEffect(() => {
+    if (!projectId) { setLastSyncedAt(null); return; }
+    let cancelled = false;
+    (async () => {
+      const [{ data: ev }, { data: row }] = await Promise.all([
+        supabase
+          .from("kobo_sync_events")
+          .select("created_at")
+          .eq("project_id", projectId)
+          .eq("status", syncEventStatus)
+          .order("created_at", { ascending: false })
+          .limit(1),
+        supabase
+          .from(table)
+          .select("updated_at")
+          .eq("project_id", projectId)
+          .order("updated_at", { ascending: false })
+          .limit(1),
+      ]);
+      if (cancelled) return;
+      const times = [ev?.[0]?.created_at, row?.[0]?.updated_at]
+        .filter(Boolean)
+        .map((t) => new Date(t as string).getTime())
+        .filter((t) => Number.isFinite(t));
+      if (times.length) setLastSyncedAt(Math.max(...times));
+    })();
+    return () => { cancelled = true; };
+  }, [projectId, table, syncEventStatus]);
+
   useEffect(() => {
     if (!projectId) { setStatus("offline"); return; }
     const channel = supabase
