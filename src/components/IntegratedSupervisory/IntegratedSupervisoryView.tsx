@@ -359,7 +359,7 @@ export default function IntegratedSupervisoryView() {
             )}
 
             <KoboSyncStatus
-              phase={syncing ? "syncing" : syncError ? "error" : "synced"}
+              phase={manualSyncing ? "syncing" : syncError ? "error" : "synced"}
               lastSyncedAt={latestUpdateAt}
               live={connected}
               lastEventAt={lastEventAt}
@@ -406,7 +406,7 @@ export default function IntegratedSupervisoryView() {
             )}
 
             <Button onClick={() => refresh(false)} disabled={syncing}>
-              {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Server className="h-4 w-4 mr-1" />}
+              {manualSyncing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Server className="h-4 w-4 mr-1" />}
               Sync Now
             </Button>
 
@@ -475,7 +475,7 @@ export default function IntegratedSupervisoryView() {
         {showTab("checklist") && (
           <TabsContent value="checklist" className="mt-4">
             <Suspense fallback={<TabFallback />}>
-              <ChecklistDashboard cache={scopedCache} onRefresh={() => refresh(false)} syncing={syncing} />
+              <ChecklistDashboard cache={scopedCache} onRefresh={() => refresh(false)} syncing={manualSyncing} />
             </Suspense>
           </TabsContent>
         )}
@@ -490,7 +490,7 @@ export default function IntegratedSupervisoryView() {
         {showTab("studio") && (
           <TabsContent value="studio" className="mt-4">
             <Suspense fallback={<TabFallback />}>
-              <SupervisoryDashboardView cache={scopedCache} onRefresh={() => refresh(false)} syncing={syncing} />
+              <SupervisoryDashboardView cache={scopedCache} onRefresh={() => refresh(false)} syncing={manualSyncing} />
             </Suspense>
           </TabsContent>
         )}
