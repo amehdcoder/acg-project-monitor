@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
+import { useTargetPopFields, defaultTargetPopFieldsFor } from "@/hooks/useTargetPopFields";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +46,7 @@ interface MicroplanEntry {
 interface MicroplanMapProps {
   entries: MicroplanEntry[];
   onEntryClick?: (id: string) => void;
+  projectName?: string | null;
 }
 
 type ThematicLayer = "none" | "flhf_catchment" | "distance" | "accessibility" | "security" | "terrain" | "cdd_origin" | "population" | "pop_density" | "distance_choropleth" | "coverage_gap" | "catchment_buffers";
@@ -139,8 +141,6 @@ const DISAGGREGATION_FIELDS: { key: string; label: string; field: keyof Micropla
   { key: "trachoma_15_plus", label: "Trachoma 15+ yrs", field: "trachoma_15_plus" as keyof MicroplanEntry },
 ];
 
-const DEFAULT_TARGET_POP_FIELDS = ["children_5_14", "adults_15_plus"];
-const TARGET_POP_STORAGE_KEY = "microplan-target-pop-fields";
 
 // ─── Multi-select dropdown component ───
 const MultiSelectDropdown = ({ values, onChange, options, placeholder, disabled }: {
@@ -205,7 +205,7 @@ const MultiSelectDropdown = ({ values, onChange, options, placeholder, disabled 
 };
 
 // ─── Component ───
-const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
+const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const { attach: attachSv, panel: streetViewPanel } = useLeafletStreetView();
   const mapInstanceRef = useRef<any>(null);
@@ -221,36 +221,9 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
   const [exportingPDF, setExportingPDF] = useState(false);
   const fullscreenRef = useRef<HTMLDivElement>(null);
 
-  // Target Pop disaggregation config
-  const [targetPopFields, setTargetPopFields] = useState<string[]>(() => {
-    if (typeof window === "undefined") return DEFAULT_TARGET_POP_FIELDS;
-
-    const saved = window.localStorage.getItem(TARGET_POP_STORAGE_KEY);
-    if (!saved) return DEFAULT_TARGET_POP_FIELDS;
-
-    try {
-      const parsed = JSON.parse(saved);
-      const validFields = Array.isArray(parsed)
-        ? parsed.filter((field): field is string => DISAGGREGATION_FIELDS.some((option) => option.key === field))
-        : [];
-
-      return validFields.length > 0 ? validFields : DEFAULT_TARGET_POP_FIELDS;
-    } catch {
-      return DEFAULT_TARGET_POP_FIELDS;
-    }
-  });
-
-  useEffect(() => {
-    window.localStorage.setItem(TARGET_POP_STORAGE_KEY, JSON.stringify(targetPopFields));
-  }, [targetPopFields]);
-
-  const calcTargetPop = useCallback((entry: MicroplanEntry) => {
-    return targetPopFields.reduce((sum, key) => {
-      const fieldDef = DISAGGREGATION_FIELDS.find(f => f.key === key);
-      if (!fieldDef) return sum;
-      return sum + ((entry[fieldDef.field] as number) || 0);
-    }, 0);
-  }, [targetPopFields]);
+  // Target Pop disaggregation config (shared, per-project; GiveWell defaults to 5–14 yrs)
+  const { fields: targetPopFields, setFields: setTargetPopFields, calcTargetPop } = useTargetPopFields(projectName);
+  const resetTargetPopFields = defaultTargetPopFieldsFor(projectName);
 
   const targetPopLabel = useMemo(() => {
     if (targetPopFields.length === 0) return "None selected";
@@ -389,7 +362,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
     return agg;
   }, [cascadedEntries]);
 
-  const maxPop = useMemo(() => Math.max(...cascadedEntries.map(e => e.estimated_total_population || 0), 1), [cascadedEntries]);
+  const maxPop = useMemo(() => cascadedEntries.reduce((m, e) => Math.max(m, e.estimated_total_population || 0), 1), [cascadedEntries]);
 
   // CDD Stats
   const cddStats = useMemo(() => {
@@ -489,7 +462,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
     const map = mapInstanceRef.current;
     if (!L || !map) return;
 
-    if (layersRef.current) layersRef.current.clearLayers();
+    if (layersRef.current) { layersRef.current.clearLayers(); map.removeLayer(layersRef.current); }
     const group = L.layerGroup().addTo(map);
     layersRef.current = group;
 
@@ -1237,7 +1210,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
                   ))}
                 </div>
                 <div className="border-t border-border pt-2 mt-2 flex items-center justify-between">
-                  <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => setTargetPopFields(DEFAULT_TARGET_POP_FIELDS)}>Reset Default</Button>
+                  <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => setTargetPopFields(resetTargetPopFields)}>Reset Default</Button>
                   <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => setTargetPopFields(DISAGGREGATION_FIELDS.map(f => f.key))}>Select All</Button>
                 </div>
               </div>

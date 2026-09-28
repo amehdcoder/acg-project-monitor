@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 export const TARGET_POP_DISAGGREGATION_FIELDS: { key: string; label: string; field: string }[] = [
   { key: "total_population", label: "Total Population (whole community)", field: "estimated_total_population" },
@@ -47,14 +47,17 @@ const read = (storageKey: string, fallback: string[]): string[] => {
  */
 export function useTargetPopFields(projectName?: string | null) {
   const storageKey = targetPopStorageKeyFor(projectName);
-  const fallback = defaultTargetPopFieldsFor(projectName);
+  const isGiveWell = !!projectName && /givewell/i.test(projectName);
+  // Stable reference: a fresh array each render caused an endless re-render loop (page freeze).
+  const fallback = useMemo(() => (isGiveWell ? ["children_5_14"] : DEFAULT_TARGET_POP_FIELDS), [isGiveWell]);
   const readCurrent = useCallback(() => read(storageKey, fallback), [storageKey, fallback]);
 
   const [fields, setFieldsState] = useState<string[]>(readCurrent);
 
   // Re-read when the project changes so a switched project shows its own selection.
   useEffect(() => {
-    setFieldsState(readCurrent());
+    const next = readCurrent();
+    setFieldsState(prev => (prev.length === next.length && prev.every((v, i) => v === next[i]) ? prev : next));
   }, [readCurrent]);
 
   useEffect(() => {

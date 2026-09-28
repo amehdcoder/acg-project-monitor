@@ -2998,6 +2998,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
           {activeView === "map" && (
             <MicroplanMap
               entries={filtered}
+              projectName={selectedProjectName}
               onEntryClick={(id) => {
                 if (lensReadOnly) { blockLensWrite(); return; }
                 const entry = entries.find(e => e.id === id);
