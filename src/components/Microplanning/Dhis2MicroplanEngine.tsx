@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import Dhis2MicroplanConnectDialog from "./Dhis2MicroplanConnectDialog";
 import { ArrowDownToLine, ArrowUpFromLine, Database, Loader2, Lock, Network, RefreshCw, Sparkles, Wand2 } from "lucide-react";
 
 type Conn = { id: string; name: string; base_url: string; project_id: string; last_sync_at: string | null; last_status: string | null };
@@ -57,15 +58,25 @@ export default function Dhis2MicroplanEngine({ projectId, projectName, canUse, o
   const [result, setResult] = useState<any>(null);
   const [filter, setFilter] = useState("");
 
-  useEffect(() => {
+  const [connectOpen, setConnectOpen] = useState(false);
+  const loadConns = useCallback((prefer?: string) => {
+    if (!projectId) { setConns([]); setConnId(""); return; }
     supabase.from("health_exchange_connections").select("id,name,base_url,project_id,last_sync_at,last_status")
-      .eq("kind", "dhis2").eq("is_active", true).order("created_at", { ascending: false })
+      .eq("kind", "dhis2").eq("is_active", true).eq("scope", "microplanning").eq("project_id", projectId)
+      .order("created_at", { ascending: false })
       .then(({ data }) => {
         const list = (data ?? []) as Conn[];
-        setConns(list);
-        setConnId((cur) => cur || list.find((c) => c.project_id === projectId)?.id || list[0]?.id || "");
+        setConns(list); setSchema(null);
+        setConnId(prefer && list.some((c) => c.id === prefer) ? prefer : list[0]?.id || "");
       });
   }, [projectId]);
+  useEffect(() => { loadConns(); }, [loadConns]);
+
+  const disconnect = async () => {
+    if (!connId || !confirm("Disconnect DHIS2 from Geo Microplanning for this project?")) return;
+    try { await call({ action: "dhis2_disconnect", connection_id: connId }); toast.success("Disconnected"); loadConns(); }
+    catch (e) { toast.error((e as Error).message); }
+  };
 
   const conn = conns.find((c) => c.id === connId);
   const elById = useMemo(() => new Map((schema?.elements ?? []).map((e) => [e.id, e])), [schema]);
@@ -140,7 +151,7 @@ export default function Dhis2MicroplanEngine({ projectId, projectName, canUse, o
   };
 
   const mappedCount = Object.keys(picks).length;
-  const disabledReason = !canUse ? "Only Owners, Super Admins and Systems Admins can use the exchange" : !conns.length ? "No DHIS2 connection yet — add one in Data Exchange" : !projectId ? "Select a project first" : null;
+  const disabledReason = !canUse ? "Only Owners, Super Admins and Systems Admins can use the exchange" : !conns.length ? "Connect DHIS2 for this project to start" : !projectId ? "Select a project first" : null;
 
   return (
     <>
@@ -167,10 +178,19 @@ export default function Dhis2MicroplanEngine({ projectId, projectName, canUse, o
           <Button size="sm" variant="outline" disabled={!!disabledReason} onClick={() => setOpen(true)}>
             <Sparkles className="h-3.5 w-3.5 mr-1" /> Open engine
           </Button>
+          {canUse && projectId && (
+            <Button size="sm" variant={conn ? "ghost" : "default"} onClick={() => setConnectOpen(true)}>
+              <Network className="h-3.5 w-3.5 mr-1" /> {conn ? "Change connection" : "Connect DHIS2"}
+            </Button>
+          )}
+          {canUse && conn && <Button size="sm" variant="ghost" className="text-destructive" onClick={disconnect}>Disconnect</Button>}
         </div>
         {disabledReason && <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Lock className="h-3 w-3" /> {disabledReason}</p>}
         {result?.type === "pull" && !open && <p className="text-[11px] text-foreground">Pulled {result.areas} areas · {result.kpis} KPIs matched{result.autoMapped ? ` (${result.autoMapped} automatically)` : ""}.</p>}
       </Card>
+
+      <Dhis2MicroplanConnectDialog open={connectOpen} onOpenChange={setConnectOpen} projectId={projectId}
+        existingId={connId || undefined} onConnected={(id) => loadConns(id)} />
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-5xl max-h-[90dvh] overflow-y-auto">

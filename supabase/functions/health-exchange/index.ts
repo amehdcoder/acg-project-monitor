@@ -316,26 +316,44 @@ Deno.serve(async (req) => {
     return json({ ok: true });
   }
 
-  // DHIS2 sign-in: verify username/password against the instance, save them
-  // server-side as a basic-auth connection, and return what the account can report.
+  // Disconnect a page-scoped DHIS2 connection (microplanning setup is separate from Cases).
+  if (action === "dhis2_disconnect") {
+    if (!connectionId) return json({ error: "connection_id required" }, 400);
+    const { data: c } = await db.from("health_exchange_connections").select("id").eq("id", connectionId).maybeSingle();
+    if (!c) return json({ error: "Connection not found" }, 404);
+    await db.from("health_exchange_credentials").delete().eq("connection_id", connectionId);
+    const { error } = await db.from("health_exchange_connections").update({ is_active: false }).eq("id", connectionId);
+    if (error) return json({ error: error.message }, 400);
+    return json({ ok: true });
+  }
+
+  // DHIS2 sign-in: verify username/password (or a personal access token) against
+  // the instance, save server-side, and return what the account can report.
   if (action === "dhis2_login") {
     const input = z.object({
       project_id: z.string().uuid(),
       base_url: z.string().trim().url().max(300).refine((u) => u.startsWith("https://"), "Server address must start with https://"),
-      username: z.string().trim().min(1).max(150),
-      password: z.string().min(1).max(500),
+      username: z.string().trim().max(150).optional(),
+      password: z.string().max(500).optional(),
+      token: z.string().trim().max(500).optional(),
+      scope: z.enum(["cases", "microplanning"]).default("cases"),
       connection_id: z.string().uuid().optional(),
     }).safeParse(payload);
     if (!input.success) return json({ error: input.error.issues[0]?.message ?? "Invalid sign-in details" }, 400);
-    const { project_id, username, password } = input.data;
+    const { project_id, scope } = input.data;
+    const token = input.data.token ?? "";
+    const username = input.data.username ?? "";
+    const password = input.data.password ?? "";
+    const usePat = token.length > 0;
+    if (!usePat && (!username || !password)) return json({ error: "Enter a username and password, or a personal access token." }, 400);
     const base = input.data.base_url.replace(/\/+$/, "");
-    const h = { Accept: "application/json", Authorization: `Basic ${btoa(`${username}:${password}`)}` };
+    const h = { Accept: "application/json", Authorization: usePat ? `ApiToken ${token}` : `Basic ${btoa(`${username}:${password}`)}` };
     const [me, sets, info] = await Promise.all([
       remoteFetch(joinUrl(base, "api/me?fields=username,displayName,email,organisationUnits[id,name,level],dataSets,userRoles[name],authorities"), { headers: h }, 30000),
       remoteFetch(joinUrl(base, "api/dataSets?fields=id,name,periodType,access[data[write]],dataSetElements~size,organisationUnits~size&paging=false"), { headers: h }, 60000),
       remoteFetch(joinUrl(base, "api/system/info"), { headers: h }, 30000),
     ]);
-    if (me.status === 401 || me.status === 403) return json({ error: "DHIS2 rejected that username or password." }, 401);
+    if (me.status === 401 || me.status === 403) return json({ error: usePat ? "DHIS2 rejected that access token." : "DHIS2 rejected that username or password." }, 401);
     if (!me.ok || typeof me.body !== "object") return json({ error: `Could not reach DHIS2 at that address (${remoteMessage(me.body, `HTTP ${me.status}`).slice(0, 200)}).` }, 502);
     const u: any = me.body;
     const assigned = new Set<string>(Array.isArray(u.dataSets) ? u.dataSets : []);
@@ -349,17 +367,19 @@ Deno.serve(async (req) => {
     })).filter((d: any) => d.canWrite || d.assigned)
       .sort((a: any, b: any) => Number(b.canWrite) - Number(a.canWrite) || a.name.localeCompare(b.name));
 
+    const authType = usePat ? "apitoken" : "basic";
+    const acct = u.username ?? username;
     const row = {
-      project_id, kind: "dhis2", base_url: base, auth_type: "basic", username,
-      name: `DHIS2 · ${u.displayName ?? username}`,
+      project_id, kind: "dhis2", base_url: base, auth_type: authType, username: acct, scope, is_active: true,
+      name: `DHIS2 · ${u.displayName ?? acct}`,
     };
     let connId = input.data.connection_id;
     if (connId) {
-      const { data: existing } = await db.from("health_exchange_connections").select("id").eq("id", connId).eq("project_id", project_id).maybeSingle();
+      const { data: existing } = await db.from("health_exchange_connections").select("id").eq("id", connId).eq("project_id", project_id).eq("scope", scope).maybeSingle();
       if (!existing) connId = undefined;
     }
     if (connId) {
-      const { error } = await db.from("health_exchange_connections").update({ base_url: base, auth_type: "basic", username }).eq("id", connId);
+      const { error } = await db.from("health_exchange_connections").update({ base_url: base, auth_type: authType, username: acct, name: row.name, is_active: true }).eq("id", connId);
       if (error) return json({ error: error.message }, 400);
     } else {
       const { data: created, error } = await db.from("health_exchange_connections").insert({ ...row, created_by: guard.userId }).select("id").single();
@@ -370,7 +390,7 @@ Deno.serve(async (req) => {
       } else connId = created.id;
     }
     const { error: credErr } = await db.from("health_exchange_credentials")
-      .upsert({ connection_id: connId, secret: password, updated_at: new Date().toISOString() });
+      .upsert({ connection_id: connId, secret: usePat ? token : password, updated_at: new Date().toISOString() });
     if (credErr) return json({ error: credErr.message }, 400);
     const { data: savedConn } = await db.from("health_exchange_connections").select("*").eq("id", connId).single();
     if (savedConn) await log(db, savedConn as Connection, "test", "dhis2_login", "success", reports.length, `Signed in as ${u.username ?? username}`, guard.userId);
@@ -389,7 +409,7 @@ Deno.serve(async (req) => {
     const today = new Date();
     const period = String(payload.period ?? previousPeriod(today));
     const { data: due } = await db.from("health_exchange_connections")
-      .select("*").eq("kind", "dhis2").eq("is_active", true).eq("auto_push_enabled", true);
+      .select("*").eq("kind", "dhis2").eq("is_active", true).eq("auto_push_enabled", true).neq("scope", "microplanning");
     const results: unknown[] = [];
     for (const c of (due ?? []) as Connection[]) {
       if (payload.force !== true && (today.getUTCDate() < Number(c.auto_push_day ?? 5) || c.last_auto_period === period)) continue;
@@ -418,6 +438,12 @@ Deno.serve(async (req) => {
     .maybeSingle();
   if (connErr || !conn) return json({ error: "Connection not found" }, 404);
   const connection = conn as Connection;
+
+  // Microplanning and Cases DHIS2 setups never share connections.
+  const connScope = (connection as unknown as { scope?: string }).scope ?? "cases";
+  if (action.startsWith("mp_") !== (connScope === "microplanning") && ["test", "pull_metadata", "dhis2_browse"].indexOf(action) < 0) {
+    return json({ error: action.startsWith("mp_") ? "Connect DHIS2 on the Geo Microplanning page first." : "This DHIS2 connection belongs to Geo Microplanning." }, 400);
+  }
 
   let headers: Record<string, string>;
   try {
