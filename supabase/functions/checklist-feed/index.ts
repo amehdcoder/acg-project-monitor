@@ -448,6 +448,7 @@ Deno.serve(async (req) => {
         total: results.length,
         scope_states: allowed.length ? caller.scopeStates : [],
         results: scoped,
+        next_start: nextStart,
       });
 
     }
