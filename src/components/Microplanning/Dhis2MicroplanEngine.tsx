@@ -10,13 +10,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import Dhis2MicroplanConnectDialog from "./Dhis2MicroplanConnectDialog";
-import { ArrowDownToLine, ArrowUpFromLine, Database, Loader2, Lock, Network, RefreshCw, Sparkles, Wand2 } from "lucide-react";
+import Dhis2SchemaExplorer from "./Dhis2SchemaExplorer";
+import { ArrowDownToLine, ArrowUpFromLine, Database, Loader2, Lock, Network, RefreshCw, Sparkles, Wand2, Compass, CalendarRange, CheckCircle2 } from "lucide-react";
 
 type Conn = { id: string; name: string; base_url: string; project_id: string; last_sync_at: string | null; last_status: string | null };
 type Coc = { id: string; name: string };
 type El = { id: string; name: string; kind: "dataElement" | "indicator"; dataSet?: string | null; categoryOptionCombos?: Coc[] };
 type Sug = { remote_id: string; remote_name: string; kind: El["kind"]; coc_id: string | null; coc_name: string | null; score: number };
-type Schema = {
+type YearInfo = { year: string; values: number; kpis: number; total: number };
+type Schema = Record<string, any> & {
   system: { name: string | null; version: string | null };
   kpis: { key: string; label: string }[];
   dataSets: { id: string; name: string; periodType: string; elementCount: number }[];
@@ -59,6 +61,24 @@ export default function Dhis2MicroplanEngine({ projectId, projectName, canUse, o
   const [filter, setFilter] = useState("");
 
   const [connectOpen, setConnectOpen] = useState(false);
+  const [pushOpen, setPushOpen] = useState(false);
+  const [years, setYears] = useState<YearInfo[] | null>(null);
+  const [yearsNote, setYearsNote] = useState<string | null>(null);
+  const [pType, setPType] = useState<"year" | "quarter" | "month">("year");
+  const [pYear, setPYear] = useState(defaultPeriod());
+  const [pSub, setPSub] = useState("1");
+  const pushPeriod = pType === "year" ? pYear : pType === "quarter" ? `${pYear}Q${pSub}` : `${pYear}${pSub.padStart(2, "0")}`;
+  const loadYears = useCallback(async () => {
+    if (!connId || !canUse) { setYears(null); return; }
+    setBusy((b) => b ?? "years");
+    try {
+      const r = await call<{ years: YearInfo[]; reason?: string }>({ action: "mp_years", connection_id: connId });
+      setYears(r.years ?? []); setYearsNote(r.reason ?? null);
+      if (r.years?.length) setPeriod((cur) => (r.years.some((y) => y.year === cur) ? cur : r.years[0].year));
+    } catch (e) { setYears([]); setYearsNote((e as Error).message); }
+    finally { setBusy((b) => (b === "years" ? null : b)); }
+  }, [connId, canUse]);
+  useEffect(() => { loadYears(); }, [loadYears]);
   const loadConns = useCallback((prefer?: string) => {
     if (!projectId) { setConns([]); setConnId(""); return; }
     supabase.from("health_exchange_connections").select("id,name,base_url,project_id,last_sync_at,last_status")
@@ -127,11 +147,11 @@ export default function Dhis2MicroplanEngine({ projectId, projectName, canUse, o
     finally { setBusy(null); }
   };
 
-  const push = async (dry: boolean) => {
+  const push = async (dry: boolean, per: string = period) => {
     setBusy(dry ? "check" : "push"); setResult(null);
     try {
       if (schema) await save();
-      const r = await call({ action: "mp_push", connection_id: connId, project_id: projectId, period, level: pushLevel, dry_run: dry });
+      const r = await call({ action: "mp_push", connection_id: connId, project_id: projectId, period: per, level: pushLevel, dry_run: dry });
       setResult({ type: "push", ...r });
       toast.success(dry ? `Check passed: ${r.sent} values for ${r.matched} areas` : `Sent ${r.sent} values to DHIS2`);
     } catch (e) { toast.error((e as Error).message); setResult({ type: "error", message: (e as Error).message }); }
@@ -144,7 +164,7 @@ export default function Dhis2MicroplanEngine({ projectId, projectName, canUse, o
     try {
       const r = await call({ action: "mp_pull", connection_id: connId, project_id: projectId, period, level: Number(level) });
       setResult({ type: "pull", ...r });
-      toast.success(`Dashboard updated with ${r.areas} DHIS2 areas`);
+      toast.success(`Dashboard updated with ${r.areas} DHIS2 areas for ${period}`);
       onPulled?.();
     } catch (e) { toast.error((e as Error).message); setResult({ type: "error", message: (e as Error).message }); }
     finally { setBusy(null); }
@@ -171,9 +191,23 @@ export default function Dhis2MicroplanEngine({ projectId, projectName, canUse, o
         </div>
         {conn && <p className="text-[11px] text-muted-foreground font-mono truncate">{conn.base_url}{conn.last_sync_at ? ` · last sync ${new Date(conn.last_sync_at).toLocaleString()}` : ""}</p>}
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" disabled={!!disabledReason || busy === "pull"} onClick={pull}>
-            {busy === "pull" ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <ArrowDownToLine className="h-3.5 w-3.5 mr-1" />}
-            Pull {period} from DHIS2
+          <div className="flex">
+            <Select value={period} onValueChange={setPeriod} disabled={!!disabledReason}>
+              <SelectTrigger className="h-8 w-[112px] rounded-r-none text-xs font-mono"><CalendarRange className="h-3.5 w-3.5 mr-1" /><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {(years?.length ? years.map((y) => y.year) : [defaultPeriod(), String(+defaultPeriod() - 1), String(+defaultPeriod() - 2)]).map((y) => {
+                  const info = years?.find((x) => x.year === y);
+                  return <SelectItem key={y} value={y}><span className="font-mono">{y}</span>{info ? <span className="ml-2 text-muted-foreground text-[11px]">{info.values} values · {info.kpis} KPIs</span> : null}</SelectItem>;
+                })}
+              </SelectContent>
+            </Select>
+            <Button size="sm" className="rounded-l-none" disabled={!!disabledReason || busy === "pull"} onClick={pull}>
+              {busy === "pull" ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <ArrowDownToLine className="h-3.5 w-3.5 mr-1" />}
+              Pull {period}
+            </Button>
+          </div>
+          <Button size="sm" variant="secondary" disabled={!!disabledReason} onClick={() => { setResult(null); setPushOpen(true); }}>
+            <ArrowUpFromLine className="h-3.5 w-3.5 mr-1" /> Push to DHIS2
           </Button>
           <Button size="sm" variant="outline" disabled={!!disabledReason} onClick={() => setOpen(true)}>
             <Sparkles className="h-3.5 w-3.5 mr-1" /> Open engine
@@ -185,10 +219,80 @@ export default function Dhis2MicroplanEngine({ projectId, projectName, canUse, o
           )}
           {canUse && conn && <Button size="sm" variant="ghost" className="text-destructive" onClick={disconnect}>Disconnect</Button>}
         </div>
+        {!disabledReason && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">Years with DHIS2 data</span>
+            {years === null || busy === "years" ? <span className="text-[11px] text-muted-foreground flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />Checking…</span>
+              : years.length ? years.map((y) => (
+                <button key={y.year} type="button" onClick={() => setPeriod(y.year)} title={`${y.values} values across ${y.kpis} KPIs`}
+                  className={`rounded border px-2 py-0.5 text-[11px] font-mono transition-colors ${period === y.year ? "border-primary bg-primary text-primary-foreground" : "border-border/60 hover:border-primary/60"}`}>
+                  {y.year}<span className="ml-1 opacity-70">{y.kpis}</span>
+                </button>))
+              : <span className="text-[11px] text-muted-foreground">{yearsNote ?? "No data found in the last 12 years"}</span>}
+            {years !== null && busy !== "years" && <button type="button" onClick={loadYears} className="text-muted-foreground hover:text-foreground"><RefreshCw className="h-3 w-3" /></button>}
+          </div>
+        )}
         {disabledReason && <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Lock className="h-3 w-3" /> {disabledReason}</p>}
         {result?.type === "pull" && !open && <p className="text-[11px] text-foreground">Pulled {result.areas} areas · {result.kpis} KPIs matched{result.autoMapped ? ` (${result.autoMapped} automatically)` : ""}.</p>}
       </Card>
 
+
+      <Dialog open={pushOpen} onOpenChange={setPushOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><ArrowUpFromLine className="h-5 w-5 text-primary" strokeWidth={1.5} />Push microplanning to DHIS2</DialogTitle>
+            <DialogDescription>{projectName ?? "This project"} → {conn?.name ?? "DHIS2"}. Entries are totalled per area and sent to your mapped data elements.</DialogDescription>
+          </DialogHeader>
+          <ol className="space-y-3">
+            <li className="rounded-lg border border-border/60 p-3 space-y-2">
+              <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">1 · Reporting period</p>
+              <div className="grid grid-cols-3 gap-2">
+                <Select value={pType} onValueChange={(v) => { setPType(v as any); setPSub("1"); setResult(null); }}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="year">Yearly</SelectItem><SelectItem value="quarter">Quarterly</SelectItem><SelectItem value="month">Monthly</SelectItem></SelectContent>
+                </Select>
+                <Select value={pYear} onValueChange={(v) => { setPYear(v); setResult(null); }}>
+                  <SelectTrigger className="h-9 font-mono"><SelectValue /></SelectTrigger>
+                  <SelectContent>{Array.from({ length: 8 }, (_, i) => String(+defaultPeriod() - i)).map((y) => <SelectItem key={y} value={y}>{y}{years?.some((x) => x.year === y) ? " · has data" : ""}</SelectItem>)}</SelectContent>
+                </Select>
+                {pType !== "year" ? (
+                  <Select value={pSub} onValueChange={(v) => { setPSub(v); setResult(null); }}>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>{(pType === "quarter" ? ["1", "2", "3", "4"] : Array.from({ length: 12 }, (_, i) => String(i + 1))).map((v) => (
+                      <SelectItem key={v} value={v}>{pType === "quarter" ? `Q${v}` : new Date(2000, +v - 1).toLocaleString(undefined, { month: "long" })}</SelectItem>))}</SelectContent>
+                  </Select>
+                ) : <div className="h-9 rounded-md border border-border/60 flex items-center px-3 text-xs font-mono text-muted-foreground">{pushPeriod}</div>}
+              </div>
+            </li>
+            <li className="rounded-lg border border-border/60 p-3 space-y-2">
+              <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">2 · Total by</p>
+              <Select value={pushLevel} onValueChange={(v) => { setPushLevel(v as "lga" | "state"); setResult(null); }}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="lga">LGA</SelectItem><SelectItem value="state">State</SelectItem></SelectContent>
+              </Select>
+            </li>
+            <li className="rounded-lg border border-border/60 p-3 space-y-2">
+              <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">3 · Check, then send</p>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => push(true, pushPeriod)} disabled={!!busy}>{busy === "check" ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1" />}Check first</Button>
+                <Button size="sm" onClick={() => push(false, pushPeriod)} disabled={!!busy || result?.type !== "push" || !result?.dry_run || result?.period !== pushPeriod}>{busy === "push" ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <ArrowUpFromLine className="h-3.5 w-3.5 mr-1" />}Send {pushPeriod}</Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">Sending unlocks after a successful check for the same period. KPIs are sent using the mappings saved in "Open engine".</p>
+            </li>
+          </ol>
+          {result && result.type !== "pull" && (
+            <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-xs space-y-1">
+              {result.type === "error" && <p className="text-destructive">{result.message}</p>}
+              {result.type === "push" && <>
+                <p className="font-semibold">{result.dry_run ? "Check passed" : "Sent"}: {result.sent} values · {result.matched} areas matched</p>
+                {result.counts && <p className="text-muted-foreground">Imported {result.counts.imported ?? 0} · updated {result.counts.updated ?? 0} · ignored {result.counts.ignored ?? 0}</p>}
+                {result.unmatched?.length > 0 && <p className="text-muted-foreground">Not found in DHIS2: {result.unmatched.slice(0, 12).join("; ")}{result.unmatched.length > 12 ? "…" : ""}</p>}
+                {result.conflicts?.map((c: string, i: number) => <p key={i} className="text-destructive">{c}</p>)}
+              </>}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
       <Dhis2MicroplanConnectDialog open={connectOpen} onOpenChange={setConnectOpen} projectId={projectId}
         existingId={connId || undefined} onConnected={(id) => loadConns(id)} />
 
@@ -231,11 +335,14 @@ export default function Dhis2MicroplanEngine({ projectId, projectName, canUse, o
                 ))}
               </div>
 
-              <Tabs defaultValue="map">
+              <Tabs defaultValue="explore">
                 <TabsList>
+                  <TabsTrigger value="explore"><Compass className="h-3.5 w-3.5 mr-1" />Explore instance</TabsTrigger>
                   <TabsTrigger value="map"><Wand2 className="h-3.5 w-3.5 mr-1" />Mapping</TabsTrigger>
                   <TabsTrigger value="sync"><Database className="h-3.5 w-3.5 mr-1" />Push & pull</TabsTrigger>
                 </TabsList>
+
+                <TabsContent value="explore"><Dhis2SchemaExplorer schema={schema as any} /></TabsContent>
 
                 <TabsContent value="map" className="space-y-3">
                   <div className="flex flex-wrap gap-2 items-center">
@@ -291,7 +398,8 @@ export default function Dhis2MicroplanEngine({ projectId, projectName, canUse, o
                 <TabsContent value="sync" className="space-y-4">
                   <div className="grid gap-3 sm:grid-cols-3">
                     <div className="space-y-1"><Label className="text-xs">DHIS2 period</Label>
-                      <Input value={period} onChange={(e) => setPeriod(e.target.value.trim())} placeholder="2026, 202609 or 2026Q3" className="h-9 font-mono" /></div>
+                      <Input value={period} onChange={(e) => setPeriod(e.target.value.trim())} placeholder="2026, 202609 or 2026Q3" className="h-9 font-mono" />
+                      {years?.length ? <p className="text-[10px] text-muted-foreground">Data available: {years.map((y) => y.year).join(", ")}</p> : null}</div>
                     <div className="space-y-1"><Label className="text-xs">Pull at level</Label>
                       <Select value={level} onValueChange={setLevel}>
                         <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
