@@ -400,7 +400,7 @@ Deno.serve(async (req) => {
       // `next_start` cursor. Loading 50k rows in one isolate exceeded the edge
       // worker's memory limit (WORKER_RESOURCE_LIMIT / 546).
       const PAGE = 1000;
-      const CHUNK = 3000;
+      const CHUNK = 2000;
       const startAt = Math.max(0, Math.floor(Number(body?.start ?? 0)) || 0);
       const dataPath = (start: number) => {
         const parts = [`format=json`, `limit=${PAGE}`, `start=${start}`, `sort=${encodeURIComponent('{"_submission_time":-1}')}`];
@@ -449,6 +449,8 @@ Deno.serve(async (req) => {
         scope_states: allowed.length ? caller.scopeStates : [],
         results: scoped,
         next_start: nextStart,
+        total_available: totalAvailable,
+        chunk_size: CHUNK,
       });
 
     }

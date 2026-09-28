@@ -151,18 +151,27 @@ export async function fetchScopedSubmissions(
     skip_schema: canDelta || undefined,
   });
   const raw: any[] = Array.isArray(d?.results) ? [...d.results] : [];
-  let next: number | null = typeof d?.next_start === "number" ? d.next_start : null;
-  let guard = 0;
-  while (next !== null && guard++ < 40) {
-    const page = await callFeed({
-      action: "fetch",
-      feed_id: d?.feed?.id ?? feedId ?? undefined,
-      since: canDelta ? since : undefined,
-      skip_schema: true,
-      start: next,
-    });
-    if (Array.isArray(page?.results)) for (const r of page.results) raw.push(r);
-    next = typeof page?.next_start === "number" && page.next_start > next ? page.next_start : null;
+  const next: number | null = typeof d?.next_start === "number" ? d.next_start : null;
+  if (next !== null) {
+    const total = Math.min(Number(d?.total_available) || 0, 50_000);
+    const step = Number(d?.chunk_size) || 2000;
+    const starts: number[] = [];
+    for (let s = next; s < total; s += step) starts.push(s);
+    // Fetch remaining chunks 3 at a time — each server call stays memory-safe.
+    for (let i = 0; i < starts.length; i += 3) {
+      const pages = await Promise.all(
+        starts.slice(i, i + 3).map((start) =>
+          callFeed({
+            action: "fetch",
+            feed_id: d?.feed?.id ?? feedId ?? undefined,
+            since: canDelta ? since : undefined,
+            skip_schema: true,
+            start,
+          }),
+        ),
+      );
+      for (const page of pages) if (Array.isArray(page?.results)) for (const r of page.results) raw.push(r);
+    }
   }
 
   const scopeStates = (d?.scope_states ?? []) as string[];
