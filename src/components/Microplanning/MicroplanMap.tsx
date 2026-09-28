@@ -1200,7 +1200,7 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
                             }
 
                             const next = prev.filter((k) => k !== f.key);
-                            return next.length > 0 ? next : DEFAULT_TARGET_POP_FIELDS;
+                            return next.length > 0 ? next : resetTargetPopFields;
                           });
                         }}
                         className="h-3.5 w-3.5"
