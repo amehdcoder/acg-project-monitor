@@ -42,35 +42,45 @@ const read = (storageKey: string, fallback: string[]): string[] => {
 
 /**
  * Shared hook for the Target Population disaggregation selection.
- * Persists to localStorage and syncs across components and tabs in real time.
+ * Pass the project name for per-project defaults (GiveWell projects target
+ * the 5–14 yrs cohort by default) and per-project persistence.
  */
-export function useTargetPopFields() {
-  const [fields, setFieldsState] = useState<string[]>(read);
+export function useTargetPopFields(projectName?: string | null) {
+  const storageKey = targetPopStorageKeyFor(projectName);
+  const fallback = defaultTargetPopFieldsFor(projectName);
+  const readCurrent = useCallback(() => read(storageKey, fallback), [storageKey, fallback]);
+
+  const [fields, setFieldsState] = useState<string[]>(readCurrent);
+
+  // Re-read when the project changes so a switched project shows its own selection.
+  useEffect(() => {
+    setFieldsState(readCurrent());
+  }, [readCurrent]);
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key === TARGET_POP_STORAGE_KEY) setFieldsState(read());
+      if (e.key === storageKey) setFieldsState(readCurrent());
     };
-    const onCustom = () => setFieldsState(read());
+    const onCustom = () => setFieldsState(readCurrent());
     window.addEventListener("storage", onStorage);
     window.addEventListener(EVENT_NAME, onCustom as EventListener);
     return () => {
       window.removeEventListener("storage", onStorage);
       window.removeEventListener(EVENT_NAME, onCustom as EventListener);
     };
-  }, []);
+  }, [storageKey, readCurrent]);
 
   const setFields = useCallback((next: string[] | ((prev: string[]) => string[])) => {
     setFieldsState(prev => {
       const value = typeof next === "function" ? (next as (p: string[]) => string[])(prev) : next;
-      const cleaned = validate(value);
+      const cleaned = validate(value, fallback);
       try {
-        window.localStorage.setItem(TARGET_POP_STORAGE_KEY, JSON.stringify(cleaned));
+        window.localStorage.setItem(storageKey, JSON.stringify(cleaned));
         window.dispatchEvent(new Event(EVENT_NAME));
       } catch {}
       return cleaned;
     });
-  }, []);
+  }, [storageKey, fallback]);
 
   const calcTargetPop = useCallback(
     (entry: Record<string, any> | null | undefined): number => {

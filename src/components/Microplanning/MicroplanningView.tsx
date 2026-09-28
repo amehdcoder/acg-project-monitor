@@ -963,8 +963,13 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
   // Project-level geographic scope (State/LGA/Ward set on the project itself).
   const { scope: projectScope } = useProjectScope(selectedProjectId);
-  // Shared target-population disaggregation selection (syncs with Map tab + globally)
-  const { calcTargetPop } = useTargetPopFields();
+  // Shared target-population disaggregation selection (syncs with Map tab + globally).
+  // Per-project defaults: GiveWell projects target the 5–14 yrs cohort by default.
+  const selectedProjectName = useMemo(
+    () => projects.find((project) => project.id === selectedProjectId)?.name,
+    [projects, selectedProjectId],
+  );
+  const { calcTargetPop } = useTargetPopFields(selectedProjectName);
 
   const fetchProjects = useCallback(async () => {
     let data: { id: string; name: string }[] | null = null;
@@ -3620,7 +3625,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
           {/* Coverage View */}
           {activeView === "coverage" && (
-            <CoverageView entries={displayEntries} onRefresh={fetchEntries} projectId={selectedProjectId || null} />
+            <CoverageView entries={displayEntries} onRefresh={fetchEntries} projectId={selectedProjectId || null} projectName={selectedProjectName} />
           )}
 
           {/* Reconciliation View — Balance of medicine + reversal destination */}

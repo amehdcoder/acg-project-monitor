@@ -51,9 +51,10 @@ interface CoverageViewProps {
   entries: CoverageEntry[];
   onRefresh: () => void;
   projectId?: string | null;
+  projectName?: string | null;
 }
 
-const CoverageView = ({ entries, onRefresh, projectId }: CoverageViewProps) => {
+const CoverageView = ({ entries, onRefresh, projectId, projectName }: CoverageViewProps) => {
   useRealtimeCoverageEntries(projectId ?? null, onRefresh);
   const [editedTreated, setEditedTreated] = useState<Record<string, string>>({});
   const [editedUsed, setEditedUsed] = useState<Record<string, string>>({});
@@ -68,7 +69,7 @@ const CoverageView = ({ entries, onRefresh, projectId }: CoverageViewProps) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const { attach: attachSv, panel: streetViewPanel } = useLeafletStreetView();
 
-  const { calcTargetPop, label: targetPopLabel } = useTargetPopFields();
+  const { calcTargetPop, label: targetPopLabel } = useTargetPopFields(projectName);
 
   const getTargetPop = (e: CoverageEntry) => {
     const sum = calcTargetPop(e as any);

@@ -238,9 +238,6 @@ const CasesView = () => {
       if (cancelled) return;
       const configured = new Set((data || []).map((row) => row.project_id));
       setBeneficiaryProjectIds(configured);
-      setProjectFilter((current) => current === "all"
-        ? projects.find((project) => configured.has(project.id))?.id || projects[0].id
-        : current);
       setProgrammeScopeLoading(false);
     })();
     return () => { cancelled = true; };
