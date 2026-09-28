@@ -5,6 +5,7 @@
 - [x] Preserve role, safeguarding, facility, and administration visibility rules.
 - [x] Add an administrator-only LGA-to-DHIS2 review, validation, and send workflow.
 - [ ] Verify the live DHIS2 LGA match and dry-run against the connected national server.
+- [ ] Verify imported DHIS2 maps render Nigeria’s National, State, and LGA boundaries with live values.
 - [x] Unify every Street View entry point on real high-quality Google panoramas with street-level fallback.
 - [x] Remove the blank longitudinal-register option from Add Module.
 - [x] Add guarded deletion for an active Comprehensive NTD programme module.
