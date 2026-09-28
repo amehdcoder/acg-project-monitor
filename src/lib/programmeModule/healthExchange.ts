@@ -100,7 +100,7 @@ export const REPORTABLE_INDICATORS: { key: string; label: string }[] = [
 
 export async function listConnections(projectId: string) {
   const { data, error } = await T("health_exchange_connections")
-    .select("*").eq("project_id", projectId).order("created_at", { ascending: false });
+    .select("*").eq("project_id", projectId).neq("scope", "microplanning").order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as ExchangeConnection[];
 }
