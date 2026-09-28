@@ -202,21 +202,83 @@ export function saveKoboConfig(cfg: KoboConfig, connectionId?: string | null) {
 }
 export function clearKoboConfig() { try { localStorage.removeItem(CONFIG_KEY); } catch { /* ignore */ } }
 
+/* ── Background memory ──────────────────────────────────────────────────────
+   Large forms overflow localStorage (~5 MB), which silently dropped the cache
+   and forced a full re-download on every page load. The cache now lives in
+   memory + IndexedDB (no size limit); localStorage is only a small-form mirror. */
+const memCache = new Map<string, KoboCache>();
+const IDB_NAME = "kobo-cache-v1";
+const IDB_STORE = "caches";
+let idbPromise: Promise<IDBDatabase | null> | null = null;
+function openIdb(): Promise<IDBDatabase | null> {
+  if (idbPromise) return idbPromise;
+  idbPromise = new Promise((resolve) => {
+    try {
+      if (typeof indexedDB === "undefined") return resolve(null);
+      const req = indexedDB.open(IDB_NAME, 1);
+      req.onupgradeneeded = () => { req.result.createObjectStore(IDB_STORE); };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+    } catch { resolve(null); }
+  });
+  return idbPromise;
+}
+function hydrate(parsed: KoboCache): KoboCache {
+  if (!parsed.flatResults) parsed.flatResults = flattenAll(parsed.results ?? [], parsed.survey);
+  if (!parsed.columns) parsed.columns = buildDataDictionary(parsed.flatResults, parsed.survey);
+  return parsed;
+}
+
 export function loadKoboCache(connectionId?: string | null): KoboCache | null {
   const id = connectionId ?? getActiveConnectionId();
+  const key = scoped(CACHE_KEY, id);
+  const mem = memCache.get(key);
+  if (mem) return mem;
   try {
-    const raw = localStorage.getItem(scoped(CACHE_KEY, id));
+    const raw = localStorage.getItem(key);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as KoboCache;
-    // Backfill computed fields for caches written by an older build.
-    if (!parsed.flatResults) parsed.flatResults = flattenAll(parsed.results ?? []);
-    if (!parsed.columns) parsed.columns = buildDataDictionary(parsed.flatResults);
+    const parsed = hydrate(JSON.parse(raw) as KoboCache);
+    memCache.set(key, parsed);
     return parsed;
   } catch { return null; }
 }
+
+/** Memory → IndexedDB → localStorage. Use on page load for instant paint of large forms. */
+export async function loadKoboCacheAsync(connectionId?: string | null): Promise<KoboCache | null> {
+  const id = connectionId ?? getActiveConnectionId();
+  const key = scoped(CACHE_KEY, id);
+  const quick = loadKoboCache(id);
+  if (quick) return quick;
+  const db = await openIdb();
+  if (!db) return null;
+  const stored = await new Promise<KoboCache | null>((resolve) => {
+    try {
+      const req = db.transaction(IDB_STORE, "readonly").objectStore(IDB_STORE).get(key);
+      req.onsuccess = () => resolve((req.result as KoboCache) ?? null);
+      req.onerror = () => resolve(null);
+    } catch { resolve(null); }
+  });
+  if (!stored) return null;
+  const c = hydrate(stored);
+  memCache.set(key, c);
+  return c;
+}
+
 export function saveKoboCache(cache: KoboCache, connectionId?: string | null) {
   const id = connectionId ?? getActiveConnectionId();
-  try { localStorage.setItem(scoped(CACHE_KEY, id), JSON.stringify(cache)); } catch { /* quota */ }
+  const key = scoped(CACHE_KEY, id);
+  memCache.set(key, cache);
+  // Persist only raw data; derived fields are rebuilt on load (smaller + faster writes).
+  const { flatResults: _f, columns: _c, validation: _v, ...lean } = cache as any;
+  void openIdb().then((db) => {
+    if (!db) return;
+    try { db.transaction(IDB_STORE, "readwrite").objectStore(IDB_STORE).put(lean, key); } catch { /* ignore */ }
+  });
+  try {
+    const json = JSON.stringify(lean);
+    if (json.length < 1_500_000) localStorage.setItem(key, json);
+    else localStorage.removeItem(key); // stale small copy must not shadow IndexedDB
+  } catch { try { localStorage.removeItem(key); } catch { /* ignore */ } }
 }
 
 export function loadLayout<T>(connectionId?: string | null): T | null {
@@ -297,7 +359,7 @@ export async function fetchSubmissions(
   connectionId?: string | null,
   opts: { full?: boolean } = {},
 ): Promise<KoboCache> {
-  const cached = opts.full ? null : loadKoboCache(connectionId);
+  const cached = opts.full ? null : await loadKoboCacheAsync(connectionId);
   // A cache belonging to a different Kobo asset must never be merged into the
   // new form's data — repointing a connection forces a complete re-download.
   const prev = cached && cached.formUid && cached.formUid !== cfg.formUid ? null : cached;
