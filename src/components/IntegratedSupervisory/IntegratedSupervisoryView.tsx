@@ -100,18 +100,31 @@ export default function IntegratedSupervisoryView() {
     return Object.keys(first).map((k) => ({ key: k, label: k.split("/").pop() || k }));
   }, [scopedCache]);
 
+  /* Paint from background memory (memory → IndexedDB) so large forms show instantly. */
+  const hydrateFromMemory = useCallback((id: string | null) => {
+    const quick = loadKoboCache(id);
+    setCache(quick);
+    if (!quick) {
+      void loadKoboCacheAsync(id).then((c) => {
+        if (c && getActiveConnectionId() === id) setCache((cur) => cur ?? c);
+      });
+    }
+  }, []);
+  useEffect(() => { if (!cache) hydrateFromMemory(getActiveConnectionId()); /* mount only */ // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const reloadRegistry = useCallback(() => {
     const all = listConnections();
     setConnections(all);
     const id = getActiveConnectionId();
     setActiveId(id);
-    setCache(loadKoboCache(id));
-  }, []);
+    hydrateFromMemory(id);
+  }, [hydrateFromMemory]);
 
   const switchTo = (id: string) => {
     setActiveConnectionId(id);
     setActiveId(id);
-    setCache(loadKoboCache(id));
+    hydrateFromMemory(id);
   };
 
   /* Cheap payload fingerprint: a merged burst that resolves to the same data
@@ -221,7 +234,8 @@ export default function IntegratedSupervisoryView() {
         setFeeds(reg.feeds);
         setFeedScopeStates(reg.scopeStates);
         if (reg.feeds[0] && needsSharedFeed) {
-          const cached = loadKoboCache(feedCacheKey(reg.feeds[0].id));
+          const cached = await loadKoboCacheAsync(feedCacheKey(reg.feeds[0].id));
+          if (cancelled) return;
           if (cached) { cacheRef.current = cached; setCache(cached); setUsingSharedFeed(true); }
         }
       } catch { /* registry is optional for admins with local configs */ }
