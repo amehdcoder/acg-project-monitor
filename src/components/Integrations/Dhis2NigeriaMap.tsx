@@ -100,13 +100,16 @@ export default function Dhis2NigeriaMap({ analytics }: { analytics: Analytics })
       const ouId = row[ouIndex];
       const label = nameOf(analytics, ouId);
       const location = unitLocation(units.get(ouId), label, states, lgas);
-      if (!location.state && !location.lga) { missing.add(label); return; }
-      const key = location.lga ? lgaKey(location.state, location.lga) : `state:${clean(location.state)}`;
+      const isNational = [label, units.get(ouId)?.name, ...(units.get(ouId)?.ancestors ?? []).map((x) => x.name)].some((name) => clean(name) === "nigeria");
+      if (!location.state && !location.lga && !isNational) { missing.add(label); return; }
+      const key = location.lga ? lgaKey(location.state, location.lga) : location.state ? `state:${clean(location.state)}` : "national:nigeria";
       const previous = cells.get(key);
       cells.set(key, { value: (previous?.value ?? 0) + value, label, ...location });
     });
     return { cells, options, unmatched: [...missing].sort() };
   }, [analytics, geo, selectedSeries]);
+
+  useEffect(() => setSelectedSeries("all"), [analytics]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -128,15 +131,16 @@ export default function Dhis2NigeriaMap({ analytics }: { analytics: Analytics })
     const min = Math.min(...values, 0); const max = Math.max(...values, 0);
     const stateTotals = new Map<string, MapCell>();
     model.cells.forEach((cell, key) => { if (key.startsWith("state:")) stateTotals.set(clean(cell.state), cell); });
+    const nationalTotal = model.cells.get("national:nigeria");
     const layer = L.geoJSON(geo, {
       style: (feature: any) => {
         const state = String(feature?.properties?.state ?? ""); const lga = String(feature?.properties?.lga ?? "");
-        const cell = model.cells.get(lgaKey(state, lga)) ?? stateTotals.get(clean(state));
+        const cell = model.cells.get(lgaKey(state, lga)) ?? stateTotals.get(clean(state)) ?? nationalTotal;
         return { fillColor: cell ? palette(cell.value, min, max) : "hsl(var(--muted))", fillOpacity: cell ? 0.86 : 0.38, color: "hsl(var(--border))", weight: 0.45, opacity: 0.85 };
       },
       onEachFeature: (feature: any, featureLayer) => {
         const state = String(feature?.properties?.state ?? ""); const lga = String(feature?.properties?.lga ?? "");
-        const cell = model.cells.get(lgaKey(state, lga)) ?? stateTotals.get(clean(state));
+        const cell = model.cells.get(lgaKey(state, lga)) ?? stateTotals.get(clean(state)) ?? nationalTotal;
         (featureLayer as L.Path).bindTooltip(`<div style="min-width:150px"><strong>${escapeHtml(lga)}</strong><br><span>${escapeHtml(state)}</span><hr style="margin:5px 0;border:0;border-top:1px solid #e2e8f0"><strong>${cell ? fmt(cell.value) : "No data"}</strong>${cell ? `<br><small>${escapeHtml(cell.label)}</small>` : ""}</div>`, { sticky: true, direction: "top" });
         featureLayer.on({
           mouseover: () => { (featureLayer as L.Path).setStyle({ weight: 2, color: "hsl(var(--foreground))" }); (featureLayer as any).bringToFront?.(); },
