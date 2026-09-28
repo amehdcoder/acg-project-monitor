@@ -294,7 +294,7 @@ export default function Dhis2MicroplanEngine({ projectId, projectName, canUse, o
           )}
         </DialogContent>
       </Dialog>
-      <Dhis2MicroplanConnectDialog open={connectOpen} onOpenChange={setConnectOpen} projectId={projectId}
+      <Dhis2MicroplanConnectDialog open={connectOpen} onOpenChange={setConnectOpen} projectId={projectId} scope={scope}
         existingId={connId || undefined} onConnected={(id) => loadConns(id)} />
 
       <Dialog open={open} onOpenChange={setOpen}>
