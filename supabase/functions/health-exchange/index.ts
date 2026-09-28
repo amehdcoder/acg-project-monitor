@@ -7,6 +7,7 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { guardRequest } from "../_shared/authGuard.ts";
 import { buildAdxXml, buildSdmxCsv, buildSdmxJson, validateAdxXml, validateSdmxPayload, type ExchangeObservation } from "../_shared/exchangeStandards.ts";
+import { MICROPLAN_KPIS, aggregateEntries, norm, suggestMappings, type RemoteElement } from "../_shared/microplanExchange.ts";
 import { z } from "npm:zod@3.23.8";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
