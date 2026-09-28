@@ -689,7 +689,7 @@ Deno.serve(async (req) => {
           rows.push(...(data ?? []));
           if (!data || data.length < 1000) break;
         }
-        if (!rows.length) return json({ error: "This project has no microplanning entries to send." }, 400);
+        if (!rows.length) return json({ ok: false, error: "This project has no microplanning entries to send." }, 200);
         const groups = aggregateEntries(rows, level);
         const ouLevel = level === "lga" ? 3 : 2;
         const ous = await remoteFetch(joinUrl(connection.base_url, `api/organisationUnits?fields=id,name,parent[name]&filter=level:eq:${ouLevel}&withinUserHierarchy=true&paging=false`), { headers }, 60000);
@@ -712,7 +712,7 @@ Deno.serve(async (req) => {
             dataValues.push({ dataElement: m.remote_id, orgUnit: ou, period, value: String(Math.round(v * 100) / 100), ...(m.category_option_combo ? { categoryOptionCombo: m.category_option_combo } : {}) });
           }
         }
-        if (!dataValues.length) return json({ ok: false, error: "No areas matched DHIS2 locations your account can report for.", unmatched }, 400);
+        if (!dataValues.length) return json({ ok: false, error: "No areas matched DHIS2 locations your account can report for.", unmatched }, 200);
         const res = await remoteFetch(joinUrl(connection.base_url, `api/dataValueSets?dryRun=${dry_run}&importStrategy=CREATE_AND_UPDATE`), { method: "POST", headers, body: JSON.stringify({ dataValues }) }, 120000);
         const b: any = res.body; const r = b?.response ?? b;
         const counts = r?.importCount ?? {};

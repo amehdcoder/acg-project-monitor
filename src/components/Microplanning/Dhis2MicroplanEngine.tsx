@@ -152,6 +152,7 @@ export default function Dhis2MicroplanEngine({ projectId, projectName, canUse, o
     try {
       if (schema) await save();
       const r = await call({ action: "mp_push", connection_id: connId, project_id: projectId, period: per, level: pushLevel, dry_run: dry });
+      if (r?.ok === false) throw new Error(r.error + (r.unmatched?.length ? ` Not found: ${r.unmatched.slice(0, 8).join("; ")}` : ""));
       setResult({ type: "push", ...r });
       toast.success(dry ? `Check passed: ${r.sent} values for ${r.matched} areas` : `Sent ${r.sent} values to DHIS2`);
     } catch (e) { toast.error((e as Error).message); setResult({ type: "error", message: (e as Error).message }); }
