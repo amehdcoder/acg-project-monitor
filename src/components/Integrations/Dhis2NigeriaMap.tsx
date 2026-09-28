@@ -129,7 +129,6 @@ export default function Dhis2NigeriaMap({ analytics }: { analytics: Analytics })
     const stateTotals = new Map<string, MapCell>();
     model.cells.forEach((cell, key) => { if (key.startsWith("state:")) stateTotals.set(clean(cell.state), cell); });
     const layer = L.geoJSON(geo, {
-      renderer: L.canvas({ padding: 0.3 }),
       style: (feature: any) => {
         const state = String(feature?.properties?.state ?? ""); const lga = String(feature?.properties?.lga ?? "");
         const cell = model.cells.get(lgaKey(state, lga)) ?? stateTotals.get(clean(state));
