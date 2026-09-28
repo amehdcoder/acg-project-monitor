@@ -364,7 +364,7 @@ Deno.serve(async (req) => {
       username: z.string().trim().max(150).optional(),
       password: z.string().max(500).optional(),
       token: z.string().trim().max(500).optional(),
-      scope: z.enum(["cases", "microplanning"]).default("cases"),
+      scope: z.enum(["cases", "microplanning", "integrations"]).default("cases"),
       connection_id: z.string().uuid().optional(),
     }).safeParse(payload);
     if (!input.success) return json({ error: input.error.issues[0]?.message ?? "Invalid sign-in details" }, 400);
@@ -437,7 +437,7 @@ Deno.serve(async (req) => {
     const today = new Date();
     const period = String(payload.period ?? previousPeriod(today));
     const { data: due } = await db.from("health_exchange_connections")
-      .select("*").eq("kind", "dhis2").eq("is_active", true).eq("auto_push_enabled", true).neq("scope", "microplanning");
+      .select("*").eq("kind", "dhis2").eq("is_active", true).eq("auto_push_enabled", true).eq("scope", "cases");
     const results: unknown[] = [];
     for (const c of (due ?? []) as Connection[]) {
       if (payload.force !== true && (today.getUTCDate() < Number(c.auto_push_day ?? 5) || c.last_auto_period === period)) continue;
@@ -469,7 +469,8 @@ Deno.serve(async (req) => {
 
   // Microplanning and Cases DHIS2 setups never share connections.
   const connScope = (connection as unknown as { scope?: string }).scope ?? "cases";
-  if (action.startsWith("mp_") !== (connScope === "microplanning") && ["test", "pull_metadata", "dhis2_browse"].indexOf(action) < 0) {
+  const pageScoped = connScope === "microplanning" || connScope === "integrations";
+  if (!action.startsWith("dash_") && action.startsWith("mp_") !== pageScoped && ["test", "pull_metadata", "dhis2_browse"].indexOf(action) < 0) {
     return json({ error: action.startsWith("mp_") ? "Connect DHIS2 on the Geo Microplanning page first." : "This DHIS2 connection belongs to Geo Microplanning." }, 400);
   }
 
@@ -570,6 +571,63 @@ Deno.serve(async (req) => {
         });
       }
 
+
+      /* ------------------ DHIS2 dashboard replica ------------------ */
+      case "dash_list": {
+        if (connection.kind !== "dhis2") return json({ error: "Dashboards need a DHIS2 connection" }, 400);
+        const r = await remoteFetch(joinUrl(connection.base_url, "api/dashboards?fields=id,displayName,displayDescription,starred,dashboardItems~size&paging=false"), { headers }, 45000);
+        if (!r.ok) return json({ error: remoteMessage(r.body, `HTTP ${r.status}`) }, 502);
+        const list = ((r.body as any)?.dashboards ?? []).map((d: any) => ({ id: d.id, name: d.displayName, description: d.displayDescription ?? null, starred: !!d.starred, items: d.dashboardItems ?? 0 }))
+          .sort((a: any, b: any) => Number(b.starred) - Number(a.starred) || a.name.localeCompare(b.name));
+        await log(db, connection, "pull", "dashboard_list", "success", list.length, "Dashboards listed", guard.userId);
+        return json({ ok: true, dashboards: list });
+      }
+      case "dash_get": {
+        const id = String(payload.dashboard_id ?? "");
+        if (!/^[A-Za-z0-9]{11}$/.test(id)) return json({ error: "Invalid dashboard" }, 400);
+        const f = "id,displayName,displayDescription,dashboardItems[id,type,x,y,width,height,shape,text,visualization[id,displayName,type],chart[id,displayName,type],reportTable[id,displayName],map[id,displayName],eventChart[id,displayName,type],eventReport[id,displayName],eventVisualization[id,displayName,type]]";
+        const r = await remoteFetch(joinUrl(connection.base_url, `api/dashboards/${id}?fields=${f}`), { headers }, 45000);
+        if (!r.ok) return json({ error: remoteMessage(r.body, `HTTP ${r.status}`) }, 502);
+        const d: any = r.body;
+        const items = (d?.dashboardItems ?? []).map((it: any) => {
+          const ref = it.visualization ?? it.chart ?? it.reportTable ?? it.map ?? it.eventVisualization ?? it.eventChart ?? it.eventReport ?? null;
+          return { id: it.id, type: it.type, x: it.x ?? 0, y: it.y ?? 0, w: it.width ?? 29, h: it.height ?? 20, text: it.text ?? null, ref: ref ? { id: ref.id, name: ref.displayName, vizType: ref.type ?? (it.reportTable ? "PIVOT_TABLE" : null) } : null };
+        });
+        return json({ ok: true, dashboard: { id: d.id, name: d.displayName, description: d.displayDescription ?? null, items } });
+      }
+      case "dash_viz": {
+        const id = String(payload.viz_id ?? "");
+        const kind = String(payload.kind ?? "VISUALIZATION");
+        if (!/^[A-Za-z0-9]{11}$/.test(id)) return json({ error: "Invalid chart" }, 400);
+        const endpoint = kind === "MAP" ? "maps" : kind === "CHART" ? "charts" : kind === "REPORT_TABLE" ? "reportTables" : "visualizations";
+        const dimF = "dimension,items[id,displayName]";
+        const fields = kind === "MAP"
+          ? `id,displayName,mapViews[layer,columns[${dimF}],rows[${dimF}],filters[${dimF}]]`
+          : `id,displayName,type,columns[${dimF}],rows[${dimF}],filters[${dimF}],showData,hideLegend,cumulativeValues,percentStackedValues,targetLineValue,baseLineValue,rangeAxisMinValue,rangeAxisMaxValue`;
+        const v = await remoteFetch(joinUrl(connection.base_url, `api/${endpoint}/${id}?fields=${encodeURIComponent(fields)}`), { headers }, 45000);
+        if (!v.ok) return json({ error: remoteMessage(v.body, `HTTP ${v.status}`) }, 502);
+        const vb: any = v.body;
+        const src: any = kind === "MAP" ? ((vb.mapViews ?? []).find((m: any) => (m.columns ?? []).length) ?? {}) : vb;
+        const dims = (arr: any[]) => (arr ?? []).filter((d: any) => d.dimension && (d.items ?? []).length).map((d: any) => ({ dimension: d.dimension, items: d.items.map((i: any) => i.id) }));
+        const columns = dims(src.columns), rows = dims(src.rows), filters = dims(src.filters);
+        if (!columns.length && !rows.length) return json({ ok: true, viz: { id, name: vb.displayName, type: kind === "MAP" ? "MAP" : vb.type }, layout: { columns, rows, filters }, analytics: null, note: "This item has no aggregate data to show." });
+        const qs = [...columns, ...rows].map((d) => `dimension=${encodeURIComponent(`${d.dimension}:${d.items.join(";")}`)}`)
+          .concat(filters.map((d) => `filter=${encodeURIComponent(`${d.dimension}:${d.items.join(";")}`)}`)).join("&");
+        const a = await remoteFetch(joinUrl(connection.base_url, `api/analytics?${qs}&displayProperty=NAME&skipRounding=false`), { headers }, 60000);
+        if (!a.ok) return json({ ok: true, viz: { id, name: vb.displayName, type: kind === "MAP" ? "MAP" : vb.type }, layout: { columns, rows, filters }, analytics: null, note: remoteMessage(a.body, `DHIS2 could not compute this item (HTTP ${a.status})`) });
+        const ab: any = a.body;
+        return json({
+          ok: true,
+          viz: { id, name: vb.displayName, type: kind === "MAP" ? "MAP" : vb.type, showData: !!vb.showData, hideLegend: !!vb.hideLegend, targetLine: vb.targetLineValue ?? null, baseLine: vb.baseLineValue ?? null },
+          layout: { columns, rows, filters },
+          analytics: {
+            headers: (ab.headers ?? []).map((h: any) => ({ name: h.name, column: h.column })),
+            rows: ab.rows ?? [],
+            items: Object.fromEntries(Object.entries(ab.metaData?.items ?? {}).map(([k, x]: any) => [k, x?.name ?? k])),
+            dimensions: ab.metaData?.dimensions ?? {},
+          },
+        });
+      }
 
       /* ------------------ Microplanning exchange engine ----------------- */
       case "mp_schema": {

@@ -9,8 +9,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
-export default function Dhis2MicroplanConnectDialog({ open, onOpenChange, projectId, existingId, onConnected }: {
-  open: boolean; onOpenChange: (o: boolean) => void; projectId: string; existingId?: string; onConnected: (id: string) => void;
+export default function Dhis2MicroplanConnectDialog({ open, onOpenChange, projectId, existingId, onConnected, scope = "microplanning" }: {
+  scope?: "microplanning" | "integrations"; open: boolean; onOpenChange: (o: boolean) => void; projectId: string; existingId?: string; onConnected: (id: string) => void;
 }) {
   const [mode, setMode] = useState<"pat" | "login">("pat");
   const [baseUrl, setBaseUrl] = useState("https://");
@@ -24,7 +24,7 @@ export default function Dhis2MicroplanConnectDialog({ open, onOpenChange, projec
     e.preventDefault();
     setBusy(true); setError("");
     const body: Record<string, unknown> = {
-      action: "dhis2_login", scope: "microplanning", project_id: projectId, base_url: baseUrl.trim(),
+      action: "dhis2_login", scope, project_id: projectId, base_url: baseUrl.trim(),
       ...(existingId ? { connection_id: existingId } : {}),
       ...(mode === "pat" ? { token: token.trim() } : { username: username.trim(), password }),
     };
@@ -45,8 +45,8 @@ export default function Dhis2MicroplanConnectDialog({ open, onOpenChange, projec
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Connect DHIS2 for Geo Microplanning</DialogTitle>
-          <DialogDescription>This setup is separate from the Cases page.</DialogDescription>
+          <DialogTitle>Connect DHIS2 {scope === "integrations" ? "for Integrations" : "for Geo Microplanning"}</DialogTitle>
+          <DialogDescription>{scope === "integrations" ? "This setup is separate from the Cases and Geo Microplanning pages." : "This setup is separate from the Cases page."}</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-3">
           <Tabs value={mode} onValueChange={(v) => setMode(v as "pat" | "login")}>
