@@ -47,7 +47,7 @@ export function TabSyncStatus({ projectId, table, syncEventStatus, label, onResy
     (async () => {
       let evQuery = supabase
         .from("kobo_sync_events")
-        .select("created_at")
+        .select("created_at,status")
         .order("created_at", { ascending: false })
         .limit(20);
       let rowQuery = supabase
@@ -75,19 +75,21 @@ export function TabSyncStatus({ projectId, table, syncEventStatus, label, onResy
   }, [projectId, table, syncEventStatus]);
 
   useEffect(() => {
-    if (!projectId) { setStatus("offline"); return; }
+    const scope = projectId ?? "all";
+    const tableFilter = projectId ? `project_id=eq.${projectId}` : undefined;
     const channel = supabase
-      .channel(`tab-sync-${table}-${projectId}-${Math.random().toString(36).slice(2, 10)}`)
+      .channel(`tab-sync-${table}-${scope}-${Math.random().toString(36).slice(2, 10)}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table, filter: `project_id=eq.${projectId}` },
+        { event: "*", schema: "public", table, ...(tableFilter ? { filter: tableFilter } : {}) },
         () => setLastSyncedAt(Date.now()),
       )
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "kobo_sync_events", filter: `project_id=eq.${projectId}` },
+        { event: "INSERT", schema: "public", table: "kobo_sync_events", ...(tableFilter ? { filter: tableFilter } : {}) },
         (payload: { new?: { status?: string } }) => {
-          if (payload?.new?.status === syncEventStatus) setLastSyncedAt(Date.now());
+          const s = payload?.new?.status;
+          if (s === syncEventStatus || s === "success") setLastSyncedAt(Date.now());
         },
       )
       .subscribe((s) => {
