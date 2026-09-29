@@ -75,10 +75,12 @@ function PivotDialog({ r, onClose }: { r: VizResult | null; onClose: () => void 
   );
 }
 
-export default function Dhis2DashboardStudio({ open, onOpenChange, connId, connName, baseUrl }: { open: boolean; onOpenChange: (o: boolean) => void; connId: string; connName?: string; baseUrl?: string }) {
+export type ImportedDash = { id: string; name: string };
+export default function Dhis2DashboardStudio({ open, onOpenChange, connId, connName, baseUrl, embedded = false, initialDashboardId, onImport, lockToInitial = false }: { open: boolean; onOpenChange: (o: boolean) => void; connId: string; connName?: string; baseUrl?: string; embedded?: boolean; initialDashboardId?: string; onImport?: (d: ImportedDash) => void; lockToInitial?: boolean }) {
   const [list, setList] = useState<DashMeta[] | null>(null);
   const [dash, setDash] = useState<Dash | null>(null);
-  const [selected, setSelected] = useState("");
+  const [selected, setSelected] = useState(initialDashboardId ?? "");
+  useEffect(() => { if (initialDashboardId) setSelected(initialDashboardId); }, [initialDashboardId]);
   const [loading, setLoading] = useState(false);
   const [q, setQ] = useState("");
   const [pivotOf, setPivotOf] = useState<VizResult | null>(null);
@@ -100,10 +102,67 @@ export default function Dhis2DashboardStudio({ open, onOpenChange, connId, connN
       .then((r) => setDash(r.dashboard)).catch((e) => toast.error(e.message)).finally(() => setLoading(false));
   }, [open, selected, connId, nonce]);
 
-  const shown = (list ?? []).filter((d) => d.name.toLowerCase().includes(q.toLowerCase()));
+  const shown = (list ?? []).filter((d) => !lockToInitial || !initialDashboardId || d.id === initialDashboardId).filter((d) => d.name.toLowerCase().includes(q.toLowerCase()));
   const items = useMemo(() => [...(dash?.items ?? [])].sort((a, b) => a.y - b.y || a.x - b.x), [dash]);
 
   return (
+    embedded ? (
+      <div className="flex flex-col h-[calc(100dvh-8rem)] min-h-[520px] rounded-lg border border-border/60 overflow-hidden shadow-sm bg-card">
+        <header className="flex items-center gap-3 bg-primary text-primary-foreground px-4 h-12 shrink-0">
+          <LayoutDashboard className="h-5 w-5" strokeWidth={1.5} />
+          <span className="font-semibold tracking-tight">DHIS2 Dashboards</span>
+          <span className="text-xs opacity-75 truncate hidden sm:inline">{connName}{baseUrl ? ` · ${baseUrl}` : ""}</span>
+        </header>
+        <div className="border-b border-border bg-card px-3 py-2 flex items-center gap-2 shrink-0">
+          <div className="relative w-44 shrink-0">
+            <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search dashboards" className="h-8 pl-7 text-xs" />
+          </div>
+          <div className="flex-1 flex gap-1.5 overflow-x-auto py-0.5">
+            {list === null ? <span className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />Loading dashboards…</span>
+              : !shown.length ? <span className="text-xs text-muted-foreground">No dashboards available to this DHIS2 account.</span>
+              : shown.map((d) => (
+                <button key={d.id} type="button" onClick={() => setSelected(d.id)}
+                  className={`shrink-0 inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs transition-colors ${selected === d.id ? "bg-primary text-primary-foreground" : "bg-muted text-foreground hover:bg-accent"}`}>
+                  {d.starred && <Star className="h-3 w-3 fill-current" />}{d.name}
+                </button>))}
+          </div>
+        </div>
+        <main className="flex-1 overflow-auto bg-muted/50 p-3 sm:p-4">
+          {dash && (
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">{dash.name}</h2>
+                {dash.description && <p className="text-xs text-muted-foreground">{dash.description}</p>}
+              </div>
+              <div className="flex gap-2">
+                {onImport && <Button size="sm" onClick={() => onImport({ id: dash.id ?? selected, name: dash.name })}><Download className="h-3.5 w-3.5 mr-1" />Import to DHIS2 Dashboard page</Button>}
+                <Button size="sm" variant="outline" onClick={() => { clearVizCache(); setNonce((n) => n + 1); }}><RefreshCw className="h-3.5 w-3.5 mr-1" />Refresh</Button>
+              </div>
+            </div>
+          )}
+          {loading ? <div className="flex h-64 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+            : dash && !items.length ? <p className="text-sm text-muted-foreground">This dashboard has no items.</p>
+            : dash && (
+              <div className="flex flex-col gap-3 lg:grid lg:gap-2.5" style={{ gridTemplateColumns: "repeat(60, minmax(0, 1fr))", gridAutoRows: "12px" }}>
+                {items.map((it) => (
+                  <div key={`${it.id}-${nonce}`} className="h-80 lg:h-auto"
+                    style={{ gridColumn: `${Math.min(it.x, 59) + 1} / span ${Math.max(1, Math.min(it.w, 60 - Math.min(it.x, 59)))}`, gridRow: `${it.y + 1} / span ${Math.max(8, it.h)}` }}>
+                    <Dhis2DashboardItem connId={connId} item={it} onPivot={setPivotOf} onExpand={setExpand} />
+                  </div>
+                ))}
+              </div>
+            )}
+        </main>
+        <PivotDialog r={pivotOf} onClose={() => setPivotOf(null)} />
+        <Dialog open={!!expand} onOpenChange={(o) => !o && setExpand(null)}>
+          <DialogContent className="max-w-6xl h-[85dvh] flex flex-col">
+            <DialogHeader><DialogTitle>{expand?.viz.name}</DialogTitle><DialogDescription>Full-screen view</DialogDescription></DialogHeader>
+            <div className="flex-1 min-h-0">{expand && <ChartBody r={expand} />}</div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    ) : (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-none w-screen h-[100dvh] p-0 gap-0 rounded-none flex flex-col [&>button]:text-primary-foreground [&>button]:top-3">
         <DialogTitle className="sr-only">DHIS2 dashboards</DialogTitle>
@@ -135,7 +194,10 @@ export default function Dhis2DashboardStudio({ open, onOpenChange, connId, connN
                 <h2 className="text-lg font-semibold text-foreground">{dash.name}</h2>
                 {dash.description && <p className="text-xs text-muted-foreground">{dash.description}</p>}
               </div>
-              <Button size="sm" variant="outline" onClick={() => { clearVizCache(); setNonce((n) => n + 1); }}><RefreshCw className="h-3.5 w-3.5 mr-1" />Refresh</Button>
+              <div className="flex gap-2">
+                {onImport && <Button size="sm" onClick={() => onImport({ id: dash.id ?? selected, name: dash.name })}><Download className="h-3.5 w-3.5 mr-1" />Import to DHIS2 Dashboard page</Button>}
+                <Button size="sm" variant="outline" onClick={() => { clearVizCache(); setNonce((n) => n + 1); }}><RefreshCw className="h-3.5 w-3.5 mr-1" />Refresh</Button>
+              </div>
             </div>
           )}
           {loading ? <div className="flex h-64 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
@@ -160,5 +222,6 @@ export default function Dhis2DashboardStudio({ open, onOpenChange, connId, connN
         </Dialog>
       </DialogContent>
     </Dialog>
+    )
   );
 }

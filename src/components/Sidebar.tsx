@@ -105,6 +105,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
 
     { id: "math-modeling", label: "Math Modeling", icon: Calculator, adminOnly: true },
     { id: "integrations", label: t("nav.integrations"), icon: Upload, adminOnly: true },
+    { id: "dhis2-dashboard", label: "DHIS2 Dashboard", icon: LayoutDashboard, adminOnly: true },
     { id: "geocoding", label: "Geocoding & IP", icon: Globe, adminOnly: true },
     { id: "email-services", label: "Email Services", icon: Mail, adminOnly: true },
     { id: "live-tracking", label: "Live Tracking", icon: Navigation, adminOnly: true },

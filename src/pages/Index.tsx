@@ -26,6 +26,7 @@ import FormsView from "@/components/FormsView";
 import ProjectsView from "@/components/ProjectsView";
 import DataView from "@/components/DataView";
 import IntegrationsView from "@/components/IntegrationsView";
+import Dhis2DashboardPage from "@/components/Integrations/Dhis2DashboardPage";
 import UsersView from "@/components/UsersView";
 import AdminDashboardBuilder from "@/components/AdminDashboardBuilder";
 import { StudioLauncher } from "@/components/DashboardStudio";
@@ -181,6 +182,12 @@ const Index = () => {
   }, [isMobile]);
 
   useEffect(() => {
+    const h = (e: Event) => { const t = (e as CustomEvent<string>).detail; if (typeof t === "string") handleTabChange(t); };
+    window.addEventListener("amehnities:open-tab", h);
+    return () => window.removeEventListener("amehnities:open-tab", h);
+  }, [handleTabChange]);
+
+  useEffect(() => {
     const handler = (event: Event) => {
       const tab = (event as CustomEvent<{ tab?: string }>).detail?.tab;
       if (tab) handleTabChange(tab);
@@ -308,6 +315,7 @@ const Index = () => {
       );
       case "data": return guardedPage("data", <DataView />);
       case "integrations": return guardedPage("integrations", <IntegrationsView />);
+      case "dhis2-dashboard": return guardedPage("integrations", <Dhis2DashboardPage />);
       case "geocoding": return guardedPage("geocoding", <GeocodingView />);
       case "email-services": return guardedPage("email-services", <EmailServicesView />);
       case "location-sharing": return <LocationSharingView />;
