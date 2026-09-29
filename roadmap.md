@@ -11,3 +11,4 @@
 - [x] Add guarded deletion for an active Comprehensive NTD programme module.
 - [x] Add 30-day KPI change indicators and recorded activity dates to the General Dashboard journey.
 - [x] Make the Service Uptake chart and every axis label fully visible at all dashboard widths.
+- [x] Professionally space and format imported DHIS2 chart categories, labels, legends, and tooltips.
