@@ -7,6 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { LayoutDashboard, Lock, Network } from "lucide-react";
 import Dhis2MicroplanEngine from "@/components/Microplanning/Dhis2MicroplanEngine";
 import Dhis2DashboardStudio from "./Dhis2DashboardStudio";
+import { openAppTab, setImportedDashboard } from "./dhis2ImportedDashboard";
+import { toast } from "sonner";
 
 type Conn = { id: string; name: string; base_url: string };
 
@@ -60,7 +62,11 @@ export default function Dhis2IntegrationsHub({ projects }: { projects: { id: str
           {(!canUse || !conn) && <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Lock className="h-3 w-3" />{!canUse ? "Only Admins, Owners and Super Admins can open DHIS2 dashboards" : "Connect DHIS2 for this project first"}</p>}
         </Card>
       </div>
-      {conn && <Dhis2DashboardStudio open={studio} onOpenChange={setStudio} connId={conn.id} connName={conn.name} baseUrl={conn.base_url} />}
+      {conn && <Dhis2DashboardStudio open={studio} onOpenChange={setStudio} connId={conn.id} connName={conn.name} baseUrl={conn.base_url}
+        onImport={(d) => {
+          setImportedDashboard({ projectId, projectName, connId: conn.id, dashboardId: d.id, dashboardName: d.name, importedAt: new Date().toISOString() });
+          setStudio(false); toast.success(`“${d.name}” imported to the DHIS2 Dashboard page`); openAppTab("dhis2-dashboard");
+        }} />}
     </section>
   );
 }
