@@ -27,6 +27,66 @@ export function loadViz(connId: string, item: DashItem) {
 }
 export const clearVizCache = () => cache.clear();
 
+const wrapCategory = (value: string, maxChars = 18) => {
+  const words = String(value).trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return [""];
+  const lines: string[] = [];
+  for (const word of words) {
+    const current = lines[lines.length - 1];
+    if (!current || (current.length + word.length + 1 > maxChars && lines.length < 2)) lines.push(word);
+    else lines[lines.length - 1] = `${current} ${word}`;
+  }
+  if (lines.length > 2) lines.splice(1, lines.length - 1, lines.slice(1).join(" "));
+  if ((lines[1]?.length ?? 0) > maxChars + 5) lines[1] = `${lines[1].slice(0, maxChars + 4)}…`;
+  return lines.slice(0, 2);
+};
+
+function CategoryTick({ x, y, payload, width = 100, horizontal = false }: any) {
+  const maxChars = horizontal ? Math.max(12, Math.floor(width / 6.3)) : 16;
+  const lines = wrapCategory(String(payload?.value ?? ""), maxChars);
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text x={horizontal ? -8 : 0} y={horizontal ? 0 : 9} textAnchor={horizontal ? "end" : "middle"} dominantBaseline={horizontal ? "central" : undefined}
+        className="fill-muted-foreground" fontSize={10} fontWeight={500}>
+        {lines.map((line, i) => <tspan key={i} x={horizontal ? -8 : 0} dy={i ? 12 : 0}>{line}</tspan>)}
+      </text>
+    </g>
+  );
+}
+
+function ValueLabel({ x, y, width, height, value, horizontal = false }: any) {
+  if (value == null || !Number.isFinite(Number(value))) return null;
+  const tx = horizontal ? Number(x) + Number(width) + 7 : Number(x) + Number(width) / 2;
+  const ty = horizontal ? Number(y) + Number(height) / 2 : Math.max(10, Number(y) - 7);
+  return (
+    <text x={tx} y={ty} textAnchor={horizontal ? "start" : "middle"} dominantBaseline={horizontal ? "central" : undefined}
+      className="fill-foreground" fontSize={9.5} fontWeight={700}
+      style={{ paintOrder: "stroke", stroke: "hsl(var(--card))", strokeWidth: 3, strokeLinejoin: "round" }}>
+      {fmt(Number(value))}
+    </text>
+  );
+}
+
+function ChartTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="min-w-[160px] max-w-[280px] rounded-md border border-border bg-card px-3 py-2.5 shadow-lg">
+      <p className="mb-2 border-b border-border/60 pb-1.5 text-[11px] font-semibold text-foreground">{label || payload[0]?.name}</p>
+      <div className="space-y-1.5">
+        {payload.filter((entry: any) => entry.value != null).map((entry: any, i: number) => (
+          <div key={`${entry.dataKey ?? entry.name}-${i}`} className="flex items-start justify-between gap-4 text-[11px]">
+            <span className="flex min-w-0 items-start gap-1.5 text-muted-foreground">
+              <span className="mt-1 h-2 w-2 shrink-0 rounded-sm" style={{ backgroundColor: entry.color ?? entry.fill }} />
+              <span className="break-words">{entry.name}</span>
+            </span>
+            <span className="shrink-0 font-mono font-semibold tabular-nums text-foreground">{fmt(Number(entry.value))}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function PivotTable({ a, rowDims, colDims, compact }: { a: Analytics; rowDims: string[]; colDims: string[]; compact?: boolean }) {
   const p = useMemo(() => pivot(a, rowDims, colDims), [a, rowDims, colDims]);
   const cell = compact ? "px-2 py-1" : "px-3 py-1.5";
@@ -81,13 +141,16 @@ function ChartBody({ r }: { r: VizResult }) {
     for (const s of series) o[s.key] = p.cell(rk, [s.key]);
     return o;
   });
-  const tip = <Tooltip formatter={(v: number) => fmt(v)} contentStyle={{ borderRadius: 6, fontSize: 12 }} />;
-  const legend = !r.viz.hideLegend && series.length > 1 ? <Legend wrapperStyle={{ fontSize: 11 }} iconType="square" /> : null;
+  const tip = <Tooltip content={<ChartTooltip />} cursor={{ fill: "hsl(var(--muted) / 0.45)" }} />;
+  const legend = !r.viz.hideLegend && series.length > 1 ? <Legend wrapperStyle={{ fontSize: 11, lineHeight: "20px", paddingTop: 8 }} iconType="square" iconSize={8} /> : null;
   const refs = <>{r.viz.targetLine != null && <ReferenceLine y={r.viz.targetLine} stroke="hsl(var(--destructive))" strokeDasharray="4 3" />}{r.viz.baseLine != null && <ReferenceLine y={r.viz.baseLine} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 3" />}</>;
+  const longestCategory = data.reduce((max, d) => Math.max(max, String(d.name).length), 0);
+  const categoryAxisWidth = Math.min(190, Math.max(92, longestCategory * 6.2));
+  const chartMargins = { top: r.viz.showData ? 30 : 16, right: r.viz.showData ? 42 : 22, bottom: 12, left: 8 };
   const axes = (horizontal = false) => horizontal
-    ? <><XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v) => fmt(v)} /><YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 10 }} /></>
-    : <><XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={data.length > 6 ? -30 : 0} textAnchor={data.length > 6 ? "end" : "middle"} height={data.length > 6 ? 60 : 30} /><YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => fmt(v)} width={48} /></>;
-  const grid = <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />;
+    ? <><XAxis type="number" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => fmt(v)} tickLine={false} axisLine={false} tickMargin={8} /><YAxis type="category" dataKey="name" width={categoryAxisWidth} tick={<CategoryTick width={categoryAxisWidth} horizontal />} tickLine={false} axisLine={false} interval={0} /></>
+    : <><XAxis dataKey="name" tick={<CategoryTick />} interval={0} height={56} tickLine={false} axisLine={false} tickMargin={7} /><YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => fmt(v)} width={56} tickLine={false} axisLine={false} tickMargin={7} /></>;
+  const grid = <CartesianGrid vertical={false} strokeDasharray="3 5" stroke="hsl(var(--border))" />;
   const stacked = type.startsWith("STACKED");
 
   if (type === "SINGLE_VALUE" || type === "GAUGE") {
@@ -101,25 +164,26 @@ function ChartBody({ r }: { r: VizResult }) {
   }
   if (type === "PIE") {
     const pieData = p.colKeys.map((k) => ({ name: nameOf(a, k[0]), value: p.colTotal(k) }));
-    return <ResponsiveContainer><PieChart><Pie data={pieData} dataKey="value" nameKey="name" outerRadius="75%" label={({ percent }) => `${Math.round(percent * 100)}%`} labelLine={false}>{pieData.map((_, i) => <Cell key={i} fill={DHIS2_COLORS[i % DHIS2_COLORS.length]} />)}</Pie>{tip}<Legend wrapperStyle={{ fontSize: 11 }} /></PieChart></ResponsiveContainer>;
+    return <ResponsiveContainer><PieChart margin={{ top: 10, right: 18, bottom: 12, left: 18 }}><Pie data={pieData} dataKey="value" nameKey="name" innerRadius="36%" outerRadius="68%" paddingAngle={2} cornerRadius={3} label={({ percent }) => `${Math.round(percent * 100)}%`} labelLine={{ stroke: "hsl(var(--border))" }}>{pieData.map((_, i) => <Cell key={i} fill={DHIS2_COLORS[i % DHIS2_COLORS.length]} stroke="hsl(var(--card))" strokeWidth={2} />)}</Pie>{tip}<Legend wrapperStyle={{ fontSize: 11, lineHeight: "20px" }} iconSize={8} /></PieChart></ResponsiveContainer>;
   }
   if (type === "RADAR") {
     return <ResponsiveContainer><RadarChart data={data}><PolarGrid /><PolarAngleAxis dataKey="name" tick={{ fontSize: 10 }} />{series.map((s, i) => <Radar key={s.key} name={s.name} dataKey={s.key} stroke={DHIS2_COLORS[i % 12]} fill={DHIS2_COLORS[i % 12]} fillOpacity={0.3} />)}{tip}{legend}</RadarChart></ResponsiveContainer>;
   }
   if (type.includes("LINE")) {
-    return <ResponsiveContainer><LineChart data={data} margin={{ top: 8, right: 12 }}>{grid}{axes()}{tip}{legend}{refs}{series.map((s, i) => <Line key={s.key} type="linear" dataKey={s.key} name={s.name} stroke={DHIS2_COLORS[i % 12]} strokeWidth={2} dot={{ r: 3 }} connectNulls>{r.viz.showData && <LabelList dataKey={s.key} position="top" fontSize={9} formatter={fmt} />}</Line>)}</LineChart></ResponsiveContainer>;
+    return <ResponsiveContainer><LineChart data={data} margin={chartMargins}>{grid}{axes()}{tip}{legend}{refs}{series.map((s, i) => <Line key={s.key} type="linear" dataKey={s.key} name={s.name} stroke={DHIS2_COLORS[i % 12]} strokeWidth={2.25} dot={{ r: 3.5, strokeWidth: 2, fill: "hsl(var(--card))" }} activeDot={{ r: 5 }} connectNulls>{r.viz.showData && <LabelList dataKey={s.key} content={<ValueLabel />} />}</Line>)}</LineChart></ResponsiveContainer>;
   }
   if (type.includes("AREA")) {
-    return <ResponsiveContainer><AreaChart data={data} margin={{ top: 8, right: 12 }}>{grid}{axes()}{tip}{legend}{refs}{series.map((s, i) => <Area key={s.key} dataKey={s.key} name={s.name} stackId={stacked ? "s" : undefined} stroke={DHIS2_COLORS[i % 12]} fill={DHIS2_COLORS[i % 12]} fillOpacity={0.5} />)}</AreaChart></ResponsiveContainer>;
+    return <ResponsiveContainer><AreaChart data={data} margin={chartMargins}>{grid}{axes()}{tip}{legend}{refs}{series.map((s, i) => <Area key={s.key} dataKey={s.key} name={s.name} stackId={stacked ? "s" : undefined} stroke={DHIS2_COLORS[i % 12]} strokeWidth={2} fill={DHIS2_COLORS[i % 12]} fillOpacity={0.28} />)}</AreaChart></ResponsiveContainer>;
   }
   const horizontal = type.includes("BAR");
   return (
     <ResponsiveContainer>
-      <BarChart data={data} layout={horizontal ? "vertical" : "horizontal"} margin={{ top: 8, right: 16 }}>
+      <BarChart data={data} layout={horizontal ? "vertical" : "horizontal"} margin={chartMargins}
+        barCategoryGap={data.length > 12 ? "20%" : "32%"} barGap={stacked ? 0 : 4}>
         {grid}{axes(horizontal)}{tip}{legend}{refs}
         {series.map((s, i) => (
-          <Bar key={s.key} dataKey={s.key} name={s.name} stackId={stacked ? "s" : undefined} fill={DHIS2_COLORS[i % 12]}>
-            {r.viz.showData && <LabelList dataKey={s.key} position={horizontal ? "right" : "top"} fontSize={9} formatter={fmt} />}
+          <Bar key={s.key} dataKey={s.key} name={s.name} stackId={stacked ? "s" : undefined} fill={DHIS2_COLORS[i % 12]} maxBarSize={46} radius={stacked ? 0 : [3, 3, 0, 0]}>
+            {r.viz.showData && <LabelList dataKey={s.key} content={<ValueLabel horizontal={horizontal} />} />}
           </Bar>
         ))}
       </BarChart>
