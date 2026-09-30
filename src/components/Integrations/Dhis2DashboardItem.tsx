@@ -149,11 +149,11 @@ function ChartBody({ r }: { r: VizResult }) {
   const refs = <>{r.viz.targetLine != null && <ReferenceLine y={r.viz.targetLine} stroke="hsl(var(--destructive))" strokeDasharray="4 3" />}{r.viz.baseLine != null && <ReferenceLine y={r.viz.baseLine} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 3" />}</>;
   const longestCategory = data.reduce((max, d) => Math.max(max, String(d.name).length), 0);
   const categoryAxisWidth = Math.min(190, Math.max(92, longestCategory * 6.2));
-  const chartMargins = { top: r.viz.showData ? 30 : 16, right: r.viz.showData ? 42 : 22, bottom: 12, left: 8 };
+  const chartMargins = { top: r.viz.showData ? 34 : 18, right: r.viz.showData ? 48 : 26, bottom: 14, left: 10 };
   const axes = (horizontal = false) => horizontal
     ? <><XAxis type="number" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => fmt(v)} tickLine={false} axisLine={false} tickMargin={8} /><YAxis type="category" dataKey="name" width={categoryAxisWidth} tick={<CategoryTick width={categoryAxisWidth} horizontal />} tickLine={false} axisLine={false} interval={0} /></>
     : <><XAxis dataKey="name" tick={<CategoryTick />} interval={0} height={56} tickLine={false} axisLine={false} tickMargin={7} /><YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => fmt(v)} width={56} tickLine={false} axisLine={false} tickMargin={7} /></>;
-  const grid = <CartesianGrid vertical={false} strokeDasharray="3 5" stroke="hsl(var(--border))" />;
+  const grid = <CartesianGrid vertical={false} strokeDasharray="3 6" stroke="hsl(var(--border))" strokeOpacity={0.55} />;
   const stacked = type.startsWith("STACKED");
 
   if (type === "SINGLE_VALUE" || type === "GAUGE") {
@@ -182,10 +182,11 @@ function ChartBody({ r }: { r: VizResult }) {
   return (
     <ResponsiveContainer>
       <BarChart data={data} layout={horizontal ? "vertical" : "horizontal"} margin={chartMargins}
-        barCategoryGap={data.length > 12 ? "20%" : "32%"} barGap={stacked ? 0 : 4}>
+        barCategoryGap={data.length > 12 ? "32%" : data.length > 6 ? "45%" : "55%"} barGap={stacked ? 0 : 6}>
         {grid}{axes(horizontal)}{tip}{legend}{refs}
         {series.map((s, i) => (
-          <Bar key={s.key} dataKey={s.key} name={s.name} stackId={stacked ? "s" : undefined} fill={DHIS2_COLORS[i % 12]} maxBarSize={46} radius={stacked ? 0 : [3, 3, 0, 0]}>
+          <Bar key={s.key} dataKey={s.key} name={s.name} stackId={stacked ? "s" : undefined} fill={DHIS2_COLORS[i % 12]} maxBarSize={38} minPointSize={2}
+            radius={stacked ? 0 : horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0]}>
             {r.viz.showData && <LabelList dataKey={s.key} content={<ValueLabel horizontal={horizontal} />} />}
           </Bar>
         ))}
