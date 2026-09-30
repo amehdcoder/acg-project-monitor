@@ -56,8 +56,11 @@ function CategoryTick({ x, y, payload, width = 100, horizontal = false }: any) {
 
 function ValueLabel({ x, y, width, height, value, horizontal = false }: any) {
   if (value == null || !Number.isFinite(Number(value))) return null;
-  const tx = horizontal ? Number(x) + Number(width) + 7 : Number(x) + Number(width) / 2;
-  const ty = horizontal ? Number(y) + Number(height) / 2 : Math.max(10, Number(y) - 7);
+  const nx = Number(x); const ny = Number(y);
+  if (!Number.isFinite(nx) || !Number.isFinite(ny)) return null;
+  const nw = Number(width); const nh = Number(height);
+  const tx = horizontal ? nx + (Number.isFinite(nw) ? nw : 0) + 7 : nx + (Number.isFinite(nw) ? nw : 0) / 2;
+  const ty = horizontal ? ny + (Number.isFinite(nh) ? nh : 0) / 2 : Math.max(10, ny - 7);
   return (
     <text x={tx} y={ty} textAnchor={horizontal ? "start" : "middle"} dominantBaseline={horizontal ? "central" : undefined}
       className="fill-foreground" fontSize={9.5} fontWeight={700}
