@@ -66,7 +66,7 @@ export default function BmzDashboard({ onClose }: Props) {
   }, [d.byLga]);
 
   const supervisorAccountability = useMemo(
-    () => d.accountability.slice(0, 10).map((u) => ({
+    () => d.accountability.map((u) => ({
       name: u.name,
       email: u.email,
       visits: u.visitCount,
