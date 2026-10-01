@@ -251,6 +251,21 @@
 }
 
 @layer components {
+  .dhis2-exchange {
+    --primary: 210 65% 32%;
+    --primary-foreground: 0 0% 100%;
+    --ring: 210 65% 32%;
+    --border: 214 32% 91%;
+  }
+
+  .dark .dhis2-exchange {
+    --primary: 199 68% 48%;
+    --primary-foreground: 210 40% 10%;
+    --border: 215 20% 28%;
+  }
+}
+
+@layer components {
   .collector-shell {
     --background: 150 18% 97%;
     --foreground: 187 46% 17%;

@@ -45,8 +45,8 @@ async function call<T = any>(body: Record<string, unknown>): Promise<T> {
 const NONE = "__none";
 const defaultPeriod = () => String(new Date().getFullYear());
 
-export default function Dhis2MicroplanEngine({ projectId, projectName, canUse, onPulled, scope = "microplanning" }: {
-  projectId: string; projectName?: string | null; canUse: boolean; onPulled?: () => void; scope?: "microplanning" | "integrations";
+export default function Dhis2MicroplanEngine({ projectId, projectName, canUse, onPulled, onExchangeActivity, scope = "microplanning" }: {
+  projectId: string; projectName?: string | null; canUse: boolean; onPulled?: () => void; onExchangeActivity?: () => void; scope?: "microplanning" | "integrations";
 }) {
   const [conns, setConns] = useState<Conn[]>([]);
   const [connId, setConnId] = useState("");
@@ -143,6 +143,7 @@ export default function Dhis2MicroplanEngine({ projectId, projectName, canUse, o
       const clear = schema.kpis.map((k) => k.key).filter((k) => !picks[k]);
       await call({ action: "mp_save_mappings", connection_id: connId, mappings, clear });
       toast.success(`Saved ${mappings.length} mappings`);
+      onExchangeActivity?.();
     } catch (e) { toast.error((e as Error).message); }
     finally { setBusy(null); }
   };
@@ -155,6 +156,7 @@ export default function Dhis2MicroplanEngine({ projectId, projectName, canUse, o
       if (r?.ok === false) throw new Error(r.error + (r.unmatched?.length ? ` Not found: ${r.unmatched.slice(0, 8).join("; ")}` : ""));
       setResult({ type: "push", ...r });
       toast.success(dry ? `Check passed: ${r.sent} values for ${r.matched} areas` : `Sent ${r.sent} values to DHIS2`);
+      onExchangeActivity?.();
     } catch (e) { toast.error((e as Error).message); setResult({ type: "error", message: (e as Error).message }); }
     finally { setBusy(null); }
   };
@@ -167,6 +169,7 @@ export default function Dhis2MicroplanEngine({ projectId, projectName, canUse, o
       setResult({ type: "pull", ...r });
       toast.success(`Dashboard updated with ${r.areas} DHIS2 areas for ${period}`);
       onPulled?.();
+      onExchangeActivity?.();
     } catch (e) { toast.error((e as Error).message); setResult({ type: "error", message: (e as Error).message }); }
     finally { setBusy(null); }
   };
@@ -176,7 +179,7 @@ export default function Dhis2MicroplanEngine({ projectId, projectName, canUse, o
 
   return (
     <>
-      <Card className="p-4 flex flex-col gap-3 border-primary/20">
+      <Card className="rounded-xl border border-border p-5 shadow-sm flex flex-col gap-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3">
             <Network className="h-5 w-5 text-primary mt-0.5" strokeWidth={1.5} />

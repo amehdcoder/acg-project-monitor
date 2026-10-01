@@ -4,13 +4,16 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { LayoutDashboard, Lock, Network } from "lucide-react";
+import { ArrowLeftRight, Database, LayoutDashboard, Lock, Network, Waypoints } from "lucide-react";
 import Dhis2MicroplanEngine from "@/components/Microplanning/Dhis2MicroplanEngine";
 import Dhis2DashboardStudio from "./Dhis2DashboardStudio";
 import { openAppTab, setImportedDashboard } from "./dhis2ImportedDashboard";
 import { toast } from "sonner";
 
 type Conn = { id: string; name: string; base_url: string };
+type ExchangeStats = { dataSets: number; mappings: number; submissions: number };
+
+const EMPTY_STATS: ExchangeStats = { dataSets: 0, mappings: 0, submissions: 0 };
 
 export default function Dhis2IntegrationsHub({ projects }: { projects: { id: string; name: string }[] }) {
   const { isAdmin, isOwner, isSuperAdmin } = useAuth();
@@ -19,6 +22,7 @@ export default function Dhis2IntegrationsHub({ projects }: { projects: { id: str
   const [conn, setConn] = useState<Conn | null>(null);
   const [studio, setStudio] = useState(false);
   const [tick, setTick] = useState(0);
+  const [stats, setStats] = useState<ExchangeStats>(EMPTY_STATS);
 
   useEffect(() => { if (!projectId && projects[0]) setProjectId(projects[0].id); }, [projects, projectId]);
   useEffect(() => {
@@ -29,15 +33,41 @@ export default function Dhis2IntegrationsHub({ projects }: { projects: { id: str
       .then(({ data }) => setConn((data?.[0] as Conn) ?? null));
   }, [projectId, tick]);
 
+  useEffect(() => {
+    let current = true;
+    if (!projectId || !conn?.id) { setStats(EMPTY_STATS); return () => { current = false; }; }
+    const loadStats = async () => {
+      const [mappingResult, logResult] = await Promise.all([
+        supabase.from("health_exchange_mappings").select("id", { count: "exact", head: true }).eq("connection_id", conn.id),
+        supabase.from("health_exchange_sync_logs").select("direction,action,status,record_count")
+          .eq("connection_id", conn.id).in("status", ["success", "partial"]),
+      ]);
+      if (!current) return;
+      const logs = logResult.data ?? [];
+      const transferred = logs
+        .filter((log) => log.direction !== "test" && !log.action.includes("dry_run") && !log.action.includes("validation"))
+        .reduce((total, log) => total + Math.max(0, Number(log.record_count) || 0), 0);
+      setStats({
+        dataSets: logs.filter((log) => log.direction === "pull" && !log.action.includes("structure")).length,
+        mappings: mappingResult.count ?? 0,
+        submissions: transferred,
+      });
+    };
+    loadStats();
+    return () => { current = false; };
+  }, [projectId, conn?.id, tick]);
+
   const projectName = projects.find((p) => p.id === projectId)?.name;
 
   return (
-    <section className="space-y-3">
+    <section className="dhis2-exchange space-y-5 rounded-xl bg-muted/30 p-3 sm:p-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex items-start gap-3">
-          <Network className="h-5 w-5 text-primary mt-1" strokeWidth={1.5} />
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+            <Network className="h-5 w-5" strokeWidth={1.75} />
+          </div>
           <div>
-            <h2 className="text-lg font-semibold text-foreground">DHIS2 Data Exchange</h2>
+            <h2 className="text-xl font-semibold text-foreground">DHIS2 Data Exchange</h2>
             <p className="text-sm text-muted-foreground">Push and pull data, explore the full DHIS2 setup and import live DHIS2 dashboards.</p>
           </div>
         </div>
@@ -46,13 +76,34 @@ export default function Dhis2IntegrationsHub({ projects }: { projects: { id: str
           <SelectContent>{projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
         </Select>
       </div>
-      <div className="grid gap-3 lg:grid-cols-[1fr_340px]" onClickCapture={() => setTimeout(() => setTick((t) => t + 1), 4000)}>
-        <Dhis2MicroplanEngine projectId={projectId} projectName={projectName} canUse={canUse} scope="integrations" />
-        <Card className="p-4 flex flex-col gap-3 border-primary/20">
+      <div className="grid gap-3 sm:grid-cols-3">
+        {[
+          { label: "Total data sets synced", value: stats.dataSets, icon: Database },
+          { label: "Active mappings", value: stats.mappings, icon: Waypoints },
+          { label: "Submissions transferred", value: stats.submissions, icon: ArrowLeftRight },
+        ].map(({ label, value, icon: Icon }) => (
+          <Card key={label} className="rounded-xl border border-border bg-card p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase text-muted-foreground">{label}</p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">{value.toLocaleString()}</p>
+              </div>
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Icon className="h-4 w-4" strokeWidth={1.75} />
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]" onClickCapture={() => setTimeout(() => setTick((t) => t + 1), 4000)}>
+        <Dhis2MicroplanEngine projectId={projectId} projectName={projectName} canUse={canUse} scope="integrations" onExchangeActivity={() => setTick((t) => t + 1)} />
+        <Card className="rounded-xl border border-border bg-card p-5 shadow-sm flex flex-col gap-4">
           <div className="flex items-start gap-3">
-            <LayoutDashboard className="h-5 w-5 text-primary mt-0.5" strokeWidth={1.5} />
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <LayoutDashboard className="h-4 w-4" strokeWidth={1.75} />
+            </div>
             <div>
-              <h3 className="text-sm font-semibold text-foreground">DHIS2 Dashboard Import</h3>
+              <h3 className="text-base font-semibold text-foreground">DHIS2 Dashboard Import</h3>
               <p className="text-xs text-muted-foreground">Opens an exact replica of your DHIS2 dashboards — same layout, charts and tables — with a data pivot on every item.</p>
             </div>
           </div>
