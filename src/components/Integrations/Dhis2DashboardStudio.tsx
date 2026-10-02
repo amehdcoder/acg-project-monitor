@@ -6,6 +6,7 @@ import { ArrowLeftRight, Download, LayoutDashboard, Loader2, RefreshCw, Search, 
 import { toast } from "sonner";
 import { dhis2Call } from "./dhis2Api";
 import Dhis2DashboardItem, { ChartBody, DashItem, PivotTable, VizResult, clearVizCache } from "./Dhis2DashboardItem";
+import Dhis2DataTable from "./Dhis2DataTable";
 import { dataDims, dimLabel, nameOf, pivot } from "./dhis2Pivot";
 
 type DashMeta = { id: string; name: string; description: string | null; starred: boolean; items: number };
@@ -148,13 +149,13 @@ export default function Dhis2DashboardStudio({ open, onOpenChange, connId, connN
                 {items.map((it) => (
                   <div key={`${it.id}-${nonce}`} className="h-80 lg:h-auto"
                     style={{ gridColumn: `${Math.min(it.x, 59) + 1} / span ${Math.max(1, Math.min(it.w, 60 - Math.min(it.x, 59)))}`, gridRow: `${it.y + 1} / span ${Math.max(8, it.h)}` }}>
-                    <Dhis2DashboardItem connId={connId} item={it} onPivot={setPivotOf} onExpand={setExpand} />
+                    <Dhis2DashboardItem connId={connId} item={it} onExpand={setExpand} />
                   </div>
                 ))}
               </div>
             )}
+          {dash && items.length > 0 && <Dhis2DataTable connId={connId} items={items} />}
         </main>
-        <PivotDialog r={pivotOf} onClose={() => setPivotOf(null)} />
         <Dialog open={!!expand} onOpenChange={(o) => !o && setExpand(null)}>
           <DialogContent className="max-w-6xl h-[85dvh] flex flex-col">
             <DialogHeader><DialogTitle>{expand?.viz.name}</DialogTitle><DialogDescription>Full-screen view</DialogDescription></DialogHeader>
@@ -207,13 +208,13 @@ export default function Dhis2DashboardStudio({ open, onOpenChange, connId, connN
                 {items.map((it) => (
                   <div key={`${it.id}-${nonce}`} className="h-80 lg:h-auto"
                     style={{ gridColumn: `${Math.min(it.x, 59) + 1} / span ${Math.max(1, Math.min(it.w, 60 - Math.min(it.x, 59)))}`, gridRow: `${it.y + 1} / span ${Math.max(8, it.h)}` }}>
-                    <Dhis2DashboardItem connId={connId} item={it} onPivot={setPivotOf} onExpand={setExpand} />
+                    <Dhis2DashboardItem connId={connId} item={it} onExpand={setExpand} />
                   </div>
                 ))}
               </div>
             )}
+          {dash && items.length > 0 && <Dhis2DataTable connId={connId} items={items} />}
         </main>
-        <PivotDialog r={pivotOf} onClose={() => setPivotOf(null)} />
         <Dialog open={!!expand} onOpenChange={(o) => !o && setExpand(null)}>
           <DialogContent className="max-w-6xl h-[85dvh] flex flex-col">
             <DialogHeader><DialogTitle>{expand?.viz.name}</DialogTitle><DialogDescription>Full-screen view</DialogDescription></DialogHeader>

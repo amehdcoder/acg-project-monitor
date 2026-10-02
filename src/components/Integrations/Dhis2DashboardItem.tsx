@@ -195,7 +195,7 @@ function ChartBody({ r }: { r: VizResult }) {
   );
 }
 
-export default function Dhis2DashboardItem({ connId, item, onPivot, onExpand }: { connId: string; item: DashItem; onPivot: (r: VizResult) => void; onExpand: (r: VizResult) => void }) {
+export default function Dhis2DashboardItem({ connId, item, onExpand }: { connId: string; item: DashItem; onPivot?: (r: VizResult) => void; onExpand: (r: VizResult) => void }) {
   const [r, setR] = useState<VizResult | null>(null);
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
@@ -213,7 +213,6 @@ export default function Dhis2DashboardItem({ connId, item, onPivot, onExpand }: 
           <h4 className="text-[13px] font-semibold text-foreground truncate" title={title}>{title}</h4>
           {r?.analytics && (
             <div className="flex gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-              <button type="button" aria-label="Open pivot" title="Open as pivot table" onClick={() => onPivot(r)} className="p-1 rounded hover:bg-muted"><Table2 className="h-3.5 w-3.5" /></button>
               <button type="button" aria-label="View full screen" title="View full screen" onClick={() => onExpand(r)} className="p-1 rounded hover:bg-muted"><Maximize2 className="h-3.5 w-3.5" /></button>
             </div>
           )}
