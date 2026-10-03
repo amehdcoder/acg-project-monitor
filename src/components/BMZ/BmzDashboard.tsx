@@ -17,6 +17,8 @@ import DashboardScopeFilters from "@/components/shared/DashboardScopeFilters";
 import { exportJigawaEyeHealthWorkbook } from "@/lib/bmz/bmzExcelExport";
 import { formatDay, formatDuration } from "@/lib/accountability";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import BmzExtraInsights from "./BmzExtraInsights";
 
 interface Props {
   onClose: () => void;
@@ -44,6 +46,8 @@ const Card = ({ title, icon: Icon, children }: { title: string; icon: any; child
 
 export default function BmzDashboard({ onClose }: Props) {
   const d = useBmzDashboard();
+  const { isAdmin, isOwner, isCoOwner, isSuperAdmin } = useAuth();
+  const canDelete = !!(isAdmin || isOwner || isCoOwner || isSuperAdmin);
   const { stats } = d;
   const [downloading, setDownloading] = useState(false);
 
@@ -398,6 +402,8 @@ export default function BmzDashboard({ onClose }: Props) {
                 </div>
               </Card>
             )}
+
+            <BmzExtraInsights rows={d.rows} canDelete={canDelete} onDeleted={() => void d.reload()} />
           </div>
         )}
       </div>

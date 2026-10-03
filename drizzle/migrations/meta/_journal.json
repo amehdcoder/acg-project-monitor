@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1791020121300,
+      "tag": "0000_bmz_admin_delete",
+      "breakpoints": true
+    }
+  ]
+}

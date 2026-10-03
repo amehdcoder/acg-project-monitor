@@ -1,0 +1,1 @@
+CREATE POLICY "Owner/admin delete bmz records" ON public.bmz_monitoring FOR DELETE TO authenticated USING (public.is_owner_or_co_owner(auth.uid()) OR public.is_admin(auth.uid()));
