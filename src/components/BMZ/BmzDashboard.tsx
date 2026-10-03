@@ -10,8 +10,8 @@ import {
   ScatterChart, Scatter, ZAxis, ReferenceLine, LabelList,
 } from "recharts";
 
-import { useBmzDashboard } from "@/hooks/useBmzDashboard";
-import { BMZ_GREEN, BMZ_TEAL, BMZ_DARK, readinessBand } from "@/lib/bmz/definition";
+import { useBmzDashboard, EMPTY_BMZ_EXTRA } from "@/hooks/useBmzDashboard";
+import { BMZ_GREEN, BMZ_TEAL, BMZ_DARK, readinessBand, CADRE_OPTIONS, SEX_OPTIONS } from "@/lib/bmz/definition";
 import JigawaLgaMap from "./JigawaLgaMap";
 import DashboardScopeFilters from "@/components/shared/DashboardScopeFilters";
 import { exportJigawaEyeHealthWorkbook } from "@/lib/bmz/bmzExcelExport";
@@ -156,6 +156,36 @@ export default function BmzDashboard({ onClose }: Props) {
               totalCount={d.allRows.length}
               accent={BMZ_GREEN}
             />
+            <div className="flex flex-wrap items-end gap-2 rounded-2xl bg-white p-3 text-xs shadow-sm">
+              {([
+                ["cadre", "Cadre", CADRE_OPTIONS.map((o) => [o.value, o.label])],
+                ["sex", "Sex", SEX_OPTIONS.map((o) => [o.value, o.label])],
+                ["status", "Status", [["submitted", "Submitted"], ["draft", "Draft"]]],
+                ["band", "Readiness", ["Strong", "Fair", "Weak", "Critical"].map((b) => [b, b])],
+              ] as [keyof typeof d.extra, string, string[][]][]).map(([k, label, opts]) => (
+                <label key={k} className="flex flex-col gap-1">
+                  <span className="font-semibold text-muted-foreground">{label}</span>
+                  <select value={d.extra[k]} onChange={(e) => d.setExtra({ ...d.extra, [k]: e.target.value })}
+                    className="h-9 rounded-lg border border-border bg-white px-2">
+                    <option value="">All</option>
+                    {opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  </select>
+                </label>
+              ))}
+              {(["from", "to"] as const).map((k) => (
+                <label key={k} className="flex flex-col gap-1">
+                  <span className="font-semibold text-muted-foreground">{k === "from" ? "From" : "To"}</span>
+                  <input type="date" value={d.extra[k]} onChange={(e) => d.setExtra({ ...d.extra, [k]: e.target.value })}
+                    className="h-9 rounded-lg border border-border bg-white px-2" />
+                </label>
+              ))}
+              {Object.values(d.extra).some(Boolean) && (
+                <button onClick={() => d.setExtra(EMPTY_BMZ_EXTRA)} className="h-9 rounded-lg border border-border px-3 font-semibold">Clear</button>
+              )}
+              {d.duplicatesRemoved > 0 && (
+                <span className="ml-auto self-center text-muted-foreground">{d.duplicatesRemoved} exact duplicate(s) removed automatically</span>
+              )}
+            </div>
             {/* KPI strip */}
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               <Kpi icon={Users} label="Monitoring visits" value={String(stats.total)} sub={`${d.draftCount} draft(s)`} color={BMZ_GREEN} />
