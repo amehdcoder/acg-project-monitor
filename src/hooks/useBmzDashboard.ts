@@ -52,14 +52,36 @@ async function fetchAll(): Promise<BmzRow[]> {
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await supabase
       .from("bmz_monitoring" as any)
-      .select(COLUMNS)
+      .select("*")
       .range(from, from + PAGE - 1);
     if (error || !data || data.length === 0) break;
     all.push(...(data as any as BmzRow[]));
     if (data.length < PAGE) break;
   }
-  return all;
+  return dedupeExact(all);
 }
+
+/** Fields that differ between otherwise identical re-submissions. */
+const DUP_IGNORE = new Set(["id", "submission_uuid", "created_at", "updated_at", "client_submitted_at", "status", "compliance_score", "readiness_band"]);
+export let bmzDuplicatesRemoved = 0;
+
+/** Drop 100% identical submissions (same answers in every field), keeping the earliest. */
+function dedupeExact(rows: BmzRow[]): BmzRow[] {
+  const sorted = [...rows].sort((a, b) => (a.created_at || "").localeCompare(b.created_at || ""));
+  const seen = new Set<string>();
+  const out: BmzRow[] = [];
+  for (const r of sorted) {
+    const sig = JSON.stringify(Object.keys(r).filter((k) => !DUP_IGNORE.has(k)).sort().map((k) => [k, (r as any)[k]]));
+    if (seen.has(sig)) continue;
+    seen.add(sig);
+    out.push(r);
+  }
+  bmzDuplicatesRemoved = rows.length - out.length;
+  return out;
+}
+
+export interface BmzExtraFilters { cadre: string; sex: string; status: string; band: string; from: string; to: string }
+export const EMPTY_BMZ_EXTRA: BmzExtraFilters = { cadre: "", sex: "", status: "", band: "", from: "", to: "" };
 
 export const useBmzDashboard = () => {
   const qc = useQueryClient();
@@ -72,6 +94,7 @@ export const useBmzDashboard = () => {
   const allRows = rowsQ.data ?? [];
 
   const [filters, setFilters] = useState<ScopeFilterValues>({ lga: "", facility: "", supervisor: "", date: "", month: "" });
+  const [extra, setExtra] = useState<BmzExtraFilters>(EMPTY_BMZ_EXTRA);
 
   const monitorIds = useMemo(
     () => [...new Set(allRows.map((r) => r.monitor_id).filter(Boolean))] as string[],
@@ -102,6 +125,13 @@ export const useBmzDashboard = () => {
     () =>
       allRows.filter((r) => {
         if (filters.lga && (r.lga || "") !== filters.lga) return false;
+        if (extra.cadre && r.cadre !== extra.cadre) return false;
+        if (extra.sex && r.sex !== extra.sex) return false;
+        if (extra.status && (extra.status === "draft" ? r.status !== "draft" : r.status === "draft")) return false;
+        if (extra.band && readinessBand(Number(r.compliance_score ?? 0)).label !== extra.band) return false;
+        const day = (r.date_of_visit || r.created_at || "").slice(0, 10);
+        if (extra.from && day < extra.from) return false;
+        if (extra.to && day > extra.to) return false;
         if (filters.date && (r.date_of_visit || "").slice(0, 10) !== filters.date) return false;
         if (filters.month && (r.date_of_visit || "").slice(0, 7) !== filters.month) return false;
         if (
@@ -119,7 +149,7 @@ export const useBmzDashboard = () => {
           return false;
         return true;
       }),
-    [allRows, filters, profileMap],
+    [allRows, filters, extra, profileMap],
   );
 
   const filterOptions = useMemo(
@@ -298,7 +328,7 @@ export const useBmzDashboard = () => {
 
 
   return {
-    rows, allRows, loading, reload,
+    rows, allRows, loading, reload, extra, setExtra, duplicatesRemoved: bmzDuplicatesRemoved,
     filters, setFilters, filterOptions,
     stats, byCadre, bySex, refresherBreakdown, activities, availability,
     byLga, challenges, flagged, points, draftCount, accountability, deleteVisits,
