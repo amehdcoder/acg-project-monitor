@@ -15,6 +15,13 @@
       "when": 1791094751168,
       "tag": "0001_merge_beneficiaries",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791094775430,
+      "tag": "0002_merge_beneficiaries_fix_audit",
+      "breakpoints": true
     }
   ]
 }
