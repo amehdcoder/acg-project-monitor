@@ -125,9 +125,9 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
     const tRegex = /<w:t[^>]*>([\s\S]*?)<\/w:t>/g;
     const tables: string[] = xml.match(tblRegex) || [];
     tables.forEach((tbl) => {
-      const trs = tbl.match(trRegex) || [];
+      const trs: string[] = tbl.match(trRegex) || [];
       trs.forEach((tr) => {
-        const tcs = tr.match(tcRegex) || [];
+        const tcs: string[] = tr.match(tcRegex) || [];
         const row = tcs.map((tc) => {
           const texts: string[] = [];
           let m: RegExpExecArray | null;
