@@ -8,6 +8,13 @@
       "when": 1791020121300,
       "tag": "0000_bmz_admin_delete",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791094751168,
+      "tag": "0001_merge_beneficiaries",
+      "breakpoints": true
     }
   ]
 }

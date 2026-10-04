@@ -13602,6 +13602,10 @@ export type Database = {
       }
       mda_lens_geo_key: { Args: { _v: string }; Returns: string }
       mda_lens_write_allowed: { Args: { _user_id: string }; Returns: boolean }
+      merge_beneficiaries: {
+        Args: { _drop: string; _keep: string; _profile?: Json }
+        Returns: undefined
+      }
       mesh_room_project: { Args: { _room_id: string }; Returns: string }
       microplan_distinct_geography:
         | {
