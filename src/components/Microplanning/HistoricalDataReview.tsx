@@ -123,7 +123,7 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
     const trRegex = /<w:tr[\s\S]*?<\/w:tr>/g;
     const tcRegex = /<w:tc[\s\S]*?<\/w:tc>/g;
     const tRegex = /<w:t[^>]*>([\s\S]*?)<\/w:t>/g;
-    const tables = xml.match(tblRegex) || [];
+    const tables: string[] = xml.match(tblRegex) || [];
     tables.forEach((tbl) => {
       const trs = tbl.match(trRegex) || [];
       trs.forEach((tr) => {
