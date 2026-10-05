@@ -31,6 +31,7 @@ import type { BeneficiaryRow, ProgrammeModuleRow } from "@/lib/programmeModule/t
 import { useBeneficiaries, useProgrammeModules } from "./useProgrammeModule";
 import BeneficiaryList from "./BeneficiaryList";
 import BeneficiaryRecord from "./BeneficiaryRecord";
+import RecordQualityBar from "./RecordQualityBar";
 import BeneficiaryFormDialog from "./BeneficiaryFormDialog";
 import ProjectTeamPanel from "./ProjectTeamPanel";
 import { useMyTeamPermissions } from "@/lib/programmeModule/projectTeam";
@@ -375,6 +376,14 @@ const ProgrammeModuleWorkspace = ({
         </Card>
       )}
 
+      {!permissionsLoading && active && view === "records" && (
+        <RecordQualityBar
+          beneficiaries={scopedBeneficiaries}
+          canMerge={canConfigure}
+          onOpen={setSelected}
+          onMerged={() => void reloadBeneficiaries()}
+        />
+      )}
       {!permissionsLoading && active && view === "records" && (
         <BeneficiaryList
           beneficiaries={scopedBeneficiaries}
