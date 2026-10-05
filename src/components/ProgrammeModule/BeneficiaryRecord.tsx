@@ -262,6 +262,7 @@ const BeneficiaryRecord = ({
                   <p className="mt-0.5 text-sm font-medium" style={{ color: `hsl(${accent})` }}>
                     Case ID: {beneficiary.case_id}
                   </p>
+                  {!beneficiary.__pending && <BeneficiaryCaseCard beneficiary={beneficiary} />}
                   {(cddSource.cdd || cddSource.facility) && (
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       Found by CDD:{" "}
