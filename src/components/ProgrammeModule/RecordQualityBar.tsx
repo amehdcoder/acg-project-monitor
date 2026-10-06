@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Copy, GitMerge, QrCode, ScanLine } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import BarcodeScanner from "@/components/FormFiller/BarcodeScanner";
+import CaseScanner from "./CaseScanner";
 import { caseIdFromScan, completenessScore, findDuplicates, missingFields, type DuplicateMatch } from "@/lib/programmeModule/dedupe";
 import type { BeneficiaryRow } from "@/lib/programmeModule/types";
 
