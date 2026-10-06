@@ -79,13 +79,7 @@ const RecordQualityBar = ({ beneficiaries, canMerge, onOpen, onMerged }: Props) 
         </Button>
       </Card>
 
-      <Dialog open={scanOpen} onOpenChange={setScanOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle className="flex items-center gap-2"><QrCode className="h-5 w-5" /> Scan Case ID</DialogTitle></DialogHeader>
-          <p className="text-sm text-muted-foreground">Point the camera at a beneficiary card QR code, or type the Case ID.</p>
-          {scanOpen && <BarcodeScanner value={null} onChange={(c) => c && openByCase(c)} autoTrigger />}
-        </DialogContent>
-      </Dialog>
+      <CaseScanner open={scanOpen} onOpenChange={setScanOpen} beneficiaries={beneficiaries} onFound={onOpen} />
 
       <Dialog open={dupOpen} onOpenChange={setDupOpen}>
         <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
