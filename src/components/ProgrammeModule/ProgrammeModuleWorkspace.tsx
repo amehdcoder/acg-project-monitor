@@ -268,7 +268,7 @@ const ProgrammeModuleWorkspace = ({
   if (selected && active) {
     const selectedFacility = (selected as unknown as { facility_id?: string }).facility_id || "";
     return (
-      <BeneficiaryRecord
+      <div className="lbr-type"><BeneficiaryRecord
         beneficiary={selected}
         config={normalizeConfig(active.config)}
         moduleId={active.id}
@@ -277,12 +277,12 @@ const ProgrammeModuleWorkspace = ({
         canManage={canConfigure || facilityLevels[selectedFacility] === "manage"}
         componentsVisible={!isFocalPerson || Boolean(facilityLevels[selectedFacility])}
         onChanged={() => void reloadBeneficiaries()}
-      />
+      /></div>
     );
   }
 
   return (
-    <div className="space-y-3 font-report">
+    <div className="lbr-type space-y-3 font-report">
       <div className="flex flex-col gap-3 rounded-lg border border-health-blue/15 bg-card p-3 shadow-soft lg:flex-row lg:items-center">
         <div className="flex min-w-0 items-center gap-3">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-health-blue text-primary-foreground"><Layers className="h-5 w-5" /></span>

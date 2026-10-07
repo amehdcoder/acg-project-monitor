@@ -12,6 +12,9 @@ import { toast } from "@/hooks/use-toast";
 import type { BeneficiaryRow } from "@/lib/programmeModule/types";
 import handsEmblem from "@/assets/hands-emblem.png";
 import fgnEmblem from "@/assets/fgn-emblem.png";
+import ecwaLogo from "@/assets/ecwa-logo.png";
+import cbmLogo from "@/assets/cbm-logo.png";
+import { Eye, Footprints, Brain, Droplets, TrendingUp, Phone, CheckCircle2 } from "lucide-react";
 
 // The hand card is a printed artefact, so it uses a fixed print palette
 // (inline styles) rather than app theme tokens — it must look identical in
@@ -96,8 +99,17 @@ const BeneficiaryCaseCard = ({ beneficiary: b }: { beneficiary: BeneficiaryRow }
   const kinRel = pick(p, ["next_of_kin_relationship", "caregiver_relationship"]);
 
   const capture = async () => {
-    const opts = { scale: 2, backgroundColor: "#ffffff", useCORS: true };
-    const [f, k] = await Promise.all([html2canvas(frontRef.current!, opts), html2canvas(backRef.current!, opts)]);
+    await document.fonts?.ready;
+    // Render from an unscaled clone so the export matches the on-screen card pixel-for-pixel.
+    const opts = {
+      scale: 3, backgroundColor: null, useCORS: true, logging: false,
+      onclone: (doc: Document) => {
+        const w = doc.querySelector<HTMLElement>("[data-card-stage]");
+        if (w) { w.style.transform = "none"; w.style.width = "auto"; w.style.height = "auto"; }
+      },
+    };
+    const f = await html2canvas(frontRef.current!, opts);
+    const k = await html2canvas(backRef.current!, opts);
     return [f, k];
   };
   const downloadPng = async () => {
@@ -116,11 +128,11 @@ const BeneficiaryCaseCard = ({ beneficiary: b }: { beneficiary: BeneficiaryRow }
     setBusy("pdf");
     try {
       const [f, k] = await capture();
-      const w = 86, h = (f.height / f.width) * w; // ~ID-card width in mm
-      const pdf = new jsPDF({ unit: "mm", format: "a4" });
-      pdf.text(`Beneficiary Hand Card — ${b.case_id}`, 12, 12);
-      pdf.addImage(f.toDataURL("image/png"), "PNG", 12, 20, w, h);
-      pdf.addImage(k.toDataURL("image/png"), "PNG", 12 + w + 8, 20, w, h);
+      const w = 105, h = (f.height / f.width) * w; // A6-width card, true aspect
+      const pdf = new jsPDF({ unit: "mm", format: [w + 10, h + 10], orientation: "portrait" });
+      pdf.addImage(f.toDataURL("image/png"), "PNG", 5, 5, w, h, undefined, "NONE");
+      pdf.addPage([w + 10, h + 10], "portrait");
+      pdf.addImage(k.toDataURL("image/png"), "PNG", 5, 5, w, h, undefined, "NONE");
       pdf.save(`${b.case_id}-hand-card.pdf`);
     } catch (e) { toast({ title: "Download failed", description: String(e), variant: "destructive" }); }
     setBusy("");
@@ -128,11 +140,11 @@ const BeneficiaryCaseCard = ({ beneficiary: b }: { beneficiary: BeneficiaryRow }
   const print = async () => {
     const [f, k] = await capture();
     const w = window.open("", "_blank"); if (!w) return;
-    w.document.write(`<html><head><title>${b.case_id}</title></head><body style="margin:0;padding:16px;display:flex;gap:16px;flex-wrap:wrap"><img src="${f.toDataURL()}" style="width:48%"/><img src="${k.toDataURL()}" style="width:48%"/><script>window.onload=()=>window.print()</script></body></html>`);
+    w.document.write(`<html><head><title>${b.case_id}</title></head><style>@page{size:A4 landscape;margin:8mm}html,body{margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}.s{display:flex;gap:8mm;justify-content:center;align-items:flex-start}.s img{width:135mm;height:auto}</style><body><div class="s"><img src="${f.toDataURL()}"/><img src="${k.toDataURL()}"/></div><script>window.onload=()=>window.print()</script></body></html>`);
     w.document.close();
   };
 
-  const card: React.CSSProperties = { width: 720, height: 960, borderRadius: 26, overflow: "hidden", background: "#fff", fontFamily: "'Plus Jakarta Sans', Arial, sans-serif", position: "relative", boxShadow: "0 0 0 1px #dfe5ef", flexShrink: 0 };
+  const card: React.CSSProperties = { WebkitPrintColorAdjust: "exact", width: 720, height: 960, borderRadius: 26, overflow: "hidden", background: "#fff", fontFamily: "'Plus Jakarta Sans', Arial, sans-serif", position: "relative", boxShadow: "0 0 0 1px #dfe5ef", flexShrink: 0 };
   const stripe = `linear-gradient(90deg, ${ORANGE}, #f4a11d 50%, ${GREEN})`;
 
   return (
@@ -149,21 +161,26 @@ const BeneficiaryCaseCard = ({ beneficiary: b }: { beneficiary: BeneficiaryRow }
             <Button variant="outline" className="gap-1" onClick={print} disabled={!!busy}><Printer className="h-4 w-4" /> Print</Button>
           </div>
           <div className="overflow-x-auto rounded-lg bg-muted/40 p-3">
-            <div style={{ display: "flex", gap: 24, transform: "scale(0.62)", transformOrigin: "top left", width: 1464, height: 600 }}>
+            <div data-card-stage style={{ display: "flex", gap: 24, transform: "scale(0.62)", transformOrigin: "top left", width: 1464, height: 600 }}>
               {/* FRONT */}
               <div ref={frontRef} style={card}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 28px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <img src={handsEmblem} style={{ height: 70 }} />
-                    <div><div style={{ fontWeight: 800, fontSize: 30, color: NAVY, lineHeight: 1 }}>HANDS</div><div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, color: NAVY }}>TRANSFORMING LIVES</div></div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 22px", gap: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                    <img src={handsEmblem} style={{ height: 66, width: "auto", objectFit: "contain" }} />
+                    <div><div style={{ fontWeight: 800, fontSize: 26, color: NAVY, lineHeight: 1 }}>HANDS</div><div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1, color: NAVY }}>TRANSFORMING LIVES</div></div>
                   </div>
-                  <div style={{ textAlign: "center", color: NAVY }}><div style={{ fontWeight: 800, fontSize: 18 }}>{facilityName}</div><div style={{ fontSize: 11 }}>Longitudinal Beneficiary Record</div></div>
-                  <div style={{ textAlign: "center" }}><img src={fgnEmblem} style={{ height: 62 }} /><div style={{ fontSize: 8, fontWeight: 700, color: GREEN }}>FEDERAL MINISTRY OF HEALTH</div></div>
+                  <div style={{ width: 1, height: 70, background: "#c9d4e6" }} />
+                  <img src={ecwaLogo} style={{ height: 66, width: "auto", maxWidth: 190, objectFit: "contain", flexShrink: 0 }} />
+                  <div style={{ width: 1, height: 70, background: "#c9d4e6" }} />
+                  <img src={cbmLogo} style={{ height: 80, width: "auto", maxWidth: 150, objectFit: "contain", flexShrink: 0 }} />
+                  <div style={{ width: 1, height: 70, background: "#c9d4e6" }} />
+                  <div style={{ textAlign: "center", flexShrink: 0 }}><img src={fgnEmblem} style={{ height: 58, width: "auto", objectFit: "contain" }} /><div style={{ fontSize: 8, fontWeight: 700, color: GREEN }}>FEDERAL MINISTRY OF HEALTH</div></div>
                 </div>
                 <div style={{ height: 6, background: stripe }} />
                 <div style={{ background: `linear-gradient(120deg, ${NAVY}, #1d5bb5)`, color: "#fff", padding: "18px 32px", borderBottomRightRadius: 80 }}>
                   <div style={{ fontSize: 46, fontWeight: 900, letterSpacing: 0.5, lineHeight: 1 }}>BENEFICIARY HAND CARD</div>
                   <div style={{ fontSize: 20, marginTop: 6, opacity: 0.95 }}>Your Health • Your Records • Always With You</div>
+                  <div style={{ fontSize: 14, marginTop: 4, opacity: 0.85 }}>{facilityName} • Longitudinal Beneficiary Record</div>
                 </div>
                 <div style={{ height: 6, background: stripe, width: "70%" }} />
                 <div style={{ display: "flex", gap: 20, padding: "24px 28px" }}>
@@ -187,9 +204,9 @@ const BeneficiaryCaseCard = ({ beneficiary: b }: { beneficiary: BeneficiaryRow }
                   </div>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-around", padding: "0 20px", textAlign: "center" }}>
-                  {[["👁", "Integrated Eye Health", "#1d5bb5"], ["🦶", "MMDP / NTD", GREEN], ["🧠", "Mental Health & Psychosocial", ORANGE], ["💧", "Inclusive WASH", "#7b2cbf"], ["📈", "Livelihood & Empowerment", RED]].map(([i, l, c]) => (
+                  {([[Eye, "Integrated Eye Health", "#1d5bb5"], [Footprints, "MMDP / NTD", GREEN], [Brain, "Mental Health & Psychosocial", ORANGE], [Droplets, "Inclusive WASH", "#7b2cbf"], [TrendingUp, "Livelihood & Empowerment", RED]] as const).map(([I, l, c]) => (
                     <div key={l} style={{ width: 120 }}>
-                      <div style={{ width: 74, height: 74, margin: "0 auto", borderRadius: "50%", background: c, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 34 }}>{i}</div>
+                      <div style={{ width: 74, height: 74, margin: "0 auto", borderRadius: "50%", background: c, display: "flex", alignItems: "center", justifyContent: "center" }}><I size={38} color="#ffffff" strokeWidth={2} /></div>
                       <div style={{ fontSize: 12, fontWeight: 700, color: c, marginTop: 6 }}>{l}</div>
                     </div>
                   ))}
@@ -220,12 +237,12 @@ const BeneficiaryCaseCard = ({ beneficiary: b }: { beneficiary: BeneficiaryRow }
                   <Row label="Date of Registration" value={fmtDate(b.created_at)} color={ORANGE} />
                 </div>
                 <div style={{ margin: "0 24px", borderRadius: 14, background: "#fde8e8", border: `1px solid ${RED}55`, padding: "12px 18px", color: RED }}>
-                  <div style={{ fontSize: 24, fontWeight: 900 }}>☎ IN CASE OF EMERGENCY</div>
+                  <div style={{ fontSize: 24, fontWeight: 900, display: "flex", alignItems: "center", gap: 8 }}><Phone size={24} color={RED} strokeWidth={2.5} /> IN CASE OF EMERGENCY</div>
                   <div style={{ fontSize: 15 }}>Please contact the next of kin or the nearest health facility.</div>
                 </div>
                 <div style={{ display: "flex", gap: 16, margin: "18px 24px" }}>
                   <div style={{ flex: 1, border: `1px solid ${GREEN}66`, background: "#f1faf3", borderRadius: 14, padding: "12px 16px", color: NAVY, fontSize: 13 }}>
-                    <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 6 }}>✔ Important Information</div>
+                    <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 6, display: "flex", alignItems: "center", gap: 8 }}><CheckCircle2 size={22} color={GREEN} strokeWidth={2.5} /> Important Information</div>
                     {["Keep this card safe and bring it to every visit.", "The QR code and barcode carry your unique Case ID for Amehnities access.", "Do not share this card with anyone.", "Report if lost or damaged.", `Valid at ${facilityName} and all HANDS-supported health facilities.`].map((t) => <div key={t} style={{ marginBottom: 4 }}>• {t}</div>)}
                   </div>
                   <div style={{ width: 250, display: "flex", flexDirection: "column", justifyContent: "space-between", alignItems: "center" }}>
