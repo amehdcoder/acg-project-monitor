@@ -1344,3 +1344,13 @@ select option {
   font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
   color: hsl(var(--muted-foreground)); margin-bottom: 4px !important;
 }
+
+/* Longitudinal Beneficiary Records: larger, more readable type scale */
+.lbr-type .text-\[9px\], .lbr-type .text-\[10px\] { font-size: 0.75rem; line-height: 1rem; }
+.lbr-type .text-\[11px\] { font-size: 0.8125rem; line-height: 1.15rem; }
+.lbr-type .text-xs { font-size: 0.875rem; line-height: 1.25rem; }
+.lbr-type .text-sm { font-size: 0.9375rem; line-height: 1.4rem; }
+.lbr-type .text-base { font-size: 1.0625rem; line-height: 1.6rem; }
+.lbr-type .text-lg { font-size: 1.25rem; line-height: 1.75rem; }
+.lbr-type .text-xl { font-size: 1.375rem; line-height: 1.9rem; }
+.lbr-type .text-2xl { font-size: 1.625rem; line-height: 2.1rem; }
