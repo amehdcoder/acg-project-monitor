@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Add a standalone in-app Hand Card screen with record-linked navigation and existing exports.
+
 - [x] Remove hand-card text collisions and verify image/PDF layout with long record details.
 - [x] Harden camera permissions, camera lifecycle, and supported torch controls; refresh scanner presentation.
 - [ ] Verify physical device camera/torch and paper printing — requires a camera/torch-equipped device and printer.
