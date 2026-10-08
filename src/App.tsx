@@ -18,6 +18,7 @@ import ResetPassword from "./pages/ResetPassword";
 import ConfirmEmail from "./pages/ConfirmEmail";
 import NotFound from "./pages/NotFound";
 import Install from "./pages/Install";
+import HandCard from "./pages/HandCard";
 import DataCleaner from "./pages/DataCleaner";
 import KoboHubPage from "./components/KoboHub/KoboHubPage";
 import MdaAnalysesHarness from "./pages/MdaAnalysesHarness";
@@ -180,6 +181,7 @@ const App = () => (
                       }
                     />
                     <Route path="/install" element={<ProtectedRoute><Install /></ProtectedRoute>} />
+                    <Route path="/hand-card/:beneficiaryId" element={<ProtectedRoute><HandCard /></ProtectedRoute>} />
                     <Route path="/witness/:surveyId/:hhId" element={<CESWitnessForm />} />
                     <Route path="/satellite-messenger" element={<ProtectedRoute><OffGridSatelliteMessenger /></ProtectedRoute>} />
                    <Route path="/data-cleaner" element={<ProtectedRoute><DataCleaner /></ProtectedRoute>} />
