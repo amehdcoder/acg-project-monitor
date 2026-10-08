@@ -1,5 +1,9 @@
 # Roadmap
 
+- [x] Remove hand-card text collisions and verify image/PDF layout with long record details.
+- [x] Harden camera permissions, camera lifecycle, and supported torch controls; refresh scanner presentation.
+- [ ] Verify physical device camera/torch and paper printing — requires a camera/torch-equipped device and printer.
+
 - [x] Replace crowded records tabs with grouped professional navigation.
 - [x] Build a live project-wide General dashboard matching the supplied reference.
 - [x] Preserve role, safeguarding, facility, and administration visibility rules.
