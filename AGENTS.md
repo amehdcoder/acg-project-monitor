@@ -1,5 +1,8 @@
 # Architecture rules
 
+- Serialize hand-card camera start/stop operations and cancel stale sessions; expose torch only when the running track supports it — why: prevents leaked cameras and false device-ready states.
+- Hand-card exports capture the same naturally flowing front/back layouts, with independent page aspect ratios — why: long beneficiary details must not collide with fixed footers or become cropped in downloads.
+
 - Route all DHIS2 reporting/dashboard imports through `health-exchange`; maps use bundled Nigeria LGA/State/National boundaries — why: credentials stay server-side and geography exact.
 - Revoke browser EXECUTE on SECURITY DEFINER trigger/internal functions; keep it only for RLS helpers and app-called RPCs — why: shrinks the callable surface without breaking policies.
 - Self-hosting ships the static build via Dockerfile + nginx.conf while the backend stays on Lovable Cloud — why: removes hosting badge without migrating data.

@@ -1,5 +1,8 @@
 # Roadmap
 
+- [ ] Remove hand-card text collisions and verify image/PDF layout with long record details.
+- [ ] Harden camera permissions, camera lifecycle, and supported torch controls; refresh scanner presentation.
+
 - [x] Replace crowded records tabs with grouped professional navigation.
 - [x] Build a live project-wide General dashboard matching the supplied reference.
 - [x] Preserve role, safeguarding, facility, and administration visibility rules.
