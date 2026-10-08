@@ -1,5 +1,7 @@
 # Architecture rules
 
+- Render Hand Cards on a protected standalone route using the same live record-backed document as exports; rely on record RLS for access — why: field viewing and downloads remain consistent without exposing beneficiary data publicly.
+
 - Serialize hand-card camera start/stop operations and cancel stale sessions; expose torch only when the running track supports it — why: prevents leaked cameras and false device-ready states.
 - Hand-card exports capture the same naturally flowing front/back layouts, with independent page aspect ratios — why: long beneficiary details must not collide with fixed footers or become cropped in downloads.
 
