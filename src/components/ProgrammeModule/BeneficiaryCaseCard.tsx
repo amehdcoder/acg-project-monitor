@@ -105,7 +105,7 @@ const BeneficiaryCaseCard = ({ beneficiary: b }: { beneficiary: BeneficiaryRow }
       scale: 3, backgroundColor: null, useCORS: true, logging: false,
       onclone: (doc: Document) => {
         const w = doc.querySelector<HTMLElement>("[data-card-stage]");
-        if (w) { w.style.transform = "none"; w.style.width = "auto"; w.style.height = "auto"; }
+        if (w) { w.style.transform = "none"; w.style.zoom = "1"; w.style.width = "1464px"; w.style.height = "auto"; }
       },
     };
     const front = frontRef.current;
@@ -145,7 +145,8 @@ const BeneficiaryCaseCard = ({ beneficiary: b }: { beneficiary: BeneficiaryRow }
     try {
     const [f, k] = await capture();
     const w = window.open("", "_blank"); if (!w) return;
-    w.document.write(`<html><head><title>${b.case_id}</title></head><style>@page{size:A4 landscape;margin:8mm}html,body{margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}.s{display:flex;gap:8mm;justify-content:center;align-items:flex-start}.s img{width:135mm;height:auto}</style><body><div class="s"><img src="${f.toDataURL()}"/><img src="${k.toDataURL()}"/></div><script>window.onload=()=>window.print()</script></body></html>`);
+    const printWidth = Math.min(132, 190 * 720 / Math.max(f.height / 3, k.height / 3));
+    w.document.write(`<html><head><title>Beneficiary Hand Card</title></head><style>@page{size:A4 landscape;margin:8mm}html,body{margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}.s{display:flex;gap:8mm;justify-content:center;align-items:flex-start}.s img{width:${printWidth}mm;height:auto}</style><body><div class="s"><img src="${f.toDataURL()}"/><img src="${k.toDataURL()}"/></div><script>window.onload=()=>window.print()</script></body></html>`);
     w.document.close();
     } catch (e) { toast({ title: "Print failed", description: String(e), variant: "destructive" }); }
   };
@@ -170,17 +171,17 @@ const BeneficiaryCaseCard = ({ beneficiary: b }: { beneficiary: BeneficiaryRow }
             <div data-card-stage style={{ display: "flex", gap: 24, zoom: 0.62, alignItems: "stretch", width: 1464 }}>
               {/* FRONT */}
               <div ref={frontRef} style={card}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 22px", gap: 10 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "180px 1px 170px 1px 125px 1px minmax(0,1fr)", alignItems: "center", padding: "16px 22px", gap: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                    <img src={handsEmblem} style={{ height: 66, width: "auto", objectFit: "contain" }} />
-                    <div><div style={{ fontWeight: 800, fontSize: 26, color: NAVY, lineHeight: 1 }}>HANDS</div><div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1, color: NAVY }}>TRANSFORMING LIVES</div></div>
+                    <img src={handsEmblem} style={{ height: 66, width: 44, objectFit: "contain" }} />
+                    <div><div style={{ fontWeight: 800, fontSize: 26, color: NAVY, lineHeight: 1.3 }}>HANDS</div><div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 0, color: NAVY }}>TRANSFORMING LIVES</div></div>
                   </div>
                   <div style={{ width: 1, height: 70, background: "#c9d4e6" }} />
-                  <img src={ecwaLogo} style={{ height: 66, width: "auto", maxWidth: 190, objectFit: "contain", flexShrink: 0 }} />
+                  <img src={ecwaLogo} style={{ height: 66, width: "100%", objectFit: "contain" }} />
                   <div style={{ width: 1, height: 70, background: "#c9d4e6" }} />
-                  <img src={cbmLogo} style={{ height: 80, width: "auto", maxWidth: 150, objectFit: "contain", flexShrink: 0 }} />
+                  <img src={cbmLogo} style={{ height: 80, width: "100%", objectFit: "contain" }} />
                   <div style={{ width: 1, height: 70, background: "#c9d4e6" }} />
-                  <div style={{ textAlign: "center", flexShrink: 0 }}><img src={fgnEmblem} style={{ height: 58, width: "auto", objectFit: "contain" }} /><div style={{ fontSize: 8, fontWeight: 700, color: GREEN }}>FEDERAL MINISTRY OF HEALTH</div></div>
+                  <div style={{ textAlign: "center", minWidth: 0 }}><img src={fgnEmblem} style={{ height: 58, width: "100%", objectFit: "contain" }} /><div style={{ fontSize: 8, fontWeight: 700, color: GREEN }}>FEDERAL MINISTRY OF HEALTH</div></div>
                 </div>
                 <div style={{ height: 6, background: stripe }} />
                 <div style={{ background: `linear-gradient(120deg, ${NAVY}, #1d5bb5)`, color: "#fff", padding: "18px 32px", borderBottomRightRadius: 80 }}>
