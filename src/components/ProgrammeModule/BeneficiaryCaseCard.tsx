@@ -4,7 +4,7 @@ import JsBarcode from "jsbarcode";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useNavigate } from "react-router-dom";
 import { Download, FileDown, Printer, QrCode, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveMediaUrl } from "@/lib/programmeModule/media";
@@ -62,8 +62,18 @@ const Row = ({ label, value, color }: { label: string; value: string; color: str
 );
 
 /** Digital Beneficiary Hand Card (front + back) with QR + barcode, downloadable. */
-const BeneficiaryCaseCard = ({ beneficiary: b }: { beneficiary: BeneficiaryRow }) => {
-  const [open, setOpen] = useState(false);
+export const HandCardDocument = ({ beneficiary: b }: { beneficiary: BeneficiaryRow }) => {
+  const stageContainer = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.62);
+  useEffect(() => {
+    const el = stageContainer.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setScale(Math.min(1, Math.max(0.2, (entry.contentRect.width - 24) / 720)));
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
   const [photo, setPhoto] = useState("");
   const [facility, setFacility] = useState("");
   const [busy, setBusy] = useState<"" | "png" | "pdf">("");
@@ -73,7 +83,6 @@ const BeneficiaryCaseCard = ({ beneficiary: b }: { beneficiary: BeneficiaryRow }
   const p = (b.profile || {}) as Record<string, unknown>;
 
   useEffect(() => {
-    if (!open) return;
     let off = false;
     void (async () => {
       const u = await resolveMediaUrl(b.photo_url || pick(p, ["photo", "patient_photo", "portrait"]));
@@ -86,7 +95,7 @@ const BeneficiaryCaseCard = ({ beneficiary: b }: { beneficiary: BeneficiaryRow }
       }
     })();
     return () => { off = true; };
-  }, [open, b.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [b.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const dob = fmtDate(pick(p, ["date_of_birth", "dob"]));
   const age = pick(p, ["age"]);
@@ -105,7 +114,7 @@ const BeneficiaryCaseCard = ({ beneficiary: b }: { beneficiary: BeneficiaryRow }
       scale: 3, backgroundColor: null, useCORS: true, logging: false,
       onclone: (doc: Document) => {
         const w = doc.querySelector<HTMLElement>("[data-card-stage]");
-        if (w) { w.style.transform = "none"; w.style.zoom = "1"; w.style.width = "1464px"; w.style.height = "auto"; }
+        if (w) { w.style.transform = "none"; w.style.zoom = "1"; w.style.width = "720px"; w.style.height = "auto"; }
       },
     };
     const front = frontRef.current;
@@ -155,20 +164,14 @@ const BeneficiaryCaseCard = ({ beneficiary: b }: { beneficiary: BeneficiaryRow }
   const stripe = `linear-gradient(90deg, ${ORANGE}, #f4a11d 50%, ${GREEN})`;
 
   return (
-    <>
-      <Button size="sm" variant="outline" className="mt-1 h-7 gap-1 text-xs" onClick={() => setOpen(true)}>
-        <QrCode className="h-3.5 w-3.5" /> Hand card
-      </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[94vh] max-w-6xl overflow-y-auto">
-          <DialogHeader><DialogTitle>Beneficiary Hand Card</DialogTitle></DialogHeader>
+    <section className="space-y-4">
           <div className="flex flex-wrap gap-2">
             <Button className="gap-1" onClick={downloadPng} disabled={!!busy}>{busy === "png" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Download image</Button>
             <Button variant="outline" className="gap-1" onClick={downloadPdf} disabled={!!busy}>{busy === "pdf" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />} Download PDF</Button>
             <Button variant="outline" className="gap-1" onClick={print} disabled={!!busy}><Printer className="h-4 w-4" /> Print</Button>
           </div>
-          <div className="overflow-x-auto rounded-lg bg-muted/40 p-3">
-            <div data-card-stage style={{ display: "flex", gap: 24, zoom: 0.62, alignItems: "stretch", width: 1464 }}>
+          <div ref={stageContainer} className="overflow-x-auto bg-muted/40 p-3">
+            <div data-card-stage style={{ display: "flex", flexDirection: "column", gap: 24, zoom: scale, width: 720, margin: "0 auto" }}>
               {/* FRONT */}
               <div ref={frontRef} style={card}>
                 <div style={{ display: "grid", gridTemplateColumns: "180px 1px 170px 1px 125px 1px minmax(0,1fr)", alignItems: "center", padding: "16px 22px", gap: 10 }}>
@@ -264,10 +267,14 @@ const BeneficiaryCaseCard = ({ beneficiary: b }: { beneficiary: BeneficiaryRow }
               </div>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
-    </>
+    </section>
   );
 };
 
+const BeneficiaryCaseCard = ({ beneficiary }: { beneficiary: BeneficiaryRow }) => {
+  const navigate = useNavigate();
+  return <Button size="sm" variant="outline" className="mt-1 gap-2" onClick={() => navigate(`/hand-card/${encodeURIComponent(beneficiary.id)}`)}>
+    <QrCode className="h-4 w-4" /> Hand card
+  </Button>;
+};
 export default BeneficiaryCaseCard;
