@@ -1,4 +1,5 @@
 import BeneficiaryCaseCard from "./BeneficiaryCaseCard";
+import { HEALTH_FIELDS, healthValue } from "@/lib/programmeModule/healthFields";
 import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -414,6 +415,19 @@ const BeneficiaryRecord = ({
                       ))}
                     </Card>
                   ))}
+
+                <Card className="p-4">
+                  <h3 className="mb-2 font-semibold text-foreground">Health & Next of Kin</h3>
+                  <Separator className="mb-2" />
+                  {HEALTH_FIELDS.map((f) => (
+                    <FieldRow key={f.key} label={f.label} value={healthValue(profile, f.key)} />
+                  ))}
+                  {HEALTH_FIELDS.some((f) => !healthValue(profile, f.key)) && (
+                    <Button variant="link" size="sm" className="h-auto px-0" onClick={() => setEditOpen(true)}>
+                      Fill in missing details
+                    </Button>
+                  )}
+                </Card>
 
                 {!!config.layout.clinicalFields.length && (
                   <Card className="p-4">

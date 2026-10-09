@@ -20,6 +20,9 @@ import {
 import { useFacilities, FACILITY_TYPE_LABEL } from "@/lib/programmeModule/facilities";
 import { useCdds } from "@/lib/programmeModule/cddCaseSearch";
 import PhotoCaptureField from "./PhotoCaptureField";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { BLOOD_GROUPS, HEALTH_FIELDS, healthValue } from "@/lib/programmeModule/healthFields";
 
 interface Props {
   open: boolean;
@@ -243,6 +246,38 @@ const BeneficiaryFormDialog = ({
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                  Health & next of kin
+                </h4>
+                <Separator className="mt-2" />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {HEALTH_FIELDS.map((f) => {
+                  const v = healthValue(answers, f.key);
+                  return (
+                    <div key={f.key} className="space-y-1.5">
+                      <Label htmlFor={`hf-${f.key}`}>{f.label}</Label>
+                      {f.type === "blood" ? (
+                        <Select value={v} onValueChange={(x) => setValue(f.key, x)}>
+                          <SelectTrigger id={`hf-${f.key}`}><SelectValue placeholder="Select blood group…" /></SelectTrigger>
+                          <SelectContent className="z-[1200] max-h-72 bg-popover">
+                            {BLOOD_GROUPS.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      ) : f.type === "textarea" ? (
+                        <Textarea id={`hf-${f.key}`} rows={2} maxLength={500} value={v}
+                          placeholder="None known" onChange={(e) => setValue(f.key, e.target.value)} />
+                      ) : (
+                        <Input id={`hf-${f.key}`} type={f.type} maxLength={f.type === "tel" ? 20 : 120}
+                          value={v} onChange={(e) => setValue(f.key, e.target.value)} />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
             {sections.map((section) => (
