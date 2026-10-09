@@ -10122,6 +10122,41 @@ export type Database = {
         }
         Relationships: []
       }
+      project_mhgap_drugs: {
+        Row: {
+          created_at: string
+          drug_class: string
+          drug_name: string
+          id: string
+          project_id: string
+          registered_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          drug_class?: string
+          drug_name: string
+          id?: string
+          project_id: string
+          registered_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          drug_class?: string
+          drug_name?: string
+          id?: string
+          project_id?: string
+          registered_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_mhgap_drugs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           created_at: string
