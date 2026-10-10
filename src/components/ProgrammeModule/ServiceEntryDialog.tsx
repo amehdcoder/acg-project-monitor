@@ -17,6 +17,7 @@ import ConfigFieldRenderer, { AnswerMap, isRelevant } from "./ConfigFieldRendere
 import ServiceExperienceSections from "./ServiceExperienceSections";
 import { recordAudit } from "./useProgrammeModule";
 import MentalHealthServiceForm, { mhFormForService } from "./MentalHealthServiceForm";
+import MhgapSupportEngine, { isMentalHealthComponent, type MhgapValue } from "./MhgapSupportEngine";
 import MmdpServiceForm, { isMmdpService } from "./MmdpServiceForm";
 import DocumentsServiceForm, { isDocumentsComponent } from "./DocumentsServiceForm";
 import FollowUpFields, { emptyFollowUp } from "./FollowUpFields";
