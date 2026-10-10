@@ -22,6 +22,7 @@ import { useCdds } from "@/lib/programmeModule/cddCaseSearch";
 import PhotoCaptureField from "./PhotoCaptureField";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useProjectMhgapDrugs } from "./MhgapDrugsManager";
 import { BLOOD_GROUPS, HEALTH_FIELDS, healthValue } from "@/lib/programmeModule/healthFields";
 
 interface Props {
@@ -52,6 +53,7 @@ const BeneficiaryFormDialog = ({
   );
   const [photoUrl, setPhotoUrl] = useState<string | null>(existing?.photo_url || null);
   const { cdds } = useCdds(projectId);
+  const { drugs: mhgapDrugs } = useProjectMhgapDrugs(projectId);
   const [cddId, setCddId] = useState<string>(existing?.cdd_id || "");
   const [referringFacilityId, setReferringFacilityId] = useState<string>(
     existing?.referring_facility_id || "",
@@ -261,6 +263,21 @@ const BeneficiaryFormDialog = ({
                   return (
                     <div key={f.key} className="space-y-1.5">
                       <Label htmlFor={`hf-${f.key}`}>{f.label}</Label>
+                      {f.key === "medications" && mhgapDrugs.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 pb-1">
+                          {mhgapDrugs.map((d) => {
+                            const list = v.split(",").map((x) => x.trim()).filter(Boolean);
+                            const on = list.includes(d.drug_name);
+                            return (
+                              <button type="button" key={d.id} title={d.drug_class}
+                                onClick={() => setValue(f.key, (on ? list.filter((x) => x !== d.drug_name) : [...list, d.drug_name]).join(", "))}
+                                className={`rounded-full border px-2.5 py-1 text-xs ${on ? "border-primary bg-primary text-primary-foreground" : "bg-muted text-foreground"}`}>
+                                {d.drug_name}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                       {f.type === "blood" ? (
                         <Select value={v} onValueChange={(x) => setValue(f.key, x)}>
                           <SelectTrigger id={`hf-${f.key}`}><SelectValue placeholder="Select blood group…" /></SelectTrigger>
