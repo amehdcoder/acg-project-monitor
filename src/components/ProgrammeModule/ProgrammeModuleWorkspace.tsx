@@ -38,6 +38,7 @@ import { useMyTeamPermissions } from "@/lib/programmeModule/projectTeam";
 import ModuleConfigurator from "./ModuleConfigurator";
 import ModuleProjectsDialog from "./ModuleProjectsDialog";
 import FacilityFocalPersons from "./FacilityFocalPersons";
+import MhgapDrugsManager from "./MhgapDrugsManager";
 import FacilityRegistry from "./FacilityRegistry";
 import FacilityDashboard from "./FacilityDashboard";
 import FollowUpsPanel from "./FollowUpsPanel";
@@ -86,6 +87,7 @@ const ProgrammeModuleWorkspace = ({
   const [configOpen, setConfigOpen] = useState(false);
   const [focalOpen, setFocalOpen] = useState(false);
   const [registryOpen, setRegistryOpen] = useState(false);
+  const [drugsOpen, setDrugsOpen] = useState(false);
   const { levels: facilityLevels } = useMyFacilityAccess();
   const [focalFacilityId, setFocalFacilityId] = useState<string | undefined>(undefined);
   const [registerOpen, setRegisterOpen] = useState(false);
@@ -351,6 +353,7 @@ const ProgrammeModuleWorkspace = ({
             <DropdownMenuItem onSelect={() => setRegistryOpen(true)}><Building2 className="mr-2 h-4 w-4" /> Health facilities</DropdownMenuItem>
             {canConfigure && <DropdownMenuItem onSelect={() => { setFocalFacilityId(undefined); setFocalOpen(true); }}><Users className="mr-2 h-4 w-4" /> Facility teams</DropdownMenuItem>}
             {(canConfigure || can("manage_team") || onTeamRegister) && <DropdownMenuItem onSelect={() => setView("team")}><Users className="mr-2 h-4 w-4" /> Project team</DropdownMenuItem>}
+            {canConfigure && <DropdownMenuItem onSelect={() => setDrugsOpen(true)}><Settings2 className="mr-2 h-4 w-4" /> mhGAP medicines</DropdownMenuItem>}
             {canConfigure && <DropdownMenuItem onSelect={() => setOfficersOpen(true)}><ShieldCheck className="mr-2 h-4 w-4" /> Safeguarding officers</DropdownMenuItem>}
             {canConfigure && active && <DropdownMenuItem onSelect={() => setConfigOpen(true)}><Settings2 className="mr-2 h-4 w-4" /> Configure module</DropdownMenuItem>}
             {isSuperAdmin && <DropdownMenuItem onSelect={() => setProjectsOpen(true)}><Layers className="mr-2 h-4 w-4" /> Records on projects</DropdownMenuItem>}
@@ -567,6 +570,7 @@ const ProgrammeModuleWorkspace = ({
 
 
 
+      <MhgapDrugsManager open={drugsOpen} onOpenChange={setDrugsOpen} projectId={projectId} />
       <FacilityFocalPersons
         open={focalOpen}
         onOpenChange={setFocalOpen}
