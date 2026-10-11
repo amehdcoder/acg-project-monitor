@@ -53,6 +53,7 @@ const ServiceEntryDialog = ({
   const [experience, setExperience] = useState<AnswerMap>({});
   const [followUp, setFollowUp] = useState<FollowUpValue>(emptyFollowUp);
   const [saving, setSaving] = useState(false);
+  const [mhgap, setMhgap] = useState<MhgapValue>({});
 
   const component = components.find((c) => c.key === componentKey);
 
@@ -128,6 +129,7 @@ const ServiceEntryDialog = ({
         data: {
           ...(answers as Record<string, unknown>),
           ...(experience as Record<string, unknown>),
+          ...(isMentalHealthComponent(componentKey, component?.label) ? (mhgap as Record<string, unknown>) : {}),
           follow_up_date: followUp.date || undefined,
           follow_up_time: followUp.time || undefined,
           follow_up_location: followUp.location || undefined,
@@ -222,6 +224,10 @@ const ServiceEntryDialog = ({
                 onChange={(v) => q.name && setAnswers((p) => ({ ...p, [q.name as string]: v }))}
               />
             ))}
+
+          {isMentalHealthComponent(componentKey, component?.label) && (
+            <MhgapSupportEngine projectId={projectId} priorServices={priorServices} value={mhgap} onChange={setMhgap} />
+          )}
 
           <ServiceExperienceSections
             answers={experience}
