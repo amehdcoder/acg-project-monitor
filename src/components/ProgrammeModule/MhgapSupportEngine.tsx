@@ -140,11 +140,11 @@ export default function MhgapSupportEngine({ projectId, priorServices, value, on
               ))}
             </div>
 
-            {decision.medicationIndicated && mod.medicineClass && (
+            {decision.medicationIndicated && mod.regimens.length > 0 && (
               <div className="rounded-lg border p-3">
                 <p className="mb-2 flex items-center gap-2 text-sm font-semibold"><Pill className="h-4 w-4 text-primary" />4 · Registered medications</p>
                 {eligible.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No {mod.medicineClass.toLowerCase()}s are registered for this project. An Admin can add them under mhGAP medicines.</p>
+                  <p className="text-xs text-muted-foreground">No guideline medicines for this condition are registered for this project. An Admin can add them under mhGAP medicines.</p>
                 ) : (
                   <div className="space-y-2">
                     {eligible.map((r) => {
@@ -152,10 +152,10 @@ export default function MhgapSupportEngine({ projectId, priorServices, value, on
                       return (
                         <div key={r.name} className="rounded-md border p-2" style={{ borderColor: sel ? hsl(mod.hue) : undefined, background: sel ? hsl(mod.hue, 0.06) : undefined }}>
                           <label className="flex cursor-pointer items-start gap-2">
-                            <Checkbox checked={!!sel} onCheckedChange={() => toggleRx(r.name, r.start)} />
+                            <Checkbox checked={!!sel} onCheckedChange={() => toggleRx(r.name, decision.drugAdvice(r).dose)} />
                             <span className="flex-1 text-sm">
                               <span className="font-semibold">{r.name}</span>
-                              <span className="block text-xs text-muted-foreground">Start: {r.start} · {r.target}</span>
+                              <span className="block text-xs text-muted-foreground">{decision.drugAdvice(r).dose}{decision.drugAdvice(r).note ? ` — ${decision.drugAdvice(r).note}` : ""}</span>
                               <span className="block text-xs text-destructive/80">{r.cautions}</span>
                             </span>
                           </label>
