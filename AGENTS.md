@@ -1,5 +1,7 @@
 # Architecture rules
 
+- Filter the beneficiary workflow tour through the workspace's visible destinations, effective permissions and configured component list — why: guidance stays aligned with actual access and project forms without introducing a separate permission system.
+
 - Render Hand Cards on a protected standalone route using the same live record-backed document as exports; rely on record RLS for access — why: field viewing and downloads remain consistent without exposing beneficiary data publicly.
 
 - Serialize hand-card camera start/stop operations and cancel stale sessions; expose torch only when the running track supports it — why: prevents leaked cameras and false device-ready states.

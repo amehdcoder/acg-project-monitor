@@ -233,12 +233,12 @@ const WorkflowTour = ({ can, canConfigure, isOfficer, ready, visibleViews, compo
   const [done, setDone] = useState<Set<string>>(new Set());
   const [pref, setPref] = useState<TourPrefs>("every_sign_in");
 
-  const stages = useMemo(() => STAGES
+  const stages = useMemo<TourStage[]>(() => STAGES
     .filter((s) => s.show({ can, canConfigure, isOfficer }) && (!s.view || visibleViews.includes(s.view)))
     .filter((s) => s.key !== "lesions" || components.some((c) => /mmdp|ntd|lesion|eye|mental|health/i.test(`${c.key} ${c.label}`)))
     .map((s) => ({ ...s, steps: [
       ...s.steps.filter((step) => (!step.permission || canConfigure || can(step.permission)) && (!step.view || visibleViews.includes(step.view))),
-      ...(s.key === "services" ? components.map((c) => ({
+      ...(s.key === "services" ? components.map((c): TourStage["steps"][number] => ({
         title: c.label,
         body: /mental|psycho|mhgap/i.test(`${c.key} ${c.label}`)
           ? "In this component, document the presenting problem and assessment, including GAD-7/PHQ-9 where relevant. Use mhGAP support to review risks, psychosocial care, registered project medicines and follow-up. Medicines require an authorised clinician's assessment; the tool does not replace clinical judgement."
