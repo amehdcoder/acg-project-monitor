@@ -122,7 +122,7 @@ const ProgrammeModuleWorkspace = ({
   const can = useMemo(() => (key: Parameters<typeof teamCan>[0]) => {
     if (safeguardingOnly) return key === "view_safeguarding";
     if (isProgrammeStaff && ["view_safeguarding", "manage_team", "configure_module", "manage_facilities"].includes(key)) return false;
-    if (isHealthWorker && ["view_dashboards", "view_safeguarding", "assess_livelihood", "verify_livelihood", "manage_livelihood", "export_data", "manage_team", "configure_module", "manage_facilities"].includes(key)) return false;
+    if (isHealthWorker && ["view_safeguarding", "assess_livelihood", "verify_livelihood", "manage_livelihood", "export_data", "manage_team", "configure_module", "manage_facilities"].includes(key)) return false;
     return teamCan(key);
   }, [teamCan, isHealthWorker, isProgrammeStaff, safeguardingOnly]);
   const componentFilter = useMemo(() => {
@@ -131,7 +131,10 @@ const ProgrammeModuleWorkspace = ({
     return undefined;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isHealthWorker, areaKey, isProgrammeStaff]);
-  const [view, setView] = useState<WorkspaceView>(() => can("view_dashboards") ? "dashboard" : "records");
+  // Health workers and programme staff always see the General dashboard and the
+  // dashboards of their own components (scoped via componentFilter below).
+  const canDash = can("view_dashboards") || ((isHealthWorker || isProgrammeStaff) && can("view_records"));
+  const [view, setView] = useState<WorkspaceView>(() => canDash ? "dashboard" : "records");
 
   // A scanned Hand Card link (?case=...) must land on the records list so the
   // record can open straight away, even for people who default to the dashboard.
@@ -144,6 +147,11 @@ const ProgrammeModuleWorkspace = ({
     () => modules.find((m) => m.id === activeId) || modules[0],
     [modules, activeId],
   );
+  const dashConfig = useMemo(() => {
+    if (!active) return undefined;
+    const c = normalizeConfig(active.config);
+    return componentFilter ? { ...c, components: c.components.filter(componentFilter) } : c;
+  }, [active, componentFilter]);
 
   const {
     beneficiaries, loading: loadingBeneficiaries, reload: reloadBeneficiaries,
@@ -168,10 +176,10 @@ const ProgrammeModuleWorkspace = ({
     {
       label: "Overview",
       items: [
-        { key: "dashboard", label: "General dashboard", description: "Project-wide outcomes, alerts and service performance", icon: BarChart3, show: can("view_dashboards") },
-        { key: "journey", label: "Beneficiary journey", description: "Change, feedback and service reach", icon: Route, show: can("view_dashboards") },
-        { key: "facility", label: "Facility dashboard", description: "Facility caseloads and referral performance", icon: Hospital, show: can("view_dashboards") },
-        { key: "clusters", label: "Community clusters", description: "Geographic concentrations and community patterns", icon: Layers, show: can("view_dashboards") },
+        { key: "dashboard", label: "General dashboard", description: "Project-wide outcomes, alerts and service performance", icon: BarChart3, show: canDash },
+        { key: "journey", label: "Beneficiary journey", description: "Change, feedback and service reach", icon: Route, show: canDash },
+        { key: "facility", label: "Facility dashboard", description: "Facility caseloads and referral performance", icon: Hospital, show: canDash },
+        { key: "clusters", label: "Community clusters", description: "Geographic concentrations and community patterns", icon: Layers, show: canDash },
       ],
     },
     {
@@ -179,7 +187,7 @@ const ProgrammeModuleWorkspace = ({
       items: [
         { key: "records", label: "Beneficiary records", description: "Find, register and open individual records", icon: LayoutGrid, show: can("view_records") },
         { key: "followups", label: "Follow-ups & referrals", description: "Upcoming visits and referral traffic", icon: CalendarClock, show: can("view_records") },
-        { key: "households", label: "Households & MDA", description: "Household members, treatment rounds and water points", icon: Home, show: (hasArea("ntd") || hasArea("wash")) && (can("manage_households") || can("view_dashboards")) },
+        { key: "households", label: "Households & MDA", description: "Household members, treatment rounds and water points", icon: Home, show: (hasArea("ntd") || hasArea("wash")) && (can("manage_households") || canDash) },
         { key: "casesearch", label: "CDD case search", description: "MMDP case finding, review and registration", icon: Search, show: (hasArea("ntd") || hasArea("eye")) && (can("manage_cdds") || can("confirm_cases") || can("view_records")) },
         { key: "livelihood", label: "Livelihood & empowerment", description: "Assessments, shortlists and verification", icon: Briefcase, show: !isHealthWorker && hasArea("livelihood") && (can("view_records") || can("view_dashboards")) },
       ],
@@ -187,9 +195,9 @@ const ProgrammeModuleWorkspace = ({
     {
       label: "Intelligence",
       items: [
-        { key: "network", label: "Transmission network", description: "Household, kinship and WASH relationships", icon: Network, show: (hasArea("ntd") || hasArea("wash")) && (can("view_dashboards") || isHealthWorker) },
-        { key: "risk", label: "Follow-up risk & CHEW visits", description: "Prioritised risk and dispatched visits", icon: Activity, show: can("view_dashboards") },
-        { key: "exchange", label: "Data exchange", description: "DHIS2, LMIS, FHIR, ADX and SDMX", icon: Share2, show: canConfigure || can("view_dashboards") },
+        { key: "network", label: "Transmission network", description: "Household, kinship and WASH relationships", icon: Network, show: (hasArea("ntd") || hasArea("wash")) && canDash },
+        { key: "risk", label: "Follow-up risk & CHEW visits", description: "Prioritised risk and dispatched visits", icon: Activity, show: canDash },
+        { key: "exchange", label: "Data exchange", description: "DHIS2, LMIS, FHIR, ADX and SDMX", icon: Share2, show: canConfigure || (can("view_dashboards") && !isHealthWorker && !isProgrammeStaff) },
       ],
     },
     {
@@ -439,7 +447,7 @@ const ProgrammeModuleWorkspace = ({
         <GeneralDashboard
           projectId={projectId}
           moduleId={active.id}
-          config={normalizeConfig(active.config)}
+          config={dashConfig!}
           beneficiaries={scopedBeneficiaries}
           allowedFacilityIds={isFocalPerson ? Object.keys(facilityLevels) : []}
           isSafeguardingOfficer={isOfficer}
@@ -463,7 +471,7 @@ const ProgrammeModuleWorkspace = ({
         <JourneyDashboard
           projectId={projectId}
           moduleId={active?.id}
-          config={active ? normalizeConfig(active.config) : undefined}
+          config={dashConfig}
           allowedFacilityIds={isFocalPerson ? Object.keys(facilityLevels) : []}
           onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }}
         />
