@@ -369,7 +369,7 @@ const ProgrammeModuleWorkspace = ({
         </div>
       </div>
 
-      <WorkflowTour can={can} canConfigure={canConfigure} isOfficer={isOfficer} ready={!permissionsLoading && Boolean(active)} onNavigate={(v) => setView(v as WorkspaceView)} />
+      <WorkflowTour can={(k) => (k === "view_dashboards" ? canDash : can(k as Parameters<typeof teamCan>[0]))} canConfigure={canConfigure} isOfficer={isOfficer} ready={!permissionsLoading && Boolean(active)} onNavigate={(v) => setView(v as WorkspaceView)} />
 
       {!permissionsLoading && canBrain && active && (
         <div role="tablist" aria-label="Cases workspace" className="flex items-end gap-6 border-b border-border/60 px-1">

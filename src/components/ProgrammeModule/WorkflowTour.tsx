@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
   Building2, Search, Stethoscope, FileCheck2, IdCard, Home, ClipboardList, CalendarClock, ShieldCheck, BarChart3,
-  ChevronLeft, ChevronRight, SkipForward, X, Check, Compass,
+  ChevronLeft, ChevronRight, SkipForward, X, Check, Compass, Sparkles, Lightbulb, Clock,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -96,9 +96,19 @@ const STAGES: TourStage[] = [
     key: "insight", title: "Dashboards & insight", icon: BarChart3, view: "dashboard",
     show: ({ can }) => can("view_dashboards"),
     steps: [
-      { title: "Monitor the programme", body: "The General dashboard, Beneficiary journey and Facility dashboard summarise outcomes, alerts and performance." },
+      { title: "Monitor the programme", body: "The General dashboard, Beneficiary journey and Facility dashboard summarise outcomes, alerts and performance — showing only the components you work on." },
     ],
   },
+];
+
+const TONES = [
+  { solid: "bg-records-blue", soft: "bg-records-blue/10", text: "text-records-blue", border: "border-records-blue/25" },
+  { solid: "bg-records-teal", soft: "bg-records-teal/10", text: "text-records-teal", border: "border-records-teal/25" },
+  { solid: "bg-records-purple", soft: "bg-records-purple/10", text: "text-records-purple", border: "border-records-purple/25" },
+  { solid: "bg-records-cyan", soft: "bg-records-cyan/10", text: "text-records-cyan", border: "border-records-cyan/25" },
+  { solid: "bg-records-green", soft: "bg-records-green/10", text: "text-records-green", border: "border-records-green/25" },
+  { solid: "bg-records-amber", soft: "bg-records-amber/10", text: "text-records-amber", border: "border-records-amber/25" },
+  { solid: "bg-records-red", soft: "bg-records-red/10", text: "text-records-red", border: "border-records-red/25" },
 ];
 
 const prefKey = (uid: string) => `amehnities.workflowTour.pref.${uid}`;
@@ -177,23 +187,30 @@ const WorkflowTour = ({ can, canConfigure, isOfficer, ready, onNavigate }: Props
   const step = stage?.steps[stepIdx];
   const isLast = stage && stageIdx === stages.length - 1 && stepIdx === stage.steps.length - 1;
 
+  const tone = (k: string) => TONES[STAGES.findIndex((s) => s.key === k) % TONES.length];
+  const t = stage ? tone(stage.key) : TONES[0];
+  const pct = stage ? Math.round((position / totalSteps) * 100) : 0;
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="max-w-2xl gap-0 overflow-hidden p-0">
-        <div className="grid md:grid-cols-[13rem_1fr]">
-          <aside className="hidden border-r border-border bg-muted/40 p-4 md:block">
-            <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Your workflow</p>
-            <ol className="space-y-1">
+      <DialogContent className="max-w-3xl gap-0 overflow-hidden rounded-2xl border-0 p-0 shadow-2xl">
+        <div className="grid md:grid-cols-[15rem_1fr]">
+          <aside className="hidden bg-gradient-to-b from-records-blue/10 via-records-teal/5 to-records-purple/10 p-4 md:block">
+            <div className="mb-4 flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-records-blue to-records-teal text-primary-foreground shadow-sm"><Compass className="h-4 w-4" /></span>
+              <div><p className="text-xs font-bold text-foreground">Your workflow</p><p className="text-[10px] text-muted-foreground">{stages.length} stages · {totalSteps} steps</p></div>
+            </div>
+            <ol className="relative space-y-1 before:absolute before:bottom-3 before:left-[1.05rem] before:top-3 before:w-px before:bg-border">
               {stages.map((s, i) => {
-                const Icon = s.icon; const on = i === stageIdx; const ok = done.has(s.key);
+                const Icon = s.icon; const on = i === stageIdx; const ok = done.has(s.key); const st = tone(s.key);
                 return (
-                  <li key={s.key}>
+                  <li key={s.key} className="relative">
                     <button onClick={() => goStage(i)}
-                      className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors ${on ? "bg-primary/10 font-semibold text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
-                      <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] ${ok ? "border-primary bg-primary text-primary-foreground" : on ? "border-primary" : "border-border"}`}>
-                        {ok ? <Check className="h-3 w-3" /> : i + 1}
+                      className={`flex w-full items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-left text-xs transition-all ${on ? "bg-background font-semibold text-foreground shadow-sm ring-1 ring-border" : "text-muted-foreground hover:bg-background/60 hover:text-foreground"}`}>
+                      <span className={`relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${ok ? "bg-records-green text-primary-foreground" : on ? `${st.solid} text-primary-foreground shadow-md` : `${st.soft} ${st.text}`}`}>
+                        {ok ? <Check className="h-3.5 w-3.5" /> : <Icon className="h-3.5 w-3.5" />}
                       </span>
-                      <Icon className="h-3.5 w-3.5 shrink-0" /><span className="leading-tight">{s.title}</span>
+                      <span className="leading-tight">{s.title}</span>
                     </button>
                   </li>
                 );
@@ -201,60 +218,81 @@ const WorkflowTour = ({ can, canConfigure, isOfficer, ready, onNavigate }: Props
             </ol>
           </aside>
 
-          <section className="flex min-h-[22rem] flex-col p-6">
+          <section className="flex min-h-[26rem] flex-col">
             {!stage ? (
               <>
-                <DialogHeader className="text-left">
-                  <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 text-primary"><Compass className="h-5 w-5" /></span>
-                  <DialogTitle className="text-xl">Welcome to your records workspace</DialogTitle>
-                  <DialogDescription className="text-sm leading-relaxed">
-                    This short tour walks through the {stages.length} stages of work you have access to — from finding cases in the community to following up and keeping people safe. You can skip any step or stage.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="mt-5 flex-1 space-y-1.5 md:hidden">
-                  {stages.map((s, i) => <p key={s.key} className="text-sm text-muted-foreground">{i + 1}. {s.title}</p>)}
+                <div className="relative overflow-hidden bg-gradient-to-br from-records-blue via-records-teal to-records-cyan px-6 py-7 text-primary-foreground">
+                  <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-background/10" />
+                  <div className="absolute -bottom-12 right-16 h-28 w-28 rounded-full bg-background/10" />
+                  <Sparkles className="mb-3 h-7 w-7" />
+                  <DialogHeader className="relative text-left">
+                    <DialogTitle className="text-2xl font-bold text-primary-foreground">Welcome to your records workspace</DialogTitle>
+                    <DialogDescription className="text-sm leading-relaxed text-primary-foreground/85">
+                      A short guided walk through the work you can do here — tailored to your role and access.
+                    </DialogDescription>
+                  </DialogHeader>
+                </div>
+                <div className="flex-1 p-6">
+                  <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">What you'll learn</p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {stages.map((s, i) => { const st = tone(s.key); const Icon = s.icon; return (
+                      <button key={s.key} onClick={() => goStage(i)} className={`flex items-center gap-2 rounded-xl border p-2.5 text-left text-xs font-medium transition-all hover:-translate-y-0.5 hover:shadow-md ${st.border} ${st.soft}`}>
+                        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${st.solid} text-primary-foreground`}><Icon className="h-3.5 w-3.5" /></span>
+                        <span className="leading-tight text-foreground">{s.title}</span>
+                      </button>
+                    ); })}
+                  </div>
+                  <p className="mt-4 flex items-center gap-1.5 text-xs text-muted-foreground"><Clock className="h-3.5 w-3.5" /> About {Math.max(1, Math.round(totalSteps * 0.25))} min · skip any step or stage</p>
                 </div>
               </>
             ) : (
               <>
-                <div className="mb-4 flex items-center gap-3">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary"><stage.icon className="h-5 w-5" /></span>
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Stage {stageIdx + 1} of {stages.length} · {stage.title}</p>
-                    <p className="text-xs text-muted-foreground">Step {stepIdx + 1} of {stage.steps.length}</p>
+                <div className={`flex items-center gap-3 px-6 py-5 ${t.soft}`}>
+                  <span className={`flex h-12 w-12 items-center justify-center rounded-xl ${t.solid} text-primary-foreground shadow-lg`}><stage.icon className="h-6 w-6" /></span>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-[11px] font-bold uppercase tracking-wider ${t.text}`}>Stage {stageIdx + 1} of {stages.length}</p>
+                    <p className="truncate text-base font-bold text-foreground">{stage.title}</p>
+                  </div>
+                  <span className={`rounded-full bg-background px-2.5 py-1 text-xs font-bold ${t.text} shadow-sm`}>{pct}%</span>
+                </div>
+                <div className="flex-1 px-6 py-5">
+                  <div className="mb-4 flex gap-1.5">
+                    {stage.steps.map((_, i) => <span key={i} className={`h-1.5 flex-1 rounded-full transition-colors ${i <= stepIdx ? t.solid : "bg-muted"}`} />)}
+                  </div>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">Step {stepIdx + 1} of {stage.steps.length}</p>
+                  <DialogHeader className="text-left">
+                    <DialogTitle className="text-xl font-bold">{step?.title}</DialogTitle>
+                    <DialogDescription className="text-sm leading-relaxed text-foreground/80">{step?.body}</DialogDescription>
+                  </DialogHeader>
+                  <div className={`mt-5 flex items-start gap-2 rounded-xl border p-3 text-xs ${t.border} ${t.soft}`}>
+                    <Lightbulb className={`mt-0.5 h-4 w-4 shrink-0 ${t.text}`} />
+                    <span className="text-foreground/80">The page behind this tour has moved to <b>{stage.title}</b> so you can see where this happens.</span>
                   </div>
                 </div>
-                <DialogHeader className="text-left">
-                  <DialogTitle className="text-lg">{step?.title}</DialogTitle>
-                  <DialogDescription className="text-sm leading-relaxed">{step?.body}</DialogDescription>
-                </DialogHeader>
-                <div className="flex-1" />
-                <Progress value={(position / totalSteps) * 100} className="mt-6 h-1.5" />
+                <div className="px-6"><Progress value={pct} className="h-1.5" /></div>
               </>
             )}
 
-            <div className="mt-5 flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 px-6 pt-4">
               {stage && <Button variant="ghost" size="sm" onClick={back} className="gap-1"><ChevronLeft className="h-4 w-4" /> Back</Button>}
               {stage && stageIdx < stages.length - 1 && (
-                <Button variant="ghost" size="sm" onClick={skipStage} className="gap-1 text-muted-foreground"><SkipForward className="h-4 w-4" /> Skip this stage</Button>
+                <Button variant="ghost" size="sm" onClick={skipStage} className="gap-1 text-muted-foreground"><SkipForward className="h-4 w-4" /> Skip stage</Button>
               )}
               <div className="flex-1" />
               <Button variant="outline" size="sm" onClick={() => setOpen(false)} className="gap-1"><X className="h-4 w-4" /> {stage ? "Skip tour" : "Not now"}</Button>
-              <Button size="sm" onClick={isLast ? () => setOpen(false) : next} className="gap-1">
-                {!stage ? "Start tour" : isLast ? "Finish" : "Next"} {!isLast && <ChevronRight className="h-4 w-4" />}
+              <Button size="sm" onClick={isLast ? () => setOpen(false) : next} className={`gap-1 border-0 ${t.solid} text-primary-foreground shadow-md hover:opacity-90`}>
+                {!stage ? "Start tour" : isLast ? "Finish" : "Next"} {isLast ? <Check className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </Button>
             </div>
 
-            <fieldset className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
-              <legend className="sr-only">When to show this tour</legend>
+            <div className="mx-6 mb-5 mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-3 text-xs text-muted-foreground" role="radiogroup" aria-label="When to show this tour">
               <span className="font-medium">On sign-in:</span>
               {([["every_sign_in", "Show this tour"], ["never", "Never show again"]] as const).map(([v, l]) => (
-                <label key={v} className="flex cursor-pointer items-center gap-1.5">
-                  <input type="radio" name="tour-pref" checked={pref === v} onChange={() => savePref(v)} className="accent-primary" /> {l}
-                </label>
+                <button key={v} role="radio" aria-checked={pref === v} onClick={() => savePref(v)}
+                  className={`rounded-full border px-3 py-1 font-medium transition-colors ${pref === v ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-muted"}`}>{l}</button>
               ))}
-              <span className="ml-auto">Reopen anytime from Manage → Guided tour</span>
-            </fieldset>
+              <span className="ml-auto hidden sm:inline">Reopen from Manage → Guided tour</span>
+            </div>
           </section>
         </div>
       </DialogContent>
