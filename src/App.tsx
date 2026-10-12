@@ -182,9 +182,9 @@ const App = () => (
                     />
                     <Route path="/install" element={<ProtectedRoute><Install /></ProtectedRoute>} />
                     <Route path="/hand-card/:beneficiaryId" element={<ProtectedRoute><HandCard /></ProtectedRoute>} />
-                    {/* Legacy /cases links (older hand cards, shared URLs) land on the
-                        Cases tab of the home shell instead of the 404 page. */}
-                    <Route path="/cases" element={<Navigate to={`/?tab=records${window.location.search ? `&${window.location.search.slice(1)}` : ""}`} replace />} />
+                    {/* Hand Card QR links (/cases?case=...) resolve the beneficiary's
+                        project and open the record in the records workspace. */}
+                    <Route path="/cases" element={<ProtectedRoute><CaseLink /></ProtectedRoute>} />
                     <Route path="/witness/:surveyId/:hhId" element={<CESWitnessForm />} />
                     <Route path="/satellite-messenger" element={<ProtectedRoute><OffGridSatelliteMessenger /></ProtectedRoute>} />
                    <Route path="/data-cleaner" element={<ProtectedRoute><DataCleaner /></ProtectedRoute>} />
