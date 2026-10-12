@@ -57,7 +57,7 @@ export function computeLevelBalances(ds: LogisticsDataset, allocations: Allocati
       inflow: toFlhf, outflow: toCdd, balance: toFlhf - toCdd,
     },
     {
-      level: "cdd", label: "Deployed to CDDs", custodian: "Community drug distributors",
+      level: "cdd", label: "Deployed to CDDs", custodian: "Community Directed Distributors (CDDs)",
       inflow: toCdd, outflow: 0, balance: toCdd,
     },
   ].map((r) => ({ ...r, balance: Math.round(r.balance) }));

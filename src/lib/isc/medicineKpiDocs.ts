@@ -22,7 +22,7 @@ export const KPI_DOCS: KpiDoc[] = [
     label: "Received vs distributed",
     group: "flow",
     definition:
-      "Total units logged as received at LGA stores (Level 1) against the total dispatched onward to health facilities (Level 2) and community drug distributors (Level 3).",
+      "Total units logged as received at LGA stores (Level 1) against the total dispatched onward to health facilities (Level 2) and Community Directed Distributors (CDDs) (Level 3).",
     formula: "Received = Σ l1_qty_received · Distributed = Σ qty issued to FLHF · Onward = Σ qty issued to CDDs",
     interpretation:
       "Distributed should converge on net usable stock as the campaign progresses. A widening gap late in the round means stock is stranded upstream.",
