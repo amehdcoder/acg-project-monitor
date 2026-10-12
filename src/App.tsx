@@ -4,7 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider, QueryCache, keepPreviousData } from "@tanstack/react-query";
 import { toast as sonnerToast } from "sonner";
 import { isTransientBackendError, describeBackendError } from "@/lib/safeData";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useEffect, lazy, Suspense } from "react";
 import { AuthProvider } from "@/hooks/useAuth";
 import { DeviceSessionProvider } from "@/hooks/useDeviceSession";
