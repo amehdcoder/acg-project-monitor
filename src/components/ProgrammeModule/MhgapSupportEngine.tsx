@@ -3,9 +3,9 @@ import { AlertTriangle, BookOpen, CheckCircle2, HeartHandshake, Pill, ShieldAler
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { MHGAP_MODULES, ESSENTIAL_CARE, EMERGENCY_FLAGS, decide, type MhgapModuleKey } from "@/lib/programmeModule/mhgapEngine";
+import { MHGAP_MODULES, ESSENTIAL_CARE, EMERGENCY_FLAGS, decide, type MhgapModuleKey, type PatientContext } from "@/lib/programmeModule/mhgapEngine";
 import { useProjectMhgapDrugs } from "./MhgapDrugsManager";
-import type { BeneficiaryServiceRow } from "@/lib/programmeModule/types";
+import type { BeneficiaryRow, BeneficiaryServiceRow } from "@/lib/programmeModule/types";
 
 export interface MhgapValue {
   mhgap_module?: MhgapModuleKey;
