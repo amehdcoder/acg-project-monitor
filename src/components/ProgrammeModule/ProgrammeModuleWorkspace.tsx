@@ -1,3 +1,5 @@
+import WorkflowTour, { openWorkflowTour } from "./WorkflowTour";
+import { Compass } from "lucide-react";
 import BeneficiaryBrainPanel from "./BeneficiaryBrainPanel";
 import { Brain, BookOpenCheck } from "lucide-react";
 import FieldGuidePanel from "./FieldGuidePanel";
@@ -336,6 +338,8 @@ const ProgrammeModuleWorkspace = ({
         </div>
       </div>
 
+      <WorkflowTour can={can} canConfigure={canConfigure} isOfficer={isOfficer} ready={!permissionsLoading && Boolean(active)} onNavigate={(v) => setView(v as WorkspaceView)} />
+
       {!permissionsLoading && canBrain && active && (
         <div role="tablist" aria-label="Cases workspace" className="flex items-end gap-6 border-b border-border/60 px-1">
           {([["records", "Beneficiary records", Layers], ["brain", "Record quality brain", Brain], ["guide", "Field guide", BookOpenCheck]] as const).map(([k, l, Icon]) => {
@@ -356,6 +360,7 @@ const ProgrammeModuleWorkspace = ({
           <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="gap-2"><SlidersHorizontal className="h-4 w-4" /> Manage<ChevronDown className="h-3.5 w-3.5" /></Button></DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64">
             <DropdownMenuLabel>Administration</DropdownMenuLabel><DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => openWorkflowTour()}><Compass className="mr-2 h-4 w-4" /> Guided tour</DropdownMenuItem>
             <DropdownMenuItem onSelect={() => setRegistryOpen(true)}><Building2 className="mr-2 h-4 w-4" /> Health facilities</DropdownMenuItem>
             {canConfigure && <DropdownMenuItem onSelect={() => { setFocalFacilityId(undefined); setFocalOpen(true); }}><Users className="mr-2 h-4 w-4" /> Facility teams</DropdownMenuItem>}
             {(canConfigure || can("manage_team") || onTeamRegister) && <DropdownMenuItem onSelect={() => setView("team")}><Users className="mr-2 h-4 w-4" /> Project team</DropdownMenuItem>}
