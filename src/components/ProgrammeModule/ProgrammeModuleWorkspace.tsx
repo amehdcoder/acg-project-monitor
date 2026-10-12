@@ -36,7 +36,7 @@ import BeneficiaryRecord from "./BeneficiaryRecord";
 import RecordQualityBar from "./RecordQualityBar";
 import BeneficiaryFormDialog from "./BeneficiaryFormDialog";
 import ProjectTeamPanel from "./ProjectTeamPanel";
-import { useMyTeamPermissions, isHealthWorkerComponent } from "@/lib/programmeModule/projectTeam";
+import { useMyTeamPermissions, isHealthWorkerComponent, componentInAreas } from "@/lib/programmeModule/projectTeam";
 import ModuleConfigurator from "./ModuleConfigurator";
 import ModuleProjectsDialog from "./ModuleProjectsDialog";
 import FacilityFocalPersons from "./FacilityFocalPersons";
@@ -108,14 +108,29 @@ const ProgrammeModuleWorkspace = ({
 
   // What this person is allowed to see and do, from the project team register.
   // People who are not listed keep the access they already had.
-  const { can: teamCan, listed: onTeamRegister, loading: permissionsLoading, healthWorkerCadre } = useMyTeamPermissions(projectId, canConfigure);
+  const { can: teamCan, listed: onTeamRegister, loading: permissionsLoading, healthWorkerCadre, programmeStaffCadre, programmeAreas } = useMyTeamPermissions(projectId, canConfigure);
   // Designated health workers only work on MMDP/NTD and mental health: case
   // search, records, households/MDA/WASH, services, follow-ups and referrals.
   const isHealthWorker = Boolean(healthWorkerCadre);
+  // Programme staff only see the programme areas (components) they work on.
+  const isProgrammeStaff = !isHealthWorker && Boolean(programmeStaffCadre);
+  const areaKey = programmeAreas.join(",");
+  const staffAreas = isProgrammeStaff && programmeAreas.length ? programmeAreas : null;
+  const hasArea = (a: string) => !staffAreas || staffAreas.includes(a as never);
+  // Safeguarding Officers (who are not administrators) only see safeguarding.
+  const safeguardingOnly = isOfficer && !canConfigure;
   const can = useMemo(() => (key: Parameters<typeof teamCan>[0]) => {
+    if (safeguardingOnly) return key === "view_safeguarding";
+    if (isProgrammeStaff && ["view_safeguarding", "manage_team", "configure_module", "manage_facilities"].includes(key)) return false;
     if (isHealthWorker && ["view_dashboards", "view_safeguarding", "assess_livelihood", "verify_livelihood", "manage_livelihood", "export_data", "manage_team", "configure_module", "manage_facilities"].includes(key)) return false;
     return teamCan(key);
-  }, [teamCan, isHealthWorker]);
+  }, [teamCan, isHealthWorker, isProgrammeStaff, safeguardingOnly]);
+  const componentFilter = useMemo(() => {
+    if (isHealthWorker) return isHealthWorkerComponent;
+    if (staffAreas) return componentInAreas(staffAreas);
+    return undefined;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isHealthWorker, areaKey, isProgrammeStaff]);
   const [view, setView] = useState<WorkspaceView>(() => can("view_dashboards") ? "dashboard" : "records");
 
   // A scanned Hand Card link (?case=...) must land on the records list so the
@@ -164,15 +179,15 @@ const ProgrammeModuleWorkspace = ({
       items: [
         { key: "records", label: "Beneficiary records", description: "Find, register and open individual records", icon: LayoutGrid, show: can("view_records") },
         { key: "followups", label: "Follow-ups & referrals", description: "Upcoming visits and referral traffic", icon: CalendarClock, show: can("view_records") },
-        { key: "households", label: "Households & MDA", description: "Household members, treatment rounds and water points", icon: Home, show: can("manage_households") || can("view_dashboards") },
-        { key: "casesearch", label: "CDD case search", description: "MMDP case finding, review and registration", icon: Search, show: can("manage_cdds") || can("confirm_cases") || can("view_records") },
-        { key: "livelihood", label: "Livelihood & empowerment", description: "Assessments, shortlists and verification", icon: Briefcase, show: !isHealthWorker && (can("view_records") || can("view_dashboards")) },
+        { key: "households", label: "Households & MDA", description: "Household members, treatment rounds and water points", icon: Home, show: (hasArea("ntd") || hasArea("wash")) && (can("manage_households") || can("view_dashboards")) },
+        { key: "casesearch", label: "CDD case search", description: "MMDP case finding, review and registration", icon: Search, show: (hasArea("ntd") || hasArea("eye")) && (can("manage_cdds") || can("confirm_cases") || can("view_records")) },
+        { key: "livelihood", label: "Livelihood & empowerment", description: "Assessments, shortlists and verification", icon: Briefcase, show: !isHealthWorker && hasArea("livelihood") && (can("view_records") || can("view_dashboards")) },
       ],
     },
     {
       label: "Intelligence",
       items: [
-        { key: "network", label: "Transmission network", description: "Household, kinship and WASH relationships", icon: Network, show: can("view_dashboards") || isHealthWorker },
+        { key: "network", label: "Transmission network", description: "Household, kinship and WASH relationships", icon: Network, show: (hasArea("ntd") || hasArea("wash")) && (can("view_dashboards") || isHealthWorker) },
         { key: "risk", label: "Follow-up risk & CHEW visits", description: "Prioritised risk and dispatched visits", icon: Activity, show: can("view_dashboards") },
         { key: "exchange", label: "Data exchange", description: "DHIS2, LMIS, FHIR, ADX and SDMX", icon: Share2, show: canConfigure || can("view_dashboards") },
       ],
@@ -202,7 +217,7 @@ const ProgrammeModuleWorkspace = ({
     const visibleViews = navGroups.flatMap((group) => group.items).filter((item) => item.show).map((item) => item.key);
     if (view === "brain" || view === "guide") return;
     if (!visibleViews.includes(view)) setView(visibleViews.includes("records") ? "records" : visibleViews[0] || "records");
-  }, [permissionsLoading, view, canConfigure, isOfficer, onTeamRegister]);
+  }, [permissionsLoading, view, canConfigure, isOfficer, onTeamRegister, isProgrammeStaff, areaKey]);
 
   useEffect(() => {
     bindQueueAutoFlush();
@@ -293,7 +308,7 @@ const ProgrammeModuleWorkspace = ({
         onBack={() => setSelected(null)}
         canManage={canConfigure || facilityLevels[selectedFacility] === "manage"}
         componentsVisible={!isFocalPerson || Boolean(facilityLevels[selectedFacility])}
-        componentFilter={isHealthWorker ? isHealthWorkerComponent : undefined}
+        componentFilter={componentFilter}
         onChanged={() => void reloadBeneficiaries()}
       /></div>
     );
