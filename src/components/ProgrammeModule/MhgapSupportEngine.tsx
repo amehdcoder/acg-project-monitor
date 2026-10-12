@@ -60,13 +60,14 @@ function patientFrom(b?: BeneficiaryRow): PatientContext {
 
 const hsl = (h: string, a = 1) => `hsl(${h} / ${a})`;
 
-export default function MhgapSupportEngine({ projectId, priorServices, value, onChange }: Props) {
+export default function MhgapSupportEngine({ projectId, priorServices, beneficiary, value, onChange }: Props) {
   const { drugs } = useProjectMhgapDrugs(projectId);
   const [modKey, setModKey] = useState<MhgapModuleKey | undefined>(value.mhgap_module);
   const mod = MHGAP_MODULES.find((m) => m.key === modKey);
   const checked = value.mhgap_criteria || {};
   const phq9 = useMemo(() => latestPhq9(priorServices), [priorServices]);
-  const decision = mod ? decide(mod, checked, mod.key === "DEP" ? phq9 : null) : null;
+  const patient = useMemo(() => patientFrom(beneficiary), [beneficiary]);
+  const decision = mod ? decide(mod, checked, mod.key === "DEP" ? phq9 : null, patient) : null;
   const rx = value.mhgap_prescriptions || [];
 
   const eligible = useMemo(() => {
