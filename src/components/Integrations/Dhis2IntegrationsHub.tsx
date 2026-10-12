@@ -19,18 +19,20 @@ export default function Dhis2IntegrationsHub({ projects }: { projects: { id: str
   const { isAdmin, isOwner, isSuperAdmin } = useAuth();
   const canUse = !!(isAdmin || isOwner || isSuperAdmin);
   const [projectId, setProjectId] = useState("");
-  const [conn, setConn] = useState<Conn | null>(null);
+  const [conns, setConns] = useState<Conn[]>([]);
+  const [connId, setConnId] = useState("");
+  const conn = conns.find((c) => c.id === connId) ?? conns[0] ?? null;
   const [studio, setStudio] = useState(false);
   const [tick, setTick] = useState(0);
   const [stats, setStats] = useState<ExchangeStats>(EMPTY_STATS);
 
   useEffect(() => { if (!projectId && projects[0]) setProjectId(projects[0].id); }, [projects, projectId]);
   useEffect(() => {
-    if (!projectId) { setConn(null); return; }
+    if (!projectId) { setConns([]); return; }
     supabase.from("health_exchange_connections").select("id,name,base_url")
       .eq("kind", "dhis2").eq("is_active", true).eq("scope", "integrations").eq("project_id", projectId)
-      .order("created_at", { ascending: false }).limit(1)
-      .then(({ data }) => setConn((data?.[0] as Conn) ?? null));
+      .order("created_at", { ascending: false })
+      .then(({ data }) => setConns((data as Conn[]) ?? []));
   }, [projectId, tick]);
 
   useEffect(() => {
@@ -107,6 +109,12 @@ export default function Dhis2IntegrationsHub({ projects }: { projects: { id: str
               <p className="text-xs text-muted-foreground">Opens an exact replica of your DHIS2 dashboards — same layout, charts and tables — with a data pivot on every item.</p>
             </div>
           </div>
+          {conns.length > 1 && (
+            <Select value={conn?.id ?? ""} onValueChange={setConnId}>
+              <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="DHIS2 server" /></SelectTrigger>
+              <SelectContent>{conns.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+            </Select>
+          )}
           <Button size="sm" disabled={!canUse || !conn} onClick={() => setStudio(true)}>
             <LayoutDashboard className="h-3.5 w-3.5 mr-1" /> Open DHIS2 dashboards
           </Button>
