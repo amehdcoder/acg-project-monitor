@@ -86,9 +86,9 @@ const ProgressRing = ({ percent, accent }: { percent: number; accent: string }) 
 };
 
 const FieldRow = ({ label, value }: { label: string; value: string }) => (
-  <div className="flex items-start justify-between gap-4 py-1.5">
+  <div className="grid grid-cols-[minmax(7.5rem,40%)_1fr] items-baseline gap-4 py-1.5">
     <span className="text-sm text-muted-foreground">{label}</span>
-    <span className="text-right text-sm font-medium text-foreground">{value || "—"}</span>
+    <span className="min-w-0 break-words text-right text-sm font-medium text-foreground">{value || "—"}</span>
   </div>
 );
 
@@ -275,14 +275,14 @@ const BeneficiaryRecord = ({
                       {cddSource.facility ? ` · Referred from ${cddSource.facility}` : ""}
                     </p>
                   )}
-                  <div className="mt-3 grid gap-x-6 gap-y-1 sm:grid-cols-2">
+                  <dl className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-x-6 gap-y-2.5">
                     {headerFacts.map((f) => (
-                      <div key={f.label} className="flex gap-2 text-sm">
-                        <span className="text-muted-foreground">{f.label}:</span>
-                        <span className="font-medium text-foreground">{f.value}</span>
+                      <div key={f.label} className="min-w-0">
+                        <dt className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground" title={f.label}>{f.label}</dt>
+                        <dd className="break-words text-sm font-semibold text-foreground">{f.value || "—"}</dd>
                       </div>
                     ))}
-                  </div>
+                  </dl>
                 </div>
                 <div className="flex shrink-0 items-start gap-2">
                   <Button size="sm" onClick={() => setEditOpen(true)} className="gap-1">
