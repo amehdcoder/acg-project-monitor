@@ -5,7 +5,8 @@ import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { Download, FileDown, Printer, QrCode, Loader2 } from "lucide-react";
+import { Download, FileDown, Printer, QrCode, Loader2, IdCard, ExternalLink } from "lucide-react";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveMediaUrl } from "@/lib/programmeModule/media";
 import { toast } from "@/hooks/use-toast";
@@ -273,8 +274,26 @@ export const HandCardDocument = ({ beneficiary: b }: { beneficiary: BeneficiaryR
 
 const BeneficiaryCaseCard = ({ beneficiary }: { beneficiary: BeneficiaryRow }) => {
   const navigate = useNavigate();
-  return <Button size="sm" variant="outline" className="mt-1 gap-2" onClick={() => navigate(`/hand-card/${encodeURIComponent(beneficiary.id)}`)}>
-    <QrCode className="h-4 w-4" /> Hand card
-  </Button>;
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button size="sm" variant="outline" className="mt-1 gap-2" onClick={() => setOpen(true)}>
+        <QrCode className="h-4 w-4" /> Hand card
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[94dvh] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><IdCard className="h-5 w-5 text-primary" /> Beneficiary Hand Card</DialogTitle>
+          </DialogHeader>
+          <HandCardDocument key={beneficiary.id} beneficiary={beneficiary} />
+          <DialogFooter>
+            <Button variant="outline" className="gap-2" onClick={() => { setOpen(false); navigate(`/hand-card/${encodeURIComponent(beneficiary.id)}`); }}>
+              <ExternalLink className="h-4 w-4" /> Open full page
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
 };
 export default BeneficiaryCaseCard;

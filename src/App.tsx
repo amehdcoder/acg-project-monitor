@@ -4,7 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider, QueryCache, keepPreviousData } from "@tanstack/react-query";
 import { toast as sonnerToast } from "sonner";
 import { isTransientBackendError, describeBackendError } from "@/lib/safeData";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useEffect, lazy, Suspense } from "react";
 import { AuthProvider } from "@/hooks/useAuth";
 import { DeviceSessionProvider } from "@/hooks/useDeviceSession";
@@ -182,6 +182,9 @@ const App = () => (
                     />
                     <Route path="/install" element={<ProtectedRoute><Install /></ProtectedRoute>} />
                     <Route path="/hand-card/:beneficiaryId" element={<ProtectedRoute><HandCard /></ProtectedRoute>} />
+                    {/* Legacy /cases links (older hand cards, shared URLs) land on the
+                        Cases tab of the home shell instead of the 404 page. */}
+                    <Route path="/cases" element={<Navigate to={`/?tab=cases${window.location.search}`} replace />} />
                     <Route path="/witness/:surveyId/:hhId" element={<CESWitnessForm />} />
                     <Route path="/satellite-messenger" element={<ProtectedRoute><OffGridSatelliteMessenger /></ProtectedRoute>} />
                    <Route path="/data-cleaner" element={<ProtectedRoute><DataCleaner /></ProtectedRoute>} />
