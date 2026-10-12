@@ -184,7 +184,7 @@ const App = () => (
                     <Route path="/hand-card/:beneficiaryId" element={<ProtectedRoute><HandCard /></ProtectedRoute>} />
                     {/* Legacy /cases links (older hand cards, shared URLs) land on the
                         Cases tab of the home shell instead of the 404 page. */}
-                    <Route path="/cases" element={<Navigate to={`/?tab=cases${window.location.search}`} replace />} />
+                    <Route path="/cases" element={<Navigate to={`/?tab=cases${window.location.search ? `&${window.location.search.slice(1)}` : ""}`} replace />} />
                     <Route path="/witness/:surveyId/:hhId" element={<CESWitnessForm />} />
                     <Route path="/satellite-messenger" element={<ProtectedRoute><OffGridSatelliteMessenger /></ProtectedRoute>} />
                    <Route path="/data-cleaner" element={<ProtectedRoute><DataCleaner /></ProtectedRoute>} />
