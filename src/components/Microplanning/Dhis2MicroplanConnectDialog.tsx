@@ -14,6 +14,7 @@ export default function Dhis2MicroplanConnectDialog({ open, onOpenChange, projec
 }) {
   const [mode, setMode] = useState<"pat" | "login">("pat");
   const [baseUrl, setBaseUrl] = useState("https://");
+  const [label, setLabel] = useState("");
   const [token, setToken] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -26,6 +27,7 @@ export default function Dhis2MicroplanConnectDialog({ open, onOpenChange, projec
     const body: Record<string, unknown> = {
       action: "dhis2_login", scope, project_id: projectId, base_url: baseUrl.trim(),
       ...(existingId ? { connection_id: existingId } : {}),
+      ...(label.trim() ? { label: label.trim() } : {}),
       ...(mode === "pat" ? { token: token.trim() } : { username: username.trim(), password }),
     };
     const { data, error: err } = await supabase.functions.invoke("health-exchange", { body });
@@ -45,7 +47,7 @@ export default function Dhis2MicroplanConnectDialog({ open, onOpenChange, projec
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Connect DHIS2 {scope === "integrations" ? "for Integrations" : "for Geo Microplanning"}</DialogTitle>
+          <DialogTitle>{existingId ? "Update DHIS2 server" : "Add a DHIS2 server"} {scope === "integrations" ? "for Integrations" : "for Geo Microplanning"}</DialogTitle>
           <DialogDescription>{scope === "integrations" ? "This setup is separate from the Cases and Geo Microplanning pages." : "This setup is separate from the Cases page."}</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-3">
@@ -55,6 +57,13 @@ export default function Dhis2MicroplanConnectDialog({ open, onOpenChange, projec
               <TabsTrigger value="login">Sign in</TabsTrigger>
             </TabsList>
           </Tabs>
+          <div className="space-y-1.5">
+            <Label htmlFor="mp-label">Server name (programme area)</Label>
+            <Input id="mp-label" list="mp-label-options" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. MMDP/NTDs DHIS2" maxLength={80} />
+            <datalist id="mp-label-options">
+              {["MMDP/NTDs DHIS2", "Mental Health & Psychosocial Support DHIS2", "Livelihood & Economic Empowerment DHIS2", "WASH DHIS2", "Eye Health DHIS2", "National HMIS (DHIS2)"].map((o) => <option key={o} value={o} />)}
+            </datalist>
+          </div>
           <div className="space-y-1.5">
             <Label htmlFor="mp-url">DHIS2 address</Label>
             <Input id="mp-url" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://dhis2.example.org" required />
