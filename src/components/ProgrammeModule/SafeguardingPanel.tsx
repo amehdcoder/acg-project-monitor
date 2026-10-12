@@ -17,7 +17,12 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Lock, Plus, ShieldAlert, MessageSquarePlus, RefreshCw, UserPlus } from "lucide-react";
+import { Lock, Plus, ShieldAlert, MessageSquarePlus, RefreshCw, UserPlus, Trash2, Eraser } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import {
   CONCERN_CATEGORIES, CONCERN_STATUSES, CONCERN_STATUS_LABEL, CONSENT_OPTIONS,
@@ -74,6 +79,41 @@ const SafeguardingPanel = ({ projectId, moduleId, beneficiaries, isOfficer }: Pr
   const [saving, setSaving] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
   const [noteFor, setNoteFor] = useState<SafeguardingConcernRow | null>(null);
+  const [canPurge, setCanPurge] = useState(false);
+  const [purge, setPurge] = useState<{ ids: string[]; label: string } | null>(null);
+  const [purging, setPurging] = useState(false);
+
+  useEffect(() => {
+    let off = false;
+    (async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) return;
+      const [o, a] = await Promise.all([
+        supabase.rpc("is_owner_or_co_owner" as never, { _user_id: auth.user.id } as never),
+        supabase.rpc("has_role" as never, { _user_id: auth.user.id, _role: "super_admin" } as never),
+      ]);
+      if (!off) setCanPurge(Boolean(o.data) || Boolean(a.data));
+    })();
+    return () => { off = true; };
+  }, []);
+
+  const runPurge = async () => {
+    if (!purge) return;
+    setPurging(true);
+    const { error, count } = await supabase
+      .from("safeguarding_concerns" as never)
+      .delete({ count: "exact" })
+      .in("id", purge.ids);
+    setPurging(false);
+    if (error) {
+      toast({ title: "Could not delete", description: error.message, variant: "destructive" });
+      return;
+    }
+    await logAccess(projectId, null, `deleted ${count ?? purge.ids.length} record(s)`);
+    toast({ title: "Safeguarding records deleted", description: `${count ?? purge.ids.length} removed.` });
+    setPurge(null);
+    void reload();
+  };
 
   const vault = useSafeguardingVault(projectId, isOfficer);
   const [opened, setOpened] = useState<Record<string, ProtectedNarrative>>({});
@@ -265,12 +305,45 @@ const SafeguardingPanel = ({ projectId, moduleId, beneficiaries, isOfficer }: Pr
         <Button variant="outline" size="sm" onClick={() => void reload()} aria-label="Refresh">
           <RefreshCw className="h-4 w-4" />
         </Button>
+        {canPurge && (
+          <Button
+            variant="outline" size="sm" className="gap-1"
+            disabled={!concerns.some((c) => c.status === "closed")}
+            onClick={() => {
+              const ids = concerns.filter((c) => c.status === "closed").map((c) => c.id);
+              setPurge({ ids, label: `all ${ids.length} closed concern(s)` });
+            }}
+          >
+            <Eraser className="h-4 w-4" /> Clean closed
+          </Button>
+        )}
         <Button size="sm" className="gap-1" onClick={startNew}>
           <Plus className="h-4 w-4" /> Log a concern
         </Button>
       </Card>
 
       <SafeguardingVaultCard projectId={projectId} vault={vault} />
+
+      <AlertDialog open={!!purge} onOpenChange={(v) => !v && setPurge(null)}>
+        <AlertDialogContent className="z-[1300]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Permanently delete safeguarding records?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes {purge?.label}, including case notes. It cannot be undone and the deletion is logged.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={purging}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={purging}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => { e.preventDefault(); void runPurge(); }}
+            >
+              {purging ? "Deleting…" : "Delete permanently"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {loading && <p className="text-sm text-muted-foreground">Loading safeguarding records…</p>}
       {!loading && visible.length === 0 && (
@@ -328,6 +401,14 @@ const SafeguardingPanel = ({ projectId, moduleId, beneficiaries, isOfficer }: Pr
                 >
                   <UserPlus className="h-4 w-4" />
                   {sharing === c.id ? "Sharing…" : "Share with officers"}
+                </Button>
+              )}
+              {canPurge && (
+                <Button
+                  size="sm" variant="ghost" className="ml-auto gap-1 text-destructive hover:text-destructive"
+                  onClick={() => setPurge({ ids: [c.id], label: `the concern for ${c.beneficiary_label || "an unlinked beneficiary"}` })}
+                >
+                  <Trash2 className="h-4 w-4" /> Delete
                 </Button>
               )}
             </div>

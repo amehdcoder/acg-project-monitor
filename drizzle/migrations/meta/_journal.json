@@ -29,6 +29,13 @@
       "when": 1791833422403,
       "tag": "0003_migration",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791834810181,
+      "tag": "0004_safeguarding_admin_delete",
+      "breakpoints": true
     }
   ]
 }
