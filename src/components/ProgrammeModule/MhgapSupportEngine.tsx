@@ -34,8 +34,28 @@ function latestPhq9(services: BeneficiaryServiceRow[]): number | null {
 interface Props {
   projectId: string;
   priorServices: BeneficiaryServiceRow[];
+  /** The person being assessed — age and sex drive the guide's special-population rules. */
+  beneficiary?: BeneficiaryRow;
   value: MhgapValue;
   onChange: (v: MhgapValue) => void;
+}
+
+/** Age and sex from the beneficiary profile, for the guide's dosing rules. */
+function patientFrom(b?: BeneficiaryRow): PatientContext {
+  if (!b) return {};
+  const p = (b.profile || {}) as Record<string, unknown>;
+  const num = (v: unknown) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  let ageYears = num(p.age ?? p.age_years ?? p.Age);
+  const dob = p.date_of_birth ?? p.dob ?? p.birth_date;
+  if (ageYears == null && dob) {
+    const d = new Date(String(dob));
+    if (!isNaN(d.getTime())) ageYears = Math.floor((Date.now() - d.getTime()) / (365.25 * 864e5));
+  }
+  const sex = String(p.sex ?? p.gender ?? "").toLowerCase();
+  return { ageYears, female: /^f/.test(sex) };
 }
 
 const hsl = (h: string, a = 1) => `hsl(${h} / ${a})`;
