@@ -226,7 +226,7 @@ const ServiceEntryDialog = ({
             ))}
 
           {isMentalHealthComponent(componentKey, component?.label) && (
-            <MhgapSupportEngine projectId={projectId} priorServices={priorServices} value={mhgap} onChange={setMhgap} />
+            <MhgapSupportEngine projectId={projectId} priorServices={priorServices} beneficiary={beneficiary} value={mhgap} onChange={setMhgap} />
           )}
 
           <ServiceExperienceSections
