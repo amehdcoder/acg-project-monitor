@@ -34,16 +34,17 @@ interface Props {
   defaultComponent?: string;
   /** Existing services — used by MMDP visits to compare with previous visits. */
   priorServices?: BeneficiaryServiceRow[];
+  componentFilter?: (c: { key: string; label?: string }) => boolean;
   onSaved: () => void;
 }
 
 const ServiceEntryDialog = ({
   open, onOpenChange, config, beneficiary, moduleId, projectId, defaultComponent,
-  priorServices = [], onSaved,
+  priorServices = [], onSaved, componentFilter,
 }: Props) => {
   const beneficiaryId = beneficiary.id;
   const { toast } = useToast();
-  const components = useMemo(() => visibleComponents(config), [config]);
+  const components = useMemo(() => visibleComponents(config).filter((c) => !componentFilter || componentFilter(c)), [config, componentFilter]);
   const [componentKey, setComponentKey] = useState(defaultComponent || components[0]?.key || "");
   const [serviceName, setServiceName] = useState("");
   const [serviceDate, setServiceDate] = useState(new Date().toISOString().slice(0, 10));

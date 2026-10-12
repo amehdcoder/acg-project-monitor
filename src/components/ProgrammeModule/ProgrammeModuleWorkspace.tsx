@@ -36,7 +36,7 @@ import BeneficiaryRecord from "./BeneficiaryRecord";
 import RecordQualityBar from "./RecordQualityBar";
 import BeneficiaryFormDialog from "./BeneficiaryFormDialog";
 import ProjectTeamPanel from "./ProjectTeamPanel";
-import { useMyTeamPermissions } from "@/lib/programmeModule/projectTeam";
+import { useMyTeamPermissions, isHealthWorkerComponent } from "@/lib/programmeModule/projectTeam";
 import ModuleConfigurator from "./ModuleConfigurator";
 import ModuleProjectsDialog from "./ModuleProjectsDialog";
 import FacilityFocalPersons from "./FacilityFocalPersons";
@@ -108,7 +108,14 @@ const ProgrammeModuleWorkspace = ({
 
   // What this person is allowed to see and do, from the project team register.
   // People who are not listed keep the access they already had.
-  const { can, listed: onTeamRegister, loading: permissionsLoading } = useMyTeamPermissions(projectId, canConfigure);
+  const { can: teamCan, listed: onTeamRegister, loading: permissionsLoading, healthWorkerCadre } = useMyTeamPermissions(projectId, canConfigure);
+  // Designated health workers only work on MMDP/NTD and mental health: case
+  // search, records, households/MDA/WASH, services, follow-ups and referrals.
+  const isHealthWorker = Boolean(healthWorkerCadre);
+  const can = useMemo(() => (key: Parameters<typeof teamCan>[0]) => {
+    if (isHealthWorker && ["view_dashboards", "view_safeguarding", "assess_livelihood", "verify_livelihood", "manage_livelihood", "export_data", "manage_team", "configure_module", "manage_facilities"].includes(key)) return false;
+    return teamCan(key);
+  }, [teamCan, isHealthWorker]);
   const [view, setView] = useState<WorkspaceView>(() => can("view_dashboards") ? "dashboard" : "records");
 
   // A scanned Hand Card link (?case=...) must land on the records list so the
@@ -159,13 +166,13 @@ const ProgrammeModuleWorkspace = ({
         { key: "followups", label: "Follow-ups & referrals", description: "Upcoming visits and referral traffic", icon: CalendarClock, show: can("view_records") },
         { key: "households", label: "Households & MDA", description: "Household members, treatment rounds and water points", icon: Home, show: can("manage_households") || can("view_dashboards") },
         { key: "casesearch", label: "CDD case search", description: "MMDP case finding, review and registration", icon: Search, show: can("manage_cdds") || can("confirm_cases") || can("view_records") },
-        { key: "livelihood", label: "Livelihood & empowerment", description: "Assessments, shortlists and verification", icon: Briefcase, show: can("view_records") || can("view_dashboards") },
+        { key: "livelihood", label: "Livelihood & empowerment", description: "Assessments, shortlists and verification", icon: Briefcase, show: !isHealthWorker && (can("view_records") || can("view_dashboards")) },
       ],
     },
     {
       label: "Intelligence",
       items: [
-        { key: "network", label: "Transmission network", description: "Household, kinship and WASH relationships", icon: Network, show: can("view_dashboards") },
+        { key: "network", label: "Transmission network", description: "Household, kinship and WASH relationships", icon: Network, show: can("view_dashboards") || isHealthWorker },
         { key: "risk", label: "Follow-up risk & CHEW visits", description: "Prioritised risk and dispatched visits", icon: Activity, show: can("view_dashboards") },
         { key: "exchange", label: "Data exchange", description: "DHIS2, LMIS, FHIR, ADX and SDMX", icon: Share2, show: canConfigure || can("view_dashboards") },
       ],
@@ -286,6 +293,7 @@ const ProgrammeModuleWorkspace = ({
         onBack={() => setSelected(null)}
         canManage={canConfigure || facilityLevels[selectedFacility] === "manage"}
         componentsVisible={!isFocalPerson || Boolean(facilityLevels[selectedFacility])}
+        componentFilter={isHealthWorker ? isHealthWorkerComponent : undefined}
         onChanged={() => void reloadBeneficiaries()}
       /></div>
     );
