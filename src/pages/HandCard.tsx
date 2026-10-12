@@ -24,10 +24,10 @@ export default function HandCard() {
     <main className="h-dvh overflow-y-auto bg-background text-foreground">
       <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-3 px-4 py-4">
-          <Button variant="outline" size="icon" aria-label="Back to Cases" title="Back to Cases" onClick={() => navigate("/?tab=cases")}><ArrowLeft className="h-5 w-5" /></Button>
+          <Button variant="outline" size="icon" aria-label="Back to records" title="Back to records" onClick={() => navigate("/?tab=records")}><ArrowLeft className="h-5 w-5" /></Button>
           <IdCard className="h-6 w-6 text-primary" />
           <div className="min-w-0 flex-1"><h1 className="text-xl font-semibold">Beneficiary Hand Card</h1><p className="text-sm text-muted-foreground">Amehnities</p></div>
-          {data && <Button variant="outline" className="gap-2" onClick={() => navigate(`/?tab=cases&case=${encodeURIComponent(data.case_id)}`)}><ClipboardList className="h-4 w-4" />Open record</Button>}
+          {data && <Button variant="outline" className="gap-2" onClick={() => navigate(`/?tab=records&case=${encodeURIComponent(data.case_id)}`)}><ClipboardList className="h-4 w-4" />Open record</Button>}
         </div>
       </header>
       <div className="mx-auto max-w-4xl space-y-4 px-3 py-6 sm:px-6">
