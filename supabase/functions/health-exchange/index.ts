@@ -366,6 +366,7 @@ Deno.serve(async (req) => {
       token: z.string().trim().max(500).optional(),
       scope: z.enum(["cases", "microplanning", "integrations"]).default("cases"),
       connection_id: z.string().uuid().optional(),
+      label: z.string().trim().max(80).optional(),
     }).safeParse(payload);
     if (!input.success) return json({ error: input.error.issues[0]?.message ?? "Invalid sign-in details" }, 400);
     const { project_id, scope } = input.data;
@@ -399,7 +400,7 @@ Deno.serve(async (req) => {
     const acct = u.username ?? username;
     const row = {
       project_id, kind: "dhis2", base_url: base, auth_type: authType, username: acct, scope, is_active: true,
-      name: `DHIS2 · ${u.displayName ?? acct}`,
+      name: input.data.label ? `${input.data.label} · ${u.displayName ?? acct}` : `DHIS2 · ${u.displayName ?? acct}`,
     };
     let connId = input.data.connection_id;
     if (connId) {
