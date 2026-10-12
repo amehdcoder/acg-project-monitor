@@ -30,7 +30,7 @@ import { cn } from "@/lib/utils";
 import { toneClasses } from "@/lib/programmeModule/defaults";
 import { useFacilities } from "@/lib/programmeModule/facilities";
 import {
-  DUTY_PRESETS, HEALTH_WORKER_CADRES,
+  DUTY_PRESETS, HEALTH_WORKER_CADRES, PROGRAMME_STAFF_CADRES, PROGRAMME_AREAS, type ProgrammeArea,
   PERMISSION_LIST, PRESETS, STATE_UNITS, TEAM_DESIGNATIONS, TEAM_TYPES,
   TEAM_TYPE_LABEL, deleteTeamMember, grantedCount, memberContext, saveTeamMember,
   useTeamMembers, type PermissionKey, type TeamMemberRow, type TeamPermissions,
@@ -431,7 +431,7 @@ const ProjectTeamPanel = ({ projectId, moduleId, canManage = false }: Props) => 
                   <div>
                     <p className="text-sm font-medium text-foreground">Health worker designation</p>
                     <p className="text-xs text-muted-foreground">
-                      A designated health worker only sees MMDP/NTD and Mental Health &amp; Psychosocial Support — with case search, households, MDA and WASH. Other components, dashboards, livelihood and safeguarding are hidden.
+                      A designated health worker sees everything about a beneficiary's health — MMDP/NTD, Eye Health, Mental Health &amp; Psychosocial Support, lesion staging, documents and outcomes, with case search, households, MDA and WASH. Dashboards, livelihood and safeguarding are hidden.
                     </p>
                   </div>
                 </div>
@@ -440,7 +440,8 @@ const ProjectTeamPanel = ({ projectId, moduleId, canManage = false }: Props) => 
                   onValueChange={(v) => {
                     if (v === "none") { const { health_worker: _h, ...rest } = perms; setPerms(rest); return; }
                     const base = perms.health_worker ? perms : (DUTY_PRESETS.find((d) => d.key === "health_worker")?.permissions || {});
-                    setPerms({ ...base, health_worker: v });
+                    const { programme_staff: _p, programme_areas: _a, ...clean } = base;
+                    setPerms({ ...clean, health_worker: v });
                   }}
                 >
                   <SelectTrigger className="mt-2"><SelectValue placeholder="Not a health worker" /></SelectTrigger>
@@ -449,6 +450,50 @@ const ProjectTeamPanel = ({ projectId, moduleId, canManage = false }: Props) => 
                     {HEALTH_WORKER_CADRES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="rounded-lg border border-accent/30 bg-accent/5 p-3">
+                <p className="text-sm font-medium text-foreground">Programme staff designation</p>
+                <p className="text-xs text-muted-foreground">
+                  Programme staff only see the components and records of their programme area. Safeguarding, team and form settings are hidden.
+                </p>
+                <Select
+                  value={perms.programme_staff || "none"}
+                  onValueChange={(v) => {
+                    if (v === "none") { const { programme_staff: _p, programme_areas: _a, ...rest } = perms; setPerms(rest); return; }
+                    const cadre = PROGRAMME_STAFF_CADRES.find((c) => c.label === v);
+                    const { health_worker: _h, ...rest } = perms;
+                    const base = perms.programme_staff ? rest : { view_records: true, view_dashboards: true, record_services: true, ...rest };
+                    setPerms({ ...base, programme_staff: v, programme_areas: cadre?.areas.length ? cadre.areas : (perms.programme_areas || []) });
+                  }}
+                >
+                  <SelectTrigger className="mt-2"><SelectValue placeholder="Not programme staff" /></SelectTrigger>
+                  <SelectContent className="z-[1200] max-h-[300px] bg-popover">
+                    <SelectItem value="none">Not programme staff</SelectItem>
+                    {PROGRAMME_STAFF_CADRES.map((c) => <SelectItem key={c.label} value={c.label}>{c.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {perms.programme_staff && (
+                  <div className="mt-2">
+                    <p className="text-xs font-medium text-foreground">Programme areas they can see</p>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {PROGRAMME_AREAS.map((a) => {
+                        const on = (perms.programme_areas || []).includes(a.value);
+                        return (
+                          <button key={a.value} type="button"
+                            onClick={() => {
+                              const cur = (perms.programme_areas || []) as ProgrammeArea[];
+                              setPerms({ ...perms, programme_areas: on ? cur.filter((x) => x !== a.value) : [...cur, a.value] });
+                            }}
+                            className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${on ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground"}`}>
+                            {a.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {!(perms.programme_areas || []).length && <p className="mt-1 text-[11px] text-muted-foreground">No area chosen — they will see every component.</p>}
+                  </div>
+                )}
               </div>
 
               <div className="rounded-lg border border-border p-3">

@@ -86,7 +86,53 @@ export interface TeamPermissions {
   configure_module?: boolean;
   /** Health worker cadre — limits the person to MMDP/NTD and mental health work. */
   health_worker?: string;
+  /** Programme staff cadre — limits the person to the programme areas below. */
+  programme_staff?: string;
+  /** Programme areas a programme staff member works on. */
+  programme_areas?: ProgrammeArea[];
 }
+
+export type ProgrammeArea = "ntd" | "mental" | "wash" | "livelihood" | "eye";
+
+export const PROGRAMME_AREAS: { value: ProgrammeArea; label: string }[] = [
+  { value: "ntd", label: "MMDP / NTDs" },
+  { value: "eye", label: "Eye health" },
+  { value: "mental", label: "Mental Health & Psychosocial Support" },
+  { value: "wash", label: "WASH" },
+  { value: "livelihood", label: "Livelihood & Economic Empowerment" },
+];
+
+export const PROGRAMME_STAFF_CADRES: { label: string; areas: ProgrammeArea[] }[] = [
+  { label: "Partner Staff", areas: [] },
+  { label: "National NTD Staff", areas: ["ntd"] },
+  { label: "State NTD Staff", areas: ["ntd"] },
+  { label: "LGA NTD Staff", areas: ["ntd"] },
+  { label: "National Mental Health Staff", areas: ["mental"] },
+  { label: "State Mental Health Staff", areas: ["mental"] },
+  { label: "LGA Mental Health Staff", areas: ["mental"] },
+  { label: "National WASH Staff", areas: ["wash"] },
+  { label: "State WASH Staff", areas: ["wash"] },
+  { label: "LGA WASH Staff", areas: ["wash"] },
+  { label: "National Livelihood/Economic Empowerment Staff", areas: ["livelihood"] },
+  { label: "State Livelihood/Economic Empowerment Staff", areas: ["livelihood"] },
+  { label: "LGA Livelihood/Economic Empowerment Staff", areas: ["livelihood"] },
+  { label: "National Eye Health Staff", areas: ["eye"] },
+  { label: "State Eye Health Staff", areas: ["eye"] },
+  { label: "LGA Eye Health Staff", areas: ["eye"] },
+  { label: "Other programme staff", areas: [] },
+];
+
+const AREA_PATTERNS: Record<ProgrammeArea, RegExp> = {
+  ntd: /mmdp|ntd|morbidity|lymph|hydro|trachom|trichiasis|oncho|schisto|filaria|lesion/i,
+  eye: /eye|ophthal|vision|cataract|trachom|trichiasis|optom/i,
+  mental: /mental|psycho|mhpss|mhgap|depress/i,
+  wash: /wash|water|sanitation|hygiene/i,
+  livelihood: /livelihood|economic|empower|income|vocation/i,
+};
+
+/** Whether a programme component belongs to any of the given areas. */
+export const componentInAreas = (areas: ProgrammeArea[]) => (c: { key: string; label?: string }) =>
+  areas.some((a) => AREA_PATTERNS[a].test(`${c.key} ${c.label || ""}`));
 
 export const HEALTH_WORKER_CADRES = [
   "CHEW (Community Health Extension Worker)",
@@ -110,9 +156,9 @@ export const HEALTH_WORKER_CADRES = [
   "Other health worker",
 ];
 
-/** Components a health worker may open: MMDP/NTD and Mental Health & Psychosocial Support. */
+/** Components a health worker may open: every health component (not livelihood/economic). */
 export const isHealthWorkerComponent = (c: { key: string; label?: string }) =>
-  /mmdp|ntd|morbidity|mental|psycho|mhpss|mhgap/i.test(`${c.key} ${c.label || ""}`);
+  !AREA_PATTERNS.livelihood.test(`${c.key} ${c.label || ""}`);
 
 export type PermissionKey = keyof TeamPermissions;
 
@@ -222,8 +268,8 @@ export const DUTY_PRESETS: { key: string; label: string; hint: string; permissio
   },
   {
     key: "health_worker",
-    label: "Health worker (MMDP/NTD & mental health)",
-    hint: "Records, case search, MDA/WASH, services, follow-ups and referrals for MMDP/NTD and MHPSS only",
+    label: "Health worker (all health components)",
+    hint: "Records, case search, MDA/WASH, lesion staging, documents, outcomes, services, follow-ups and referrals for every health component",
     permissions: {
       health_worker: "Other health worker", view_records: true, edit_records: true, record_services: true,
       confirm_cases: true, manage_cdds: true, manage_households: true, home_visits: true, accept_referrals: true,
@@ -374,5 +420,7 @@ export const useMyTeamPermissions = (projectId?: string, isAdmin = false) => {
   }, [row, isAdmin]);
 
   const healthWorkerCadre = !isAdmin ? row?.permissions?.health_worker || null : null;
-  return { member: row, can, listed: !!row, loading, reload: load, healthWorkerCadre };
+  const programmeStaffCadre = !isAdmin ? row?.permissions?.programme_staff || null : null;
+  const programmeAreas = (row?.permissions?.programme_areas || []) as ProgrammeArea[];
+  return { member: row, can, listed: !!row, loading, reload: load, healthWorkerCadre, programmeStaffCadre, programmeAreas };
 };

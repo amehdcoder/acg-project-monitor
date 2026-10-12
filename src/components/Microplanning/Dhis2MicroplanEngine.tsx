@@ -61,6 +61,7 @@ export default function Dhis2MicroplanEngine({ projectId, projectName, canUse, o
   const [filter, setFilter] = useState("");
 
   const [connectOpen, setConnectOpen] = useState(false);
+  const [connectNew, setConnectNew] = useState(false);
   const [pushOpen, setPushOpen] = useState(false);
   const [years, setYears] = useState<YearInfo[] | null>(null);
   const [yearsNote, setYearsNote] = useState<string | null>(null);
@@ -93,7 +94,7 @@ export default function Dhis2MicroplanEngine({ projectId, projectName, canUse, o
   useEffect(() => { loadConns(); }, [loadConns]);
 
   const disconnect = async () => {
-    if (!connId || !confirm("Disconnect DHIS2 from Geo Microplanning for this project?")) return;
+    if (!connId || !confirm(`Disconnect ${conn?.name ?? "this DHIS2 server"}?`)) return;
     try { await call({ action: "dhis2_disconnect", connection_id: connId }); toast.success("Disconnected"); loadConns(); }
     catch (e) { toast.error((e as Error).message); }
   };
@@ -193,6 +194,12 @@ export default function Dhis2MicroplanEngine({ projectId, projectName, canUse, o
             {conn ? conn.name : "Not connected"}
           </span>
         </div>
+        {conns.length > 1 && (
+          <Select value={connId} onValueChange={setConnId}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Choose a DHIS2 server" /></SelectTrigger>
+            <SelectContent>{conns.map((c) => <SelectItem key={c.id} value={c.id}>{c.name} <span className="ml-1 font-mono text-[10px] text-muted-foreground">{c.base_url}</span></SelectItem>)}</SelectContent>
+          </Select>
+        )}
         {conn && <p className="text-[11px] text-muted-foreground font-mono truncate">{conn.base_url}{conn.last_sync_at ? ` · last sync ${new Date(conn.last_sync_at).toLocaleString()}` : ""}</p>}
         <div className="flex flex-wrap gap-2">
           <div className="flex">
@@ -217,9 +224,12 @@ export default function Dhis2MicroplanEngine({ projectId, projectName, canUse, o
             <Sparkles className="h-3.5 w-3.5 mr-1" /> Open engine
           </Button>
           {canUse && projectId && (
-            <Button size="sm" variant={conn ? "ghost" : "default"} onClick={() => setConnectOpen(true)}>
-              <Network className="h-3.5 w-3.5 mr-1" /> {conn ? "Change connection" : "Connect DHIS2"}
-            </Button>
+            <>
+              <Button size="sm" variant={conn ? "ghost" : "default"} onClick={() => { setConnectNew(!conn); setConnectOpen(true); }}>
+                <Network className="h-3.5 w-3.5 mr-1" /> {conn ? "Update server" : "Connect DHIS2"}
+              </Button>
+              {conn && <Button size="sm" variant="ghost" onClick={() => { setConnectNew(true); setConnectOpen(true); }}>+ Add another server</Button>}
+            </>
           )}
           {canUse && conn && <Button size="sm" variant="ghost" className="text-destructive" onClick={disconnect}>Disconnect</Button>}
         </div>
@@ -298,7 +308,7 @@ export default function Dhis2MicroplanEngine({ projectId, projectName, canUse, o
         </DialogContent>
       </Dialog>
       <Dhis2MicroplanConnectDialog open={connectOpen} onOpenChange={setConnectOpen} projectId={projectId} scope={scope}
-        existingId={connId || undefined} onConnected={(id) => loadConns(id)} />
+        existingId={connectNew ? undefined : connId || undefined} key={connectNew ? "new" : connId} onConnected={(id) => loadConns(id)} />
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-5xl max-h-[90dvh] overflow-y-auto">
