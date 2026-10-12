@@ -6082,6 +6082,7 @@ export type Database = {
           lmis_program_id: string | null
           name: string
           org_unit_id: string | null
+          programme_area: string | null
           project_id: string
           scope: string
           token_url: string | null
@@ -6113,6 +6114,7 @@ export type Database = {
           lmis_program_id?: string | null
           name: string
           org_unit_id?: string | null
+          programme_area?: string | null
           project_id: string
           scope?: string
           token_url?: string | null
@@ -6144,6 +6146,7 @@ export type Database = {
           lmis_program_id?: string | null
           name?: string
           org_unit_id?: string | null
+          programme_area?: string | null
           project_id?: string
           scope?: string
           token_url?: string | null
@@ -13200,6 +13203,15 @@ export type Database = {
         Args: { _topic: string }
         Returns: Json
       }
+      beneficiary_in_user_scope: {
+        Args: {
+          _beneficiary: string
+          _created_by: string
+          _project: string
+          _uid: string
+        }
+        Returns: boolean
+      }
       bulk_grant_ces_roles: {
         Args: { _project_id: string; _roles: string[]; _user_ids: string[] }
         Returns: number
@@ -13748,6 +13760,10 @@ export type Database = {
         }[]
       }
       profile_owner_flag: { Args: { _user_id: string }; Returns: boolean }
+      programme_area_matches: {
+        Args: { _areas: string[]; _component: string }
+        Returns: boolean
+      }
       prune_mda_lens_access_events: { Args: never; Returns: undefined }
       record_inactive_login_attempt: {
         Args: {
@@ -13782,6 +13798,15 @@ export type Database = {
       reset_quiz_attempts: {
         Args: { p_attempt_type?: string; p_quiz_id: string }
         Returns: number
+      }
+      service_in_user_scope: {
+        Args: {
+          _component: string
+          _project: string
+          _recorded_by: string
+          _uid: string
+        }
+        Returns: boolean
       }
       set_proximity_conversation_flag: {
         Args: { _action: string; _conversation_id: string }
@@ -13904,6 +13929,10 @@ export type Database = {
           _ward: string
         }
         Returns: boolean
+      }
+      user_programme_areas: {
+        Args: { _project: string; _uid: string }
+        Returns: string[]
       }
       visible_form_submission_counts: {
         Args: { _form_ids: string[] }
