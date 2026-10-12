@@ -3,9 +3,9 @@ import { AlertTriangle, BookOpen, CheckCircle2, HeartHandshake, Pill, ShieldAler
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { MHGAP_MODULES, ESSENTIAL_CARE, EMERGENCY_FLAGS, decide, type MhgapModuleKey } from "@/lib/programmeModule/mhgapEngine";
+import { MHGAP_MODULES, ESSENTIAL_CARE, EMERGENCY_FLAGS, decide, type MhgapModuleKey, type PatientContext } from "@/lib/programmeModule/mhgapEngine";
 import { useProjectMhgapDrugs } from "./MhgapDrugsManager";
-import type { BeneficiaryServiceRow } from "@/lib/programmeModule/types";
+import type { BeneficiaryRow, BeneficiaryServiceRow } from "@/lib/programmeModule/types";
 
 export interface MhgapValue {
   mhgap_module?: MhgapModuleKey;
@@ -34,19 +34,40 @@ function latestPhq9(services: BeneficiaryServiceRow[]): number | null {
 interface Props {
   projectId: string;
   priorServices: BeneficiaryServiceRow[];
+  /** The person being assessed — age and sex drive the guide's special-population rules. */
+  beneficiary?: BeneficiaryRow;
   value: MhgapValue;
   onChange: (v: MhgapValue) => void;
 }
 
+/** Age and sex from the beneficiary profile, for the guide's dosing rules. */
+function patientFrom(b?: BeneficiaryRow): PatientContext {
+  if (!b) return {};
+  const p = (b.profile || {}) as Record<string, unknown>;
+  const num = (v: unknown) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  let ageYears = num(p.age ?? p.age_years ?? p.Age);
+  const dob = p.date_of_birth ?? p.dob ?? p.birth_date;
+  if (ageYears == null && dob) {
+    const d = new Date(String(dob));
+    if (!isNaN(d.getTime())) ageYears = Math.floor((Date.now() - d.getTime()) / (365.25 * 864e5));
+  }
+  const sex = String(p.sex ?? p.gender ?? "").toLowerCase();
+  return { ageYears, female: /^f/.test(sex) };
+}
+
 const hsl = (h: string, a = 1) => `hsl(${h} / ${a})`;
 
-export default function MhgapSupportEngine({ projectId, priorServices, value, onChange }: Props) {
+export default function MhgapSupportEngine({ projectId, priorServices, beneficiary, value, onChange }: Props) {
   const { drugs } = useProjectMhgapDrugs(projectId);
   const [modKey, setModKey] = useState<MhgapModuleKey | undefined>(value.mhgap_module);
   const mod = MHGAP_MODULES.find((m) => m.key === modKey);
   const checked = value.mhgap_criteria || {};
   const phq9 = useMemo(() => latestPhq9(priorServices), [priorServices]);
-  const decision = mod ? decide(mod, checked, mod.key === "DEP" ? phq9 : null) : null;
+  const patient = useMemo(() => patientFrom(beneficiary), [beneficiary]);
+  const decision = mod ? decide(mod, checked, mod.key === "DEP" ? phq9 : null, patient) : null;
   const rx = value.mhgap_prescriptions || [];
 
   const eligible = useMemo(() => {
