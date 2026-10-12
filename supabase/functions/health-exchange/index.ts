@@ -159,6 +159,43 @@ function previousPeriod(now = new Date()) {
 }
 
 /** Totals plus sex breakdowns (key:female / key:male) for one project-month. */
+const AREA_RX: Record<string, RegExp> = {
+  ntd: /mmdp|ntd|morbidity|lymph|hydro|trachom|trichiasis|oncho|schisto|filaria|lesion/i,
+  eye: /eye|ophthal|vision|cataract|trachom|trichiasis|optom/i,
+  mental: /mental|psycho|mhpss|mhgap|depress/i,
+  wash: /wash|water|sanitation|hygiene/i,
+  livelihood: /livelihood|economic|empower|income|vocation/i,
+};
+
+/** Real beneficiary service totals for the month, optionally limited to one programme area. */
+async function computeServiceValues(db: ReturnType<typeof admin>, projectId: string, period: string, area?: string | null) {
+  const { start, end } = monthRange(period);
+  const rx = area ? AREA_RX[area] : null;
+  const rows: { component_key: string; beneficiary_id: string }[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await db.from("beneficiary_services").select("component_key, beneficiary_id")
+      .eq("project_id", projectId).gte("service_date", start.slice(0, 10)).lt("service_date", end.slice(0, 10)).range(from, from + 999);
+    if (error || !data?.length) break;
+    rows.push(...(data as typeof rows));
+    if (data.length < 1000) break;
+  }
+  const scoped = rx ? rows.filter((r) => rx.test(r.component_key || "")) : rows;
+  const out: { indicator_key: string; value: number }[] = [
+    { indicator_key: "services_delivered", value: scoped.length },
+    { indicator_key: "beneficiaries_served", value: new Set(scoped.map((r) => r.beneficiary_id)).size },
+  ];
+  const byComp = new Map<string, number>();
+  for (const r of scoped) byComp.set(r.component_key, (byComp.get(r.component_key) ?? 0) + 1);
+  for (const [k, v] of byComp) out.push({ indicator_key: `services:${k}`, value: v });
+  return out;
+}
+
+async function computeConnectionValues(db: ReturnType<typeof admin>, c: Connection, period: string) {
+  const area = (c as unknown as { programme_area?: string | null }).programme_area ?? null;
+  const [base, services] = await Promise.all([computeMonthlyValues(db, c.project_id, period), computeServiceValues(db, c.project_id, period, area)]);
+  return [...base, ...services];
+}
+
 async function computeMonthlyValues(db: ReturnType<typeof admin>, projectId: string, period: string) {
   const { start, end } = monthRange(period);
   const count = async (table: string, extra?: (q: any) => any, dated = true) => {
@@ -346,7 +383,30 @@ Deno.serve(async (req) => {
 
   // Disconnect a page-scoped DHIS2 connection (microplanning setup is separate from Cases).
   if (action === "dhis2_disconnect") {
-    if (!connectionId) return json({ error: "connection_id required" }, 400);
+    if (action === "push_all_servers") {
+    const projectId = String(payload.project_id ?? "");
+    if (!/^[0-9a-f-]{36}$/i.test(projectId)) return json({ error: "project_id required" }, 400);
+    const period = /^\d{6}$/.test(String(payload.period ?? "")) ? String(payload.period) : previousPeriod();
+    const dryRun = payload.dry_run === true;
+    const { data: servers } = await db.from("health_exchange_connections").select("*")
+      .eq("project_id", projectId).eq("kind", "dhis2").eq("is_active", true).eq("scope", "cases");
+    const results: unknown[] = [];
+    for (const c of (servers ?? []) as Connection[]) {
+      try {
+        const h = await authHeaders(db, c);
+        const values = await computeConnectionValues(db, c, period);
+        const r = await pushDataValues(db, c, h, period, values, c.org_unit_id ?? "", dryRun, guard.userId, "dhis2_monthly_all");
+        if (r.httpStatus === 200 && !dryRun) await db.from("health_exchange_connections").update({ last_auto_period: period }).eq("id", c.id);
+        results.push({ connection_id: c.id, connection: c.name, programme_area: (c as unknown as { programme_area?: string }).programme_area ?? null, status: r.httpStatus, values: values.length, ...r.body as object });
+      } catch (e) {
+        await log(db, c, "push", "dhis2_monthly_all", "error", 0, (e as Error).message, guard.userId);
+        results.push({ connection_id: c.id, connection: c.name, status: 0, error: (e as Error).message });
+      }
+    }
+    return json({ ok: true, period, dry_run: dryRun, servers: results.length, results });
+  }
+
+  if (!connectionId) return json({ error: "connection_id required" }, 400);
     const { data: c } = await db.from("health_exchange_connections").select("id").eq("id", connectionId).maybeSingle();
     if (!c) return json({ error: "Connection not found" }, 404);
     await db.from("health_exchange_credentials").delete().eq("connection_id", connectionId);
@@ -444,7 +504,7 @@ Deno.serve(async (req) => {
       if (payload.force !== true && (today.getUTCDate() < Number(c.auto_push_day ?? 5) || c.last_auto_period === period)) continue;
       try {
         const h = await authHeaders(db, c);
-        const values = await computeMonthlyValues(db, c.project_id, period);
+        const values = await computeConnectionValues(db, c, period);
         const r = await pushDataValues(db, c, h, period, values, c.org_unit_id ?? "", c.auto_push_dry_run === true, null, "dhis2_monthly_auto");
         if (r.httpStatus === 200 && c.auto_push_dry_run !== true) {
           await db.from("health_exchange_connections").update({ last_auto_period: period }).eq("id", c.id);
@@ -456,6 +516,29 @@ Deno.serve(async (req) => {
       }
     }
     return json({ ok: true, period, processed: results.length, results });
+  }
+
+  if (action === "push_all_servers") {
+    const projectId = String(payload.project_id ?? "");
+    if (!/^[0-9a-f-]{36}$/i.test(projectId)) return json({ error: "project_id required" }, 400);
+    const period = /^\d{6}$/.test(String(payload.period ?? "")) ? String(payload.period) : previousPeriod();
+    const dryRun = payload.dry_run === true;
+    const { data: servers } = await db.from("health_exchange_connections").select("*")
+      .eq("project_id", projectId).eq("kind", "dhis2").eq("is_active", true).eq("scope", "cases");
+    const results: unknown[] = [];
+    for (const c of (servers ?? []) as Connection[]) {
+      try {
+        const h = await authHeaders(db, c);
+        const values = await computeConnectionValues(db, c, period);
+        const r = await pushDataValues(db, c, h, period, values, c.org_unit_id ?? "", dryRun, guard.userId, "dhis2_monthly_all");
+        if (r.httpStatus === 200 && !dryRun) await db.from("health_exchange_connections").update({ last_auto_period: period }).eq("id", c.id);
+        results.push({ connection_id: c.id, connection: c.name, programme_area: (c as unknown as { programme_area?: string }).programme_area ?? null, status: r.httpStatus, values: values.length, ...r.body as object });
+      } catch (e) {
+        await log(db, c, "push", "dhis2_monthly_all", "error", 0, (e as Error).message, guard.userId);
+        results.push({ connection_id: c.id, connection: c.name, status: 0, error: (e as Error).message });
+      }
+    }
+    return json({ ok: true, period, dry_run: dryRun, servers: results.length, results });
   }
 
   if (!connectionId) return json({ error: "connection_id required" }, 400);
@@ -872,7 +955,7 @@ Deno.serve(async (req) => {
       /* ------------- Monthly totals + category breakdowns ------------- */
       case "monthly_values": {
         const period = String(payload.period ?? previousPeriod());
-        return json({ ok: true, period, values: await computeMonthlyValues(db, connection.project_id, period) });
+        return json({ ok: true, period, values: await computeConnectionValues(db, connection, period) });
       }
       case "scoped_monthly_values":
       case "push_scoped_monthly": {
@@ -889,7 +972,7 @@ Deno.serve(async (req) => {
       case "push_monthly": {
         if (connection.kind !== "dhis2") return json({ error: "Monthly reporting is for DHIS2 connections" }, 400);
         const period = String(payload.period ?? previousPeriod());
-        const values = await computeMonthlyValues(db, connection.project_id, period);
+        const values = await computeConnectionValues(db, connection, period);
         const dryRun = payload.dry_run === true;
         const r = await pushDataValues(db, connection, headers, period, values, String(payload.org_unit ?? connection.org_unit_id ?? ""), dryRun, guard.userId, "dhis2_monthly");
         if (r.httpStatus === 200 && !dryRun) await db.from("health_exchange_connections").update({ last_auto_period: period }).eq("id", connection.id);

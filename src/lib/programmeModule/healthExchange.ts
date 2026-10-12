@@ -96,6 +96,8 @@ export const REPORTABLE_INDICATORS: { key: string; label: string }[] = [
   { key: "beneficiaries_registered:male", label: "Beneficiaries registered — male" },
   { key: "beneficiaries_active:female", label: "Active beneficiaries — female" },
   { key: "beneficiaries_active:male", label: "Active beneficiaries — male" },
+  { key: "services_delivered", label: "Services delivered (this server's programme area)" },
+  { key: "beneficiaries_served", label: "Beneficiaries served (this server's programme area)" },
 ];
 
 export async function listConnections(projectId: string) {
@@ -191,6 +193,11 @@ export const validateImportedPayload = (connection_id: string, format: ExchangeF
   call({ action: "validate_import", connection_id, format, content });
 export const monthlyValues = (connection_id: string, period: string) =>
   call({ action: "monthly_values", connection_id, period });
+export const pushAllServers = (project_id: string, period: string, dry_run = false) =>
+  call({ action: "push_all_servers", project_id, period, dry_run }) as Promise<{
+    ok: boolean; period: string; servers: number;
+    results: { connection: string; status: number; values?: number; error?: string; programme_area?: string | null }[];
+  }>;
 export const pushMonthly = (connection_id: string, period: string, dry_run = false) =>
   call({ action: "push_monthly", connection_id, period, dry_run });
 export const scopedMonthlyValues = (connection_id: string, period: string, state: string, lga: string) =>
