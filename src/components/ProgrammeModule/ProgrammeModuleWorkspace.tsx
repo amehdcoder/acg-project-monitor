@@ -109,6 +109,12 @@ const ProgrammeModuleWorkspace = ({
   const { can, listed: onTeamRegister, loading: permissionsLoading } = useMyTeamPermissions(projectId, canConfigure);
   const [view, setView] = useState<WorkspaceView>(() => can("view_dashboards") ? "dashboard" : "records");
 
+  // A scanned Hand Card link (?case=...) must land on the records list so the
+  // record can open straight away, even for people who default to the dashboard.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("case")) setView("records");
+  }, []);
+
 
   const active: ProgrammeModuleRow | undefined = useMemo(
     () => modules.find((m) => m.id === activeId) || modules[0],
