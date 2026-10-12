@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { outcomesForComponent, servicesForComponent } from "@/lib/programmeModule/componentOutcomes";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -44,7 +45,13 @@ const ServiceEntryDialog = ({
 }: Props) => {
   const beneficiaryId = beneficiary.id;
   const { toast } = useToast();
-  const components = useMemo(() => visibleComponents(config).filter((c) => !componentFilter || componentFilter(c)), [config, componentFilter]);
+  const allowed = useMemo(() => visibleComponents(config).filter((c) => !componentFilter || componentFilter(c)), [config, componentFilter]);
+  // Opened from a component tab: only that component is offered.
+  const components = useMemo(
+    () => (defaultComponent && allowed.some((c) => c.key === defaultComponent)
+      ? allowed.filter((c) => c.key === defaultComponent) : allowed),
+    [allowed, defaultComponent],
+  );
   const [componentKey, setComponentKey] = useState(defaultComponent || components[0]?.key || "");
   const [serviceName, setServiceName] = useState("");
   const [serviceDate, setServiceDate] = useState(new Date().toISOString().slice(0, 10));
@@ -56,7 +63,16 @@ const ServiceEntryDialog = ({
   const [saving, setSaving] = useState(false);
   const [mhgap, setMhgap] = useState<MhgapValue>({});
 
+  useEffect(() => {
+    if (!open) return;
+    setComponentKey(defaultComponent || components[0]?.key || "");
+    setServiceName(""); setResult(""); setResultOther(false);
+  }, [open, defaultComponent]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [resultOther, setResultOther] = useState(false);
   const component = components.find((c) => c.key === componentKey);
+  const serviceOptions = component ? servicesForComponent(component) : [];
+  const outcomeOptions = component ? outcomesForComponent(component) : [];
 
   // GAD-7 / PHQ-9 open the full standard screening instrument instead of the
   // generic service form, so clinicians use the identical validated tool.
@@ -123,7 +139,7 @@ const ServiceEntryDialog = ({
         module_id: moduleId,
         project_id: projectId,
         component_key: componentKey,
-        service_name: serviceName || component?.services?.[0] || component?.label || null,
+        service_name: serviceName || serviceOptions[0] || component?.label || null,
         service_date: serviceDate,
         result: result || null,
         status,
@@ -172,7 +188,7 @@ const ServiceEntryDialog = ({
         <div className="space-y-4">
           <div className="space-y-1.5">
             <Label>Programme component</Label>
-            <Select value={componentKey} onValueChange={setComponentKey}>
+            <Select value={componentKey} onValueChange={(v) => { setComponentKey(v); setServiceName(""); setResult(""); setResultOther(false); }} disabled={components.length === 1}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent className="z-[1200] bg-popover">
                 {components.map((c) => <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>)}
@@ -180,13 +196,13 @@ const ServiceEntryDialog = ({
             </Select>
           </div>
 
-          {!!component?.services?.length && (
+          {!!serviceOptions.length && (
             <div className="space-y-1.5">
               <Label>Service</Label>
               <Select value={serviceName} onValueChange={setServiceName}>
                 <SelectTrigger><SelectValue placeholder="Select service…" /></SelectTrigger>
                 <SelectContent className="z-[1200] bg-popover">
-                  {component.services.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  {serviceOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -211,8 +227,20 @@ const ServiceEntryDialog = ({
           </div>
 
           <div className="space-y-1.5">
-            <Label>Result / outcome</Label>
-            <Input value={result} onChange={(e) => setResult(e.target.value)} placeholder="e.g. 6/6 (improved)" />
+            <Label>{component ? `${component.label} result / outcome` : "Result / outcome"}</Label>
+            <Select
+              value={resultOther ? "__other" : result}
+              onValueChange={(v) => { if (v === "__other") { setResultOther(true); setResult(""); } else { setResultOther(false); setResult(v); } }}
+            >
+              <SelectTrigger><SelectValue placeholder="Select result / outcome…" /></SelectTrigger>
+              <SelectContent className="z-[1200] bg-popover">
+                {outcomeOptions.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                <SelectItem value="__other">Other (type it)…</SelectItem>
+              </SelectContent>
+            </Select>
+            {resultOther && (
+              <Input value={result} onChange={(e) => setResult(e.target.value)} placeholder="Describe the result / outcome" />
+            )}
           </div>
 
           {(component?.questions || [])

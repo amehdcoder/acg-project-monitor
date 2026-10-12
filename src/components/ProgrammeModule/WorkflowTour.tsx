@@ -43,7 +43,7 @@ export const STAGES: TourStage[] = [
     key: "search", title: "CDDs & case search", icon: Search, view: "casesearch",
     show: ({ can }) => can("view_records") || can("manage_cdds") || can("confirm_cases"),
     steps: [
-      { title: "Register CDDs under a facility", body: "In CDD case search, register each community drug distributor under the supervising facility and correct community, ward and LGA before recording potential cases.", permission: "manage_cdds" },
+      { title: "Register CDDs under a facility", body: "In CDD case search, register each Community Directed Distributor (CDD) under its Frontline Health Facility (FLHF) and correct community, ward and LGA before recording potential cases.", permission: "manage_cdds" },
       { title: "Record and track potential cases", body: "Record suspected condition, symptoms, location and appropriate photographs. Review the case-search list for cases awaiting clinician review. A potential case is not yet a confirmed beneficiary.", permission: "manage_cdds" },
       { title: "Follow the case-search status", body: "Use the case-search list to distinguish pending review, confirmed, referred and registered cases. Do not register the same person again while their existing case is being reviewed." },
     ],
