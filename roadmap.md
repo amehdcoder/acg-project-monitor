@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Complete and verify the permission-aware longitudinal beneficiary guided tour, including safeguarding and vaulting.
+
 - [x] Add a standalone in-app Hand Card screen with record-linked navigation and existing exports.
 
 - [x] Remove hand-card text collisions and verify image/PDF layout with long record details.
