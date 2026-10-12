@@ -62,6 +62,8 @@ interface Props {
    * a facility they have been granted access to.
    */
   componentsVisible?: boolean;
+  /** Limits which programme components this person may see (health workers). */
+  componentFilter?: (c: { key: string; label?: string }) => boolean;
 }
 
 const fmtDate = (d?: string | null) =>
@@ -94,7 +96,7 @@ const FieldRow = ({ label, value }: { label: string; value: string }) => (
 
 const BeneficiaryRecord = ({
   beneficiary, config, moduleId, projectId, onBack, onChanged, canManage = false,
-  componentsVisible = true,
+  componentsVisible = true, componentFilter,
 }: Props) => {
   const { services, referrals, audit, reload } = useBeneficiaryRecord(beneficiary.id);
   const { toast } = useToast();
@@ -130,8 +132,8 @@ const BeneficiaryRecord = ({
   // Health, Mental Health & Psychosocial Support …) for beneficiaries inside a
   // facility they have been granted access to.
   const components = useMemo(
-    () => (componentsVisible ? visibleComponents(config) : []),
-    [config, componentsVisible],
+    () => (componentsVisible ? visibleComponents(config).filter((c) => !componentFilter || componentFilter(c)) : []),
+    [config, componentsVisible, componentFilter],
   );
   const progress = useMemo(() => computeProgress(config, services), [config, services]);
   const flags = useMemo(() => evaluateDataQuality(config, beneficiary), [config, beneficiary]);
@@ -726,7 +728,7 @@ const BeneficiaryRecord = ({
       <ServiceEntryDialog
         open={serviceOpen} onOpenChange={setServiceOpen} config={config}
         beneficiary={beneficiary} moduleId={moduleId} projectId={projectId}
-        defaultComponent={serviceComponent} priorServices={services}
+        defaultComponent={serviceComponent} priorServices={services} componentFilter={componentFilter}
         onSaved={() => { void reload(); onChanged(); }}
       />
       <ReferralDialog

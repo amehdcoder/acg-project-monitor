@@ -43,7 +43,7 @@ const ServiceEntryDialog = ({
 }: Props) => {
   const beneficiaryId = beneficiary.id;
   const { toast } = useToast();
-  const components = useMemo(() => visibleComponents(config), [config]);
+  const components = useMemo(() => visibleComponents(config).filter((c) => !componentFilter || componentFilter(c)), [config, componentFilter]);
   const [componentKey, setComponentKey] = useState(defaultComponent || components[0]?.key || "");
   const [serviceName, setServiceName] = useState("");
   const [serviceDate, setServiceDate] = useState(new Date().toISOString().slice(0, 10));

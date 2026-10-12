@@ -30,7 +30,7 @@ import { cn } from "@/lib/utils";
 import { toneClasses } from "@/lib/programmeModule/defaults";
 import { useFacilities } from "@/lib/programmeModule/facilities";
 import {
-  DUTY_PRESETS,
+  DUTY_PRESETS, HEALTH_WORKER_CADRES,
   PERMISSION_LIST, PRESETS, STATE_UNITS, TEAM_DESIGNATIONS, TEAM_TYPES,
   TEAM_TYPE_LABEL, deleteTeamMember, grantedCount, memberContext, saveTeamMember,
   useTeamMembers, type PermissionKey, type TeamMemberRow, type TeamPermissions,
@@ -424,6 +424,31 @@ const ProjectTeamPanel = ({ projectId, moduleId, canManage = false }: Props) => 
                 <p className="mt-1 text-xs text-muted-foreground">
                   Without a user ID the entry is a contact record only — permissions apply once it is linked.
                 </p>
+              </div>
+
+              <div className="rounded-lg border border-primary/25 bg-primary/5 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Health worker designation</p>
+                    <p className="text-xs text-muted-foreground">
+                      A designated health worker only sees MMDP/NTD and Mental Health &amp; Psychosocial Support — with case search, households, MDA and WASH. Other components, dashboards, livelihood and safeguarding are hidden.
+                    </p>
+                  </div>
+                </div>
+                <Select
+                  value={perms.health_worker || "none"}
+                  onValueChange={(v) => {
+                    if (v === "none") { const { health_worker: _h, ...rest } = perms; setPerms(rest); return; }
+                    const base = perms.health_worker ? perms : (DUTY_PRESETS.find((d) => d.key === "health_worker")?.permissions || {});
+                    setPerms({ ...base, health_worker: v });
+                  }}
+                >
+                  <SelectTrigger className="mt-2"><SelectValue placeholder="Not a health worker" /></SelectTrigger>
+                  <SelectContent className="z-[1200] max-h-[300px] bg-popover">
+                    <SelectItem value="none">Not a health worker</SelectItem>
+                    {HEALTH_WORKER_CADRES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="rounded-lg border border-border p-3">

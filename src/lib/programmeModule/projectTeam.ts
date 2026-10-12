@@ -84,7 +84,35 @@ export interface TeamPermissions {
   export_data?: boolean;
   manage_team?: boolean;
   configure_module?: boolean;
+  /** Health worker cadre — limits the person to MMDP/NTD and mental health work. */
+  health_worker?: string;
 }
+
+export const HEALTH_WORKER_CADRES = [
+  "CHEW (Community Health Extension Worker)",
+  "JCHEW (Junior CHEW)",
+  "Community Health Officer",
+  "Nurse / Midwife",
+  "Ophthalmic Nurse",
+  "Optometrist",
+  "Ophthalmologist",
+  "Public Health Physician / Doctor",
+  "Medical Officer / General Practitioner",
+  "Psychiatrist",
+  "Psychiatric / Mental Health Nurse",
+  "Clinical Psychologist",
+  "Psychosocial / Social Worker",
+  "Dermatologist",
+  "Surgeon",
+  "Physiotherapist",
+  "Pharmacist / Pharmacy Technician",
+  "Environmental Health Officer",
+  "Other health worker",
+];
+
+/** Components a health worker may open: MMDP/NTD and Mental Health & Psychosocial Support. */
+export const isHealthWorkerComponent = (c: { key: string; label?: string }) =>
+  /mmdp|ntd|morbidity|mental|psycho|mhpss|mhgap/i.test(`${c.key} ${c.label || ""}`);
 
 export type PermissionKey = keyof TeamPermissions;
 
@@ -191,6 +219,15 @@ export const DUTY_PRESETS: { key: string; label: string; hint: string; permissio
     label: "Records administrator",
     hint: "Full running of the records on this project",
     permissions: Object.fromEntries(PERMISSION_LIST.map((p) => [p.key, true])) as TeamPermissions,
+  },
+  {
+    key: "health_worker",
+    label: "Health worker (MMDP/NTD & mental health)",
+    hint: "Records, case search, MDA/WASH, services, follow-ups and referrals for MMDP/NTD and MHPSS only",
+    permissions: {
+      health_worker: "Other health worker", view_records: true, edit_records: true, record_services: true,
+      confirm_cases: true, manage_cdds: true, manage_households: true, home_visits: true, accept_referrals: true,
+    },
   },
   {
     key: "read_only",
@@ -336,5 +373,6 @@ export const useMyTeamPermissions = (projectId?: string, isAdmin = false) => {
     };
   }, [row, isAdmin]);
 
-  return { member: row, can, listed: !!row, loading, reload: load };
+  const healthWorkerCadre = !isAdmin ? row?.permissions?.health_worker || null : null;
+  return { member: row, can, listed: !!row, loading, reload: load, healthWorkerCadre };
 };
