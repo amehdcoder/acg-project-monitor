@@ -21,7 +21,7 @@ import {
   saveCredential, testConnection, pullMetadata, pullStock, pushIndicators, pushFhirPatients,
   pullFhir, computeIndicatorValues, listBeneficiariesForExchange, previewAggregatePayload,
   pushAggregatePayload, pullSdmxStructure, pullSdmxData, validateImportedPayload,
-  pushMonthly, pullStockCategory, pushStock,
+  pushMonthly, pushAllServers, pullStockCategory, pushStock,
   type ExchangeConnection, type ExchangeKind, type ExchangeLog,
   type CommodityStock, type ExchangeMapping, type ExchangeFormat, type ExchangeAuthType,
 } from "@/lib/programmeModule/healthExchange";
@@ -511,8 +511,30 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
                   <Switch checked={!!active.auto_push_dry_run} disabled={!canManage || busy === "auto"}
                     onCheckedChange={(v) => void saveAuto({ auto_push_dry_run: v })} /> Practice run only
                 </label>
+                <div className="space-y-1">
+                  <Label>Programme area sent</Label>
+                  <select className="h-10 rounded-md border border-input bg-background px-2 text-sm" disabled={!canManage}
+                    value={(active as unknown as { programme_area?: string | null }).programme_area ?? ""}
+                    onChange={(e) => void saveAuto({ programme_area: e.target.value || null } as never)}>
+                    <option value="">All programme areas</option>
+                    <option value="ntd">MMDP / NTDs</option>
+                    <option value="eye">Eye health</option>
+                    <option value="mental">Mental health & psychosocial support</option>
+                    <option value="wash">WASH</option>
+                    <option value="livelihood">Livelihood & economic empowerment</option>
+                  </select>
+                </div>
                 {canManage && (
-                  <div className="ml-auto flex gap-2">
+                  <div className="ml-auto flex flex-wrap gap-2">
+                    <Button variant="secondary" disabled={busy === "all"}
+                      onClick={() => void run("all", async () => {
+                        const r = await pushAllServers(projectId, lastMonth());
+                        const failed = r.results.filter((x) => x.status !== 200);
+                        if (failed.length) throw new Error(failed.map((f) => `${f.connection}: ${f.error || `HTTP ${f.status}`}`).join("; "));
+                        return r;
+                      }, "Last month sent to every connected DHIS2 server")}>
+                      <Upload className="h-4 w-4" /> Send {lastMonth()} to all servers
+                    </Button>
                     <Button variant="outline" disabled={busy === "monthly-dry"}
                       onClick={() => void run("monthly-dry", () => pushMonthly(active.id, lastMonth(), true), "DHIS2 checked last month's report")}>
                       Check {lastMonth()}
