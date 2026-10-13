@@ -1,6 +1,7 @@
 # Roadmap
 
-- [ ] Complete and verify the permission-aware longitudinal beneficiary guided tour, including safeguarding and vaulting.
+- [x] Complete and verify the permission-aware longitudinal beneficiary guided tour, including safeguarding and vaulting.
+- [x] Lock Record service to the current component with component-specific services/outcomes; rename to CDDs and FLHFs.
 
 - [x] Add a standalone in-app Hand Card screen with record-linked navigation and existing exports.
 
