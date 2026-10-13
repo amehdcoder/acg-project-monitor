@@ -533,9 +533,16 @@ const BeneficiaryRecord = ({
                           <p className="text-xs text-muted-foreground">{rows.length} service{rows.length === 1 ? "" : "s"} recorded</p>
                         </div>
                       </div>
-                      <Button size="sm" onClick={() => { setServiceComponent(c.key); setServiceOpen(true); }}>
-                        Record service
-                      </Button>
+                      <div className="flex flex-wrap gap-2">
+                        {/mental|mhpss|psycho/i.test(`${c.key} ${c.label}`) && (
+                          <Button size="sm" variant="outline" asChild>
+                            <a href="/mhgap-guide" target="_blank" rel="noopener noreferrer">mhGAP guide</a>
+                          </Button>
+                        )}
+                        <Button size="sm" onClick={() => { setServiceComponent(c.key); setServiceOpen(true); }}>
+                          Record service
+                        </Button>
+                      </div>
                     </div>
                     <div className="overflow-x-auto">
                       <Table>

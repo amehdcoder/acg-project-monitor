@@ -102,10 +102,14 @@ export default function MhgapSupportEngine({ projectId, priorServices, beneficia
     <div className="overflow-hidden rounded-xl border border-border shadow-sm">
       <div className="flex items-center gap-3 px-4 py-3 text-primary-foreground" style={{ background: "linear-gradient(120deg, hsl(262 70% 50%), hsl(199 85% 42%))" }}>
         <BookOpen className="h-5 w-5" />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold">mhGAP clinical support</p>
           <p className="text-xs opacity-90">WHO mhGAP Intervention Guide 2.0 — assess, decide, manage, follow up</p>
         </div>
+        <a href={`/mhgap-guide${modKey ? `#${modKey}` : ""}`} target="_blank" rel="noopener noreferrer"
+          className="shrink-0 rounded-md bg-background/20 px-2 py-1 text-xs font-semibold underline-offset-2 hover:underline">
+          Open guide{mod ? ` · ${mod.short}` : ""}
+        </a>
       </div>
 
       <div className="space-y-4 p-4">
