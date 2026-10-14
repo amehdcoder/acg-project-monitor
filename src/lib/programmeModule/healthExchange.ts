@@ -1,3 +1,4 @@
+import { NATIONAL_INDICATORS, computeNationalIndicators, type IndicatorArea, type IndicatorRows } from "./nationalIndicators";
 // Client helpers for the national health data exchange (DHIS2 / FHIR / LMIS).
 // Credentials never travel through the browser twice: they are sent once to the
 // edge function, which stores them server-side.
@@ -84,7 +85,7 @@ export const KIND_LABEL: Record<ExchangeKind, string> = {
 };
 
 /** Indicators this programme can report upward. */
-export const REPORTABLE_INDICATORS: { key: string; label: string }[] = [
+export const REPORTABLE_INDICATORS: { key: string; label: string; area?: IndicatorArea; definition?: string }[] = [
   { key: "beneficiaries_registered", label: "Beneficiaries registered" },
   { key: "beneficiaries_active", label: "Active beneficiaries" },
   { key: "cases_confirmed", label: "Cases clinically confirmed" },
@@ -98,6 +99,7 @@ export const REPORTABLE_INDICATORS: { key: string; label: string }[] = [
   { key: "beneficiaries_active:male", label: "Active beneficiaries — male" },
   { key: "services_delivered", label: "Services delivered (this server's programme area)" },
   { key: "beneficiaries_served", label: "Beneficiaries served (this server's programme area)" },
+  ...NATIONAL_INDICATORS.map((i) => ({ key: i.key, label: i.label, area: i.area, definition: i.definition })),
 ];
 
 export async function listConnections(projectId: string) {
@@ -280,7 +282,33 @@ export async function computeIndicatorValues(projectId: string, period: string) 
     "beneficiaries_active:female": actF,
     "beneficiaries_active:male": actM,
   };
+  const rows = await fetchIndicatorRows(projectId, start, end);
+  for (const v of computeNationalIndicators(rows)) map[v.indicator_key] = v.value;
   return REPORTABLE_INDICATORS.map((i) => ({ ...i, value: map[i.key] ?? 0 }));
+}
+
+async function fetchIndicatorRows(projectId: string, start: string, end: string): Promise<IndicatorRows> {
+  const all = async (table: string, cols: string, dateCol: string, dateOnly = false) => {
+    const out: any[] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await T(table).select(cols).eq("project_id", projectId)
+        .gte(dateCol, dateOnly ? start.slice(0, 10) : start).lt(dateCol, dateOnly ? end.slice(0, 10) : end).range(from, from + 999);
+      if (error || !data?.length) break;
+      out.push(...data);
+      if (data.length < 1000) break;
+    }
+    return out;
+  };
+  const [services, referrals, mda, morbidity, cases, livelihood, visits] = await Promise.all([
+    all("beneficiary_services", "component_key,service_name,result,beneficiary_id", "service_date", true),
+    all("beneficiary_referrals", "component_key,status,outcome", "created_at"),
+    all("household_mda_treatments", "outcome,drug,age_years,sex,adverse_event,adverse_event_serious", "created_at"),
+    all("ntd_morbidity_records", "condition,stage,self_care_kit_issued,self_care_trained,surgery_status,acute_attacks_last_year", "created_at"),
+    all("mmdp_potential_cases", "condition,confirmed_condition,confirmed_at,status", "created_at"),
+    all("livelihood_assessments", "decision,priority_band", "created_at"),
+    all("beneficiary_home_visits", "status,found_at_home", "created_at"),
+  ]);
+  return { services, referrals, mda, morbidity, cases, livelihood, visits };
 }
 
 export interface Dhis2OrgUnit { id: string; name: string; level?: number; childCount?: number; path?: string; ancestors?: { id: string; name: string; level?: number }[] }

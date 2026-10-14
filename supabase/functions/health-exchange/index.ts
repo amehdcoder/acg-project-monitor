@@ -1,3 +1,4 @@
+import { computeNationalIndicators } from "../_shared/nationalIndicators.ts";
 // Bi-directional health data exchange: DHIS2 (aggregate indicators + metadata),
 // HL7 FHIR (Patient / Condition) and LMIS (commodity stock).
 //
@@ -192,8 +193,37 @@ async function computeServiceValues(db: ReturnType<typeof admin>, projectId: str
 
 async function computeConnectionValues(db: ReturnType<typeof admin>, c: Connection, period: string) {
   const area = (c as unknown as { programme_area?: string | null }).programme_area ?? null;
-  const [base, services] = await Promise.all([computeMonthlyValues(db, c.project_id, period), computeServiceValues(db, c.project_id, period, area)]);
-  return [...base, ...services];
+  const [base, services, national] = await Promise.all([
+    computeMonthlyValues(db, c.project_id, period), computeServiceValues(db, c.project_id, period, area),
+    computeNationalValues(db, c.project_id, period, area),
+  ]);
+  return [...base, ...services, ...national];
+}
+
+/** Standard national programme indicators (see _shared/nationalIndicators.ts). */
+async function computeNationalValues(db: ReturnType<typeof admin>, projectId: string, period: string, area?: string | null) {
+  const { start, end } = monthRange(period);
+  const all = async (table: string, cols: string, dateCol: string, dateOnly = false) => {
+    const out: any[] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await db.from(table).select(cols).eq("project_id", projectId)
+        .gte(dateCol, dateOnly ? start.slice(0, 10) : start).lt(dateCol, dateOnly ? end.slice(0, 10) : end).range(from, from + 999);
+      if (error || !data?.length) break;
+      out.push(...data);
+      if (data.length < 1000) break;
+    }
+    return out;
+  };
+  const [services, referrals, mda, morbidity, cases, livelihood, visits] = await Promise.all([
+    all("beneficiary_services", "component_key,service_name,result,beneficiary_id", "service_date", true),
+    all("beneficiary_referrals", "component_key,status,outcome", "created_at"),
+    all("household_mda_treatments", "outcome,drug,age_years,sex,adverse_event,adverse_event_serious", "created_at"),
+    all("ntd_morbidity_records", "condition,stage,self_care_kit_issued,self_care_trained,surgery_status,acute_attacks_last_year", "created_at"),
+    all("mmdp_potential_cases", "condition,confirmed_condition,confirmed_at,status", "created_at"),
+    all("livelihood_assessments", "decision,priority_band", "created_at"),
+    all("beneficiary_home_visits", "status,found_at_home", "created_at"),
+  ]);
+  return computeNationalIndicators({ services, referrals, mda, morbidity, cases, livelihood, visits }, area);
 }
 
 async function computeMonthlyValues(db: ReturnType<typeof admin>, projectId: string, period: string) {
