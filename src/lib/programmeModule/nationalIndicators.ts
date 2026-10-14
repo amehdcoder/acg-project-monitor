@@ -1,0 +1,156 @@
+// Standard programme indicators sent through the DHIS2 Data Exchange.
+// Definitions follow WHO NTD/MMDP (lymphatic filariasis, hydrocoele, trachoma/TT,
+// onchocerciasis, PC-NTD MDA), WHO mhGAP/NMHP, WHO/UNICEF JMP (WASH), WHO eye-care
+// (eCSC/eREC) and standard livelihood output indicators that Nigeria's national
+// programmes aggregate in DHIS2. Mirror: supabase/functions/_shared/nationalIndicators.ts
+
+export type IndicatorArea = "core" | "ntd" | "eye" | "mental" | "wash" | "livelihood" | "health_system";
+
+export interface IndicatorRows {
+  services: { component_key: string | null; service_name: string | null; result: string | null; beneficiary_id: string | null }[];
+  referrals: { component_key: string | null; status: string | null; outcome: string | null }[];
+  mda: { outcome: string | null; drug: string | null; age_years: number | null; sex: string | null; adverse_event: boolean | null; adverse_event_serious: boolean | null }[];
+  morbidity: { condition: string | null; stage: string | null; self_care_kit_issued: boolean | null; self_care_trained: boolean | null; surgery_status: string | null; acute_attacks_last_year: number | null }[];
+  cases: { condition: string | null; confirmed_condition: string | null; confirmed_at: string | null; status: string | null }[];
+  livelihood: { decision: string | null; priority_band: string | null }[];
+  visits: { status: string | null; found_at_home: boolean | null }[];
+}
+
+export interface NationalIndicator {
+  key: string;
+  label: string;
+  area: IndicatorArea;
+  /** Standard definition shown to the person mapping it. */
+  definition: string;
+  compute: (r: IndicatorRows) => number;
+}
+
+const t = (v: unknown) => String(v ?? "").toLowerCase();
+const rx = (p: RegExp) => (s: unknown) => p.test(t(s));
+const AREA: Record<Exclude<IndicatorArea, "core">, RegExp> = {
+  ntd: /mmdp|ntd|morbidity|lymph|hydro|trachom|trichiasis|oncho|schisto|filaria|lesion/,
+  eye: /eye|ophthal|vision|cataract|optom/,
+  mental: /mental|psycho|mhpss|mhgap|depress/,
+  wash: /wash|water|sanitation|hygiene/,
+  livelihood: /livelihood|economic|empower|income|vocation/,
+  health_system: /health_system|system|facility/,
+};
+const inArea = (a: keyof typeof AREA) => (s: { component_key: string | null }) => AREA[a].test(t(s.component_key));
+
+/** Services in an area whose name and/or result match. */
+const svc = (a: keyof typeof AREA, name?: RegExp, result?: RegExp) => (r: IndicatorRows) =>
+  r.services.filter((s) => inArea(a)(s) && (!name || name.test(t(s.service_name))) && (!result || result.test(t(s.result)))).length;
+/** Unique people with any matching service in an area. */
+const people = (a: keyof typeof AREA, name?: RegExp, result?: RegExp) => (r: IndicatorRows) =>
+  new Set(r.services.filter((s) => inArea(a)(s) && (!name || name.test(t(s.service_name))) && (!result || result.test(t(s.result)))).map((s) => s.beneficiary_id)).size;
+const morb = (cond: RegExp, extra: (m: IndicatorRows["morbidity"][number]) => boolean = () => true) => (r: IndicatorRows) =>
+  r.morbidity.filter((m) => cond.test(t(m.condition)) && extra(m)).length;
+const confirmed = (cond: RegExp) => (r: IndicatorRows) =>
+  r.cases.filter((c) => c.confirmed_at && cond.test(t(c.confirmed_condition || c.condition))).length;
+const treated = (m: IndicatorRows["mda"][number]) => /treat|swallow|given|taken/.test(t(m.outcome));
+const mdaDrug = (d: RegExp, extra: (m: IndicatorRows["mda"][number]) => boolean = () => true) => (r: IndicatorRows) =>
+  r.mda.filter((m) => treated(m) && d.test(t(m.drug)) && extra(m)).length;
+const refs = (a: keyof typeof AREA, status?: RegExp) => (r: IndicatorRows) =>
+  r.referrals.filter((x) => inArea(a)(x) && (!status || status.test(`${t(x.status)} ${t(x.outcome)}`))).length;
+
+const LF = /lymph|lf\b|elephant/;
+const HYD = /hydro/;
+const TT = /trichiasis|\btt\b/;
+
+export const NATIONAL_INDICATORS: NationalIndicator[] = [
+  // ---------- NTD / MMDP (WHO LF MMDP minimum package, trachoma TT, PC-NTD MDA) ----------
+  { key: "ntd:lf_lymphoedema_cases_identified", area: "ntd", label: "LF: lymphoedema cases confirmed", definition: "New lymphoedema patients clinically confirmed in the month (WHO MMDP case identification).", compute: confirmed(LF) },
+  { key: "ntd:hydrocoele_cases_identified", area: "ntd", label: "LF: hydrocoele cases confirmed", definition: "New hydrocoele cases clinically confirmed in the month.", compute: confirmed(HYD) },
+  { key: "ntd:tt_cases_identified", area: "ntd", label: "Trachoma: TT cases confirmed", definition: "Trachomatous trichiasis cases confirmed in the month.", compute: confirmed(TT) },
+  { key: "ntd:oncho_skin_cases_identified", area: "ntd", label: "Onchocerciasis: skin disease cases confirmed", definition: "Onchocercal skin disease cases confirmed in the month.", compute: confirmed(/oncho/) },
+  { key: "ntd:lymphoedema_patients_managed", area: "ntd", label: "LF: lymphoedema patients under morbidity management", definition: "Lymphoedema morbidity records reviewed/managed in the month.", compute: morb(LF) },
+  { key: "ntd:lymphoedema_self_care_trained", area: "ntd", label: "LF: lymphoedema patients trained in self-care", definition: "Lymphoedema patients trained in limb hygiene/self-care (WHO MMDP essential package).", compute: (r) => morb(LF, (m) => !!m.self_care_trained)(r) + svc("ntd", /self-?care training/)(r) },
+  { key: "ntd:self_care_kits_issued", area: "ntd", label: "LF: self-care kits issued", definition: "Patients given a lymphoedema self-care kit.", compute: (r) => morb(/./, (m) => !!m.self_care_kit_issued)(r) + svc("ntd", /self-?care kit/)(r) },
+  { key: "ntd:adla_episodes_managed", area: "ntd", label: "LF: acute attacks (ADLA) managed", definition: "Acute dermatolymphangioadenitis episodes treated.", compute: svc("ntd", /acute attack|adla/) },
+  { key: "ntd:lymphoedema_stage_advanced", area: "ntd", label: "LF: lymphoedema stage 4–7 (advanced)", definition: "Lymphoedema patients recorded at Dreyer stage 4 or above.", compute: morb(LF, (m) => /[4-7]|advanced|severe/.test(t(m.stage))) },
+  { key: "ntd:hydrocoelectomies_performed", area: "ntd", label: "LF: hydrocoelectomies performed", definition: "Hydrocoele surgeries completed in the month.", compute: (r) => morb(HYD, (m) => /done|complete|perform/.test(t(m.surgery_status)))(r) + svc("ntd", /hydrocoele surgery|hydrocoelectomy/, /success|complet/)(r) },
+  { key: "ntd:hydrocoele_surgery_complications", area: "ntd", label: "LF: hydrocoele post-surgical complications", definition: "Post-operative complications recorded after hydrocoelectomy.", compute: svc("ntd", undefined, /post-?surgical complication/) },
+  { key: "ntd:tt_surgeries_performed", area: "ntd", label: "Trachoma: TT surgeries performed", definition: "Trichiasis surgeries completed (WHO TT surgery indicator).", compute: (r) => svc("ntd", TT)(r) + svc("eye", /trichiasis|tt\) surgery/)(r) },
+  { key: "ntd:mda_persons_treated", area: "ntd", label: "MDA: persons treated (all PC-NTD drugs)", definition: "People who swallowed preventive chemotherapy in the month.", compute: (r) => r.mda.filter(treated).length },
+  { key: "ntd:mda_treated_ivermectin", area: "ntd", label: "MDA: treated with ivermectin (Oncho/LF)", definition: "People treated with ivermectin (alone or combined).", compute: mdaDrug(/ivermectin|mectizan/) },
+  { key: "ntd:mda_treated_albendazole", area: "ntd", label: "MDA: treated with albendazole (LF/STH)", definition: "People treated with albendazole (alone or combined).", compute: mdaDrug(/albendazole/) },
+  { key: "ntd:mda_treated_praziquantel", area: "ntd", label: "MDA: treated with praziquantel (SCH)", definition: "People treated with praziquantel for schistosomiasis.", compute: mdaDrug(/praziquantel/) },
+  { key: "ntd:mda_treated_azithromycin", area: "ntd", label: "MDA: treated with azithromycin (Trachoma)", definition: "People treated with azithromycin/tetracycline eye ointment.", compute: mdaDrug(/azithro|zithromax|tetracycline/) },
+  { key: "ntd:mda_treated_mebendazole", area: "ntd", label: "MDA: treated with mebendazole (STH)", definition: "People treated with mebendazole.", compute: mdaDrug(/mebendazole/) },
+  { key: "ntd:mda_sac_treated", area: "ntd", label: "MDA: school-age children (5–14) treated", definition: "Treated persons aged 5–14 years (WHO SAC denominator group).", compute: (r) => r.mda.filter((m) => treated(m) && (m.age_years ?? -1) >= 5 && (m.age_years ?? 99) <= 14).length },
+  { key: "ntd:mda_adults_treated", area: "ntd", label: "MDA: adults (15+) treated", definition: "Treated persons aged 15 years and over.", compute: (r) => r.mda.filter((m) => treated(m) && (m.age_years ?? -1) >= 15).length },
+  { key: "ntd:mda_female_treated", area: "ntd", label: "MDA: females treated", definition: "Treated persons recorded as female.", compute: (r) => r.mda.filter((m) => treated(m) && t(m.sex).startsWith("f")).length },
+  { key: "ntd:mda_male_treated", area: "ntd", label: "MDA: males treated", definition: "Treated persons recorded as male.", compute: (r) => r.mda.filter((m) => treated(m) && t(m.sex).startsWith("m")).length },
+  { key: "ntd:mda_absent_refused", area: "ntd", label: "MDA: persons absent or refused", definition: "Eligible persons not treated because absent or refusing.", compute: (r) => r.mda.filter((m) => /absent|refus/.test(t(m.outcome))).length },
+  { key: "ntd:mda_not_eligible", area: "ntd", label: "MDA: persons not eligible", definition: "Persons excluded (age, pregnancy, illness) per drug guidelines.", compute: (r) => r.mda.filter((m) => /not.?eligible|exclud/.test(t(m.outcome))).length },
+  { key: "ntd:mda_adverse_events", area: "ntd", label: "MDA: adverse events reported", definition: "Adverse events following drug administration.", compute: (r) => r.mda.filter((m) => m.adverse_event).length },
+  { key: "ntd:mda_serious_adverse_events", area: "ntd", label: "MDA: serious adverse events (SAE)", definition: "Serious adverse events requiring notification.", compute: (r) => r.mda.filter((m) => m.adverse_event_serious).length },
+  { key: "ntd:referrals_made", area: "ntd", label: "NTD: referrals made", definition: "NTD/MMDP referrals issued.", compute: refs("ntd") },
+
+  // ---------- Eye health (WHO eCSC / eREC, NPEH) ----------
+  { key: "eye:persons_screened", area: "eye", label: "Eye: persons screened (visual acuity)", definition: "Persons with presenting visual acuity measured.", compute: people("eye", /visual acuity|screen/) },
+  { key: "eye:visual_impairment_detected", area: "eye", label: "Eye: visual impairment detected (VA < 6/12)", definition: "Persons with presenting VA worse than 6/12 in the better eye.", compute: svc("eye", undefined, /visual impairment|severe impairment|blind/) },
+  { key: "eye:blindness_detected", area: "eye", label: "Eye: blindness detected (VA < 3/60 / 6/60)", definition: "Persons with severe impairment or blindness.", compute: svc("eye", undefined, /severe impairment|blind/) },
+  { key: "eye:refractions_done", area: "eye", label: "Eye: refractions performed", definition: "Refraction examinations completed.", compute: svc("eye", /refraction/) },
+  { key: "eye:spectacles_dispensed", area: "eye", label: "Eye: spectacles dispensed (eREC)", definition: "Spectacles provided to persons with refractive error.", compute: (r) => svc("eye", /glasses|spectacle/)(r) + svc("eye", /^(?!.*(glasses|spectacle)).*/, /spectacles dispensed/)(r) },
+  { key: "eye:cataract_detected", area: "eye", label: "Eye: cataract detected and referred", definition: "Operable cataract identified and referred.", compute: svc("eye", undefined, /cataract detected/) },
+  { key: "eye:cataract_surgeries", area: "eye", label: "Eye: cataract surgeries performed (eCSC)", definition: "Cataract operations completed.", compute: svc("eye", /cataract surgery/) },
+  { key: "eye:cataract_good_outcome", area: "eye", label: "Eye: cataract surgery good outcome", definition: "Cataract surgeries with a successful/improved visual outcome.", compute: svc("eye", /cataract surgery/, /success|improv/) },
+  { key: "eye:glaucoma_screened", area: "eye", label: "Eye: glaucoma screenings", definition: "Glaucoma screenings completed.", compute: svc("eye", /glaucoma/) },
+  { key: "eye:trachoma_screened", area: "eye", label: "Eye: trachoma/TT screenings", definition: "Persons screened for trachoma or trichiasis.", compute: svc("eye", /trachoma screening/) },
+  { key: "eye:referrals_made", area: "eye", label: "Eye: referrals made", definition: "Eye health referrals issued.", compute: refs("eye") },
+
+  // ---------- Mental health (WHO mhGAP / NMHP) ----------
+  { key: "mental:persons_assessed", area: "mental", label: "MH: persons assessed (mhGAP)", definition: "Unique persons with a mental-health assessment.", compute: people("mental", /gad|phq|assessment|review/) },
+  { key: "mental:phq9_screenings", area: "mental", label: "MH: PHQ-9 depression screenings", definition: "PHQ-9 assessments completed.", compute: svc("mental", /phq/) },
+  { key: "mental:gad7_screenings", area: "mental", label: "MH: GAD-7 anxiety screenings", definition: "GAD-7 assessments completed.", compute: svc("mental", /gad/) },
+  { key: "mental:moderate_severe_symptoms", area: "mental", label: "MH: moderate–severe symptoms identified", definition: "Assessments scoring moderate, moderately severe or severe.", compute: svc("mental", undefined, /moderate|severe/) },
+  { key: "mental:persons_receiving_care", area: "mental", label: "MH: persons receiving care (service coverage)", definition: "Unique persons receiving any MHPSS service (WHO service-coverage numerator).", compute: people("mental") },
+  { key: "mental:psychosocial_sessions", area: "mental", label: "MH: psychosocial intervention sessions", definition: "Counselling, psychoeducation, peer and family sessions.", compute: svc("mental", /counsel|psychoeducation|peer|family|caregiver/) },
+  { key: "mental:medication_reviews", area: "mental", label: "MH: medication reviews / pharmacological care", definition: "Medication reviews and mhGAP clinical reviews.", compute: svc("mental", /medication|clinical review/) },
+  { key: "mental:symptoms_improved", area: "mental", label: "MH: persons with improved symptoms", definition: "Follow-ups recording symptom improvement.", compute: svc("mental", undefined, /improved/) },
+  { key: "mental:adherent_medication", area: "mental", label: "MH: adherent to medication", definition: "Follow-ups recording medication adherence.", compute: svc("mental", undefined, /^adherent/) },
+  { key: "mental:suicide_risk_identified", area: "mental", label: "MH: self-harm/suicide risk identified", definition: "Suicide-risk assessments identifying risk needing urgent action.", compute: svc("mental", undefined, /suicide risk/) },
+  { key: "mental:specialist_referrals", area: "mental", label: "MH: referred to specialist care", definition: "Referrals to psychiatric/specialist services.", compute: (r) => refs("mental")(r) + svc("mental", /specialist/)(r) },
+
+  // ---------- WASH (WHO/UNICEF JMP) ----------
+  { key: "wash:households_assessed", area: "wash", label: "WASH: persons/households assessed", definition: "Unique persons with a WASH check.", compute: people("wash") },
+  { key: "wash:basic_water_access", area: "wash", label: "WASH: with safe (basic) drinking water", definition: "Checks finding an improved, accessible drinking-water source (JMP basic).", compute: svc("wash", undefined, /safe water available|water point functional/) },
+  { key: "wash:no_safe_water", area: "wash", label: "WASH: without safe drinking water", definition: "Checks finding no safe water access.", compute: svc("wash", undefined, /no safe water|non-functional/) },
+  { key: "wash:accessible_sanitation", area: "wash", label: "WASH: with accessible sanitation", definition: "Accessible latrine in use (JMP basic sanitation, disability-inclusive).", compute: svc("wash", undefined, /accessible latrine in use|adaptation completed/) },
+  { key: "wash:latrine_adaptations", area: "wash", label: "WASH: accessible latrine adaptations completed", definition: "Latrine adaptations delivered.", compute: svc("wash", /latrine adaptation/) },
+  { key: "wash:handwashing_facilities", area: "wash", label: "WASH: handwashing stations provided", definition: "Handwashing facilities with soap and water provided (JMP basic hygiene).", compute: svc("wash", /handwashing/) },
+  { key: "wash:hygiene_promotion", area: "wash", label: "WASH: hygiene promotion sessions", definition: "Hygiene promotion including menstrual hygiene support.", compute: svc("wash", /hygiene/) },
+  { key: "wash:water_points_checked", area: "wash", label: "WASH: water point functionality checks", definition: "Water point functionality checks done.", compute: svc("wash", /water point|water access/) },
+
+  // ---------- Livelihood / economic empowerment ----------
+  { key: "livelihood:vulnerability_assessed", area: "livelihood", label: "Livelihood: vulnerability assessments", definition: "Livelihood vulnerability assessments completed.", compute: (r) => r.livelihood.length },
+  { key: "livelihood:high_priority", area: "livelihood", label: "Livelihood: high-priority (most vulnerable)", definition: "Assessments placed in the high-priority band.", compute: (r) => r.livelihood.filter((l) => /high|critical/.test(t(l.priority_band))).length },
+  { key: "livelihood:approved_support", area: "livelihood", label: "Livelihood: approved for support", definition: "Assessments with an approved support decision.", compute: (r) => r.livelihood.filter((l) => /approv|eligible|support/.test(t(l.decision))).length },
+  { key: "livelihood:ground_verified", area: "livelihood", label: "Livelihood: ground verifications", definition: "Ground verifications completed.", compute: svc("livelihood", /verification/) },
+  { key: "livelihood:skills_trained", area: "livelihood", label: "Livelihood: persons completing skills training", definition: "Skills and financial-literacy trainings completed.", compute: svc("livelihood", /training/, /complet/) },
+  { key: "livelihood:inputs_received", area: "livelihood", label: "Livelihood: inputs/start-up kits received", definition: "Poultry inputs, start-up kits or cash grants received.", compute: svc("livelihood", /input|kit|grant|cash/) },
+  { key: "livelihood:vsla_members", area: "livelihood", label: "Livelihood: savings group (VSLA) enrolments", definition: "Persons joining a savings group.", compute: (r) => svc("livelihood", /vsla|savings/)(r) },
+  { key: "livelihood:businesses_active", area: "livelihood", label: "Livelihood: businesses active / generating income", definition: "Monitoring visits recording an active business.", compute: svc("livelihood", undefined, /business (started|active)/) },
+  { key: "livelihood:income_increased", area: "livelihood", label: "Livelihood: reporting increased income", definition: "Monitoring visits recording increased income.", compute: svc("livelihood", undefined, /income increased/) },
+
+  // ---------- Health system / continuity of care ----------
+  { key: "hs:referrals_completed", area: "health_system", label: "Referrals completed (all components)", definition: "Referrals accepted and with a recorded outcome.", compute: (r) => r.referrals.filter((x) => /complet|accept/.test(t(x.status))).length },
+  { key: "hs:home_visits_done", area: "health_system", label: "Home visits completed (LTFU tracing)", definition: "Follow-up home visits carried out.", compute: (r) => r.visits.filter((v) => /done|complet|visited/.test(t(v.status))).length },
+  { key: "hs:ltfu_traced_found", area: "health_system", label: "Lost to follow-up traced and found", definition: "Home visits where the beneficiary was found.", compute: (r) => r.visits.filter((v) => v.found_at_home).length },
+  { key: "hs:supervision_visits", area: "health_system", label: "Facility supportive supervision visits", definition: "Supportive supervision visits to facilities.", compute: svc("health_system", /supervision/) },
+  { key: "hs:health_workers_trained", area: "health_system", label: "Health workers trained", definition: "Health worker training sessions delivered.", compute: svc("health_system", /training/) },
+  { key: "hs:stock_outs_found", area: "health_system", label: "Commodity stock-outs found", definition: "Supply checks finding a stock-out.", compute: svc("health_system", undefined, /stock-?out/) },
+];
+
+export const INDICATOR_AREA_LABEL: Record<IndicatorArea, string> = {
+  core: "Core programme", ntd: "NTDs / MMDP", eye: "Eye health", mental: "Mental health (mhGAP)",
+  wash: "WASH", livelihood: "Livelihood", health_system: "Health system & continuity",
+};
+
+/** Area each server programme setting covers (null/"all" = everything). */
+export const indicatorAllowed = (area: IndicatorArea, serverArea?: string | null) =>
+  !serverArea || serverArea === "all" || area === "core" || area === "health_system" || area === serverArea;
+
+export const computeNationalIndicators = (rows: IndicatorRows, serverArea?: string | null) =>
+  NATIONAL_INDICATORS.filter((i) => indicatorAllowed(i.area, serverArea)).map((i) => ({ indicator_key: i.key, value: i.compute(rows) }));
