@@ -1,3 +1,5 @@
+import { Fragment } from "react";
+import { INDICATOR_AREA_LABEL } from "@/lib/programmeModule/nationalIndicators";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -568,13 +570,17 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
                 <tr><th className="p-2">Indicator</th><th className="p-2">Count</th><th className="p-2">Linked to</th></tr>
               </thead>
               <tbody>
-                {values.map((v) => {
+                {values.map((v, vi) => {
                   const m = mappings.find((x) => x.indicator_key === v.key);
                   const liveSet = active?.kind === "dhis2" ? dhisCatalog?.dataSets.find((d) => d.id === active.dataset_id) : undefined;
                   const liveEl = liveSet?.dataElements.find((e) => e.id === m?.remote_id);
                   return (
-                    <tr key={v.key} className="border-t">
-                      <td className="p-2">{v.label}</td>
+                    <Fragment key={v.key}>
+                    {(v as any).area && (v as any).area !== (values[vi - 1] as any)?.area && (
+                      <tr className="bg-muted/50"><td colSpan={3} className="p-2 text-xs font-semibold uppercase tracking-wide text-primary">{INDICATOR_AREA_LABEL[(v as any).area as keyof typeof INDICATOR_AREA_LABEL]}</td></tr>
+                    )}
+                    <tr className="border-t">
+                      <td className="p-2"><div className="font-medium">{v.label}</div>{(v as any).definition && <div className="text-xs text-muted-foreground">{(v as any).definition}</div>}</td>
                       <td className="p-2 font-semibold">{v.value}</td>
                       <td className="p-2">
                         {liveSet ? (
@@ -657,6 +663,7 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
                         )}
                       </td>
                     </tr>
+                    </Fragment>
                   );
                 })}
                 {values.length === 0 && (
