@@ -204,24 +204,30 @@ async function computeConnectionValues(db: ReturnType<typeof admin>, c: Connecti
 async function computeNationalValues(db: ReturnType<typeof admin>, projectId: string, period: string, area?: string | null) {
   const { start, end } = monthRange(period);
   const all = async (table: string, cols: string, dateCol: string, dateOnly = false) => {
+    // Count each record in the month its event happened; fall back to creation time when the event date is blank.
+    const s = dateOnly ? start.slice(0, 10) : start, e = dateOnly ? end.slice(0, 10) : end;
+    const window = dateCol === "created_at"
+      ? `and(created_at.gte.${start},created_at.lt.${end})`
+      : `and(${dateCol}.gte.${s},${dateCol}.lt.${e}),and(${dateCol}.is.null,created_at.gte.${start},created_at.lt.${end})`;
     const out: any[] = [];
     for (let from = 0; ; from += 1000) {
       const { data, error } = await db.from(table).select(cols).eq("project_id", projectId)
-        .gte(dateCol, dateOnly ? start.slice(0, 10) : start).lt(dateCol, dateOnly ? end.slice(0, 10) : end).range(from, from + 999);
-      if (error || !data?.length) break;
+        .or(window).order("id").range(from, from + 999);
+      if (error) throw new Error(`Could not count ${table}: ${error.message}`);
+      if (!data?.length) break;
       out.push(...data);
       if (data.length < 1000) break;
     }
     return out;
   };
   const [services, referrals, mda, morbidity, cases, livelihood, visits] = await Promise.all([
-    all("beneficiary_services", "component_key,service_name,result,beneficiary_id", "service_date", true),
-    all("beneficiary_referrals", "component_key,status,outcome", "created_at"),
+    all("beneficiary_services", "id,component_key,service_name,result,beneficiary_id", "service_date", true),
+    all("beneficiary_referrals", "component_key,status,outcome", "referral_date", true),
     all("household_mda_treatments", "outcome,drug,age_years,sex,adverse_event,adverse_event_serious", "created_at"),
-    all("ntd_morbidity_records", "condition,stage,self_care_kit_issued,self_care_trained,surgery_status,acute_attacks_last_year", "created_at"),
-    all("mmdp_potential_cases", "condition,confirmed_condition,confirmed_at,status", "created_at"),
-    all("livelihood_assessments", "decision,priority_band", "created_at"),
-    all("beneficiary_home_visits", "status,found_at_home", "created_at"),
+    all("ntd_morbidity_records", "condition,stage,self_care_kit_issued,self_care_trained,surgery_status,acute_attacks_last_year", "recorded_on", true),
+    all("mmdp_potential_cases", "condition,confirmed_condition,confirmed_at,status", "confirmed_at"),
+    all("livelihood_assessments", "decision,priority_band", "assessed_on", true),
+    all("beneficiary_home_visits", "status,found_at_home", "visited_at"),
   ]);
   return computeNationalIndicators({ services, referrals, mda, morbidity, cases, livelihood, visits }, area);
 }
