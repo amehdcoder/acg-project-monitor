@@ -21,3 +21,5 @@
 - [x] Add 30-day KPI change indicators and recorded activity dates to the General Dashboard journey.
 - [x] Make the Service Uptake chart and every axis label fully visible at all dashboard widths.
 - [x] Professionally space and format imported DHIS2 chart categories, labels, legends, and tooltips.
+- [x] Add standard national indicators across all components to the DHIS2 Data Exchange, grouped with definitions.
+- [ ] Map new indicators to DHIS2 data elements and send a live test — requires the user's DHIS2 server in the app.
