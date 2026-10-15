@@ -126,7 +126,13 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
 
   useEffect(() => {
     if (!projectId || tab !== "indicators") return;
-    computeIndicatorValues(projectId, period).then(setValues).catch(() => setValues([]));
+    let live = true;
+    // Recount from the records on open, every minute and when the window regains focus; keep last figures on a transient failure.
+    const load = () => computeIndicatorValues(projectId, period).then((v) => { if (live) setValues(v); }).catch(() => {});
+    load();
+    const timer = window.setInterval(load, 60_000);
+    window.addEventListener("focus", load);
+    return () => { live = false; window.clearInterval(timer); window.removeEventListener("focus", load); };
   }, [projectId, period, tab]);
 
   useEffect(() => {
