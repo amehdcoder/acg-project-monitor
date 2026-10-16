@@ -21,10 +21,14 @@ export const KIND_SERVICES: Record<Kind, string[]> = {
     "Glaucoma screening", "Low-vision assessment", "Eye health education",
   ],
   mmdp: [
+    "Lymphoedema case confirmation", "Hydrocoele case confirmation", "TT case confirmation",
+    "Onchocercal skin disease confirmation",
     "Limb care assessment (baseline)", "Lymphoedema care outcome", "Hydrocoele surgery outcome",
-    "Self-care training", "Acute attack (ADLA) management", "Hydrocoele screening",
+    "Trichiasis (TT) surgery", "Self-care training", "Acute attack (ADLA) management", "Hydrocoele screening",
     "Self-care kit provided", "Wound care", "Onchocerciasis skin assessment",
-    "NTD morbidity counselling",
+    "MDA: Ivermectin", "MDA: Ivermectin + Albendazole", "MDA: Albendazole", "MDA: Praziquantel",
+    "MDA: Azithromycin / Tetracycline eye ointment", "MDA: Mebendazole",
+    "Adverse event follow-up", "NTD morbidity counselling",
   ],
   mental: [
     "GAD-7 assessment", "PHQ-9 assessment", "Counselling session",
@@ -38,13 +42,13 @@ export const KIND_SERVICES: Record<Kind, string[]> = {
     "Water point functionality check", "Menstrual hygiene support", "Household water treatment",
   ],
   livelihood: [
-    "Poultry input", "Skills training", "Cash grant", "Vulnerability assessment",
-    "Ground verification", "Savings group (VSLA) enrolment", "Business start-up kit",
+    "Vulnerability assessment", "Ground verification", "Poultry input", "Skills training", "Cash grant",
+    "Savings group (VSLA) enrolment", "Business start-up kit",
     "Financial literacy training", "Business monitoring visit",
   ],
   health_system: [
-    "PHC referral", "Facility supportive supervision", "Health worker training",
-    "Commodity / drug supply check", "Data quality review", "Facility accessibility audit",
+    "PHC referral", "Referral follow-up", "Home visit (LTFU tracing)", "Facility supportive supervision",
+    "Health worker training", "Commodity / drug supply check", "Data quality review", "Facility accessibility audit",
   ],
   generic: [],
 };
@@ -57,10 +61,14 @@ export const KIND_OUTCOMES: Record<Kind, string[]> = {
     "Surgery successful", "Post-operative complication", "TT detected — referred", "No eye condition found",
   ],
   mmdp: [
+    "Case confirmed", "Case not confirmed",
+    "Lymphoedema stage 1–3 (early)", "Lymphoedema stage 4–7 (advanced)",
     "Lymphoedema stage improved", "Lymphoedema stable", "Lymphoedema worsened",
     "No acute attack since last visit", "Acute attack treated", "Self-care practised correctly",
     "Self-care not practised", "Hydrocoele confirmed — referred for surgery", "Hydrocoelectomy successful",
-    "Post-surgical complication", "Wound healed", "Wound not healed",
+    "TT surgery completed", "Post-surgical complication", "Wound healed", "Wound not healed",
+    "Treated — drug swallowed", "Absent", "Refused", "Not eligible (age / pregnancy / illness)",
+    "Adverse event reported", "Serious adverse event (SAE) reported",
   ],
   mental: [
     "Minimal symptoms", "Mild symptoms", "Moderate symptoms", "Moderately severe symptoms", "Severe symptoms",
@@ -73,12 +81,14 @@ export const KIND_OUTCOMES: Record<Kind, string[]> = {
     "Adaptation completed", "Follow-up needed",
   ],
   livelihood: [
+    "High priority (most vulnerable)", "Medium priority", "Low priority", "Approved for support",
     "Eligible — verified", "Not eligible", "Input received", "Training completed", "Training not completed",
     "Business started", "Business active / generating income", "Business not active",
     "Income increased", "Joined savings group", "Grant received",
   ],
   health_system: [
-    "Referral completed", "Referral pending", "Supervision done — action points agreed",
+    "Referral completed", "Referral pending", "Beneficiary found at home", "Beneficiary not found",
+    "Supervision done — action points agreed",
     "Gaps identified", "Stock adequate", "Stock-out found", "Training completed", "Data quality acceptable",
     "Data quality issues found",
   ],
