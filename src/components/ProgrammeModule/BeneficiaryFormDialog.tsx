@@ -184,7 +184,40 @@ const BeneficiaryFormDialog = ({
     }
   };
 
+  const saveWg = async (wgAnswers: WgAnswers) => {
+    if (!wgRow) return;
+    const classification = classifyWg(wgAnswers);
+    const profile = {
+      ...(wgRow.profile || {}),
+      wg_ss: { answers: wgAnswers, ...classification, completed_at: new Date().toISOString() },
+    };
+    const { data, error } = await supabase.from("beneficiaries")
+      .update({ profile } as never).eq("id", wgRow.id).select("*").single();
+    if (error) {
+      toast({ title: "Screening save failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({
+      title: "Disability screening saved",
+      description: classification.hasDisability
+        ? `Disability identified: ${classification.disabilityDomains.join(", ")}`
+        : "No disability identified",
+    });
+    const finalRow = (data as unknown as BeneficiaryRow) || ({ ...wgRow, profile } as BeneficiaryRow);
+    setWgRow(null);
+    onSaved(finalRow);
+    onOpenChange(false);
+  };
+
+  const skipWg = () => {
+    const row = wgRow;
+    setWgRow(null);
+    onSaved(row || undefined);
+    onOpenChange(false);
+  };
+
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92dvh] max-w-3xl overflow-hidden p-0">
         <DialogHeader className="border-b border-border px-5 py-4">
