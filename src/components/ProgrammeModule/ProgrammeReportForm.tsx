@@ -92,6 +92,11 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
   const [officerBusy, setOfficerBusy] = useState(false);
   const [teamMembers, setTeamMembers] = useState<{ user_id: string; full_name: string; email: string | null }[]>([]);
   const [search, setSearch] = useState("");
+  const [view, setView] = useState<"entry" | "review" | "dashboard">("entry");
+  const [resolving, setResolving] = useState<ReportRow | null>(null);
+  const [resolutionNote, setResolutionNote] = useState("");
+  const [resolveBusy, setResolveBusy] = useState(false);
+  const [profileNames, setProfileNames] = useState<Record<string, string>>({});
 
   const indicators = useMemo(() => flatIndicators(), []);
 
