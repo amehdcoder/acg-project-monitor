@@ -416,6 +416,13 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <div className="flex rounded-lg border border-border bg-card p-0.5">
+                {([["entry", "New report", ClipboardList], ["review", `Review queue (${pendingCount})`, CheckCircle2], ["dashboard", "Dashboard", BarChart3]] as const).map(([key, label, Icon]) => (
+                  <Button key={key} variant={view === key ? "default" : "ghost"} size="sm" className="gap-1.5" onClick={() => setView(key)}>
+                    <Icon className="h-4 w-4" /> {label}
+                  </Button>
+                ))}
+              </div>
               {canManage && (
                 <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setOfficersOpen(true)}>
                   <Users className="h-4 w-4" /> Programme Officers
