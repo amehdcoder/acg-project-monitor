@@ -102,7 +102,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
 
   // Project users (team register) — the pool Programme Officers are picked from.
   const loadTeamMembers = useCallback(async () => {
-    const { data } = await db.from("programme_team_members").select("user_id, full_name, email").eq("project_id", projectId).order("full_name").limit(1000);
+    const { data } = await db.from("programme_team_members").select("user_id, full_name, email").eq("project_id", projectId).order("full_name");
     setTeamMembers(((data || []) as { user_id: string | null; full_name: string; email: string | null }[]).filter((m) => !!m.user_id) as { user_id: string; full_name: string; email: string | null }[]);
   }, [projectId]);
 
