@@ -550,6 +550,126 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
           </Button>
         </div>
       </section>
+      </>)}
+
+      {view === "review" && (
+        <section className="space-y-3">
+          <p className="text-sm text-muted-foreground">Review submitted reports, then mark them resolved with a note. Only designated Programme Officers and managers can see this queue.</p>
+          {reports.length === 0 && <p className="rounded-lg border border-dashed border-border py-8 text-center text-sm text-muted-foreground">No reports submitted yet.</p>}
+          {reports.map((r) => {
+            const entries = historyEntries[r.id] || [];
+            const resolved = r.status === "resolved";
+            return (
+              <div key={r.id} className={cn("rounded-lg border-l-4 bg-card p-4 shadow-soft", resolved ? "border-status-success/50" : "border-status-warning/50")}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-health-ink">
+                      <CalendarRange className="h-4 w-4 text-health-blue" />{r.period_label}
+                      <Badge variant="secondary" className="text-[10px]">Year {r.report_year}</Badge>
+                      <Badge className={cn("text-[10px]", resolved ? "bg-status-success/10 text-status-success" : "bg-status-warning/10 text-status-warning")}>
+                        {resolved ? "Resolved" : "Pending review"}
+                      </Badge>
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Submitted by {r.created_by ? profileNames[r.created_by] || "Unknown user" : "Unknown user"} · {new Date(r.created_at).toLocaleString()} · {entries.length} entries
+                    </p>
+                    {r.notes && <p className="mt-1.5 text-xs text-muted-foreground">{r.notes}</p>}
+                    {resolved && (
+                      <div className="mt-2 rounded-md bg-status-success/5 px-3 py-2 text-xs">
+                        <p className="font-semibold text-status-success">Resolved by {r.reviewed_by ? profileNames[r.reviewed_by] || "Unknown user" : "Unknown user"}{r.reviewed_at ? ` · ${new Date(r.reviewed_at).toLocaleString()}` : ""}</p>
+                        {r.resolution_note && <p className="mt-0.5 text-muted-foreground">{r.resolution_note}</p>}
+                      </div>
+                    )}
+                  </div>
+                  {!resolved && (
+                    <Button size="sm" className="gap-1.5" onClick={() => { setResolving(r); setResolutionNote(""); }}>
+                      <CheckCircle2 className="h-4 w-4" /> Mark resolved
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </section>
+      )}
+
+      {view === "dashboard" && (() => {
+        const officerIds = [...new Set(reports.map((r) => r.created_by).filter(Boolean))] as string[];
+        const perOfficer = officerIds.map((id) => {
+          const mine = reports.filter((r) => r.created_by === id);
+          const entryCount = mine.reduce((n, r) => n + (historyEntries[r.id]?.length || 0), 0);
+          return { id, name: profileNames[id] || "Unknown user", reports: mine.length, entries: entryCount, last: mine[0]?.created_at };
+        }).sort((a, b) => b.reports - a.reports);
+        const totals = new Map<string, number>();
+        for (const entries of Object.values(historyEntries)) {
+          for (const e of entries) if (e.value !== null) totals.set(e.indicator_code, (totals.get(e.indicator_code) || 0) + Number(e.value));
+        }
+        const titleFor = new Map(indicators.map((i) => [i.code, i.title]));
+        const totalEntries = Object.values(historyEntries).reduce((n, arr) => n + arr.length, 0);
+        return (
+          <section className="space-y-5">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {[
+                { label: "Reports submitted", value: reports.length, tone: "bg-health-blue/10 text-health-blue" },
+                { label: "Pending review", value: pendingCount, tone: "bg-status-warning/10 text-status-warning" },
+                { label: "Resolved", value: reports.length - pendingCount, tone: "bg-status-success/10 text-status-success" },
+                { label: "Indicator entries", value: totalEntries, tone: "bg-health-teal/10 text-health-teal" },
+              ].map((s) => (
+                <div key={s.label} className="rounded-lg border border-border bg-card p-3 shadow-soft">
+                  <p className="text-2xl font-bold tabular-nums text-foreground">{s.value}</p>
+                  <p className="text-xs text-muted-foreground">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-lg border border-border bg-card shadow-soft">
+              <p className="border-b border-border px-4 py-3 text-sm font-semibold text-health-ink">Reports per officer</p>
+              {perOfficer.length === 0 && <p className="px-4 py-6 text-center text-sm text-muted-foreground">No reports submitted yet.</p>}
+              {perOfficer.map((o) => (
+                <div key={o.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 px-4 py-2.5 last:border-0">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-health-ink">{o.name}</p>
+                    {o.last && <p className="text-xs text-muted-foreground">Last report {new Date(o.last).toLocaleDateString()}</p>}
+                  </div>
+                  <div className="flex gap-4 text-right">
+                    <div><p className="text-sm font-bold tabular-nums text-health-blue">{o.reports}</p><p className="text-[10px] text-muted-foreground">reports</p></div>
+                    <div><p className="text-sm font-bold tabular-nums text-health-teal">{o.entries}</p><p className="text-[10px] text-muted-foreground">entries</p></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-lg border border-border bg-card shadow-soft">
+              <p className="border-b border-border px-4 py-3 text-sm font-semibold text-health-ink">Cumulative indicator totals — all reports</p>
+              {totals.size === 0 && <p className="px-4 py-6 text-center text-sm text-muted-foreground">No indicator values recorded yet.</p>}
+              {[...totals.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([code, total]) => (
+                <div key={code} className="flex items-center justify-between gap-3 border-b border-border/50 px-4 py-2 last:border-0">
+                  <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground" title={titleFor.get(code) || code}>
+                    <span className="mr-2 font-mono text-[10px] font-bold text-health-blue">{code}</span>{titleFor.get(code) || code}
+                  </p>
+                  <p className="shrink-0 text-sm font-bold tabular-nums text-health-ink">{total.toLocaleString()}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        );
+      })()}
+
+      <Dialog open={!!resolving} onOpenChange={(o) => { if (!o) setResolving(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-status-success" /> Resolve report</DialogTitle>
+            <DialogDescription>{resolving?.period_label} — add a resolution note for the record.</DialogDescription>
+          </DialogHeader>
+          <Textarea value={resolutionNote} onChange={(e) => setResolutionNote(e.target.value)} placeholder="e.g. Figures verified against field registers; follow-up needed on referral completion…" className="min-h-24" />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setResolving(null)}>Cancel</Button>
+            <Button onClick={resolveReport} disabled={resolveBusy} className="gap-1.5">
+              {resolveBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Mark resolved
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
         <DialogContent className="max-w-2xl">
