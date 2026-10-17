@@ -118,16 +118,24 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
     void loadHistoryEntries(rows);
     const userIds = [...new Set(rows.flatMap((r) => [r.created_by, r.reviewed_by]).filter(Boolean))] as string[];
     if (userIds.length > 0) {
-      const { data: profs } = await db.from("profiles").select("id, full_name, email").in("id", userIds);
+      const { data: profs } = await db.from("profiles").select("user_id, first_name, last_name, email").in("user_id", userIds);
       const names: Record<string, string> = {};
-      for (const p of (profs || []) as { id: string; full_name: string | null; email: string | null }[]) names[p.id] = p.full_name || p.email || "Unknown user";
+      for (const p of (profs || []) as { user_id: string; first_name: string | null; last_name: string | null; email: string | null }[]) {
+        names[p.user_id] = [p.first_name, p.last_name].filter(Boolean).join(" ").trim() || p.email || "Unknown user";
+      }
       setProfileNames(names);
     }
   }, [projectId, loadHistoryEntries]);
 
   const loadOfficers = useCallback(async () => {
-    const { data } = await db.from("programme_report_officers").select("id, user_id, profiles(full_name, email)").eq("project_id", projectId);
-    setOfficers((data || []) as OfficerRow[]);
+    const { data } = await db.from("programme_report_officers").select("id, user_id, profiles(first_name, last_name, email)").eq("project_id", projectId);
+    const rows = ((data || []) as { id: string; user_id: string; profiles: { first_name: string | null; last_name: string | null; email: string | null } | null }[]).map((r) => ({
+      ...r,
+      profiles: r.profiles
+        ? { full_name: [r.profiles.first_name, r.profiles.last_name].filter(Boolean).join(" ").trim() || r.profiles.email, email: r.profiles.email }
+        : null,
+    }));
+    setOfficers(rows as OfficerRow[]);
   }, [projectId]);
 
   // Project users — everyone assigned to the project (user_project_assignments)
@@ -142,12 +150,13 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
     const teamRows = ((team || []) as { user_id: string | null; full_name: string; email: string | null }[]).filter((m) => !!m.user_id);
     for (const m of teamRows) ids.add(m.user_id as string);
     if (ids.size === 0) { setTeamMembers([]); return; }
-    const { data: profiles } = await db.from("profiles").select("id, full_name, email").in("id", [...ids]);
-    const byId = new Map(((profiles || []) as { id: string; full_name: string | null; email: string | null }[]).map((p) => [p.id, p]));
+    const { data: profiles } = await db.from("profiles").select("user_id, first_name, last_name, email").in("user_id", [...ids]);
+    const byId = new Map(((profiles || []) as { user_id: string; first_name: string | null; last_name: string | null; email: string | null }[]).map((p) => [p.user_id, p]));
     const merged = [...ids].map((id) => {
       const p = byId.get(id);
       const t = teamRows.find((m) => m.user_id === id);
-      return { user_id: id, full_name: p?.full_name || t?.full_name || "Unnamed user", email: p?.email || t?.email || null };
+      const profileName = [p?.first_name, p?.last_name].filter(Boolean).join(" ").trim();
+      return { user_id: id, full_name: profileName || t?.full_name || p?.email || t?.email || "Unnamed user", email: p?.email || t?.email || null };
     }).sort((a, b) => a.full_name.localeCompare(b.full_name));
     setTeamMembers(merged);
   }, [projectId]);
