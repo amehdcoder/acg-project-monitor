@@ -18,6 +18,11 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import FeedbackQrCard from "./FeedbackQrCard";
 
+// Newly created tables are not yet in the generated Supabase types.
+const db = supabase as unknown as {
+  from: (table: string) => ReturnType<typeof supabase.from>;
+};
+
 interface FeedbackRow {
   id: string;
   reference: string;
@@ -87,7 +92,7 @@ const FeedbackReportsPanel = ({ projectId, projectName, canManage }: Props) => {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("project_feedback")
       .select("*")
       .eq("project_id", projectId)
@@ -105,7 +110,7 @@ const FeedbackReportsPanel = ({ projectId, projectName, canManage }: Props) => {
 
   const loadViewers = useCallback(async () => {
     if (!canManage) return;
-    const { data } = await supabase
+    const { data } = await db
       .from("feedback_viewers")
       .select("id, user_id, profiles(full_name, email)")
       .eq("project_id", projectId);
@@ -134,7 +139,7 @@ const FeedbackReportsPanel = ({ projectId, projectName, canManage }: Props) => {
     if (!selected) return;
     setSaving(true);
     const { data: auth } = await supabase.auth.getUser();
-    const { error } = await supabase
+    const { error } = await db
       .from("project_feedback")
       .update({
         status,
@@ -168,7 +173,7 @@ const FeedbackReportsPanel = ({ projectId, projectName, canManage }: Props) => {
       return;
     }
     const { data: auth } = await supabase.auth.getUser();
-    const { error } = await supabase
+    const { error } = await db
       .from("feedback_viewers")
       .insert({ project_id: projectId, user_id: (profile as { id: string }).id, granted_by: auth.user?.id } as never);
     setAddingViewer(false);
@@ -182,7 +187,7 @@ const FeedbackReportsPanel = ({ projectId, projectName, canManage }: Props) => {
   };
 
   const removeViewer = async (id: string) => {
-    const { error } = await supabase.from("feedback_viewers").delete().eq("id", id);
+    const { error } = await db.from("feedback_viewers").delete().eq("id", id);
     if (error) toast({ title: "Could not remove", description: error.message, variant: "destructive" });
     else loadViewers();
   };
