@@ -449,6 +449,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
           </div>
         </div>
 
+        {view === "entry" && (
         <div className="flex flex-wrap items-end gap-4 border-t border-border px-4 py-5 sm:px-6">
           <div>
             <Label htmlFor="programme-report-period" className="text-sm font-medium">Reporting period</Label>
@@ -471,8 +472,10 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save report
           </Button>
         </div>
+        )}
       </section>
 
+      {view === "entry" && (<>
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative min-w-0 flex-1 basis-64">
           <Search className="absolute left-3 top-4 h-4 w-4 text-muted-foreground" />
