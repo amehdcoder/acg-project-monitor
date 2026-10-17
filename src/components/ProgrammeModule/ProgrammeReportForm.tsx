@@ -100,10 +100,26 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
     setOfficers((data || []) as OfficerRow[]);
   }, [projectId]);
 
-  // Project users (team register) — the pool Programme Officers are picked from.
+  // Project users — everyone assigned to the project (user_project_assignments)
+  // plus the team register, resolved to names/emails from profiles.
   const loadTeamMembers = useCallback(async () => {
-    const { data } = await db.from("programme_team_members").select("user_id, full_name, email").eq("project_id", projectId).order("full_name");
-    setTeamMembers(((data || []) as { user_id: string | null; full_name: string; email: string | null }[]).filter((m) => !!m.user_id) as { user_id: string; full_name: string; email: string | null }[]);
+    const [{ data: assignments }, { data: team }] = await Promise.all([
+      db.from("user_project_assignments").select("user_id").eq("project_id", projectId),
+      db.from("programme_team_members").select("user_id, full_name, email").eq("project_id", projectId),
+    ]);
+    const ids = new Set<string>();
+    for (const a of (assignments || []) as { user_id: string | null }[]) if (a.user_id) ids.add(a.user_id);
+    const teamRows = ((team || []) as { user_id: string | null; full_name: string; email: string | null }[]).filter((m) => !!m.user_id);
+    for (const m of teamRows) ids.add(m.user_id as string);
+    if (ids.size === 0) { setTeamMembers([]); return; }
+    const { data: profiles } = await db.from("profiles").select("id, full_name, email").in("id", [...ids]);
+    const byId = new Map(((profiles || []) as { id: string; full_name: string | null; email: string | null }[]).map((p) => [p.id, p]));
+    const merged = [...ids].map((id) => {
+      const p = byId.get(id);
+      const t = teamRows.find((m) => m.user_id === id);
+      return { user_id: id, full_name: p?.full_name || t?.full_name || "Unnamed user", email: p?.email || t?.email || null };
+    }).sort((a, b) => a.full_name.localeCompare(b.full_name));
+    setTeamMembers(merged);
   }, [projectId]);
 
   const runAggregation = useCallback(async () => {
