@@ -21,7 +21,7 @@ export const aggregateIndicators = async (
 
   const [{ data: bens }, { data: services }, { data: referrals }, { data: visits }, { data: livelihood }, { data: feedback }] =
     await Promise.all([
-      db.from("beneficiaries").select("id, gender, date_of_birth, wg_has_disability").eq("project_id", projectId),
+      db.from("beneficiaries").select("id, profile").eq("project_id", projectId),
       db.from("beneficiary_services").select("beneficiary_id, component, service_type, outcome, created_at").eq("project_id", projectId),
       db.from("beneficiary_referrals").select("id, status").eq("project_id", projectId),
       db.from("beneficiary_home_visits").select("id").eq("project_id", projectId),
@@ -29,14 +29,14 @@ export const aggregateIndicators = async (
       db.from("project_feedback").select("id, status").eq("project_id", projectId),
     ]);
 
-  const benList = (bens || []) as { id: string; wg_has_disability?: boolean | null }[];
+  const benList = (bens || []) as { id: string; profile?: { wg_ss?: { has_disability?: boolean } } | null }[];
   const svcList = (services || []) as { beneficiary_id: string; component?: string | null; service_type?: string | null; outcome?: string | null }[];
   const refList = (referrals || []) as { status?: string | null }[];
   const fbList = (feedback || []) as { status?: string | null }[];
 
   const servedIds = new Set(svcList.map((s) => s.beneficiary_id));
   out.people_accessing_services = servedIds.size;
-  const pwdIds = new Set(benList.filter((b) => b.wg_has_disability).map((b) => b.id));
+  const pwdIds = new Set(benList.filter((b) => b.profile?.wg_ss?.has_disability).map((b) => b.id));
   out.pwd_accessing_services = [...servedIds].filter((id) => pwdIds.has(id)).length;
 
   const screeningWords = ["screen", "assessment", "test"];

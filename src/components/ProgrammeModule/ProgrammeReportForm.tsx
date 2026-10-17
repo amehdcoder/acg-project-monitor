@@ -46,6 +46,11 @@ interface ReportRow {
   report_year: number;
   notes: string | null;
   created_at: string;
+  created_by: string | null;
+  status: string;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  resolution_note: string | null;
 }
 
 interface OfficerRow {
@@ -87,23 +92,64 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
   const [officerBusy, setOfficerBusy] = useState(false);
   const [teamMembers, setTeamMembers] = useState<{ user_id: string; full_name: string; email: string | null }[]>([]);
   const [search, setSearch] = useState("");
+  const [view, setView] = useState<"entry" | "review" | "dashboard">("entry");
+  const [resolving, setResolving] = useState<ReportRow | null>(null);
+  const [resolutionNote, setResolutionNote] = useState("");
+  const [resolveBusy, setResolveBusy] = useState(false);
+  const [profileNames, setProfileNames] = useState<Record<string, string>>({});
 
   const indicators = useMemo(() => flatIndicators(), []);
 
+  const loadHistoryEntries = useCallback(async (rows: ReportRow[]) => {
+    if (rows.length === 0) { setHistoryEntries({}); return; }
+    const ids = rows.map((r) => r.id);
+    const { data } = await db.from("programme_report_entries").select("report_id, indicator_code, value, risk").in("report_id", ids);
+    const grouped: Record<string, { indicator_code: string; value: number | null; risk: string | null }[]> = {};
+    for (const e of (data || []) as { report_id: string; indicator_code: string; value: number | null; risk: string | null }[]) {
+      (grouped[e.report_id] ||= []).push(e);
+    }
+    setHistoryEntries(grouped);
+  }, []);
+
   const loadReports = useCallback(async () => {
-    const { data } = await db.from("programme_reports").select("id, period_label, report_year, notes, created_at").eq("project_id", projectId).order("created_at", { ascending: false });
-    setReports((data || []) as ReportRow[]);
-  }, [projectId]);
+    const { data } = await db.from("programme_reports").select("id, period_label, report_year, notes, created_at, created_by, status, reviewed_by, reviewed_at, resolution_note").eq("project_id", projectId).order("created_at", { ascending: false });
+    const rows = (data || []) as ReportRow[];
+    setReports(rows);
+    void loadHistoryEntries(rows);
+    const userIds = [...new Set(rows.flatMap((r) => [r.created_by, r.reviewed_by]).filter(Boolean))] as string[];
+    if (userIds.length > 0) {
+      const { data: profs } = await db.from("profiles").select("id, full_name, email").in("id", userIds);
+      const names: Record<string, string> = {};
+      for (const p of (profs || []) as { id: string; full_name: string | null; email: string | null }[]) names[p.id] = p.full_name || p.email || "Unknown user";
+      setProfileNames(names);
+    }
+  }, [projectId, loadHistoryEntries]);
 
   const loadOfficers = useCallback(async () => {
     const { data } = await db.from("programme_report_officers").select("id, user_id, profiles(full_name, email)").eq("project_id", projectId);
     setOfficers((data || []) as OfficerRow[]);
   }, [projectId]);
 
-  // Project users (team register) — the pool Programme Officers are picked from.
+  // Project users — everyone assigned to the project (user_project_assignments)
+  // plus the team register, resolved to names/emails from profiles.
   const loadTeamMembers = useCallback(async () => {
-    const { data } = await db.from("programme_team_members").select("user_id, full_name, email").eq("project_id", projectId).order("full_name");
-    setTeamMembers(((data || []) as { user_id: string | null; full_name: string; email: string | null }[]).filter((m) => !!m.user_id) as { user_id: string; full_name: string; email: string | null }[]);
+    const [{ data: assignments }, { data: team }] = await Promise.all([
+      db.from("user_project_assignments").select("user_id").eq("project_id", projectId),
+      db.from("programme_team_members").select("user_id, full_name, email").eq("project_id", projectId),
+    ]);
+    const ids = new Set<string>();
+    for (const a of (assignments || []) as { user_id: string | null }[]) if (a.user_id) ids.add(a.user_id);
+    const teamRows = ((team || []) as { user_id: string | null; full_name: string; email: string | null }[]).filter((m) => !!m.user_id);
+    for (const m of teamRows) ids.add(m.user_id as string);
+    if (ids.size === 0) { setTeamMembers([]); return; }
+    const { data: profiles } = await db.from("profiles").select("id, full_name, email").in("id", [...ids]);
+    const byId = new Map(((profiles || []) as { id: string; full_name: string | null; email: string | null }[]).map((p) => [p.id, p]));
+    const merged = [...ids].map((id) => {
+      const p = byId.get(id);
+      const t = teamRows.find((m) => m.user_id === id);
+      return { user_id: id, full_name: p?.full_name || t?.full_name || "Unnamed user", email: p?.email || t?.email || null };
+    }).sort((a, b) => a.full_name.localeCompare(b.full_name));
+    setTeamMembers(merged);
   }, [projectId]);
 
   const runAggregation = useCallback(async () => {
@@ -150,6 +196,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
     }));
   };
 
+  const pendingCount = reports.filter((r) => r.status !== "resolved").length;
   const filledCount = Object.values(drafts).filter((d) => d.value.trim() !== "").length;
   const riskCount = Object.values(drafts).filter((d) => d.risk.trim() !== "").length;
   const autoCount = Object.values(drafts).filter((d) => d.auto && d.value.trim() !== "").length;
@@ -170,14 +217,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
 
   const openHistory = async () => {
     setHistoryOpen(true);
-    if (reports.length === 0) return;
-    const ids = reports.map((r) => r.id);
-    const { data } = await db.from("programme_report_entries").select("report_id, indicator_code, value, risk").in("report_id", ids);
-    const grouped: Record<string, { indicator_code: string; value: number | null; risk: string | null }[]> = {};
-    for (const e of (data || []) as { report_id: string; indicator_code: string; value: number | null; risk: string | null }[]) {
-      (grouped[e.report_id] ||= []).push(e);
-    }
-    setHistoryEntries(grouped);
+    await loadHistoryEntries(reports);
   };
 
   const save = async () => {
@@ -249,6 +289,29 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
       toast({ title: "Could not designate officer", description: (e as Error).message, variant: "destructive" });
     } finally {
       setOfficerBusy(false);
+    }
+  };
+
+  const resolveReport = async () => {
+    if (!resolving) return;
+    setResolveBusy(true);
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const { error } = await db.from("programme_reports").update({
+        status: "resolved",
+        reviewed_by: auth.user?.id,
+        reviewed_at: new Date().toISOString(),
+        resolution_note: resolutionNote.trim() || null,
+      }).eq("id", resolving.id);
+      if (error) throw error;
+      toast({ title: "Report marked resolved", description: resolving.period_label });
+      setResolving(null);
+      setResolutionNote("");
+      await loadReports();
+    } catch (e) {
+      toast({ title: "Could not resolve report", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setResolveBusy(false);
     }
   };
 
@@ -354,6 +417,13 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <div className="flex rounded-lg border border-border bg-card p-0.5">
+                {([["entry", "New report", ClipboardList], ["review", `Review queue (${pendingCount})`, CheckCircle2], ["dashboard", "Dashboard", BarChart3]] as const).map(([key, label, Icon]) => (
+                  <Button key={key} variant={view === key ? "default" : "ghost"} size="sm" className="gap-1.5" onClick={() => setView(key)}>
+                    <Icon className="h-4 w-4" /> {label}
+                  </Button>
+                ))}
+              </div>
               {canManage && (
                 <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setOfficersOpen(true)}>
                   <Users className="h-4 w-4" /> Programme Officers
@@ -379,6 +449,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
           </div>
         </div>
 
+        {view === "entry" && (
         <div className="flex flex-wrap items-end gap-4 border-t border-border px-4 py-5 sm:px-6">
           <div>
             <Label htmlFor="programme-report-period" className="text-sm font-medium">Reporting period</Label>
@@ -401,8 +472,10 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save report
           </Button>
         </div>
+        )}
       </section>
 
+      {view === "entry" && (<>
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative min-w-0 flex-1 basis-64">
           <Search className="absolute left-3 top-4 h-4 w-4 text-muted-foreground" />
@@ -477,6 +550,126 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
           </Button>
         </div>
       </section>
+      </>)}
+
+      {view === "review" && (
+        <section className="space-y-3">
+          <p className="text-sm text-muted-foreground">Review submitted reports, then mark them resolved with a note. Only designated Programme Officers and managers can see this queue.</p>
+          {reports.length === 0 && <p className="rounded-lg border border-dashed border-border py-8 text-center text-sm text-muted-foreground">No reports submitted yet.</p>}
+          {reports.map((r) => {
+            const entries = historyEntries[r.id] || [];
+            const resolved = r.status === "resolved";
+            return (
+              <div key={r.id} className={cn("rounded-lg border-l-4 bg-card p-4 shadow-soft", resolved ? "border-status-success/50" : "border-status-warning/50")}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-health-ink">
+                      <CalendarRange className="h-4 w-4 text-health-blue" />{r.period_label}
+                      <Badge variant="secondary" className="text-[10px]">Year {r.report_year}</Badge>
+                      <Badge className={cn("text-[10px]", resolved ? "bg-status-success/10 text-status-success" : "bg-status-warning/10 text-status-warning")}>
+                        {resolved ? "Resolved" : "Pending review"}
+                      </Badge>
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Submitted by {r.created_by ? profileNames[r.created_by] || "Unknown user" : "Unknown user"} · {new Date(r.created_at).toLocaleString()} · {entries.length} entries
+                    </p>
+                    {r.notes && <p className="mt-1.5 text-xs text-muted-foreground">{r.notes}</p>}
+                    {resolved && (
+                      <div className="mt-2 rounded-md bg-status-success/5 px-3 py-2 text-xs">
+                        <p className="font-semibold text-status-success">Resolved by {r.reviewed_by ? profileNames[r.reviewed_by] || "Unknown user" : "Unknown user"}{r.reviewed_at ? ` · ${new Date(r.reviewed_at).toLocaleString()}` : ""}</p>
+                        {r.resolution_note && <p className="mt-0.5 text-muted-foreground">{r.resolution_note}</p>}
+                      </div>
+                    )}
+                  </div>
+                  {!resolved && (
+                    <Button size="sm" className="gap-1.5" onClick={() => { setResolving(r); setResolutionNote(""); }}>
+                      <CheckCircle2 className="h-4 w-4" /> Mark resolved
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </section>
+      )}
+
+      {view === "dashboard" && (() => {
+        const officerIds = [...new Set(reports.map((r) => r.created_by).filter(Boolean))] as string[];
+        const perOfficer = officerIds.map((id) => {
+          const mine = reports.filter((r) => r.created_by === id);
+          const entryCount = mine.reduce((n, r) => n + (historyEntries[r.id]?.length || 0), 0);
+          return { id, name: profileNames[id] || "Unknown user", reports: mine.length, entries: entryCount, last: mine[0]?.created_at };
+        }).sort((a, b) => b.reports - a.reports);
+        const totals = new Map<string, number>();
+        for (const entries of Object.values(historyEntries)) {
+          for (const e of entries) if (e.value !== null) totals.set(e.indicator_code, (totals.get(e.indicator_code) || 0) + Number(e.value));
+        }
+        const titleFor = new Map(indicators.map((i) => [i.code, i.title]));
+        const totalEntries = Object.values(historyEntries).reduce((n, arr) => n + arr.length, 0);
+        return (
+          <section className="space-y-5">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {[
+                { label: "Reports submitted", value: reports.length, tone: "bg-health-blue/10 text-health-blue" },
+                { label: "Pending review", value: pendingCount, tone: "bg-status-warning/10 text-status-warning" },
+                { label: "Resolved", value: reports.length - pendingCount, tone: "bg-status-success/10 text-status-success" },
+                { label: "Indicator entries", value: totalEntries, tone: "bg-health-teal/10 text-health-teal" },
+              ].map((s) => (
+                <div key={s.label} className="rounded-lg border border-border bg-card p-3 shadow-soft">
+                  <p className="text-2xl font-bold tabular-nums text-foreground">{s.value}</p>
+                  <p className="text-xs text-muted-foreground">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-lg border border-border bg-card shadow-soft">
+              <p className="border-b border-border px-4 py-3 text-sm font-semibold text-health-ink">Reports per officer</p>
+              {perOfficer.length === 0 && <p className="px-4 py-6 text-center text-sm text-muted-foreground">No reports submitted yet.</p>}
+              {perOfficer.map((o) => (
+                <div key={o.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 px-4 py-2.5 last:border-0">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-health-ink">{o.name}</p>
+                    {o.last && <p className="text-xs text-muted-foreground">Last report {new Date(o.last).toLocaleDateString()}</p>}
+                  </div>
+                  <div className="flex gap-4 text-right">
+                    <div><p className="text-sm font-bold tabular-nums text-health-blue">{o.reports}</p><p className="text-[10px] text-muted-foreground">reports</p></div>
+                    <div><p className="text-sm font-bold tabular-nums text-health-teal">{o.entries}</p><p className="text-[10px] text-muted-foreground">entries</p></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-lg border border-border bg-card shadow-soft">
+              <p className="border-b border-border px-4 py-3 text-sm font-semibold text-health-ink">Cumulative indicator totals — all reports</p>
+              {totals.size === 0 && <p className="px-4 py-6 text-center text-sm text-muted-foreground">No indicator values recorded yet.</p>}
+              {[...totals.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([code, total]) => (
+                <div key={code} className="flex items-center justify-between gap-3 border-b border-border/50 px-4 py-2 last:border-0">
+                  <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground" title={titleFor.get(code) || code}>
+                    <span className="mr-2 font-mono text-[10px] font-bold text-health-blue">{code}</span>{titleFor.get(code) || code}
+                  </p>
+                  <p className="shrink-0 text-sm font-bold tabular-nums text-health-ink">{total.toLocaleString()}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        );
+      })()}
+
+      <Dialog open={!!resolving} onOpenChange={(o) => { if (!o) setResolving(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-status-success" /> Resolve report</DialogTitle>
+            <DialogDescription>{resolving?.period_label} — add a resolution note for the record.</DialogDescription>
+          </DialogHeader>
+          <Textarea value={resolutionNote} onChange={(e) => setResolutionNote(e.target.value)} placeholder="e.g. Figures verified against field registers; follow-up needed on referral completion…" className="min-h-24" />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setResolving(null)}>Cancel</Button>
+            <Button onClick={resolveReport} disabled={resolveBusy} className="gap-1.5">
+              {resolveBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Mark resolved
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
         <DialogContent className="max-w-2xl">
