@@ -97,7 +97,7 @@ export const LOGFRAME: LogframeObjective[] = [
             baseline: "0",
             targets: ["620", "1505", "1355", "1155"],
             totalTarget: "4635",
-            disaggregation: ["Gender", "Age band", "Disease condition", "Impairment / Disability type"],
+            disaggregation: ["Sex", "Age band", "Disease condition", "Impairment / Disability type"],
             autoKey: "people_accessing_services",
           },
           {
@@ -107,7 +107,7 @@ export const LOGFRAME: LogframeObjective[] = [
             baseline: "0",
             targets: ["62", "150.5", "135.5", "115.5"],
             totalTarget: "463.5",
-            disaggregation: ["Gender", "Age band", "Disease condition", "Impairment / Disability type"],
+            disaggregation: ["Sex", "Age band", "Disease condition", "Impairment / Disability type"],
             autoKey: "pwd_accessing_services",
           },
         ],
@@ -124,7 +124,7 @@ export const LOGFRAME: LogframeObjective[] = [
             baseline: "0",
             targets: ["2", "3", "3", "3"],
             totalTarget: "3",
-            disaggregation: ["Gender", "Impairment / Disability type", "Stakeholder type"],
+            disaggregation: ["Sex", "Impairment / Disability type", "Stakeholder type"],
           },
           {
             code: "SO1.R1.2",
@@ -176,7 +176,7 @@ export const LOGFRAME: LogframeObjective[] = [
             baseline: "0",
             targets: ["0", "240", "240", null],
             totalTarget: "240",
-            disaggregation: ["Gender", "Impairment / Disability type", "Cadre"],
+            disaggregation: ["Sex", "Impairment / Disability type", "Cadre"],
           },
         ],
         activities: [
@@ -202,7 +202,7 @@ export const LOGFRAME: LogframeObjective[] = [
             baseline: "0",
             targets: ["3020", "18240", "18540", "12969"],
             totalTarget: "52,769",
-            disaggregation: ["Gender", "Age band", "Disease condition", "Impairment / Disability type"],
+            disaggregation: ["Sex", "Age band", "Disease condition", "Impairment / Disability type"],
             autoKey: "people_screened",
           },
           {
@@ -212,7 +212,7 @@ export const LOGFRAME: LogframeObjective[] = [
             baseline: "0",
             targets: ["0", "1505", "1355", "1155"],
             totalTarget: "4015",
-            disaggregation: ["Gender", "Age band", "Disease condition", "Impairment / Disability type", "Services"],
+            disaggregation: ["Sex", "Age band", "Disease condition", "Impairment / Disability type", "Services"],
             autoKey: "people_treated",
           },
           {
@@ -222,7 +222,7 @@ export const LOGFRAME: LogframeObjective[] = [
             baseline: "0",
             targets: ["0", "0.3", "0.6", "0.8"],
             totalTarget: "0.8",
-            disaggregation: ["Gender", "Age band", "Disease condition", "Services"],
+            disaggregation: ["Sex", "Age band", "Disease condition", "Services"],
             autoKey: "referral_completion",
             isPercent: true,
           },
@@ -266,7 +266,7 @@ export const LOGFRAME: LogframeObjective[] = [
             baseline: "0",
             targets: ["36000", "36000", "4500", null],
             totalTarget: "76500",
-            disaggregation: ["Gender", "Age band", "Impairment / Disability type"],
+            disaggregation: ["Sex", "Age band", "Impairment / Disability type"],
           },
           {
             code: "SO1.R4.3",
@@ -318,7 +318,7 @@ export const LOGFRAME: LogframeObjective[] = [
             baseline: "0",
             targets: ["0", "10", "40", "90"],
             totalTarget: "140",
-            disaggregation: ["Gender", "Age band", "Impairment / Disability type"],
+            disaggregation: ["Sex", "Age band", "Impairment / Disability type"],
           },
           {
             code: "SO2.3",
@@ -327,7 +327,7 @@ export const LOGFRAME: LogframeObjective[] = [
             baseline: "0",
             targets: ["0", "10", "50", "90"],
             totalTarget: "150",
-            disaggregation: ["Gender", "Age band", "Impairment / Disability type"],
+            disaggregation: ["Sex", "Age band", "Impairment / Disability type"],
           },
         ],
         activities: [],
@@ -336,9 +336,9 @@ export const LOGFRAME: LogframeObjective[] = [
         key: "so2-r1",
         title: "Result 1 — Improved livelihood capacities, agency and self-reliance among programme participants",
         indicators: [
-          { code: "SO2.R1.1", title: "Number of participants completing graduation pathway training", mov: "Training attendance sheets", baseline: "0", targets: ["0", "80", "80", "0"], totalTarget: "160", disaggregation: ["Gender", "Age band", "Impairment / Disability type"] },
-          { code: "SO2.R1.2", title: "Number of participants receiving coaching support", mov: "Coaching records", baseline: "0", targets: ["0", "80", "80", "0"], totalTarget: "160", disaggregation: ["Gender", "Age band", "Impairment / Disability type"] },
-          { code: "SO2.R1.3", title: "Number of participants demonstrating improved livelihood planning skills", mov: "Skills assessments, Participant database", baseline: "0", targets: ["0", "65", "70", "0"], totalTarget: "135", disaggregation: ["Gender", "Age band", "Impairment / Disability type"] },
+          { code: "SO2.R1.1", title: "Number of participants completing graduation pathway training", mov: "Training attendance sheets", baseline: "0", targets: ["0", "80", "80", "0"], totalTarget: "160", disaggregation: ["Sex", "Age band", "Impairment / Disability type"] },
+          { code: "SO2.R1.2", title: "Number of participants receiving coaching support", mov: "Coaching records", baseline: "0", targets: ["0", "80", "80", "0"], totalTarget: "160", disaggregation: ["Sex", "Age band", "Impairment / Disability type"] },
+          { code: "SO2.R1.3", title: "Number of participants demonstrating improved livelihood planning skills", mov: "Skills assessments, Participant database", baseline: "0", targets: ["0", "65", "70", "0"], totalTarget: "135", disaggregation: ["Sex", "Age band", "Impairment / Disability type"] },
         ],
         activities: [
           { code: "PSO02R01A01", title: "Community entry, stakeholder engagement, awareness and sensitization", indicator: "Number of stakeholders reached", mov: "Attendance records, Activity report", targets: ["1", "0", "0", "0"], totalTarget: "1" },
@@ -352,9 +352,9 @@ export const LOGFRAME: LogframeObjective[] = [
         key: "so2-r2",
         title: "Result 2 — Increased economic participation and financial inclusion",
         indicators: [
-          { code: "SO2.R2.1", title: "Number of participants engaged in productive livelihood activities", mov: "Business assessments, grant records, monitoring visits", baseline: "0", targets: ["0", "80", "20", "0"], totalTarget: "100", disaggregation: ["Gender", "Age band", "Impairment / Disability type"], autoKey: "livelihood_participants" },
-          { code: "SO2.R2.2", title: "Number of participants receiving productive assets or start-up support", mov: "Asset distribution records", baseline: "0", targets: ["0", "80", "80", "0"], totalTarget: "160", disaggregation: ["Gender", "Age band", "Impairment / Disability type"] },
-          { code: "SO2.R2.3", title: "Number of participants using formal financial services", mov: "Financial inclusion reports, Participant progress records", baseline: "0", targets: ["0", "30", "65", "40"], totalTarget: "135", disaggregation: ["Gender", "Age band", "Impairment / Disability type"] },
+          { code: "SO2.R2.1", title: "Number of participants engaged in productive livelihood activities", mov: "Business assessments, grant records, monitoring visits", baseline: "0", targets: ["0", "80", "20", "0"], totalTarget: "100", disaggregation: ["Sex", "Age band", "Impairment / Disability type"], autoKey: "livelihood_participants" },
+          { code: "SO2.R2.2", title: "Number of participants receiving productive assets or start-up support", mov: "Asset distribution records", baseline: "0", targets: ["0", "80", "80", "0"], totalTarget: "160", disaggregation: ["Sex", "Age band", "Impairment / Disability type"] },
+          { code: "SO2.R2.3", title: "Number of participants using formal financial services", mov: "Financial inclusion reports, Participant progress records", baseline: "0", targets: ["0", "30", "65", "40"], totalTarget: "135", disaggregation: ["Sex", "Age band", "Impairment / Disability type"] },
         ],
         activities: [
           { code: "PSO02R02A01", title: "Skills acquisition training for 160 livelihood participants", indicator: "Number of participants completing livelihood and financial inclusion training", mov: "Training attendance sheets", targets: ["0", "80", "80", "0"], totalTarget: "160" },
@@ -368,9 +368,9 @@ export const LOGFRAME: LogframeObjective[] = [
         key: "so2-r3",
         title: "Result 3 — Increased access to community-based financial and market systems",
         indicators: [
-          { code: "SO2.R3.1", title: "Number of participants enrolled in VSLAs or cooperatives", mov: "VSLA records, Cooperative records", baseline: "0", targets: ["0", "250", "375", "0"], totalTarget: "625", disaggregation: ["Gender", "Age band", "Impairment / Disability type"] },
-          { code: "SO2.R3.2", title: "Total amount saved through VSLA groups (NGN)", mov: "VSLA records", baseline: "0", targets: ["0", "10000000", "14000000", "0"], totalTarget: "24000000", disaggregation: ["Gender", "Age band", "Impairment / Disability type"] },
-          { code: "SO2.R3.3", title: "Number of participants linked to markets and value chains", mov: "Market linkage reports, Monitoring reports", baseline: "0", targets: ["0", "110", "123", "0"], totalTarget: "233", disaggregation: ["Gender", "Age band", "Impairment / Disability type"] },
+          { code: "SO2.R3.1", title: "Number of participants enrolled in VSLAs or cooperatives", mov: "VSLA records, Cooperative records", baseline: "0", targets: ["0", "250", "375", "0"], totalTarget: "625", disaggregation: ["Sex", "Age band", "Impairment / Disability type"] },
+          { code: "SO2.R3.2", title: "Total amount saved through VSLA groups (NGN)", mov: "VSLA records", baseline: "0", targets: ["0", "10000000", "14000000", "0"], totalTarget: "24000000", disaggregation: ["Sex", "Age band", "Impairment / Disability type"] },
+          { code: "SO2.R3.3", title: "Number of participants linked to markets and value chains", mov: "Market linkage reports, Monitoring reports", baseline: "0", targets: ["0", "110", "123", "0"], totalTarget: "233", disaggregation: ["Sex", "Age band", "Impairment / Disability type"] },
         ],
         activities: [
           { code: "PSO02R03A01", title: "Establish and strengthen VSLAs", indicator: "Number of functional VSLAs established or strengthened", mov: "VSLA registration/formation records", targets: ["0", "10", "15", "0"], totalTarget: "25" },
@@ -382,8 +382,8 @@ export const LOGFRAME: LogframeObjective[] = [
         title: "Result 4 — Strengthened policy environment and social inclusion for persons with disabilities",
         indicators: [
           { code: "SO2.R4.1", title: "Number of disability-inclusive livelihood policies/programmes influenced", mov: "Policy documents, Advocacy reports", baseline: "0", targets: ["0", "1", "1", "0"], totalTarget: "2", disaggregation: ["State"] },
-          { code: "SO2.R4.2", title: "Number of programme participants accessing government empowerment schemes", mov: "Government beneficiary economic empowerment records", baseline: "0", targets: ["0", "50", "100", "150"], totalTarget: "300", disaggregation: ["Gender", "Age band", "Impairment / Disability type"] },
-          { code: "SO2.R4.3", title: "Number of participants reporting reduced discrimination in economic participation", mov: "Participant perception surveys", baseline: "0", targets: ["0", "15", "65", "80"], totalTarget: "160", disaggregation: ["Gender", "Age band", "Impairment / Disability type"] },
+          { code: "SO2.R4.2", title: "Number of programme participants accessing government empowerment schemes", mov: "Government beneficiary economic empowerment records", baseline: "0", targets: ["0", "50", "100", "150"], totalTarget: "300", disaggregation: ["Sex", "Age band", "Impairment / Disability type"] },
+          { code: "SO2.R4.3", title: "Number of participants reporting reduced discrimination in economic participation", mov: "Participant perception surveys", baseline: "0", targets: ["0", "15", "65", "80"], totalTarget: "160", disaggregation: ["Sex", "Age band", "Impairment / Disability type"] },
         ],
         activities: [
           { code: "PSO02R04A01", title: "Advocate for disability-inclusive livelihood and social protection policies", indicator: "Number of participants enrolled in government-supported programmes", mov: "Advocacy engagement reports", targets: ["0", "4", "0", "0"], totalTarget: "4" },
