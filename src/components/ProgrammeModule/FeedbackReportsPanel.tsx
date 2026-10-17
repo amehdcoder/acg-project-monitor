@@ -112,9 +112,15 @@ const FeedbackReportsPanel = ({ projectId, projectName, canManage }: Props) => {
     if (!canManage) return;
     const { data } = await db
       .from("feedback_viewers")
-      .select("id, user_id, profiles(full_name, email)")
+      .select("id, user_id, profiles(first_name, last_name, email)")
       .eq("project_id", projectId);
-    setViewers((data || []) as unknown as ViewerRow[]);
+    const rows = ((data || []) as unknown as { id: string; user_id: string; profiles: { first_name: string | null; last_name: string | null; email: string | null } | null }[]).map((r) => ({
+      ...r,
+      profiles: r.profiles
+        ? { full_name: [r.profiles.first_name, r.profiles.last_name].filter(Boolean).join(" ").trim() || r.profiles.email, email: r.profiles.email }
+        : null,
+    }));
+    setViewers(rows as ViewerRow[]);
   }, [projectId, canManage]);
 
   useEffect(() => { load(); loadViewers(); }, [load, loadViewers]);
