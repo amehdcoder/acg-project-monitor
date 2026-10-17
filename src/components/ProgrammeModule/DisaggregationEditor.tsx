@@ -27,53 +27,92 @@ interface Props {
 
 const LocationPanel = ({ dim, raw, onChange, idPrefix }: { dim: DisaggDimension; raw: string; onChange: (v: string) => void; idPrefix: string }) => {
   const level = dim.level || "ward";
-  const parsed = useMemo(() => {
-    const m = parseDisaggCell(raw);
-    const first = Object.entries(m)[0];
-    return first ? { key: first[0], value: String(first[1]) } : { key: "", value: "" };
-  }, [raw]);
-  const parts = parsed.key.split("|");
-  const state = parts[0] || "";
-  const lga = parts[1] || "";
-  const ward = parts[2] || "";
-
-  const emit = (s: string, l: string, w: string, val: string) => {
-    const key = [s, level !== "state" && l, level === "ward" && w].filter(Boolean).join("|") as string;
-    onChange(serializeDisaggCell(key ? { [key]: Number(val) || 0 } : {}));
-  };
+  const map = parseDisaggCell(raw);
+  const [pickState, setPickState] = useState("");
+  const [pickLga, setPickLga] = useState("");
+  const [pickWard, setPickWard] = useState("");
 
   const states = useMemo(() => getAllStates(), []);
-  const lgas = useMemo(() => (state ? getLGAsForState(state) : []), [state]);
-  const wards = useMemo(() => (state && lga ? getWardsForLGA(state, lga) : []), [state, lga]);
+  const lgas = useMemo(() => (pickState ? getLGAsForState(pickState) : []), [pickState]);
+  const wards = useMemo(() => (pickState && pickLga ? getWardsForLGA(pickState, pickLga) : []), [pickState, pickLga]);
+
+  const emit = (next: Record<string, number>) => onChange(serializeDisaggCell(next));
+
+  const pendingKey = [pickState, level !== "state" && pickLga, level === "ward" && pickWard].filter(Boolean).join("|");
+  const ready = level === "state" ? !!pickState : level === "lga" ? !!(pickState && pickLga) : !!(pickState && pickLga && pickWard);
+
+  const addLocation = () => {
+    if (!ready || pendingKey in map) return;
+    emit({ ...map, [pendingKey]: 0 });
+    setPickState(""); setPickLga(""); setPickWard("");
+  };
+
+  const setValue = (key: string, val: string) => {
+    const n = Number(val);
+    const next = { ...map };
+    if (!val || !Number.isFinite(n)) next[key] = 0; else next[key] = n;
+    emit(next);
+  };
+
+  const removeLocation = (key: string) => {
+    const next = { ...map };
+    delete next[key];
+    emit(next);
+  };
+
+  const entries = Object.entries(map);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {dim.hint && <p className="text-xs text-muted-foreground">{dim.hint}</p>}
-      <div className={cn("grid gap-3", level === "ward" ? "sm:grid-cols-3" : level === "lga" ? "sm:grid-cols-2" : "sm:grid-cols-1")}>
-        <GeoCombobox label="State" value={state} options={states} onSelect={(v) => emit(v, "", "", parsed.value)} />
-        {level !== "state" && (
-          <GeoCombobox label="LGA" value={lga} options={lgas} disabled={!state}
-            placeholder={state ? "Select LGA" : "Pick a state first"}
-            onSelect={(v) => emit(state, v, "", parsed.value)} />
-        )}
-        {level === "ward" && (
-          <GeoCombobox label="Ward" value={ward} options={wards} disabled={!lga}
-            placeholder={lga ? "Select ward" : "Pick an LGA first"}
-            onSelect={(v) => emit(state, lga, v, parsed.value)} />
-        )}
-      </div>
-      {parsed.key && (
-        <div>
-          <Label htmlFor={`${idPrefix}-loc-value`} className="text-xs text-muted-foreground">
-            Value for {parsed.key.split("|").filter(Boolean).join(" → ")}
-          </Label>
-          <Input
-            id={`${idPrefix}-loc-value`} type="number" value={parsed.value}
-            onChange={(e) => emit(state, lga, ward, e.target.value)}
-            className="mt-1 h-11 w-40 tabular-nums"
-          />
+
+      {entries.length > 0 && (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {entries.map(([key, val]) => (
+            <div key={key} className="flex items-center gap-2 rounded-xl border border-health-blue/25 bg-card px-3 py-2 shadow-soft">
+              <MapPin className="h-4 w-4 shrink-0 text-health-blue" />
+              <span className="min-w-0 flex-1 truncate text-xs font-semibold text-health-ink" title={key.split("|").join(" → ")}>
+                {key.split("|").join(" → ")}
+              </span>
+              <Input
+                id={`${idPrefix}-loc-${key}`} type="number" inputMode="numeric"
+                aria-label={`Value for ${key.split("|").join(", ")}`}
+                value={val === 0 ? "" : String(val)} placeholder="0"
+                onChange={(e) => setValue(key, e.target.value)}
+                className="h-9 w-24 shrink-0 text-right tabular-nums"
+              />
+              <button type="button" onClick={() => removeLocation(key)} aria-label={`Remove ${key.split("|").join(", ")}`}
+                className="shrink-0 rounded-full p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
         </div>
       )}
+
+      <div className="rounded-xl border border-dashed border-health-teal/40 bg-health-teal/5 p-3">
+        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-health-teal">
+          {entries.length === 0 ? "Add a location" : "Add another location"}
+        </p>
+        <div className={cn("grid gap-2", level === "ward" ? "sm:grid-cols-3" : level === "lga" ? "sm:grid-cols-2" : "sm:grid-cols-1")}>
+          <GeoCombobox label="State" value={pickState} options={states}
+            onSelect={(v) => { setPickState(v); setPickLga(""); setPickWard(""); }} />
+          {level !== "state" && (
+            <GeoCombobox label="LGA" value={pickLga} options={lgas} disabled={!pickState}
+              placeholder={pickState ? "Select LGA" : "Pick a state first"}
+              onSelect={(v) => { setPickLga(v); setPickWard(""); }} />
+          )}
+          {level === "ward" && (
+            <GeoCombobox label="Ward" value={pickWard} options={wards} disabled={!pickLga}
+              placeholder={pickLga ? "Select ward" : "Pick an LGA first"}
+              onSelect={setPickWard} />
+          )}
+        </div>
+        <Button type="button" size="sm" className="mt-3 gap-1.5" disabled={!ready || pendingKey in map} onClick={addLocation}>
+          <Plus className="h-3.5 w-3.5" />
+          {pendingKey in map ? "Already added" : ready ? `Add ${pendingKey.split("|").join(" → ")}` : "Select a location"}
+        </Button>
+      </div>
     </div>
   );
 };
