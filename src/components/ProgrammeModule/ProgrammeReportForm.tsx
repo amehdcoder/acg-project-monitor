@@ -46,6 +46,11 @@ interface ReportRow {
   report_year: number;
   notes: string | null;
   created_at: string;
+  created_by: string | null;
+  status: string;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  resolution_note: string | null;
 }
 
 interface OfficerRow {
@@ -91,7 +96,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
   const indicators = useMemo(() => flatIndicators(), []);
 
   const loadReports = useCallback(async () => {
-    const { data } = await db.from("programme_reports").select("id, period_label, report_year, notes, created_at").eq("project_id", projectId).order("created_at", { ascending: false });
+    const { data } = await db.from("programme_reports").select("id, period_label, report_year, notes, created_at, created_by, status, reviewed_by, reviewed_at, resolution_note").eq("project_id", projectId).order("created_at", { ascending: false });
     setReports((data || []) as ReportRow[]);
   }, [projectId]);
 
