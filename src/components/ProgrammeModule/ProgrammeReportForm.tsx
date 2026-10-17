@@ -116,6 +116,13 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
     const rows = (data || []) as ReportRow[];
     setReports(rows);
     void loadHistoryEntries(rows);
+    const userIds = [...new Set(rows.flatMap((r) => [r.created_by, r.reviewed_by]).filter(Boolean))] as string[];
+    if (userIds.length > 0) {
+      const { data: profs } = await db.from("profiles").select("id, full_name, email").in("id", userIds);
+      const names: Record<string, string> = {};
+      for (const p of (profs || []) as { id: string; full_name: string | null; email: string | null }[]) names[p.id] = p.full_name || p.email || "Unknown user";
+      setProfileNames(names);
+    }
   }, [projectId, loadHistoryEntries]);
 
   const loadOfficers = useCallback(async () => {
