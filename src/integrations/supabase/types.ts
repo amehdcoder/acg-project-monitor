@@ -5442,6 +5442,38 @@ export type Database = {
         }
         Relationships: []
       }
+      feedback_viewers: {
+        Row: {
+          created_at: string
+          granted_by: string | null
+          id: string
+          project_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          project_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          project_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_viewers_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       field_activity: {
         Row: {
           created_at: string
@@ -10124,6 +10156,86 @@ export type Database = {
           success?: boolean
         }
         Relationships: []
+      }
+      project_feedback: {
+        Row: {
+          category: string
+          community: string | null
+          consent_given: boolean
+          created_at: string
+          id: string
+          is_anonymous: boolean
+          lga: string | null
+          message: string
+          preferred_contact: string | null
+          project_id: string
+          reference: string
+          reporter_email: string | null
+          reporter_name: string | null
+          reporter_phone: string | null
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          state: string | null
+          status: string
+          ward: string | null
+        }
+        Insert: {
+          category: string
+          community?: string | null
+          consent_given?: boolean
+          created_at?: string
+          id?: string
+          is_anonymous?: boolean
+          lga?: string | null
+          message: string
+          preferred_contact?: string | null
+          project_id: string
+          reference: string
+          reporter_email?: string | null
+          reporter_name?: string | null
+          reporter_phone?: string | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          state?: string | null
+          status?: string
+          ward?: string | null
+        }
+        Update: {
+          category?: string
+          community?: string | null
+          consent_given?: boolean
+          created_at?: string
+          id?: string
+          is_anonymous?: boolean
+          lga?: string | null
+          message?: string
+          preferred_contact?: string | null
+          project_id?: string
+          reference?: string
+          reporter_email?: string | null
+          reporter_name?: string | null
+          reporter_phone?: string | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          state?: string | null
+          status?: string
+          ward?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_feedback_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       project_mhgap_drugs: {
         Row: {

@@ -58,6 +58,8 @@ import LivelihoodPanel from "./LivelihoodPanel";
 import HealthExchangePanel from "./HealthExchangePanel";
 import GeneralDashboard from "./GeneralDashboard";
 import FeedbackReportsPanel from "./FeedbackReportsPanel";
+import ProgrammeReportForm from "./ProgrammeReportForm";
+import { ClipboardList } from "lucide-react";
 import WorkspaceNavigation, { type WorkspaceNavGroup, type WorkspaceView } from "./WorkspaceNavigation";
 import { useIsSafeguardingOfficer } from "@/lib/programmeModule/safeguarding";
 import { useMyFacilityAccess } from "@/lib/programmeModule/facilities";
@@ -137,6 +139,18 @@ const ProgrammeModuleWorkspace = ({
   const canDash = can("view_dashboards") || ((isHealthWorker || isProgrammeStaff) && can("view_records"));
   const [view, setView] = useState<WorkspaceView>(() => canDash ? "dashboard" : "records");
 
+  // Designated Programme Officers (plus Owner / Super Admins) see and fill the
+  // Programme Report Form built on the project logframe.
+  const [isProgrammeOfficer, setIsProgrammeOfficer] = useState(false);
+  useEffect(() => {
+    if (!projectId) return;
+    void (supabase as unknown as { rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown }> })
+      .rpc("is_programme_officer", { _project_id: projectId })
+      .then(({ data }) => setIsProgrammeOfficer(Boolean(data)))
+      .catch(() => setIsProgrammeOfficer(false));
+  }, [projectId]);
+  const canReport = canConfigure || isProgrammeOfficer;
+
   // A scanned Hand Card link (?case=...) must land on the records list so the
   // record can open straight away, even for people who default to the dashboard.
   useEffect(() => {
@@ -177,6 +191,7 @@ const ProgrammeModuleWorkspace = ({
     {
       label: "Overview",
       items: [
+        { key: "report", label: "Programme report", description: "Logframe indicators, targets, disaggregation and risks", icon: ClipboardList, show: canReport },
         { key: "dashboard", label: "General dashboard", description: "Project-wide outcomes, alerts and service performance", icon: BarChart3, show: canDash },
         { key: "journey", label: "Beneficiary journey", description: "Change, feedback and service reach", icon: Route, show: canDash },
         { key: "facility", label: "Facility dashboard", description: "Facility caseloads and referral performance", icon: Hospital, show: canDash },
@@ -445,6 +460,9 @@ const ProgrammeModuleWorkspace = ({
         />
       )}
 
+      {!permissionsLoading && active && view === "report" && projectId && canReport && (
+        <ProgrammeReportForm projectId={projectId} canManage={canConfigure || isSuperAdmin} />
+      )}
       {!permissionsLoading && active && view === "dashboard" && (
         <GeneralDashboard
           projectId={projectId}

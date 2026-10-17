@@ -24,3 +24,6 @@
 - [x] Add standard national indicators across all components to the DHIS2 Data Exchange, grouped with definitions.
 - [ ] Map new indicators to DHIS2 data elements and send a live test — requires the user's DHIS2 server in the app.
 - [ ] Deploy updated health-exchange (indicator-aligned services/aggregation) — blocked: Lovable Cloud backend is paused; user must resume it, then redeploy.
+
+- [x] Build CiSKuLA-2 Programme Report Form (logframe indicators, targets, disaggregation, risks, history, auto-aggregation) with Programme Officer designation.
+- [ ] Verify programme report save/history end-to-end with a designated officer account.
