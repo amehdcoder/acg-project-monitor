@@ -13,6 +13,21 @@ export const componentKind = (key: string, label = ""): Kind => {
   return "generic";
 };
 
+/** Priority Graduation Approach services, in programme delivery order. */
+export const PRIORITY_LIVELIHOOD_SERVICES = [
+  "Beneficiary mapping, verification & Graduation pathway planning",
+  "Participant orientation: Graduation Approach, rights & safeguarding",
+  "Life skills, social empowerment, inclusion & safeguarding (PSEA)",
+  "Skills acquisition training",
+  "Financial literacy & entrepreneurship training",
+  "Financial literacy & entrepreneurship refresher",
+  "Monthly cash transfer (time-bound social protection)",
+  "Quarterly enterprise coaching, mentoring & business support",
+  "Productive assets, inputs, start-up grants & working capital",
+  "VSLA membership (savings & credit)",
+  "Market linkages: suppliers, aggregators & buyers",
+];
+
 /** Additional standard services offered per component kind. */
 export const KIND_SERVICES: Record<Kind, string[]> = {
   eye: [
@@ -42,6 +57,7 @@ export const KIND_SERVICES: Record<Kind, string[]> = {
     "Water point functionality check", "Menstrual hygiene support", "Household water treatment",
   ],
   livelihood: [
+    ...PRIORITY_LIVELIHOOD_SERVICES,
     "Vulnerability assessment", "Ground verification", "Poultry input", "Skills training", "Cash grant",
     "Savings group (VSLA) enrolment", "Business start-up kit",
     "Financial literacy training", "Business monitoring visit",
@@ -100,8 +116,14 @@ const mergeUnique = (a: string[], b: string[]) => {
   return [...a, ...b.filter((s) => !seen.has(s.toLowerCase()))];
 };
 
-export const servicesForComponent = (c: { key: string; label?: string; services?: string[] }) =>
-  mergeUnique(c.services || [], KIND_SERVICES[componentKind(c.key, c.label)]);
+export const servicesForComponent = (c: { key: string; label?: string; services?: string[] }) => {
+  const kind = componentKind(c.key, c.label);
+  const services = mergeUnique(c.services || [], KIND_SERVICES[kind]);
+  // Priority services must precede even the project's configured options.
+  return kind === "livelihood"
+    ? mergeUnique(PRIORITY_LIVELIHOOD_SERVICES, services)
+    : services;
+};
 
 export const outcomesForComponent = (c: { key: string; label?: string }) =>
   KIND_OUTCOMES[componentKind(c.key, c.label)];
