@@ -60,6 +60,8 @@ const BeneficiaryFormDialog = ({
   const [referringFacilityId, setReferringFacilityId] = useState<string>(
     existing?.referring_facility_id || "",
   );
+  // Washington Group screening pops up right after a successful save.
+  const [wgRow, setWgRow] = useState<BeneficiaryRow | null>(null);
 
 
   const sections = useMemo(
