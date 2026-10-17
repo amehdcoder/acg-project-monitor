@@ -27,6 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { LOGFRAME, LOGFRAME_PROJECT, flatIndicators, numericTarget, type AutoKey, type FlatIndicator } from "@/lib/programmeModule/logframe";
 import { aggregateIndicators } from "@/lib/programmeModule/programmeReport";
+import DisaggregationEditor from "./DisaggregationEditor";
 
 const db = supabase as unknown as {
   from: (t: string) => any; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -297,19 +298,12 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
             />
           </div>
           {ind.disaggregation && ind.disaggregation.length > 0 && (
-            <div>
-              <Label className="text-[11px] uppercase text-muted-foreground">Disaggregation</Label>
-              <div className="mt-2 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {ind.disaggregation.map((d) => (
-                  <div key={d} className="min-w-0">
-                    <Label htmlFor={`report-${ind.code}-${d}`} className="text-xs text-muted-foreground">{d}</Label>
-                    <Input id={`report-${ind.code}-${d}`} value={draft?.disaggregation?.[d] || ""}
-                      onChange={(e) => setDraft(ind.code, { disaggregation: { ...(draft?.disaggregation || {}), [d]: e.target.value } })}
-                      className="mt-1 h-[52px] w-full" />
-                  </div>
-                ))}
-              </div>
-            </div>
+            <DisaggregationEditor
+              labels={ind.disaggregation}
+              values={draft?.disaggregation || {}}
+              onChange={(next) => setDraft(ind.code, { disaggregation: next })}
+              idPrefix={`report-${ind.code}`}
+            />
           )}
         </div>
         <div className="mt-3">
