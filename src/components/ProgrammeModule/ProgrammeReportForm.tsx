@@ -95,6 +95,17 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
 
   const indicators = useMemo(() => flatIndicators(), []);
 
+  const loadHistoryEntries = useCallback(async (rows: ReportRow[]) => {
+    if (rows.length === 0) { setHistoryEntries({}); return; }
+    const ids = rows.map((r) => r.id);
+    const { data } = await db.from("programme_report_entries").select("report_id, indicator_code, value, risk").in("report_id", ids);
+    const grouped: Record<string, { indicator_code: string; value: number | null; risk: string | null }[]> = {};
+    for (const e of (data || []) as { report_id: string; indicator_code: string; value: number | null; risk: string | null }[]) {
+      (grouped[e.report_id] ||= []).push(e);
+    }
+    setHistoryEntries(grouped);
+  }, []);
+
   const loadReports = useCallback(async () => {
     const { data } = await db.from("programme_reports").select("id, period_label, report_year, notes, created_at, created_by, status, reviewed_by, reviewed_at, resolution_note").eq("project_id", projectId).order("created_at", { ascending: false });
     const rows = (data || []) as ReportRow[];
@@ -190,17 +201,6 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
     if (Number.isFinite(draftVal)) sum += draftVal;
     return sum;
   };
-
-  const loadHistoryEntries = useCallback(async (rows: ReportRow[]) => {
-    if (rows.length === 0) { setHistoryEntries({}); return; }
-    const ids = rows.map((r) => r.id);
-    const { data } = await db.from("programme_report_entries").select("report_id, indicator_code, value, risk").in("report_id", ids);
-    const grouped: Record<string, { indicator_code: string; value: number | null; risk: string | null }[]> = {};
-    for (const e of (data || []) as { report_id: string; indicator_code: string; value: number | null; risk: string | null }[]) {
-      (grouped[e.report_id] ||= []).push(e);
-    }
-    setHistoryEntries(grouped);
-  }, []);
 
   const openHistory = async () => {
     setHistoryOpen(true);
