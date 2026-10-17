@@ -1,5 +1,7 @@
 # Architecture rules
 
+- Keep major longitudinal workspace tabs separate from grouped record navigation, with Programme Report using the same project-scoped access gate — why: reporting is directly reachable without duplicating Overview entries or bypassing permissions.
+
 - Dispatch CCFF paths to a standalone form-only shell before mounting workspace providers; use anonymous public-function requests and published QR origins — why: community visitors cannot enter records through form navigation, shared overlays, error states or editor-only links.
 
 - Filter the beneficiary workflow tour through the workspace's visible destinations, effective permissions and configured component list — why: guidance stays aligned with actual access and project forms without introducing a separate permission system.
