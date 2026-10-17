@@ -66,14 +66,24 @@ const FeedbackForm = () => {
     let alive = true;
     (async () => {
       if (!projectId) { setProjectState("missing"); return; }
-      const { data, error: err } = await supabase
-        .from("projects")
-        .select("name")
-        .eq("id", projectId)
-        .maybeSingle();
-      if (!alive) return;
-      if (err || !data) setProjectState("missing");
-      else { setProjectName((data as { name: string }).name); setProjectState("ok"); }
+      // The project name is served by the public function — anonymous visitors
+      // cannot read the projects table directly.
+      const base = import.meta.env.VITE_SUPABASE_URL as string;
+      const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+      try {
+        const res = await fetch(
+          `${base}/functions/v1/submit-feedback?project_id=${encodeURIComponent(projectId)}`,
+          { headers: { apikey: key } },
+        );
+        if (!alive) return;
+        if (!res.ok) { setProjectState("missing"); return; }
+        const data = (await res.json()) as { name?: string };
+        if (!data.name) { setProjectState("missing"); return; }
+        setProjectName(data.name);
+        setProjectState("ok");
+      } catch {
+        if (alive) setProjectState("missing");
+      }
     })();
     return () => { alive = false; };
   }, [projectId]);

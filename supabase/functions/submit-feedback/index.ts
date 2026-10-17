@@ -47,6 +47,20 @@ const json = (body: unknown, status = 200) =>
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  // GET ?project_id=… → public-safe project name for the form header.
+  if (req.method === "GET") {
+    const pid = new URL(req.url).searchParams.get("project_id") || "";
+    if (!pid) return json({ error: "project_id required" }, 400);
+    const { data } = await supabase
+      .from("projects")
+      .select("name")
+      .eq("id", pid)
+      .maybeSingle();
+    if (!data) return json({ error: "Unknown project" }, 404);
+    return json({ name: (data as { name: string }).name });
+  }
+
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   let body: Record<string, unknown>;
