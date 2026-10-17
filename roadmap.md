@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Move Programme Report to the major tab between Beneficiary Records and Record Quality Brain; refine the reporting interface and verify navigation.
+
 - [x] Fix CCFF QR/deep links and verify isolated public form, error and confirmation screens without record/dashboard access.
 
 - [x] Complete and verify the permission-aware longitudinal beneficiary guided tour, including safeguarding and vaulting.
