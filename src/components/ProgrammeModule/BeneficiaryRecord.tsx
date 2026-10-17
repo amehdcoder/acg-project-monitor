@@ -431,6 +431,49 @@ const BeneficiaryRecord = ({
                   )}
                 </Card>
 
+                <Card className="p-4">
+                  <h3 className="mb-2 flex items-center gap-2 font-semibold text-foreground">
+                    <Accessibility className="h-4 w-4 text-primary" /> Disability (Washington Group)
+                  </h3>
+                  <Separator className="mb-2" />
+                  {(() => {
+                    const wg = readWgResult(profile);
+                    if (!wg) {
+                      return (
+                        <div className="space-y-2">
+                          <p className="text-sm text-muted-foreground">
+                            The six-question disability screening has not been completed for this beneficiary.
+                          </p>
+                          <Button variant="link" size="sm" className="h-auto px-0" onClick={() => setEditOpen(true)}>
+                            Complete screening
+                          </Button>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="space-y-2">
+                        <FieldRow
+                          label="Classification"
+                          value={wg.hasDisability ? "Person with a disability" : "No disability identified"}
+                        />
+                        {wg.hasDisability && (
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {wg.disabilityDomains.map((d) => (
+                              <span key={d}
+                                className="rounded-full border border-primary/40 bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                                {d}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          Screened {new Date(wg.completed_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    );
+                  })()}
+                </Card>
+
                 {!!config.layout.clinicalFields.length && (
                   <Card className="p-4">
                     <h3 className="mb-2 font-semibold text-foreground">Key Clinical & Social Information</h3>
