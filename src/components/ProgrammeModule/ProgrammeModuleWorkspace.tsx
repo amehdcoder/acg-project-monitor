@@ -23,7 +23,7 @@ import {
   Plus, Settings2, CloudOff, RefreshCw, Layers, Users, Building2, ShieldAlert,
   LayoutGrid, CalendarClock, Hospital, Route, ShieldCheck, Home, Network, Activity,
   Search, Briefcase, Share2, ChevronDown, SlidersHorizontal, BarChart3,
-  Trash2,
+  Trash2, MessageSquareHeart,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -57,6 +57,7 @@ import CddCaseSearchPanel from "./CddCaseSearchPanel";
 import LivelihoodPanel from "./LivelihoodPanel";
 import HealthExchangePanel from "./HealthExchangePanel";
 import GeneralDashboard from "./GeneralDashboard";
+import FeedbackReportsPanel from "./FeedbackReportsPanel";
 import WorkspaceNavigation, { type WorkspaceNavGroup, type WorkspaceView } from "./WorkspaceNavigation";
 import { useIsSafeguardingOfficer } from "@/lib/programmeModule/safeguarding";
 import { useMyFacilityAccess } from "@/lib/programmeModule/facilities";
@@ -205,6 +206,7 @@ const ProgrammeModuleWorkspace = ({
       items: [
         { key: "safeguarding_dashboard", label: "Safeguarding dashboard", description: "Restricted caseload oversight and outcomes", icon: ShieldAlert, show: isOfficer && can("view_safeguarding") },
         { key: "safeguarding", label: "Safeguarding cases", description: "Restricted concerns, actions and secure notes", icon: ShieldCheck, show: isOfficer && can("view_safeguarding") },
+        { key: "feedback", label: "Community feedback", description: "Public complaints & feedback form, QR code and reports", icon: MessageSquareHeart, show: canConfigure || can("view_records") || canDash },
       ],
     },
   ];
@@ -568,6 +570,14 @@ const ProgrammeModuleWorkspace = ({
 
       {view === "exchange" && projectId && (
         <HealthExchangePanel projectId={projectId} canManage={canConfigure} />
+      )}
+
+      {view === "feedback" && projectId && (
+        <FeedbackReportsPanel
+          projectId={projectId}
+          projectName={active?.name || "this project"}
+          canManage={isOwner || isSuperAdmin}
+        />
       )}
 
       {view === "safeguarding" && (
