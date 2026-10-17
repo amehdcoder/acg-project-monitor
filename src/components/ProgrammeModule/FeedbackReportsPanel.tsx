@@ -20,7 +20,7 @@ import FeedbackQrCard from "./FeedbackQrCard";
 
 // Newly created tables are not yet in the generated Supabase types.
 const db = supabase as unknown as {
-  from: (table: string) => ReturnType<typeof supabase.from>;
+  from: (t: string) => any; // eslint-disable-line @typescript-eslint/no-explicit-any
 };
 
 interface FeedbackRow {
