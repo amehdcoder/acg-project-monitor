@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle, BarChart3, CalendarRange, CheckCircle2, ChevronDown, ChevronRight,
   ClipboardList, History, Loader2, RefreshCw, Save, Sparkles, Target, Trash2,
-  UserPlus, Users, X,
+  UserPlus, Users, Search, ChevronsDownUp, ChevronsUpDown,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
@@ -55,8 +55,8 @@ interface OfficerRow {
 
 const TONES = {
   blue: { bar: "bg-health-blue", soft: "bg-health-blue/10 text-health-blue", border: "border-health-blue/25" },
-  teal: { bar: "bg-teal-600", soft: "bg-teal-600/10 text-teal-700", border: "border-teal-600/25" },
-  amber: { bar: "bg-amber-600", soft: "bg-amber-600/10 text-amber-700", border: "border-amber-600/25" },
+  teal: { bar: "bg-health-teal", soft: "bg-health-teal/10 text-health-teal", border: "border-health-teal/25" },
+  amber: { bar: "bg-status-warning", soft: "bg-status-warning/10 text-status-warning", border: "border-status-warning/25" },
 } as const;
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -84,6 +84,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
   const [officersOpen, setOfficersOpen] = useState(false);
   const [officerEmail, setOfficerEmail] = useState("");
   const [officerBusy, setOfficerBusy] = useState(false);
+  const [search, setSearch] = useState("");
 
   const indicators = useMemo(() => flatIndicators(), []);
 
@@ -249,75 +250,76 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
     const pct = yearTarget && yearTarget > 0 ? Math.min(100, Math.round((cumulative / yearTarget) * 100)) : null;
     const t = TONES[tone];
     return (
-      <div key={ind.code} className={cn("rounded-lg border bg-card p-4 shadow-soft", t.border)}>
+      <div key={ind.code} className={cn("rounded-lg border border-l-4 bg-card p-4 shadow-soft sm:p-5", t.border)}>
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className={cn("rounded-sm px-1.5 py-0.5 font-mono text-[10px] font-bold", t.soft)}>{ind.code}</span>
-              {ind.autoKey && (
-                <span className="inline-flex items-center gap-1 rounded-sm bg-emerald-600/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+              {draft?.auto && (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-status-success">
                   <Sparkles className="h-3 w-3" /> Auto-aggregated from records
                 </span>
               )}
             </div>
-            <p className="mt-1.5 text-sm font-semibold leading-snug text-health-ink">{ind.title}</p>
+            <p className="mt-2 text-base font-semibold leading-relaxed text-foreground">{ind.title}</p>
             {ind.mov && <p className="mt-0.5 text-xs text-muted-foreground">MoV: {ind.mov}</p>}
           </div>
-          <div className="flex shrink-0 flex-col items-end gap-1 text-right">
-            <div className="flex gap-3 text-[11px] text-muted-foreground">
+          <div className="flex w-full flex-col gap-2 border-t border-border/60 pt-3 xl:w-auto xl:items-end xl:border-0 xl:pt-0">
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
               <span>Baseline: <span className="font-semibold text-health-ink">{ind.baseline || "0"}</span></span>
               <span>Year {reportYear} target: <span className="font-semibold text-health-ink">{ind.targets[yearIdx] ?? "—"}</span></span>
               {ind.totalTarget && <span>Total: <span className="font-semibold text-health-ink">{ind.totalTarget}</span></span>}
             </div>
             {pct !== null && (
-              <div className="w-44">
+              <div className="w-full max-w-xs">
                 <div className="flex items-center justify-between text-[10px] font-semibold">
                   <span className="text-muted-foreground">Progress to Year {reportYear} target</span>
-                  <span className={pct >= 100 ? "text-emerald-700" : "text-health-blue"}>{pct}%</span>
+                  <span className={pct >= 100 ? "text-status-success" : "text-health-blue"}>{pct}%</span>
                 </div>
                 <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-muted">
-                  <div className={cn("h-full rounded-full transition-all", pct >= 100 ? "bg-emerald-600" : t.bar)} style={{ width: `${pct}%` }} />
+                  <div className={cn("h-full rounded-full transition-all", pct >= 100 ? "bg-status-success" : t.bar)} style={{ width: `${pct}%` }} />
                 </div>
               </div>
             )}
           </div>
         </div>
 
-        <div className="mt-3 grid gap-3 md:grid-cols-[160px_1fr]">
+        <div className="mt-5 grid gap-5 lg:grid-cols-[200px_1fr]">
           <div>
-            <Label className="text-[11px] uppercase text-muted-foreground">Value this period{ind.isPercent ? " (% / proportion)" : ""}</Label>
+            <Label htmlFor={`report-value-${ind.code}`} className="text-sm font-medium text-foreground">Value this period{ind.isPercent ? " (% / proportion)" : ""}</Label>
             <Input
+              id={`report-value-${ind.code}`}
               type="number"
               value={draft?.value || ""}
               onChange={(e) => setDraft(ind.code, { value: e.target.value, auto: false })}
               placeholder={ind.autoKey ? "Auto from records" : "Enter value"}
-              className={cn("mt-1", draft?.auto && "border-emerald-500/40 bg-emerald-50/40")}
+              className={cn("mt-2 h-[52px] text-lg font-semibold tabular-nums", draft?.auto && "border-status-success/40 bg-status-success/5")}
             />
           </div>
           {ind.disaggregation && ind.disaggregation.length > 0 && (
             <div>
               <Label className="text-[11px] uppercase text-muted-foreground">Disaggregation</Label>
-              <div className="mt-1 flex flex-wrap gap-2">
+              <div className="mt-2 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {ind.disaggregation.map((d) => (
-                  <Input
-                    key={d}
-                    value={draft?.disaggregation?.[d] || ""}
-                    onChange={(e) => setDraft(ind.code, { disaggregation: { ...(draft?.disaggregation || {}), [d]: e.target.value } })}
-                    placeholder={d}
-                    className="h-9 w-40 text-xs"
-                  />
+                  <div key={d} className="min-w-0">
+                    <Label htmlFor={`report-${ind.code}-${d}`} className="text-xs text-muted-foreground">{d}</Label>
+                    <Input id={`report-${ind.code}-${d}`} value={draft?.disaggregation?.[d] || ""}
+                      onChange={(e) => setDraft(ind.code, { disaggregation: { ...(draft?.disaggregation || {}), [d]: e.target.value } })}
+                      className="mt-1 h-[52px] w-full" />
+                  </div>
                 ))}
               </div>
             </div>
           )}
         </div>
         <div className="mt-3">
-          <Label className="inline-flex items-center gap-1 text-[11px] uppercase text-muted-foreground"><AlertTriangle className="h-3 w-3" /> Risks / challenges encountered</Label>
+          <Label htmlFor={`report-risk-${ind.code}`} className="inline-flex items-center gap-2 text-sm font-medium text-status-warning"><AlertTriangle className="h-3 w-3" /> Risks / challenges encountered</Label>
           <Textarea
+            id={`report-risk-${ind.code}`}
             value={draft?.risk || ""}
             onChange={(e) => setDraft(ind.code, { risk: e.target.value })}
             placeholder="e.g. stock-outs delayed outreach; insecurity limited access to 2 wards…"
-            className="mt-1 min-h-14 text-xs"
+            className="mt-2 min-h-20 text-sm"
           />
         </div>
       </div>
@@ -325,15 +327,16 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
   };
 
   return (
-    <div className="space-y-4">
-      <Card className="overflow-hidden border-health-blue/20 shadow-soft">
-        <div className="bg-health-surface px-5 py-4">
+    <div className="space-y-6">
+      <section className="overflow-hidden border-b border-border">
+        <div className="border-t-4 border-health-teal bg-health-surface px-4 py-6 sm:px-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-md bg-health-blue text-primary-foreground"><ClipboardList className="h-5 w-5" /></span>
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-health-teal/10 text-health-teal"><ClipboardList className="h-5 w-5" /></span>
               <div>
                 <p className="text-[10px] font-bold uppercase text-health-blue">Programme Report — {LOGFRAME_PROJECT.id}</p>
-                <h3 className="font-report-display text-lg font-bold text-health-ink">{LOGFRAME_PROJECT.name}</h3>
+                <h3 className="text-2xl font-bold text-foreground">Programme Report</h3>
+                <p className="mt-1 text-sm font-semibold text-health-teal">{LOGFRAME_PROJECT.name}</p>
                 <p className="text-xs text-muted-foreground">{LOGFRAME_PROJECT.impact}</p>
               </div>
             </div>
@@ -350,28 +353,28 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
           </div>
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
-              { label: "Logframe indicators", value: indicators.length, icon: BarChart3 },
-              { label: "Filled this period", value: filledCount, icon: CheckCircle2 },
-              { label: "Auto-aggregated", value: autoCount, icon: Sparkles },
-              { label: "Risks logged", value: riskCount, icon: AlertTriangle },
+              { label: "Logframe indicators", value: indicators.length, icon: BarChart3, tone: "bg-health-blue/10 text-health-blue" },
+              { label: "Filled this period", value: filledCount, icon: CheckCircle2, tone: "bg-health-teal/10 text-health-teal" },
+              { label: "Auto-aggregated", value: autoCount, icon: Sparkles, tone: "bg-records-cyan/10 text-records-cyan" },
+              { label: "Risks logged", value: riskCount, icon: AlertTriangle, tone: "bg-status-warning/10 text-status-warning" },
             ].map((s) => (
-              <div key={s.label} className="rounded-md border border-health-blue/15 bg-card px-3 py-2.5">
-                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-muted-foreground"><s.icon className="h-3.5 w-3.5 text-health-blue" />{s.label}</div>
-                <p className="mt-0.5 font-report-display text-xl font-bold text-health-ink">{s.value}</p>
+              <div key={s.label} className="flex min-w-0 items-center gap-3 rounded-lg border border-border bg-card p-3 shadow-soft">
+                <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", s.tone)}><s.icon className="h-5 w-5" /></span>
+                <div><p className="text-2xl font-bold tabular-nums text-foreground">{s.value}</p><p className="text-xs text-muted-foreground">{s.label}</p></div>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="flex flex-wrap items-end gap-3 border-t border-health-blue/15 px-5 py-4">
+        <div className="flex flex-wrap items-end gap-4 border-t border-border px-4 py-5 sm:px-6">
           <div>
-            <Label className="text-[11px] uppercase text-muted-foreground">Reporting period</Label>
-            <Input value={period} onChange={(e) => setPeriod(e.target.value)} className="mt-1 w-48" placeholder="e.g. October 2026" />
+            <Label htmlFor="programme-report-period" className="text-sm font-medium">Reporting period</Label>
+            <Input id="programme-report-period" value={period} onChange={(e) => setPeriod(e.target.value)} className="mt-2 h-[52px] w-full sm:w-52" placeholder="e.g. October 2026" />
           </div>
           <div>
-            <Label className="text-[11px] uppercase text-muted-foreground">Programme year</Label>
+            <Label htmlFor="programme-report-year" className="text-sm font-medium">Programme year</Label>
             <Select value={reportYear} onValueChange={setReportYear}>
-              <SelectTrigger className="mt-1 w-36"><SelectValue /></SelectTrigger>
+              <SelectTrigger id="programme-report-year" className="mt-2 h-[52px] w-36"><SelectValue /></SelectTrigger>
               <SelectContent className="z-[1200] bg-popover">
                 {["1", "2", "3", "4"].map((y) => <SelectItem key={y} value={y}>Year {y}</SelectItem>)}
               </SelectContent>
@@ -385,39 +388,53 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save report
           </Button>
         </div>
-      </Card>
+      </section>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative min-w-0 flex-1 basis-64">
+          <Search className="absolute left-3 top-4 h-4 w-4 text-muted-foreground" />
+          <Input aria-label="Search report indicators" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search indicator or code…" className="h-[52px] pl-10" />
+        </div>
+        <Button variant="outline" className="min-h-[52px] gap-2" onClick={() => setExpanded(Object.fromEntries(LOGFRAME.flatMap((obj) => obj.results.map((res) => [res.key, true]))))}><ChevronsUpDown className="h-4 w-4" /> Expand all</Button>
+        <Button variant="ghost" className="min-h-[52px] gap-2" onClick={() => setExpanded({})}><ChevronsDownUp className="h-4 w-4" /> Collapse all</Button>
+      </div>
 
       {LOGFRAME.map((obj) => {
         const t = TONES[obj.tone];
+        const matches = (ind: { code: string; title: string; indicator?: string }) => `${ind.code} ${ind.title} ${ind.indicator || ""}`.toLowerCase().includes(search.trim().toLowerCase());
+        const results = obj.results.filter((res) => [...res.indicators, ...res.activities].some(matches));
+        if (!results.length) return null;
         return (
-          <Card key={obj.key} className={cn("overflow-hidden border shadow-soft", t.border)}>
-            <div className={cn("px-5 py-3", t.soft)}>
+          <section key={obj.key} className="space-y-4">
+            <div className={cn("flex items-start gap-3 rounded-lg border-l-4 px-5 py-4", t.soft, t.border)}>
+              <Target className="mt-1 h-6 w-6 shrink-0" /><div>
               <p className="text-[10px] font-bold uppercase">{obj.title}</p>
-              <p className="text-sm font-semibold leading-snug">{obj.statement}</p>
+              <p className="mt-1 text-base font-semibold leading-relaxed">{obj.statement}</p>
+              </div>
             </div>
-            <div className="space-y-3 p-4">
-              {obj.results.map((res) => {
-                const isOpen = expanded[res.key] ?? false;
+            <div className="space-y-4">
+              {results.map((res) => {
+                const isOpen = search.trim() ? true : expanded[res.key] ?? false;
                 const count = res.indicators.length + res.activities.length;
                 return (
-                  <div key={res.key} className="rounded-lg border border-border/60">
-                    <button
-                      className="flex w-full items-center gap-2 px-4 py-2.5 text-left"
+                  <div key={res.key} className="space-y-3">
+                    <Button variant="ghost" aria-expanded={isOpen}
+                      className="flex min-h-[52px] h-auto w-full items-center gap-3 whitespace-normal px-2 py-3 text-left"
                       onClick={() => setExpanded((p) => ({ ...p, [res.key]: !isOpen }))}
                     >
                       {isOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                       <span className="flex-1 text-sm font-semibold text-health-ink">{res.title}</span>
-                      <Badge variant="secondary" className="text-[10px]">{count} indicators</Badge>
-                    </button>
+                      <span className="shrink-0 text-xs font-medium text-muted-foreground">{[...res.indicators, ...res.activities].filter((ind) => drafts[ind.code]?.value.trim()).length}/{count}</span>
+                    </Button>
                     {isOpen && (
-                      <div className="space-y-3 border-t border-border/60 p-3">
-                        {res.indicators.map((ind) =>
+                      <div className="space-y-4">
+                        {res.indicators.filter(matches).map((ind) =>
                           renderIndicator(
                             { ...ind, objectiveKey: obj.key, objectiveTitle: obj.title, resultKey: res.key, resultTitle: res.title, kind: res.key.endsWith("outcome") ? "outcome" : "result" },
                             obj.tone,
                           ),
                         )}
-                        {res.activities.map((act) =>
+                        {res.activities.filter(matches).map((act) =>
                           renderIndicator(
                             {
                               code: act.code, title: `${act.title} — ${act.indicator}`, mov: act.mov,
@@ -434,19 +451,19 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
                 );
               })}
             </div>
-          </Card>
+          </section>
         );
       })}
 
-      <Card className="border-health-blue/20 p-4 shadow-soft">
-        <Label className="text-[11px] uppercase text-muted-foreground">Overall narrative notes for this period</Label>
-        <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="mt-1 min-h-20" placeholder="Summary of progress, cross-cutting risks, and support needed…" />
+      <section className="border-t border-border pt-5">
+        <Label htmlFor="programme-report-notes" className="text-base font-semibold">Overall narrative notes for this period</Label>
+        <Textarea id="programme-report-notes" value={notes} onChange={(e) => setNotes(e.target.value)} className="mt-3 min-h-28" placeholder="Summary of progress, cross-cutting risks, and support needed…" />
         <div className="mt-3 flex justify-end">
           <Button className="gap-1.5" onClick={save} disabled={saving}>
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save report
           </Button>
         </div>
-      </Card>
+      </section>
 
       <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
         <DialogContent className="max-w-2xl">
