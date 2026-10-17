@@ -12,7 +12,7 @@ export type WorkspaceView =
   | "guide"
   | "dashboard" | "records" | "journey" | "facility" | "followups" | "households"
   | "clusters" | "network" | "risk" | "casesearch" | "livelihood" | "safeguarding"
-  | "safeguarding_dashboard" | "team" | "exchange";
+  | "safeguarding_dashboard" | "team" | "exchange" | "feedback";
 
 export interface WorkspaceNavItem {
   key: WorkspaceView;

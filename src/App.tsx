@@ -21,6 +21,7 @@ import Install from "./pages/Install";
 import HandCard from "./pages/HandCard";
 import CaseLink from "./pages/CaseLink";
 import MhgapGuide from "./pages/MhgapGuide";
+import FeedbackForm from "./pages/FeedbackForm";
 import DataCleaner from "./pages/DataCleaner";
 import KoboHubPage from "./components/KoboHub/KoboHubPage";
 import MdaAnalysesHarness from "./pages/MdaAnalysesHarness";
@@ -188,6 +189,7 @@ const App = () => (
                         project and open the record in the records workspace. */}
                     <Route path="/cases" element={<ProtectedRoute><CaseLink /></ProtectedRoute>} />
                     <Route path="/mhgap-guide" element={<ProtectedRoute><MhgapGuide /></ProtectedRoute>} />
+                    <Route path="/feedback/:projectId" element={<FeedbackForm />} />
                     <Route path="/witness/:surveyId/:hhId" element={<CESWitnessForm />} />
                     <Route path="/satellite-messenger" element={<ProtectedRoute><OffGridSatelliteMessenger /></ProtectedRoute>} />
                    <Route path="/data-cleaner" element={<ProtectedRoute><DataCleaner /></ProtectedRoute>} />
