@@ -196,6 +196,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
     }));
   };
 
+  const pendingCount = reports.filter((r) => r.status !== "resolved").length;
   const filledCount = Object.values(drafts).filter((d) => d.value.trim() !== "").length;
   const riskCount = Object.values(drafts).filter((d) => d.risk.trim() !== "").length;
   const autoCount = Object.values(drafts).filter((d) => d.auto && d.value.trim() !== "").length;
