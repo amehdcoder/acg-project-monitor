@@ -1,6 +1,7 @@
 # Roadmap
 
-- [ ] Move Programme Report to the major tab between Beneficiary Records and Record Quality Brain; refine the reporting interface and verify navigation.
+- [x] Move Programme Report to the major tab between Beneficiary Records and Record Quality Brain; refine the reporting interface and verify isolated tab navigation and desktop/mobile layout.
+- [ ] Verify updated report navigation in the authenticated live workspace — managed preview session is immediately signed out; isolated form/tab tests passed.
 
 - [x] Fix CCFF QR/deep links and verify isolated public form, error and confirmation screens without record/dashboard access.
 

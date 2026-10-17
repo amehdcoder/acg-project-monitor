@@ -330,10 +330,10 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
     <div className="space-y-6">
       <section className="overflow-hidden border-b border-border">
         <div className="border-t-4 border-health-teal bg-health-surface px-4 py-6 sm:px-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex min-w-0 flex-1 items-start gap-3">
+          <div className="flex flex-col items-start justify-between gap-4 lg:flex-row">
+            <div className="flex min-w-0 w-full flex-1 items-start gap-3">
               <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-health-teal/10 text-health-teal"><ClipboardList className="h-5 w-5" /></span>
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-[10px] font-bold uppercase text-health-blue">Programme Report — {LOGFRAME_PROJECT.id}</p>
                 <h3 className="text-2xl font-bold text-foreground">Programme Report</h3>
                 <p className="mt-1 text-sm font-semibold text-health-teal">{LOGFRAME_PROJECT.name}</p>
