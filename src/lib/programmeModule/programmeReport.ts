@@ -21,7 +21,7 @@ export const aggregateIndicators = async (
 
   const [{ data: bens }, { data: services }, { data: referrals }, { data: visits }, { data: livelihood }, { data: feedback }] =
     await Promise.all([
-      db.from("beneficiaries").select("id, gender, date_of_birth, wg_has_disability").eq("project_id", projectId),
+      db.from("beneficiaries").select("id, profile").eq("project_id", projectId),
       db.from("beneficiary_services").select("beneficiary_id, component, service_type, outcome, created_at").eq("project_id", projectId),
       db.from("beneficiary_referrals").select("id, status").eq("project_id", projectId),
       db.from("beneficiary_home_visits").select("id").eq("project_id", projectId),

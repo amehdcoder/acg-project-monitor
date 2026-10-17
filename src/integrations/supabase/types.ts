@@ -10010,6 +10010,10 @@ export type Database = {
           period_label: string
           project_id: string
           report_year: number
+          resolution_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
         }
         Insert: {
           created_at?: string
@@ -10019,6 +10023,10 @@ export type Database = {
           period_label: string
           project_id: string
           report_year?: number
+          resolution_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
         }
         Update: {
           created_at?: string
@@ -10028,6 +10036,10 @@ export type Database = {
           period_label?: string
           project_id?: string
           report_year?: number
+          resolution_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
         }
         Relationships: [
           {
