@@ -6,7 +6,7 @@
 // inside the report entry's disaggregation object.
 
 import { useMemo, useState } from "react";
-import { ChevronDown, MapPin, Plus } from "lucide-react";
+import { ChevronDown, MapPin, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
