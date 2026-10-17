@@ -26,7 +26,7 @@ const tone: Record<string, string> = {
   declined: "border-red-400/40 bg-red-500/10 text-red-700",
 };
 
-/** Deletion requests raised by administrators, decided by a project Super Admin or the Owner. */
+/** Deletion requests raised by administrators, decided by a project Super Admin. */
 const DeleteRequestsPanel = ({ open, onOpenChange, projectId, onDecided }: Props) => {
   const { toast } = useToast();
   const { requests, loading, reload } = useDeleteRequests(projectId);
@@ -59,7 +59,7 @@ const DeleteRequestsPanel = ({ open, onOpenChange, projectId, onDecided }: Props
 
         <p className="text-sm text-muted-foreground">
           Administrators can request removal of a registered beneficiary. Only a Super Admin assigned
-          to this project, or the Owner, can approve it.
+          to this project can approve it.
         </p>
 
         <div className="space-y-3">
@@ -94,7 +94,7 @@ const DeleteRequestsPanel = ({ open, onOpenChange, projectId, onDecided }: Props
                 </div>
               )}
               {r.status === "pending" && !canApprove && (
-                <p className="text-xs text-muted-foreground">Awaiting Super Admin or Owner approval.</p>
+                <p className="text-xs text-muted-foreground">Awaiting Super Admin approval.</p>
               )}
               {r.review_note && <p className="text-xs text-muted-foreground">Note: {r.review_note}</p>}
             </Card>

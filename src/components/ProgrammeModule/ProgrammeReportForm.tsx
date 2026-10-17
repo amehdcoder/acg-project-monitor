@@ -721,7 +721,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><Users className="h-5 w-5 text-health-blue" /> Programme Officers</DialogTitle>
-            <DialogDescription>Only designated Programme Officers (and the Owner / Super Admins) can see and fill the Programme Report Form.</DialogDescription>
+            <DialogDescription>Only designated Programme Officers and Super Admins can see and fill the Programme Report Form.</DialogDescription>
           </DialogHeader>
           <div>
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Project users</p>

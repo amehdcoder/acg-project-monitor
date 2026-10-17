@@ -118,7 +118,7 @@ const BeneficiaryRecord = ({
       await requestBeneficiaryDeletion({ beneficiary, reason: deleteReason });
       toast({
         title: "Deletion request sent",
-        description: "A Super Admin on this project, or the Owner, must approve it.",
+        description: "A Super Admin on this project must approve it.",
       });
       setDeleteOpen(false);
       setDeleteReason("");
@@ -798,7 +798,7 @@ const BeneficiaryRecord = ({
           <AlertDialogHeader>
             <AlertDialogTitle>Request deletion of {beneficiary.full_name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              The record is only removed after a Super Admin assigned to this project, or the Owner,
+              The record is only removed after a Super Admin assigned to this project
               approves the request.
             </AlertDialogDescription>
           </AlertDialogHeader>

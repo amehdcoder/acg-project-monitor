@@ -139,7 +139,7 @@ const ProgrammeModuleWorkspace = ({
   const canDash = can("view_dashboards") || ((isHealthWorker || isProgrammeStaff) && can("view_records"));
   const [view, setView] = useState<WorkspaceView>(() => canDash ? "dashboard" : "records");
 
-  // Designated Programme Officers (plus Owner / Super Admins) see and fill the
+  // Designated Programme Officers (plus Super Admins) see and fill the
   // Programme Report Form built on the project logframe.
   const [isProgrammeOfficer, setIsProgrammeOfficer] = useState(false);
   useEffect(() => {

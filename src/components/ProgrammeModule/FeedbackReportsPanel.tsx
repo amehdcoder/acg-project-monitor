@@ -204,7 +204,7 @@ const FeedbackReportsPanel = ({ projectId, projectName, canManage }: Props) => {
         <ShieldCheck className="mx-auto h-10 w-10 text-slate-300" />
         <h3 className="mt-3 font-semibold text-slate-900">Restricted area</h3>
         <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500">
-          Community feedback reports are confidential. Only the project Owner, Super Admins and
+          Community feedback reports are confidential. Only Super Admins and
           approved viewers can see them.
         </p>
       </div>
@@ -359,7 +359,7 @@ const FeedbackReportsPanel = ({ projectId, projectName, canManage }: Props) => {
           <DialogHeader>
             <DialogTitle>Who can see these reports</DialogTitle>
             <DialogDescription>
-              The project Owner and Super Admins always have access. Add other trusted users below.
+              Super Admins always have access. Add other trusted users below.
             </DialogDescription>
           </DialogHeader>
           <div className="flex gap-2">
