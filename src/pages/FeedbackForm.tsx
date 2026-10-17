@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
 import {
   AlertTriangle, CheckCircle2, HeartHandshake, Loader2, Lock,
   MessageSquareHeart, ShieldCheck, Sparkles,
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -40,10 +38,10 @@ const NIGERIAN_STATES = [
   "Plateau","Rivers","Sokoto","Taraba","Yobe","Zamfara",
 ];
 
-const FeedbackForm = () => {
-  const { projectId } = useParams<{ projectId: string }>();
+const FeedbackForm = ({ projectId }: { projectId?: string }) => {
   const [projectName, setProjectName] = useState<string | null>(null);
-  const [projectState, setProjectState] = useState<"loading" | "ok" | "missing">("loading");
+  const [projectState, setProjectState] = useState<"loading" | "ok" | "missing" | "unavailable">("loading");
+  const [lookupAttempt, setLookupAttempt] = useState(0);
 
   const [category, setCategory] = useState("");
   const [severity, setSeverity] = useState("standard");
@@ -64,6 +62,9 @@ const FeedbackForm = () => {
 
   useEffect(() => {
     let alive = true;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 15000);
+    setProjectState("loading");
     (async () => {
       if (!projectId) { setProjectState("missing"); return; }
       // The project name is served by the public function — anonymous visitors
@@ -73,20 +74,20 @@ const FeedbackForm = () => {
       try {
         const res = await fetch(
           `${base}/functions/v1/submit-feedback?project_id=${encodeURIComponent(projectId)}`,
-          { headers: { apikey: key } },
+          { headers: { apikey: key }, signal: controller.signal, credentials: "omit", cache: "no-store" },
         );
         if (!alive) return;
-        if (!res.ok) { setProjectState("missing"); return; }
+        if (!res.ok) { setProjectState([400, 404].includes(res.status) ? "missing" : "unavailable"); return; }
         const data = (await res.json()) as { name?: string };
         if (!data.name) { setProjectState("missing"); return; }
         setProjectName(data.name);
         setProjectState("ok");
       } catch {
-        if (alive) setProjectState("missing");
+        if (alive) setProjectState("unavailable");
       }
     })();
-    return () => { alive = false; };
-  }, [projectId]);
+    return () => { alive = false; controller.abort(); window.clearTimeout(timeout); };
+  }, [projectId, lookupAttempt]);
 
   const canSubmit = useMemo(
     () => category && message.trim().length >= 10 && consent && !submitting,
@@ -98,8 +99,12 @@ const FeedbackForm = () => {
     setSubmitting(true);
     setError(null);
     try {
-      const { data, error: fnErr } = await supabase.functions.invoke("submit-feedback", {
-        body: {
+      // Always anonymous: never attach a workspace user's saved access token.
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/submit-feedback`, {
+        method: "POST",
+        credentials: "omit",
+        headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({
           project_id: projectId,
           category,
           severity,
@@ -114,11 +119,11 @@ const FeedbackForm = () => {
           reporter_email: email || null,
           preferred_contact: preferredContact,
           consent_given: consent,
-        },
+        }),
       });
-      if (fnErr) throw fnErr;
-      if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
-      setReference((data as { reference: string }).reference);
+      const data = await response.json() as { error?: string; reference?: string };
+      if (!response.ok || data.error || !data.reference) throw new Error(data.error || "Could not send your report. Please try again.");
+      setReference(data.reference);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not send your report. Please try again.");
     } finally {
@@ -134,14 +139,15 @@ const FeedbackForm = () => {
     );
   }
 
-  if (projectState === "missing") {
+  if (projectState === "missing" || projectState === "unavailable") {
     return (
       <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 bg-slate-50 px-6 text-center">
         <AlertTriangle className="h-10 w-10 text-amber-500" />
-        <h1 className="text-xl font-semibold text-slate-900">This feedback link is not valid</h1>
+        <h1 className="text-xl font-semibold text-foreground">{projectState === "missing" ? "This feedback link is not valid" : "The feedback form is temporarily unavailable"}</h1>
         <p className="max-w-sm text-sm text-slate-500">
-          The link may have expired or been typed incorrectly. Please scan the QR code again or ask the programme team for a new link.
+          {projectState === "missing" ? "Please scan the QR code again or ask the programme team for a new feedback link." : "Check your internet connection and try again. You do not need to sign in."}
         </p>
+        {projectState === "unavailable" && <Button onClick={() => setLookupAttempt((n) => n + 1)}>Try again</Button>}
       </div>
     );
   }
