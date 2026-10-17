@@ -521,11 +521,38 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
             <DialogTitle className="flex items-center gap-2"><Users className="h-5 w-5 text-health-blue" /> Programme Officers</DialogTitle>
             <DialogDescription>Only designated Programme Officers (and the Owner / Super Admins) can see and fill the Programme Report Form.</DialogDescription>
           </DialogHeader>
-          <div className="flex gap-2">
-            <Input value={officerEmail} onChange={(e) => setOfficerEmail(e.target.value)} placeholder="officer@example.org" type="email" />
-            <Button onClick={addOfficer} disabled={officerBusy} className="gap-1.5">
-              {officerBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />} Add
-            </Button>
+          <div>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Project users</p>
+            <div className="max-h-48 space-y-1.5 overflow-y-auto rounded-lg border border-border/60 p-2">
+              {teamMembers.length === 0 && <p className="py-3 text-center text-xs text-muted-foreground">No project team members with user accounts yet.</p>}
+              {teamMembers.map((m) => {
+                const already = officers.some((o) => o.user_id === m.user_id);
+                return (
+                  <div key={m.user_id} className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-health-ink">{m.full_name || "Unnamed user"}</p>
+                      {m.email && <p className="truncate text-xs text-muted-foreground">{m.email}</p>}
+                    </div>
+                    {already ? (
+                      <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-status-success"><CheckCircle2 className="h-3.5 w-3.5" /> Officer</span>
+                    ) : (
+                      <Button size="sm" variant="outline" className="h-8 shrink-0 gap-1" disabled={officerBusy} onClick={() => designateOfficer(m.user_id, m.full_name || m.email || "user")}>
+                        <UserPlus className="h-3.5 w-3.5" /> Designate
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Add by email</p>
+            <div className="flex gap-2">
+              <Input value={officerEmail} onChange={(e) => setOfficerEmail(e.target.value)} placeholder="officer@example.org" type="email" />
+              <Button onClick={addOfficer} disabled={officerBusy} className="gap-1.5">
+                {officerBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />} Add
+              </Button>
+            </div>
           </div>
           <div className="max-h-64 space-y-2 overflow-y-auto">
             {officers.length === 0 && <p className="py-4 text-center text-sm text-muted-foreground">No Programme Officers designated yet.</p>}
