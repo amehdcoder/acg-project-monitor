@@ -168,7 +168,7 @@ const DisaggregationEditor = ({ labels, values, onChange, idPrefix }: Props) => 
         <div key={dim.key} className="mt-3 rounded-xl border border-health-teal/25 bg-health-teal/5 p-4">
           {dim.kind === "location" ? (
             <LocationPanel
-              raw={values[dim.label] ?? ""} idPrefix={`${idPrefix}-${dim.key}`}
+              dim={dim} raw={values[dim.label] ?? ""} idPrefix={`${idPrefix}-${dim.key}`}
               onChange={(v) => onChange({ ...values, [dim.label]: v })}
             />
           ) : (
