@@ -11,6 +11,8 @@ export interface DisaggDimension {
   /** Label shown in the form. */
   label: string;
   kind: DisaggKind;
+  /** For kind "location": deepest level this dimension captures. */
+  level?: "state" | "lga" | "ward";
   /** Option groups for kind "options". */
   groups?: { title: string; options: string[] }[];
   /** Allow a free-text "Other" option. */
@@ -57,7 +59,15 @@ const is = (label: string, ...words: string[]) => {
 /** Resolve a logframe disaggregation label (e.g. "Gender", "Age band") to a dimension. */
 export function dimensionFor(label: string): DisaggDimension {
   if (is(label, "state", "lga", "ward", "community", "location")) {
-    return { key: "location", label: "Location", kind: "location", hint: "Pick the State, then LGA, then Ward, and enter the value for that area." };
+    const l = label.toLowerCase();
+    const level: "state" | "lga" | "ward" = l.includes("ward") || l.includes("community") ? "ward" : l.includes("lga") ? "lga" : "state";
+    const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+    return {
+      key: `location_${slug}`, label, kind: "location", level,
+      hint: level === "state" ? "Pick the State and enter the value for it."
+        : level === "lga" ? "Pick the State, then the LGA, and enter the value for that LGA."
+        : "Pick the State, then LGA, then Ward, and enter the value for that area.",
+    };
   }
   if (is(label, "gender", "sex")) {
     return { key: "sex", label: "Sex", kind: "options", groups: [{ title: "Sex", options: SEX_OPTIONS }] };
