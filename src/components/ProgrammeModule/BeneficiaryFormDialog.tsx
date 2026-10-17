@@ -24,6 +24,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useProjectMhgapDrugs } from "./MhgapDrugsManager";
 import { BLOOD_GROUPS, HEALTH_FIELDS, healthValue } from "@/lib/programmeModule/healthFields";
+import WashingtonGroupDialog from "./WashingtonGroupDialog";
+import { classifyWg, readWgResult, WgAnswers } from "@/lib/programmeModule/washingtonGroup";
 
 interface Props {
   open: boolean;
@@ -58,6 +60,8 @@ const BeneficiaryFormDialog = ({
   const [referringFacilityId, setReferringFacilityId] = useState<string>(
     existing?.referring_facility_id || "",
   );
+  // Washington Group screening pops up right after a successful save.
+  const [wgRow, setWgRow] = useState<BeneficiaryRow | null>(null);
 
 
   const sections = useMemo(
@@ -164,8 +168,14 @@ const BeneficiaryFormDialog = ({
           toast({ title: "Saved offline", description: "It will sync automatically when you are back online." });
         }
       }
-      onSaved(savedRow);
-      onOpenChange(false);
+      // Open the WG-SS disability screening before closing — it applies to
+      // every beneficiary, including ones registered earlier.
+      if (savedRow && !savedRow.__pending) {
+        setWgRow(savedRow);
+      } else {
+        onSaved(savedRow);
+        onOpenChange(false);
+      }
       void flushQueue();
     } catch (e) {
       toast({ title: "Save failed", description: (e as Error).message, variant: "destructive" });
@@ -174,7 +184,40 @@ const BeneficiaryFormDialog = ({
     }
   };
 
+  const saveWg = async (wgAnswers: WgAnswers) => {
+    if (!wgRow) return;
+    const classification = classifyWg(wgAnswers);
+    const profile = {
+      ...(wgRow.profile || {}),
+      wg_ss: { answers: wgAnswers, ...classification, completed_at: new Date().toISOString() },
+    };
+    const { data, error } = await supabase.from("beneficiaries")
+      .update({ profile } as never).eq("id", wgRow.id).select("*").single();
+    if (error) {
+      toast({ title: "Screening save failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({
+      title: "Disability screening saved",
+      description: classification.hasDisability
+        ? `Disability identified: ${classification.disabilityDomains.join(", ")}`
+        : "No disability identified",
+    });
+    const finalRow = (data as unknown as BeneficiaryRow) || ({ ...wgRow, profile } as BeneficiaryRow);
+    setWgRow(null);
+    onSaved(finalRow);
+    onOpenChange(false);
+  };
+
+  const skipWg = () => {
+    const row = wgRow;
+    setWgRow(null);
+    onSaved(row || undefined);
+    onOpenChange(false);
+  };
+
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92dvh] max-w-3xl overflow-hidden p-0">
         <DialogHeader className="border-b border-border px-5 py-4">
@@ -333,6 +376,16 @@ const BeneficiaryFormDialog = ({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    {wgRow && (
+      <WashingtonGroupDialog
+        open
+        beneficiaryName={wgRow.full_name}
+        initial={readWgResult(wgRow.profile)?.answers}
+        onSave={saveWg}
+        onSkip={skipWg}
+      />
+    )}
+    </>
   );
 };
 
