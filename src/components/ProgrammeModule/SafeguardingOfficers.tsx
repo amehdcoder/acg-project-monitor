@@ -126,7 +126,7 @@ const SafeguardingOfficers = ({ open, onOpenChange, projectId, isOwner = false, 
           <p className="text-xs text-muted-foreground">
             Only the people listed here can open safeguarding narratives, concerns and actions.
             {isOwner
-              ? "Owners may appoint themselves or another trusted user. Access is restricted to this project."
+              ? "Super Admins may appoint themselves or another trusted user. Access is restricted to this project."
               : "Appointing someone does not give you access yourself."}
           </p>
           <div className="space-y-1.5">

@@ -18,7 +18,7 @@ interface Props {
 }
 
 /**
- * Full-screen shell for projects the Owner / Co-Owner has locked to the
+ * Full-screen shell for projects a Super Admin has locked to the
  * Longitudinal Beneficiary Records system. Nothing else in the application is
  * reachable from here.
  */

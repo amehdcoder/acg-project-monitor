@@ -112,9 +112,15 @@ const FeedbackReportsPanel = ({ projectId, projectName, canManage }: Props) => {
     if (!canManage) return;
     const { data } = await db
       .from("feedback_viewers")
-      .select("id, user_id, profiles(full_name, email)")
+      .select("id, user_id, profiles(first_name, last_name, email)")
       .eq("project_id", projectId);
-    setViewers((data || []) as unknown as ViewerRow[]);
+    const rows = ((data || []) as unknown as { id: string; user_id: string; profiles: { first_name: string | null; last_name: string | null; email: string | null } | null }[]).map((r) => ({
+      ...r,
+      profiles: r.profiles
+        ? { full_name: [r.profiles.first_name, r.profiles.last_name].filter(Boolean).join(" ").trim() || r.profiles.email, email: r.profiles.email }
+        : null,
+    }));
+    setViewers(rows as ViewerRow[]);
   }, [projectId, canManage]);
 
   useEffect(() => { load(); loadViewers(); }, [load, loadViewers]);
@@ -198,7 +204,7 @@ const FeedbackReportsPanel = ({ projectId, projectName, canManage }: Props) => {
         <ShieldCheck className="mx-auto h-10 w-10 text-slate-300" />
         <h3 className="mt-3 font-semibold text-slate-900">Restricted area</h3>
         <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500">
-          Community feedback reports are confidential. Only the project Owner, Super Admins and
+          Community feedback reports are confidential. Only Super Admins and
           approved viewers can see them.
         </p>
       </div>
@@ -353,7 +359,7 @@ const FeedbackReportsPanel = ({ projectId, projectName, canManage }: Props) => {
           <DialogHeader>
             <DialogTitle>Who can see these reports</DialogTitle>
             <DialogDescription>
-              The project Owner and Super Admins always have access. Add other trusted users below.
+              Super Admins always have access. Add other trusted users below.
             </DialogDescription>
           </DialogHeader>
           <div className="flex gap-2">
