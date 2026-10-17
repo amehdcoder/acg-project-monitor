@@ -85,6 +85,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
   const [officersOpen, setOfficersOpen] = useState(false);
   const [officerEmail, setOfficerEmail] = useState("");
   const [officerBusy, setOfficerBusy] = useState(false);
+  const [teamMembers, setTeamMembers] = useState<{ user_id: string; full_name: string; email: string | null }[]>([]);
   const [search, setSearch] = useState("");
 
   const indicators = useMemo(() => flatIndicators(), []);
@@ -97,6 +98,12 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
   const loadOfficers = useCallback(async () => {
     const { data } = await db.from("programme_report_officers").select("id, user_id, profiles(full_name, email)").eq("project_id", projectId);
     setOfficers((data || []) as OfficerRow[]);
+  }, [projectId]);
+
+  // Project users (team register) — the pool Programme Officers are picked from.
+  const loadTeamMembers = useCallback(async () => {
+    const { data } = await db.from("programme_team_members").select("user_id, full_name, email").eq("project_id", projectId).order("full_name");
+    setTeamMembers(((data || []) as { user_id: string | null; full_name: string; email: string | null }[]).filter((m) => !!m.user_id) as { user_id: string; full_name: string; email: string | null }[]);
   }, [projectId]);
 
   const runAggregation = useCallback(async () => {
@@ -132,8 +139,9 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
   useEffect(() => {
     void loadReports();
     void loadOfficers();
+    void loadTeamMembers();
     void runAggregation();
-  }, [loadReports, loadOfficers, runAggregation]);
+  }, [loadReports, loadOfficers, loadTeamMembers, runAggregation]);
 
   const setDraft = (code: string, patch: Partial<EntryDraft>) => {
     setDrafts((prev) => ({
@@ -210,6 +218,21 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
     }
   };
 
+  const designateOfficer = async (userId: string, label: string) => {
+    setOfficerBusy(true);
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const { error } = await db.from("programme_report_officers").insert({ project_id: projectId, user_id: userId, granted_by: auth.user?.id });
+      if (error) throw error;
+      toast({ title: "Programme Officer designated", description: label });
+      await loadOfficers();
+    } catch (e) {
+      toast({ title: "Could not designate officer", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setOfficerBusy(false);
+    }
+  };
+
   const addOfficer = async () => {
     const email = officerEmail.trim().toLowerCase();
     if (!email) return;
@@ -220,12 +243,8 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
         toast({ title: "No user with that email", description: "The person must have an Amehnities account first.", variant: "destructive" });
         return;
       }
-      const { data: auth } = await supabase.auth.getUser();
-      const { error } = await db.from("programme_report_officers").insert({ project_id: projectId, user_id: profile.id, granted_by: auth.user?.id });
-      if (error) throw error;
-      toast({ title: "Programme Officer designated", description: profile.full_name || email });
       setOfficerEmail("");
-      await loadOfficers();
+      await designateOfficer(profile.id, profile.full_name || email);
     } catch (e) {
       toast({ title: "Could not designate officer", description: (e as Error).message, variant: "destructive" });
     } finally {
@@ -502,11 +521,38 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
             <DialogTitle className="flex items-center gap-2"><Users className="h-5 w-5 text-health-blue" /> Programme Officers</DialogTitle>
             <DialogDescription>Only designated Programme Officers (and the Owner / Super Admins) can see and fill the Programme Report Form.</DialogDescription>
           </DialogHeader>
-          <div className="flex gap-2">
-            <Input value={officerEmail} onChange={(e) => setOfficerEmail(e.target.value)} placeholder="officer@example.org" type="email" />
-            <Button onClick={addOfficer} disabled={officerBusy} className="gap-1.5">
-              {officerBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />} Add
-            </Button>
+          <div>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Project users</p>
+            <div className="max-h-48 space-y-1.5 overflow-y-auto rounded-lg border border-border/60 p-2">
+              {teamMembers.length === 0 && <p className="py-3 text-center text-xs text-muted-foreground">No project team members with user accounts yet.</p>}
+              {teamMembers.map((m) => {
+                const already = officers.some((o) => o.user_id === m.user_id);
+                return (
+                  <div key={m.user_id} className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-health-ink">{m.full_name || "Unnamed user"}</p>
+                      {m.email && <p className="truncate text-xs text-muted-foreground">{m.email}</p>}
+                    </div>
+                    {already ? (
+                      <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-status-success"><CheckCircle2 className="h-3.5 w-3.5" /> Officer</span>
+                    ) : (
+                      <Button size="sm" variant="outline" className="h-8 shrink-0 gap-1" disabled={officerBusy} onClick={() => designateOfficer(m.user_id, m.full_name || m.email || "user")}>
+                        <UserPlus className="h-3.5 w-3.5" /> Designate
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Add by email</p>
+            <div className="flex gap-2">
+              <Input value={officerEmail} onChange={(e) => setOfficerEmail(e.target.value)} placeholder="officer@example.org" type="email" />
+              <Button onClick={addOfficer} disabled={officerBusy} className="gap-1.5">
+                {officerBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />} Add
+              </Button>
+            </div>
           </div>
           <div className="max-h-64 space-y-2 overflow-y-auto">
             {officers.length === 0 && <p className="py-4 text-center text-sm text-muted-foreground">No Programme Officers designated yet.</p>}
