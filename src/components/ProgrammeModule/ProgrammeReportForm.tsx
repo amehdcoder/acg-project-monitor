@@ -284,6 +284,29 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
     }
   };
 
+  const resolveReport = async () => {
+    if (!resolving) return;
+    setResolveBusy(true);
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const { error } = await db.from("programme_reports").update({
+        status: "resolved",
+        reviewed_by: auth.user?.id,
+        reviewed_at: new Date().toISOString(),
+        resolution_note: resolutionNote.trim() || null,
+      }).eq("id", resolving.id);
+      if (error) throw error;
+      toast({ title: "Report marked resolved", description: resolving.period_label });
+      setResolving(null);
+      setResolutionNote("");
+      await loadReports();
+    } catch (e) {
+      toast({ title: "Could not resolve report", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setResolveBusy(false);
+    }
+  };
+
   const removeOfficer = async (id: string) => {
     const { error } = await db.from("programme_report_officers").delete().eq("id", id);
     if (error) {
