@@ -29,14 +29,14 @@ export const aggregateIndicators = async (
       db.from("project_feedback").select("id, status").eq("project_id", projectId),
     ]);
 
-  const benList = (bens || []) as { id: string; wg_has_disability?: boolean | null }[];
+  const benList = (bens || []) as { id: string; profile?: { wg_ss?: { has_disability?: boolean } } | null }[];
   const svcList = (services || []) as { beneficiary_id: string; component?: string | null; service_type?: string | null; outcome?: string | null }[];
   const refList = (referrals || []) as { status?: string | null }[];
   const fbList = (feedback || []) as { status?: string | null }[];
 
   const servedIds = new Set(svcList.map((s) => s.beneficiary_id));
   out.people_accessing_services = servedIds.size;
-  const pwdIds = new Set(benList.filter((b) => b.wg_has_disability).map((b) => b.id));
+  const pwdIds = new Set(benList.filter((b) => b.profile?.wg_ss?.has_disability).map((b) => b.id));
   out.pwd_accessing_services = [...servedIds].filter((id) => pwdIds.has(id)).length;
 
   const screeningWords = ["screen", "assessment", "test"];
