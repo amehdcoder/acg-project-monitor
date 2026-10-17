@@ -500,7 +500,7 @@ const Index = () => {
               <HeartPulse className="h-5 w-5" />
             </span>
             <span className="leading-tight">
-              <span className="block text-[10px] font-bold uppercase tracking-wide text-primary-foreground/75">Owner view</span>
+              <span className="block text-[10px] font-bold uppercase tracking-wide text-primary-foreground/75">Super Admin view</span>
               <span className="block text-sm font-semibold">Switch to records workspace</span>
             </span>
           </button>
