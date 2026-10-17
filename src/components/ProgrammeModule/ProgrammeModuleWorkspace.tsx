@@ -58,6 +58,8 @@ import LivelihoodPanel from "./LivelihoodPanel";
 import HealthExchangePanel from "./HealthExchangePanel";
 import GeneralDashboard from "./GeneralDashboard";
 import FeedbackReportsPanel from "./FeedbackReportsPanel";
+import ProgrammeReportForm from "./ProgrammeReportForm";
+import { ClipboardList } from "lucide-react";
 import WorkspaceNavigation, { type WorkspaceNavGroup, type WorkspaceView } from "./WorkspaceNavigation";
 import { useIsSafeguardingOfficer } from "@/lib/programmeModule/safeguarding";
 import { useMyFacilityAccess } from "@/lib/programmeModule/facilities";
