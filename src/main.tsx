@@ -32,26 +32,31 @@ import { prepareSilentFormRestoreForUpdate } from "./lib/formProgressPersistence
 import { installAfterHoursInterceptor } from "./lib/afterHours/interceptor";
 import { requestPersistentStorage } from "./lib/storagePersistence";
 import "./index.css";
+import { isPublicFeedbackLocation } from "./lib/publicFeedback";
+
+const publicFeedbackBoot = isPublicFeedbackLocation(window.location);
 
 // Gate all form submissions during the locked evening window (7 PM–8 AM WAT).
-installAfterHoursInterceptor();
+if (!publicFeedbackBoot) installAfterHoursInterceptor();
 
 // Ask the OS to treat our offline IndexedDB data (queues, saved forms, audit
 // ledger) as persistent so it is exempt from automated background eviction.
-void requestPersistentStorage();
+if (!publicFeedbackBoot) void requestPersistentStorage();
 
 // Drain any queued offline media + submissions as soon as the app boots /
 // regains connectivity.
-initOfflineMedia();
-initOfflineSubmissions();
-initSavedFormAutoSync();
+if (!publicFeedbackBoot) {
+  initOfflineMedia();
+  initOfflineSubmissions();
+  initSavedFormAutoSync();
+}
 // Seed the offline-first State→LGA→Ward geography lookup table into IndexedDB
 // once (skips the write entirely if a current copy already exists). The pickers
 // work synchronously from the bundled dataset while this resolves.
-void initGeographyCache();
+if (!publicFeedbackBoot) void initGeographyCache();
 // Self-heal any special-form mirrors stuck showing "queued" after their row
 // already reached the server.
-initSpecialFormReconcile();
+if (!publicFeedbackBoot) initSpecialFormReconcile();
 
 // Install global error capture FIRST so any failure during bootstrap is logged.
 installGlobalErrorReporter();
@@ -173,7 +178,9 @@ try {
   if (a11y.reducedMotion) document.documentElement.style.setProperty("--animation-duration", "0s");
 } catch {}
 
-createRoot(document.getElementById("root")!).render(
+const rootElement = document.getElementById("root");
+if (!rootElement) throw new Error("Page root is missing");
+createRoot(rootElement).render(
   <RootErrorBoundary>
     <App />
   </RootErrorBoundary>
@@ -183,7 +190,7 @@ createRoot(document.getElementById("root")!).render(
 // manifest + state-name index (only when online) so the cascading location
 // dropdowns in the MDA checklists open instantly with no network wait. Runs
 // during idle time and never blocks the UI.
-{
+if (!publicFeedbackBoot) {
   const warmGeo = () => {
     if (typeof navigator !== "undefined" && navigator.onLine === false) return;
     import("./lib/grid3NigeriaData")

@@ -4,6 +4,7 @@ import { Copy, Download, MessageSquareHeart, QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import handsEmblem from "@/assets/hands-emblem.png";
+import { publicFeedbackUrl } from "@/lib/publicFeedback";
 
 interface Props {
   projectId: string;
@@ -14,7 +15,7 @@ interface Props {
 const FeedbackQrCard = ({ projectId, projectName }: Props) => {
   const { toast } = useToast();
   const posterRef = useRef<HTMLDivElement>(null);
-  const url = `${window.location.origin}/feedback/${projectId}`;
+  const url = publicFeedbackUrl(projectId, window.location.origin);
 
   const copy = async () => {
     try {
@@ -35,7 +36,8 @@ const FeedbackQrCard = ({ projectId, projectName }: Props) => {
       const scale = 4;
       canvas.width = 240 * scale;
       canvas.height = 240 * scale;
-      const ctx = canvas.getContext("2d")!;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);

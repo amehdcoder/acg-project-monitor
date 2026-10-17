@@ -9934,6 +9934,111 @@ export type Database = {
           },
         ]
       }
+      programme_report_entries: {
+        Row: {
+          disaggregation: Json
+          id: string
+          indicator_code: string
+          report_id: string
+          risk: string | null
+          value: number | null
+        }
+        Insert: {
+          disaggregation?: Json
+          id?: string
+          indicator_code: string
+          report_id: string
+          risk?: string | null
+          value?: number | null
+        }
+        Update: {
+          disaggregation?: Json
+          id?: string
+          indicator_code?: string
+          report_id?: string
+          risk?: string | null
+          value?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "programme_report_entries_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "programme_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      programme_report_officers: {
+        Row: {
+          created_at: string
+          granted_by: string | null
+          id: string
+          project_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          project_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          project_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "programme_report_officers_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      programme_reports: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          period_label: string
+          project_id: string
+          report_year: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          period_label: string
+          project_id: string
+          report_year?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          period_label?: string
+          project_id?: string
+          report_year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "programme_reports_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       programme_team_members: {
         Row: {
           created_at: string
@@ -13671,6 +13776,7 @@ export type Database = {
       is_owner_level: { Args: { _user_id: string }; Returns: boolean }
       is_owner_or_co_owner: { Args: { _user_id: string }; Returns: boolean }
       is_platform_owner: { Args: { _user_id: string }; Returns: boolean }
+      is_programme_officer: { Args: { _project_id: string }; Returns: boolean }
       is_project_member: {
         Args: { _project_id: string; _user_id: string }
         Returns: boolean

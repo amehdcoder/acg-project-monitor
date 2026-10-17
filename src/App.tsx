@@ -21,7 +21,8 @@ import Install from "./pages/Install";
 import HandCard from "./pages/HandCard";
 import CaseLink from "./pages/CaseLink";
 import MhgapGuide from "./pages/MhgapGuide";
-import FeedbackForm from "./pages/FeedbackForm";
+import PublicFeedbackRoute from "./components/PublicFeedbackRoute";
+import { isPublicFeedbackLocation } from "@/lib/publicFeedback";
 import DataCleaner from "./pages/DataCleaner";
 import KoboHubPage from "./components/KoboHub/KoboHubPage";
 import MdaAnalysesHarness from "./pages/MdaAnalysesHarness";
@@ -143,7 +144,7 @@ const queryClient = new QueryClient({
   },
 });
 
-const App = () => (
+const WorkspaceApp = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider
       attribute="class"
@@ -159,7 +160,6 @@ const App = () => (
           <StorageWarningBanner />
           <InstallBanner />
           <PWAUpdatePrompt />
-          <BrowserRouter>
             <AuthProvider>
               <DeviceSessionProvider>
               <ImpersonationProvider>
@@ -189,7 +189,6 @@ const App = () => (
                         project and open the record in the records workspace. */}
                     <Route path="/cases" element={<ProtectedRoute><CaseLink /></ProtectedRoute>} />
                     <Route path="/mhgap-guide" element={<ProtectedRoute><MhgapGuide /></ProtectedRoute>} />
-                    <Route path="/feedback/:projectId" element={<FeedbackForm />} />
                     <Route path="/witness/:surveyId/:hhId" element={<CESWitnessForm />} />
                     <Route path="/satellite-messenger" element={<ProtectedRoute><OffGridSatelliteMessenger /></ProtectedRoute>} />
                    <Route path="/data-cleaner" element={<ProtectedRoute><DataCleaner /></ProtectedRoute>} />
@@ -215,11 +214,17 @@ const App = () => (
               </ImpersonationProvider>
               </DeviceSessionProvider>
             </AuthProvider>
-          </BrowserRouter>
         </TooltipProvider>
       </LanguageProvider>
     </ThemeProvider>
   </QueryClientProvider>
 );
+
+const AppContent = () => {
+  const location = useLocation();
+  return isPublicFeedbackLocation(location) ? <PublicFeedbackRoute /> : <WorkspaceApp />;
+};
+
+const App = () => <BrowserRouter><AppContent /></BrowserRouter>;
 
 export default App;

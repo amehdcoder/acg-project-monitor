@@ -1,5 +1,7 @@
 # Architecture rules
 
+- Dispatch CCFF paths to a standalone form-only shell before mounting workspace providers; use anonymous public-function requests and published QR origins — why: community visitors cannot enter records through form navigation, shared overlays, error states or editor-only links.
+
 - Filter the beneficiary workflow tour through the workspace's visible destinations, effective permissions and configured component list — why: guidance stays aligned with actual access and project forms without introducing a separate permission system.
 
 - Render Hand Cards on a protected standalone route using the same live record-backed document as exports; rely on record RLS for access — why: field viewing and downloads remain consistent without exposing beneficiary data publicly.
