@@ -97,8 +97,10 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
 
   const loadReports = useCallback(async () => {
     const { data } = await db.from("programme_reports").select("id, period_label, report_year, notes, created_at, created_by, status, reviewed_by, reviewed_at, resolution_note").eq("project_id", projectId).order("created_at", { ascending: false });
-    setReports((data || []) as ReportRow[]);
-  }, [projectId]);
+    const rows = (data || []) as ReportRow[];
+    setReports(rows);
+    void loadHistoryEntries(rows);
+  }, [projectId, loadHistoryEntries]);
 
   const loadOfficers = useCallback(async () => {
     const { data } = await db.from("programme_report_officers").select("id, user_id, profiles(full_name, email)").eq("project_id", projectId);
