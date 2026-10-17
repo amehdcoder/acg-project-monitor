@@ -11,7 +11,7 @@ export interface RecordsOnlyProject {
 const CACHE_KEY = "amehnities:records-only:projects";
 
 /**
- * Projects that the Owner / Co-Owner has locked to the Longitudinal
+ * Projects that a Super Admin has locked to the Longitudinal
  * Beneficiary Records system.
  *
  * Everyone else (Super Admin, Systems Admin, regular users) sees nothing but
