@@ -11,8 +11,9 @@ import {
 } from "@/components/ui/table";
 import {
   ChevronLeft, MoreHorizontal, Pencil, CloudOff, Cloud, AlertTriangle,
-  CalendarClock, ArrowLeftRight, History, MapPin, Printer, Check,
+  CalendarClock, ArrowLeftRight, History, MapPin, Printer, Check, Accessibility,
 } from "lucide-react";
+import { readWgResult } from "@/lib/programmeModule/washingtonGroup";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
