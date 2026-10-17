@@ -22,11 +22,17 @@ describe("disaggregation catalog", () => {
     expect(dimensionFor("Ward").kind).toBe("location");
   });
 
-  it("serializes and parses option maps, dropping zeros", () => {
+  it("serializes and parses option maps, keeping zero selections but hiding them in summaries", () => {
     const raw = serializeDisaggCell({ Male: 12, Female: 9, "0–4 years": 0 });
-    expect(parseDisaggCell(raw)).toEqual({ Male: 12, Female: 9 });
+    expect(parseDisaggCell(raw)).toEqual({ Male: 12, Female: 9, "0–4 years": 0 });
     expect(summarizeDisaggCell(raw)).toBe("Male: 12 · Female: 9");
     expect(parseDisaggCell("legacy free text")).toEqual({});
+  });
+
+  it("keeps a freshly selected location visible before a value is entered", () => {
+    const raw = serializeDisaggCell({ "Kano|Dala|Gwammaja": 0 });
+    expect(parseDisaggCell(raw)).toEqual({ "Kano|Dala|Gwammaja": 0 });
+    expect(summarizeDisaggCell(raw)).toBe("");
   });
 });
 

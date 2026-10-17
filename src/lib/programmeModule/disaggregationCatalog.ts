@@ -104,7 +104,7 @@ export function parseDisaggCell(raw: string | undefined): Record<string, number>
       const out: Record<string, number> = {};
       for (const [k, n] of Object.entries(v)) {
         const num = typeof n === "number" ? n : Number(n);
-        if (Number.isFinite(num) && num !== 0) out[k] = num;
+        if (Number.isFinite(num)) out[k] = num;
       }
       return out;
     }
@@ -117,7 +117,7 @@ export const serializeDisaggCell = (map: Record<string, number>): string =>
 
 /** Short human summary of a stored cell, e.g. "M 12 · F 9". */
 export function summarizeDisaggCell(raw: string | undefined, max = 3): string {
-  const entries = Object.entries(parseDisaggCell(raw));
+  const entries = Object.entries(parseDisaggCell(raw)).filter(([, v]) => v !== 0);
   if (!entries.length) return "";
   const shown = entries.slice(0, max).map(([k, v]) => `${k}: ${v}`);
   return shown.join(" · ") + (entries.length > max ? ` +${entries.length - max} more` : "");

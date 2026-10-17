@@ -133,7 +133,7 @@ export const LOGFRAME: LogframeObjective[] = [
             baseline: "0",
             targets: ["0", "114", "114", "114"],
             totalTarget: "114",
-            disaggregation: ["State", "LGA", "Council Ward"],
+            disaggregation: ["State", "LGA", "Ward"],
           },
         ],
         activities: [
@@ -158,7 +158,7 @@ export const LOGFRAME: LogframeObjective[] = [
             baseline: "1 (ECWA Eye Hospital)",
             targets: ["1", "2", "3", "4"],
             totalTarget: "4",
-            disaggregation: ["State", "LGA", "Council Ward", "Health facility level"],
+            disaggregation: ["State", "LGA", "Ward"],
           },
           {
             code: "SO1.R2.2",
@@ -167,7 +167,7 @@ export const LOGFRAME: LogframeObjective[] = [
             baseline: "1 (ECWA Eye Hospital)",
             targets: ["1", "21", "51", "41"],
             totalTarget: "114",
-            disaggregation: ["State", "LGA", "Council Ward", "Health facility level"],
+            disaggregation: ["State", "LGA", "Ward"],
           },
           {
             code: "SO1.R2.3",
@@ -257,7 +257,7 @@ export const LOGFRAME: LogframeObjective[] = [
             baseline: "0",
             targets: ["0", "16", "16", "0"],
             totalTarget: "32",
-            disaggregation: ["State", "LGA", "Council Ward", "Community"],
+            disaggregation: ["State", "LGA", "Ward"],
           },
           {
             code: "SO1.R4.2",
@@ -275,7 +275,7 @@ export const LOGFRAME: LogframeObjective[] = [
             baseline: "0",
             targets: ["0", "0", "6", "10"],
             totalTarget: "16",
-            disaggregation: ["State", "LGA", "Council Ward", "Community"],
+            disaggregation: ["State", "LGA", "Ward"],
           },
         ],
         activities: [
@@ -309,7 +309,7 @@ export const LOGFRAME: LogframeObjective[] = [
             baseline: "0",
             targets: ["0", "5", "12", "6"],
             totalTarget: "23",
-            disaggregation: ["State", "LGA", "Community"],
+            disaggregation: ["State", "LGA"],
           },
           {
             code: "SO2.2",
@@ -440,8 +440,8 @@ export const LOGFRAME: LogframeObjective[] = [
         title: "Result 1 — Strengthened disability-inclusive monitoring, accountability, learning and government ownership systems",
         indicators: [
           { code: "SO3.R1.1", title: "% of programme indicators reported accurately, completely and on time through the integrated MEAL system", mov: "DHIS2 reports, partner reports, reporting compliance tracker", baseline: "No functional integrated MEAL framework", targets: ["Yes", "Maintained", "Maintained", "Maintained"], totalTarget: "Yes", disaggregation: ["State"], isPercent: true },
-          { code: "SO3.R1.2", title: "% of complaints and feedback cases resolved within agreed timelines", mov: "CCFM database, complaints registers, accountability reports", baseline: "To be determined", targets: ["15", "40", "60", "65"], totalTarget: "65", disaggregation: ["State", "LGA", "Ward", "Community"], autoKey: "ccfm_resolved_pct", isPercent: true },
-          { code: "SO3.R1.3", title: "% of agreed actions from accountability and learning reviews implemented", mov: "Learning review reports, action plan trackers", baseline: "0", targets: ["0.2", "0.5", "0.8", "0.8"], totalTarget: "0.8", disaggregation: ["State", "LGA", "Ward", "Community"], isPercent: true },
+          { code: "SO3.R1.2", title: "% of complaints and feedback cases resolved within agreed timelines", mov: "CCFM database, complaints registers, accountability reports", baseline: "To be determined", targets: ["15", "40", "60", "65"], totalTarget: "65", disaggregation: ["State", "LGA", "Ward"], autoKey: "ccfm_resolved_pct", isPercent: true },
+          { code: "SO3.R1.3", title: "% of agreed actions from accountability and learning reviews implemented", mov: "Learning review reports, action plan trackers", baseline: "0", targets: ["0.2", "0.5", "0.8", "0.8"], totalTarget: "0.8", disaggregation: ["State", "LGA", "Ward"], isPercent: true },
           { code: "SO3.R1.4", title: "Government ownership and sustainability score achieved by supported facilities/LGAs", mov: "Sustainability assessment reports, ownership scorecards", baseline: "To be determined", targets: ["0", "0.05", "0.05", "0.05"], totalTarget: "0.15", disaggregation: ["State"] },
           { code: "SO3.R1.5", title: "Number of supported LGAs integrating programme approaches into routine planning and budgeting", mov: "Government policy documents, strategic plans, budget documents", baseline: "0", targets: ["4", "4", "8", "8"], totalTarget: "8", disaggregation: ["State", "LGA"] },
         ],
