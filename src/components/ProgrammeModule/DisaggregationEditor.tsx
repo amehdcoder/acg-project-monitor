@@ -11,7 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import GeoCascadeFields from "./GeoCascadeFields";
+import { GeoCombobox } from "./GeoCascadeFields";
+import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
 import {
   dimensionFor, parseDisaggCell, serializeDisaggCell, summarizeDisaggCell,
   type DisaggDimension,
@@ -24,33 +25,51 @@ interface Props {
   idPrefix: string;
 }
 
-const LocationPanel = ({ raw, onChange, idPrefix }: { raw: string; onChange: (v: string) => void; idPrefix: string }) => {
+const LocationPanel = ({ dim, raw, onChange, idPrefix }: { dim: DisaggDimension; raw: string; onChange: (v: string) => void; idPrefix: string }) => {
+  const level = dim.level || "ward";
   const parsed = useMemo(() => {
     const m = parseDisaggCell(raw);
     const first = Object.entries(m)[0];
     return first ? { key: first[0], value: String(first[1]) } : { key: "", value: "" };
   }, [raw]);
   const parts = parsed.key.split("|");
-  const geo = { state: parts[0] || "", lga: parts[1] || "", ward: parts[2] || "" };
+  const state = parts[0] || "";
+  const lga = parts[1] || "";
+  const ward = parts[2] || "";
+
+  const emit = (s: string, l: string, w: string, val: string) => {
+    const key = [s, level !== "state" && l, level === "ward" && w].filter(Boolean).join("|") as string;
+    onChange(serializeDisaggCell(key ? { [key]: Number(val) || 0 } : {}));
+  };
+
+  const states = useMemo(() => getAllStates(), []);
+  const lgas = useMemo(() => (state ? getLGAsForState(state) : []), [state]);
+  const wards = useMemo(() => (state && lga ? getWardsForLGA(state, lga) : []), [state, lga]);
 
   return (
     <div className="space-y-3">
-      <GeoCascadeFields
-        value={geo}
-        showCommunity={false}
-        onChange={(patch) => {
-          const key = [patch.state, patch.lga, patch.ward].filter(Boolean).join("|");
-          onChange(serializeDisaggCell(key ? { [key]: Number(parsed.value) || 0 } : {}));
-        }}
-      />
+      {dim.hint && <p className="text-xs text-muted-foreground">{dim.hint}</p>}
+      <div className={cn("grid gap-3", level === "ward" ? "sm:grid-cols-3" : level === "lga" ? "sm:grid-cols-2" : "sm:grid-cols-1")}>
+        <GeoCombobox label="State" value={state} options={states} onSelect={(v) => emit(v, "", "", parsed.value)} />
+        {level !== "state" && (
+          <GeoCombobox label="LGA" value={lga} options={lgas} disabled={!state}
+            placeholder={state ? "Select LGA" : "Pick a state first"}
+            onSelect={(v) => emit(state, v, "", parsed.value)} />
+        )}
+        {level === "ward" && (
+          <GeoCombobox label="Ward" value={ward} options={wards} disabled={!lga}
+            placeholder={lga ? "Select ward" : "Pick an LGA first"}
+            onSelect={(v) => emit(state, lga, v, parsed.value)} />
+        )}
+      </div>
       {parsed.key && (
         <div>
           <Label htmlFor={`${idPrefix}-loc-value`} className="text-xs text-muted-foreground">
-            Value for {parts.filter(Boolean).join(" → ")}
+            Value for {parsed.key.split("|").filter(Boolean).join(" → ")}
           </Label>
           <Input
             id={`${idPrefix}-loc-value`} type="number" value={parsed.value}
-            onChange={(e) => onChange(serializeDisaggCell({ [parsed.key]: Number(e.target.value) || 0 }))}
+            onChange={(e) => emit(state, lga, ward, e.target.value)}
             className="mt-1 h-11 w-40 tabular-nums"
           />
         </div>
@@ -149,7 +168,7 @@ const DisaggregationEditor = ({ labels, values, onChange, idPrefix }: Props) => 
         <div key={dim.key} className="mt-3 rounded-xl border border-health-teal/25 bg-health-teal/5 p-4">
           {dim.kind === "location" ? (
             <LocationPanel
-              raw={values[dim.label] ?? ""} idPrefix={`${idPrefix}-${dim.key}`}
+              dim={dim} raw={values[dim.label] ?? ""} idPrefix={`${idPrefix}-${dim.key}`}
               onChange={(v) => onChange({ ...values, [dim.label]: v })}
             />
           ) : (
