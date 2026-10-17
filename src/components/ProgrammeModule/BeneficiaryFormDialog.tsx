@@ -376,6 +376,16 @@ const BeneficiaryFormDialog = ({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    {wgRow && (
+      <WashingtonGroupDialog
+        open
+        beneficiaryName={wgRow.full_name}
+        initial={readWgResult(wgRow.profile)?.answers}
+        onSave={saveWg}
+        onSkip={skipWg}
+      />
+    )}
+    </>
   );
 };
 
