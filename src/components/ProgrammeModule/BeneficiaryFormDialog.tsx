@@ -168,8 +168,14 @@ const BeneficiaryFormDialog = ({
           toast({ title: "Saved offline", description: "It will sync automatically when you are back online." });
         }
       }
-      onSaved(savedRow);
-      onOpenChange(false);
+      // Open the WG-SS disability screening before closing — it applies to
+      // every beneficiary, including ones registered earlier.
+      if (savedRow && !savedRow.__pending) {
+        setWgRow(savedRow);
+      } else {
+        onSaved(savedRow);
+        onOpenChange(false);
+      }
       void flushQueue();
     } catch (e) {
       toast({ title: "Save failed", description: (e as Error).message, variant: "destructive" });
