@@ -139,8 +139,9 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
   useEffect(() => {
     void loadReports();
     void loadOfficers();
+    void loadTeamMembers();
     void runAggregation();
-  }, [loadReports, loadOfficers, runAggregation]);
+  }, [loadReports, loadOfficers, loadTeamMembers, runAggregation]);
 
   const setDraft = (code: string, patch: Partial<EntryDraft>) => {
     setDrafts((prev) => ({
@@ -217,6 +218,21 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
     }
   };
 
+  const designateOfficer = async (userId: string, label: string) => {
+    setOfficerBusy(true);
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const { error } = await db.from("programme_report_officers").insert({ project_id: projectId, user_id: userId, granted_by: auth.user?.id });
+      if (error) throw error;
+      toast({ title: "Programme Officer designated", description: label });
+      await loadOfficers();
+    } catch (e) {
+      toast({ title: "Could not designate officer", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setOfficerBusy(false);
+    }
+  };
+
   const addOfficer = async () => {
     const email = officerEmail.trim().toLowerCase();
     if (!email) return;
@@ -227,12 +243,8 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
         toast({ title: "No user with that email", description: "The person must have an Amehnities account first.", variant: "destructive" });
         return;
       }
-      const { data: auth } = await supabase.auth.getUser();
-      const { error } = await db.from("programme_report_officers").insert({ project_id: projectId, user_id: profile.id, granted_by: auth.user?.id });
-      if (error) throw error;
-      toast({ title: "Programme Officer designated", description: profile.full_name || email });
       setOfficerEmail("");
-      await loadOfficers();
+      await designateOfficer(profile.id, profile.full_name || email);
     } catch (e) {
       toast({ title: "Could not designate officer", description: (e as Error).message, variant: "destructive" });
     } finally {
