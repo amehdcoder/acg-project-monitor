@@ -59,7 +59,7 @@ import HealthExchangePanel from "./HealthExchangePanel";
 import GeneralDashboard from "./GeneralDashboard";
 import FeedbackReportsPanel from "./FeedbackReportsPanel";
 import ProgrammeReportForm from "./ProgrammeReportForm";
-import { ClipboardList } from "lucide-react";
+import WorkspaceMajorTabs, { type MajorTab } from "./WorkspaceMajorTabs";
 import WorkspaceNavigation, { type WorkspaceNavGroup, type WorkspaceView } from "./WorkspaceNavigation";
 import { useIsSafeguardingOfficer } from "@/lib/programmeModule/safeguarding";
 import { useMyFacilityAccess } from "@/lib/programmeModule/facilities";
@@ -191,7 +191,6 @@ const ProgrammeModuleWorkspace = ({
     {
       label: "Overview",
       items: [
-        { key: "report", label: "Programme report", description: "Logframe indicators, targets, disaggregation and risks", icon: ClipboardList, show: canReport },
         { key: "dashboard", label: "General dashboard", description: "Project-wide outcomes, alerts and service performance", icon: BarChart3, show: canDash },
         { key: "journey", label: "Beneficiary journey", description: "Change, feedback and service reach", icon: Route, show: canDash },
         { key: "facility", label: "Facility dashboard", description: "Facility caseloads and referral performance", icon: Hospital, show: canDash },
@@ -229,8 +228,8 @@ const ProgrammeModuleWorkspace = ({
   const canBrain = can("view_dashboards") || can("view_records");
   const [brainMounted, setBrainMounted] = useState(false);
   const [lastRecordsView, setLastRecordsView] = useState<WorkspaceView>("records");
-  const isSide = (v: WorkspaceView) => v === "brain" || v === "guide";
-  const openTab = (t: "records" | "brain" | "guide") => {
+  const isSide = (v: WorkspaceView) => v === "brain" || v === "guide" || v === "report";
+  const openTab = (t: MajorTab) => {
     if (t === "records") { if (isSide(view)) setView(lastRecordsView); return; }
     if (!isSide(view)) setLastRecordsView(view);
     if (t === "brain") setBrainMounted(true);
@@ -239,10 +238,10 @@ const ProgrammeModuleWorkspace = ({
 
   useEffect(() => {
     if (permissionsLoading) return;
-    const visibleViews = navGroups.flatMap((group) => group.items).filter((item) => item.show).map((item) => item.key);
+    const visibleViews: WorkspaceView[] = [...navGroups.flatMap((group) => group.items).filter((item) => item.show).map((item) => item.key), ...(canReport ? ["report" as const] : [])];
     if (view === "brain" || view === "guide") return;
     if (!visibleViews.includes(view)) setView(visibleViews.includes("records") ? "records" : visibleViews[0] || "records");
-  }, [permissionsLoading, view, canConfigure, isOfficer, onTeamRegister, isProgrammeStaff, areaKey]);
+  }, [permissionsLoading, view, canConfigure, canReport, isOfficer, onTeamRegister, isProgrammeStaff, areaKey]);
 
   useEffect(() => {
     bindQueueAutoFlush();
@@ -388,19 +387,8 @@ const ProgrammeModuleWorkspace = ({
 
       <WorkflowTour can={(k) => (k === "view_dashboards" ? canDash : can(k as Parameters<typeof teamCan>[0]))} canConfigure={canConfigure} isOfficer={isOfficer} ready={!permissionsLoading && Boolean(active)} visibleViews={[...navGroups.flatMap((g) => g.items).filter((i) => i.show).map((i) => i.key), ...(canBrain ? ["brain", "guide"] : [])]} components={(dashConfig?.components || []).filter((c) => !c.hidden)} onNavigate={(v) => { if (v === "brain" || v === "guide") openTab(v); else setView(v as WorkspaceView); }} />
 
-      {!permissionsLoading && canBrain && active && (
-        <div role="tablist" aria-label="Cases workspace" className="flex items-end gap-6 border-b border-border/60 px-1">
-          {([["records", "Beneficiary records", Layers], ["brain", "Record quality brain", Brain], ["guide", "Field guide", BookOpenCheck]] as const).map(([k, l, Icon]) => {
-            const on = k === "records" ? !isSide(view) : view === k;
-            return (
-              <button key={k} role="tab" aria-selected={on} onClick={() => openTab(k)}
-                className={`-mb-px flex items-center gap-2 border-b-2 px-1 pb-2.5 pt-1 text-sm font-semibold transition-colors ${on ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-                <Icon className="h-4 w-4" />{l}
-                {k === "brain" && <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Shared brain</span>}
-              </button>
-            );
-          })}
-        </div>
+      {!permissionsLoading && (canBrain || canReport) && active && (
+        <WorkspaceMajorTabs selected={isSide(view) ? view as MajorTab : "records"} canReport={canReport} canBrain={canBrain} onSelect={openTab} />
       )}
 
       {!permissionsLoading && !isSide(view) && <WorkspaceNavigation groups={navGroups} view={view} onViewChange={setView} administration={
