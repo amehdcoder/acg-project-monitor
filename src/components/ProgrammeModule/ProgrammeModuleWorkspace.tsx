@@ -460,6 +460,9 @@ const ProgrammeModuleWorkspace = ({
         />
       )}
 
+      {!permissionsLoading && active && view === "report" && projectId && canReport && (
+        <ProgrammeReportForm projectId={projectId} canManage={canConfigure || isSuperAdmin} />
+      )}
       {!permissionsLoading && active && view === "dashboard" && (
         <GeneralDashboard
           projectId={projectId}
