@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Fix CCFF QR/deep links and verify isolated public form, error and confirmation screens without record/dashboard access.
+
 - [x] Complete and verify the permission-aware longitudinal beneficiary guided tour, including safeguarding and vaulting.
 - [x] Lock Record service to the current component with component-specific services/outcomes; rename to CDDs and FLHFs.
 
