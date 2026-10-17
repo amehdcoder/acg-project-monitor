@@ -85,6 +85,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
   const [officersOpen, setOfficersOpen] = useState(false);
   const [officerEmail, setOfficerEmail] = useState("");
   const [officerBusy, setOfficerBusy] = useState(false);
+  const [teamMembers, setTeamMembers] = useState<{ user_id: string; full_name: string; email: string | null }[]>([]);
   const [search, setSearch] = useState("");
 
   const indicators = useMemo(() => flatIndicators(), []);
@@ -97,6 +98,12 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
   const loadOfficers = useCallback(async () => {
     const { data } = await db.from("programme_report_officers").select("id, user_id, profiles(full_name, email)").eq("project_id", projectId);
     setOfficers((data || []) as OfficerRow[]);
+  }, [projectId]);
+
+  // Project users (team register) — the pool Programme Officers are picked from.
+  const loadTeamMembers = useCallback(async () => {
+    const { data } = await db.from("programme_team_members").select("user_id, full_name, email").eq("project_id", projectId).not("user_id", "is", null).order("full_name").limit(1000);
+    setTeamMembers((data || []) as { user_id: string; full_name: string; email: string | null }[]);
   }, [projectId]);
 
   const runAggregation = useCallback(async () => {
