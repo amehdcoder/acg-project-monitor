@@ -756,6 +756,7 @@ const ProgrammeModuleWorkspace = ({
           />
         </>
       )}
+      <WhatsAppRemindersDialog open={whatsappOpen} onOpenChange={setWhatsappOpen} projectId={projectId} />
     </div>
   );
 };
