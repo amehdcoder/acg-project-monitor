@@ -61,7 +61,12 @@ export interface LogframeObjective {
   results: LogframeResult[];
 }
 
-export const LOGFRAME_PROJECT = {
+export interface LogframeProjectInfo { id: string; name: string; country: string; impact: string }
+
+/** A project's editable logframe: header details plus the full objective tree. */
+export interface ProjectLogframe { project: LogframeProjectInfo; objectives: LogframeObjective[] }
+
+export const LOGFRAME_PROJECT: LogframeProjectInfo = {
   id: "G00094",
   name: "Scaling up integrated, holistic and person-centred care in Nigeria (CiSKuLA-2)",
   country: "Nigeria",
@@ -479,9 +484,9 @@ export interface FlatIndicator {
   kind: "outcome" | "result" | "activity";
 }
 
-export const flatIndicators = (): FlatIndicator[] => {
+export const flatIndicators = (objectives: LogframeObjective[] = LOGFRAME): FlatIndicator[] => {
   const out: FlatIndicator[] = [];
-  for (const obj of LOGFRAME) {
+  for (const obj of objectives) {
     for (const res of obj.results) {
       for (const ind of res.indicators) {
         out.push({
@@ -511,3 +516,6 @@ export const numericTarget = (raw?: string | null): number | null => {
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : null;
 };
+
+export const defaultLogframe = (): ProjectLogframe =>
+  JSON.parse(JSON.stringify({ project: LOGFRAME_PROJECT, objectives: LOGFRAME }));
