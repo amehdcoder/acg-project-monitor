@@ -9939,6 +9939,7 @@ export type Database = {
           disaggregation: Json
           id: string
           indicator_code: string
+          over_target_comment: string | null
           report_id: string
           risk: string | null
           value: number | null
@@ -9947,6 +9948,7 @@ export type Database = {
           disaggregation?: Json
           id?: string
           indicator_code: string
+          over_target_comment?: string | null
           report_id: string
           risk?: string | null
           value?: number | null
@@ -9955,6 +9957,7 @@ export type Database = {
           disaggregation?: Json
           id?: string
           indicator_code?: string
+          over_target_comment?: string | null
           report_id?: string
           risk?: string | null
           value?: number | null
