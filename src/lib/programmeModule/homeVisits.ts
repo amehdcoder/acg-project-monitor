@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { offlineMutate, currentUserId } from "./offlineWrite";
 
 const db = supabase as unknown as { from: (t: string) => any }; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -136,10 +137,10 @@ export interface VisitOutcomeInput {
  * next step.
  */
 export const reportVisitOutcome = async (input: VisitOutcomeInput) => {
-  const { data: auth } = await supabase.auth.getUser();
+  const uid = await currentUserId();
   const def = outcomeDef(input.outcome);
 
-  const { error } = await db.from("beneficiary_home_visits").update({
+  await offlineMutate({ table: "beneficiary_home_visits", action: "update", id: input.visitId, values: {
     status: "completed",
     outcome: input.outcome,
     outcome_notes: input.notes || null,
@@ -153,17 +154,15 @@ export const reportVisitOutcome = async (input: VisitOutcomeInput) => {
     action_taken: input.actionTaken || null,
     latitude: input.latitude ?? null,
     longitude: input.longitude ?? null,
-    reported_by: auth.user?.id || null,
-  }).eq("id", input.visitId);
-  if (error) throw error;
+    reported_by: uid || null,
+  } });
 
   // Carry the result back to the person's record.
   const patch: Record<string, unknown> = {};
   if (input.nextAppointmentDate) patch.next_follow_up_date = input.nextAppointmentDate;
   if (def?.beneficiaryStatus) patch.status = def.beneficiaryStatus;
   if (Object.keys(patch).length) {
-    const { error: bErr } = await db.from("beneficiaries").update(patch).eq("id", input.beneficiaryId);
-    if (bErr) throw bErr;
+    await offlineMutate({ table: "beneficiaries", action: "update", values: patch, id: input.beneficiaryId });
   }
 
   // Keep the visit on the care timeline alongside clinical services.

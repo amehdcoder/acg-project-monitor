@@ -62,6 +62,9 @@ export const enqueue = (kind: QueueKind, payload: Record<string, unknown>): Queu
     attempts: 0,
   };
   item.payload.submission_uuid = item.submission_uuid;
+  // Pending beneficiaries keep the same id on the server, so services or visits
+  // recorded against them offline still point at the right person.
+  if (kind === "beneficiary" && !item.payload.id) item.payload.id = item.submission_uuid;
   write([...read(), item]);
   return item;
 };

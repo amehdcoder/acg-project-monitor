@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { offlineMutate, currentUserId } from "./offlineWrite";
 
 export interface WashSourceRow {
   id: string;
@@ -242,23 +243,17 @@ export const nextHouseholdCode = (existing: HouseholdRow[]) => {
 export const saveHousehold = async (
   row: Partial<HouseholdRow> & { project_id: string },
 ): Promise<string> => {
-  const { data: auth } = await supabase.auth.getUser();
   if (row.id) {
     const { id, ...rest } = row;
-    const { error } = await db.from("beneficiary_households").update(rest).eq("id", id);
-    if (error) throw error;
+    await offlineMutate({ table: "beneficiary_households", action: "update", values: rest as Record<string, unknown>, id });
     return id;
   }
-  const { data, error } = await db.from("beneficiary_households")
-    .insert({ ...row, created_by: auth.user?.id })
-    .select("id").single();
-  if (error) throw error;
-  return (data as { id: string }).id;
+  const res = await offlineMutate({ table: "beneficiary_households", action: "insert", values: { ...row, created_by: await currentUserId() } });
+  return res.id as string;
 };
 
 export const deleteHousehold = async (id: string) => {
-  const { error } = await db.from("beneficiary_households").delete().eq("id", id);
-  if (error) throw error;
+  await offlineMutate({ table: "beneficiary_households", action: "delete", id });
 };
 
 export const saveWashSource = async (
@@ -437,10 +432,7 @@ export const setBeneficiaryHousehold = async (
   householdId: string | null,
   role: string | null,
 ) => {
-  const { error } = await db.from("beneficiaries")
-    .update({ household_id: householdId, household_role: role })
-    .eq("id", beneficiaryId);
-  if (error) throw error;
+  await offlineMutate({ table: "beneficiaries", action: "update", values: { household_id: householdId, household_role: role }, id: beneficiaryId });
 };
 
 /** Treatment coverage for a household across all recorded MDA rounds. */

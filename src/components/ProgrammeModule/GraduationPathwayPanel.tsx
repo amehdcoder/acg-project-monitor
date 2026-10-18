@@ -11,6 +11,7 @@ import {
   GraduationGate, SelectionStatus, SELECTION_STEPS, pathwayPercent, readGate, stageProgress,
 } from "@/lib/programmeModule/graduation";
 import type { BeneficiaryRow } from "@/lib/programmeModule/types";
+import { offlineMutate, currentUserId } from "@/lib/programmeModule/offlineWrite";
 
 interface Props {
   beneficiary: BeneficiaryRow;
@@ -53,9 +54,7 @@ const GraduationPathwayPanel = ({ beneficiary, componentKey, services, onRecord,
           ? { decided_at: now, verified_at: gate?.verified_at || now, mapped_at: gate?.mapped_at || now, reason: why || undefined }
           : {}),
       };
-      const { error } = await supabase.from("beneficiaries")
-        .update({ profile: { ...profile, graduation: next } } as never).eq("id", beneficiary.id);
-      if (error) throw error;
+      await offlineMutate({ table: "beneficiaries", action: "update", values: { profile: { ...profile, graduation: next } }, id: beneficiary.id });
       toast({ title: status === "not_selected" ? "Marked not selected" : `Household ${SELECTION_STEPS.find((s) => s.value === status)?.label.toLowerCase()}` });
       setRejecting(false);
       setReason("");

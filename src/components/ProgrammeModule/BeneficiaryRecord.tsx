@@ -51,6 +51,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { offlineMutate, currentUserId } from "@/lib/programmeModule/offlineWrite";
 
 interface Props {
   beneficiary: BeneficiaryRow;
@@ -190,9 +191,7 @@ const BeneficiaryRecord = ({
     if (value === beneficiary.status) return;
     setStatusSaving(true);
     try {
-      const { error } = await supabase.from("beneficiaries")
-        .update({ status: value } as never).eq("id", beneficiary.id);
-      if (error) throw error;
+      await offlineMutate({ table: "beneficiaries", action: "update", values: { status: value }, id: beneficiary.id });
       await recordAudit({
         beneficiary_id: beneficiary.id, project_id: projectId, action: "status_changed",
         field_name: "status", old_value: beneficiary.status, new_value: value,
@@ -841,8 +840,8 @@ const BeneficiaryRecord = ({
         onSkip={() => setWgOpen(false)}
         onSave={async (answers) => {
           const profile = { ...((beneficiary.profile || {}) as Record<string, unknown>), wg_ss: buildWgRecord(answers) };
-          const { error } = await supabase.from("beneficiaries").update({ profile } as never).eq("id", beneficiary.id);
-          if (error) { toast({ title: "Screening save failed", description: error.message, variant: "destructive" }); return; }
+          try { await offlineMutate({ table: "beneficiaries", action: "update", values: { profile }, id: beneficiary.id }); }
+          catch (error) { toast({ title: "Screening save failed", description: (error as Error).message, variant: "destructive" }); return; }
           toast({ title: "Disability screening saved" });
           setWgOpen(false);
           void reload(); onChanged();

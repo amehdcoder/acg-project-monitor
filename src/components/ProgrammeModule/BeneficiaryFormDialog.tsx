@@ -26,6 +26,7 @@ import { useProjectMhgapDrugs } from "./MhgapDrugsManager";
 import { BLOOD_GROUPS, HEALTH_FIELDS, healthValue } from "@/lib/programmeModule/healthFields";
 import WashingtonGroupDialog from "./WashingtonGroupDialog";
 import { buildWgRecord, classifyWg, readWgResult, WgAnswers } from "@/lib/programmeModule/washingtonGroup";
+import { offlineMutate, currentUserId } from "@/lib/programmeModule/offlineWrite";
 
 interface Props {
   open: boolean;
@@ -122,11 +123,9 @@ const BeneficiaryFormDialog = ({
       let savedRow: BeneficiaryRow | undefined;
 
       if (existing) {
-        const { data, error } = await supabase.from("beneficiaries")
-          .update(base as never).eq("id", existing.id).select("*").single();
-        if (error) throw error;
-        savedRow = (data as unknown as BeneficiaryRow) || { ...existing, ...base } as BeneficiaryRow;
-        toast({ title: "Record updated" });
+        const res = await offlineMutate({ table: "beneficiaries", action: "update", values: base as Record<string, unknown>, id: existing.id });
+        savedRow = { ...existing, ...base, ...(res.queued ? { __pending: true } : {}) } as BeneficiaryRow;
+        toast(res.queued ? { title: "Edit saved offline", description: "It will sync automatically when you are back online." } : { title: "Record updated" });
         void recordAudit({
           beneficiary_id: existing.id, project_id: projectId, action: "profile_updated",
         });
@@ -191,10 +190,12 @@ const BeneficiaryFormDialog = ({
       ...(wgRow.profile || {}),
       wg_ss: buildWgRecord(wgAnswers),
     };
-    const { data, error } = await supabase.from("beneficiaries")
-      .update({ profile } as never).eq("id", wgRow.id).select("*").single();
-    if (error) {
-      toast({ title: "Screening save failed", description: error.message, variant: "destructive" });
+    let data: unknown = null;
+    try {
+      await offlineMutate({ table: "beneficiaries", action: "update", values: { profile }, id: wgRow.id });
+      data = { ...wgRow, profile };
+    } catch (error) {
+      toast({ title: "Screening save failed", description: (error as Error).message, variant: "destructive" });
       return;
     }
     toast({
