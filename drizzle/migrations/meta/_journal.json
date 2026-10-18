@@ -57,6 +57,13 @@
       "when": 1792355845639,
       "tag": "0007_project_custom_services",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792356278992,
+      "tag": "0008_whatsapp_followup_reminders",
+      "breakpoints": true
     }
   ]
 }
