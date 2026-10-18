@@ -1367,3 +1367,17 @@ select option {
 .form-scroll::-webkit-scrollbar { width: 8px; }
 .form-scroll::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.45); border-radius: 9999px; }
 .form-scroll::-webkit-scrollbar-track { background: transparent; }
+
+/* Mobile: lift small form text to regular, readable form sizes */
+@media (max-width: 640px) {
+  .mobile-form-text .text-\[10px\],
+  .mobile-form-text .text-\[11px\] { font-size: 0.8125rem !important; line-height: 1.2rem !important; }
+  .mobile-form-text .text-xs { font-size: 0.875rem !important; line-height: 1.3rem !important; }
+  .mobile-form-text .text-sm { font-size: 1rem !important; line-height: 1.5rem !important; }
+  .mobile-form-text .text-base { font-size: 1.0625rem !important; }
+  .mobile-form-text input,
+  .mobile-form-text textarea,
+  .mobile-form-text select,
+  .mobile-form-text button,
+  .mobile-form-text label { font-size: 1rem !important; }
+}

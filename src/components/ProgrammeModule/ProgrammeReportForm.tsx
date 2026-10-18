@@ -551,7 +551,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
   };
 
   return (
-    <div className="form-scroll max-h-[calc(100dvh-7rem)] space-y-6 pr-1">
+    <div className="form-scroll mobile-form-text max-h-[calc(100dvh-7rem)] space-y-6 pr-1">
       <section className="overflow-hidden border-b border-border">
         <div className="border-t-4 border-health-teal bg-health-surface px-4 py-6 sm:px-6">
           <div className="flex flex-col items-start justify-between gap-4 lg:flex-row">
