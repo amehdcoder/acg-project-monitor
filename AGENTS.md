@@ -13,7 +13,8 @@
 
 - Route all DHIS2 reporting/dashboard imports through `health-exchange`; maps use bundled Nigeria LGA/State/National boundaries — why: credentials stay server-side and geography exact.
 - Revoke browser EXECUTE on SECURITY DEFINER trigger/internal functions; keep it only for RLS helpers and app-called RPCs — why: shrinks the callable surface without breaking policies.
-- Self-hosting: Dockerfile + nginx.conf static build, backend on Lovable Cloud — why: no badge, no data migration.
+- Self-hosting: Dockerfile + nginx.conf, backend on Lovable Cloud — why: no badge.
+- Records reads go through `offlineReadCache.cachedRead` (IndexedDB); queue flush is Web-Lock single-tab, parent-first, backoff, jittered reconnect — why: offline use, no reconnect stampedes.
 - Route every in-app Street View through the shared Google panorama viewer, with official imagery preferred and street-level fallback — why: keeps map drill-down quality and failure handling consistent.
 - Data Cleaner has no hand-written validation rules; all flags come from the on-device autoencoder + transformer brain worker (dataCleanerBrain.worker.ts) with IndexedDB memory — why: "normal" is learned cumulatively from cleaned history.
 - Record quality brain trains in the browser worker and, once past 5,000 steps, in the `brain-train` edge function every 30 min (pg_cron, lease via `claim_brain_for_training`); checkpoint in `brain_models` (most-trained wins), flags/resolutions in `brain_flags`; `_shared/brain/*` mirrors `src/lib/dataCleaner/neural/*` — why: cumulative shared learning even with nobody online, within edge CPU limits.
