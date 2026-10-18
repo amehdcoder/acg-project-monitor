@@ -74,7 +74,7 @@ const ServicePicker = ({ componentKey, projectId, options, recent = [], value, o
       const { error } = await (supabase as unknown as { from: (t: string) => any }).from("project_custom_services")
         .upsert({ project_id: projectId, component_key: componentKey, name, created_by: auth.user?.id }, { ignoreDuplicates: true });
       // Offline: keep on this device and publish on the next successful load.
-      if (error) { try { localStorage.setItem(customKey(componentKey), JSON.stringify([name, ...readCustom(componentKey)])); } catch { /* ignore */ } }
+      if (error && error.code !== "23505") { try { localStorage.setItem(customKey(componentKey), JSON.stringify([name, ...readCustom(componentKey)])); } catch { /* ignore */ } }
     })();
     onChange(name);
     setQuery("");
