@@ -176,7 +176,7 @@ export const reportVisitOutcome = async (input: VisitOutcomeInput) => {
     result: OUTCOME_LABEL[input.outcome] || input.outcome,
     notes: [input.actionTaken, input.notes].filter(Boolean).join(" — ") || null,
     next_follow_up_date: input.nextAppointmentDate || null,
-    created_by: auth.user?.id,
+    created_by: uid,
   });
 };
 
