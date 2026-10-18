@@ -86,7 +86,7 @@ const BeneficiaryRiskCard = ({
         ...services.map((s) => s.service_date),
         ...referrals.map((r) => r.referral_date),
       ].filter(Boolean) as string[],
-      nextFollowUp: beneficiary.next_follow_up_date,
+      nextFollowUp: bookedDate || beneficiary.next_follow_up_date || (openVisit as { due_date?: string | null } | null | undefined)?.due_date || null,
       lat: beneficiary.latitude,
       lng: beneficiary.longitude,
       facilityLat: facility?.latitude ?? null,
@@ -96,22 +96,33 @@ const BeneficiaryRiskCard = ({
       surgical,
       status: beneficiary.status,
     });
-  }, [beneficiary, services, referrals, facility, age]);
+  }, [beneficiary, services, referrals, facility, age, bookedDate, openVisit]);
+
+  const [bookedDate, setBookedDate] = useState<string | null>(null);
 
   const dispatch = async () => {
     setDispatching(true);
     try {
       const uid = await currentUserId();
+      const todayStart = new Date(new Date().toDateString());
+      const existing = beneficiary.next_follow_up_date;
+      const dueDate = existing && new Date(existing) >= todayStart
+        ? existing
+        : new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10);
       await offlineMutate({ table: "beneficiary_home_visits", action: "insert", values: {
         project_id: projectId,
         beneficiary_id: beneficiary.id,
         risk_score: risk.score,
         risk_band: risk.band,
         reasons: risk.reasons,
-        due_date: beneficiary.next_follow_up_date,
+        due_date: dueDate,
         status: "dispatched",
         created_by: uid,
       } });
+      if (dueDate !== existing) {
+        await offlineMutate({ table: "beneficiaries", action: "update", id: beneficiary.id, values: { next_follow_up_date: dueDate } });
+        setBookedDate(dueDate);
+      }
       setDispatched(true);
       toast({ title: "Home visit dispatched", description: risk.recommendation });
     } catch (e) {
@@ -144,6 +155,7 @@ const BeneficiaryRiskCard = ({
         <span>Average gap: {risk.meanIntervalDays != null ? `${risk.meanIntervalDays} days` : "—"}</span>
         <span>
           Appointment: {risk.daysToAppointment == null ? "not booked"
+            : openVisit && risk.daysToAppointment >= 0 ? `booked · CHEW visit in ${risk.daysToAppointment} days`
             : risk.daysToAppointment < 0 ? `${Math.abs(risk.daysToAppointment)} days overdue`
               : `in ${risk.daysToAppointment} days`}
         </span>
