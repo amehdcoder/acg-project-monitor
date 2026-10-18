@@ -8,7 +8,7 @@
 
 - Render Hand Cards on a protected standalone route using the same live record-backed document as exports; rely on record RLS for access — why: consistent viewing/downloads, no public beneficiary data.
 
-- Serialize hand-card camera start/stop operations and cancel stale sessions; expose torch only when the running track supports it — why: prevents leaked cameras and false device-ready states.
+- Serialize hand-card camera start/stop operations and cancel stale sessions; expose torch only when the running track supports it — why: no leaked cameras.
 - Hand-card exports capture the same naturally flowing front/back layouts, with independent page aspect ratios — why: long beneficiary details must not collide with fixed footers or become cropped in downloads.
 
 - Route all DHIS2 reporting/dashboard imports through `health-exchange`; maps use bundled Nigeria LGA/State/National boundaries — why: secrets server-side, exact geography.
