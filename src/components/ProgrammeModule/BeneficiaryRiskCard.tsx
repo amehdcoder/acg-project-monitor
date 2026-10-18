@@ -53,6 +53,7 @@ const BeneficiaryRiskCard = ({
   const [reportOpen, setReportOpen] = useState(false);
   const { visits, reload } = useBeneficiaryHomeVisits(beneficiary.id);
   const openVisit = visits.find(isVisitOpen) || null;
+  const [bookedDate, setBookedDate] = useState<string | null>(null);
   const visitCount = visits.length;
 
   const facilityId = (beneficiary as unknown as { facility_id?: string | null }).facility_id || null;
@@ -97,8 +98,6 @@ const BeneficiaryRiskCard = ({
       status: beneficiary.status,
     });
   }, [beneficiary, services, referrals, facility, age, bookedDate, openVisit]);
-
-  const [bookedDate, setBookedDate] = useState<string | null>(null);
 
   const dispatch = async () => {
     setDispatching(true);
