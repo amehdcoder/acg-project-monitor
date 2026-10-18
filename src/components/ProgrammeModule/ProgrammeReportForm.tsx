@@ -68,6 +68,7 @@ interface ReportRow {
 interface OfficerRow {
   id: string;
   user_id: string;
+  is_reviewer?: boolean;
   profiles?: { full_name: string | null; email: string | null } | null;
 }
 
@@ -109,6 +110,9 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
   const [resolutionNote, setResolutionNote] = useState("");
   const [resolveBusy, setResolveBusy] = useState(false);
   const [profileNames, setProfileNames] = useState<Record<string, string>>({});
+  const [myUserId, setMyUserId] = useState<string | null>(null);
+  useEffect(() => { void supabase.auth.getUser().then(({ data }) => setMyUserId(data.user?.id ?? null)); }, []);
+  const canReview = canManage || officers.some((o) => o.user_id === myUserId && o.is_reviewer);
 
   const indicators = useMemo(() => flatIndicators(), []);
 
@@ -140,8 +144,8 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
   }, [projectId, loadHistoryEntries]);
 
   const loadOfficers = useCallback(async () => {
-    const { data } = await db.from("programme_report_officers").select("id, user_id, profiles(first_name, last_name, email)").eq("project_id", projectId);
-    const rows = ((data || []) as { id: string; user_id: string; profiles: { first_name: string | null; last_name: string | null; email: string | null } | null }[]).map((r) => ({
+    const { data } = await db.from("programme_report_officers").select("id, user_id, is_reviewer, profiles(first_name, last_name, email)").eq("project_id", projectId);
+    const rows = ((data || []) as { id: string; user_id: string; is_reviewer: boolean; profiles: { first_name: string | null; last_name: string | null; email: string | null } | null }[]).map((r) => ({
       ...r,
       profiles: r.profiles
         ? { full_name: [r.profiles.first_name, r.profiles.last_name].filter(Boolean).join(" ").trim() || r.profiles.email, email: r.profiles.email }
@@ -334,13 +338,13 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
     if (!email) return;
     setOfficerBusy(true);
     try {
-      const { data: profile } = await db.from("profiles").select("id, full_name").ilike("email", email).maybeSingle();
+      const { data: profile } = await db.from("profiles").select("user_id, first_name, last_name").ilike("email", email).maybeSingle();
       if (!profile) {
         toast({ title: "No user with that email", description: "The person must have an Amehnities account first.", variant: "destructive" });
         return;
       }
       setOfficerEmail("");
-      await designateOfficer(profile.id, profile.full_name || email);
+      await designateOfficer(profile.user_id, [profile.first_name, profile.last_name].filter(Boolean).join(" ") || email);
     } catch (e) {
       toast({ title: "Could not designate officer", description: (e as Error).message, variant: "destructive" });
     } finally {
@@ -369,6 +373,13 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
     } finally {
       setResolveBusy(false);
     }
+  };
+
+  const toggleReviewer = async (o: OfficerRow) => {
+    const { error } = await db.from("programme_report_officers").update({ is_reviewer: !o.is_reviewer }).eq("id", o.id);
+    if (error) { toast({ title: "Could not update reviewer", description: error.message, variant: "destructive" }); return; }
+    toast({ title: o.is_reviewer ? "Reviewer role removed" : "Designated as report reviewer", description: o.profiles?.full_name || o.profiles?.email || "" });
+    await loadOfficers();
   };
 
   const removeOfficer = async (id: string) => {
@@ -680,7 +691,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
                       </div>
                     )}
                   </div>
-                  {!resolved && (
+                  {!resolved && canReview && (
                     <Button size="sm" className="gap-1.5" onClick={() => { setResolving(r); setResolutionNote(""); }}>
                       <CheckCircle2 className="h-4 w-4" /> Mark resolved
                     </Button>
@@ -854,7 +865,13 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
                   <p className="text-sm font-semibold text-health-ink">{o.profiles?.full_name || "Unnamed user"}</p>
                   <p className="text-xs text-muted-foreground">{o.profiles?.email}</p>
                 </div>
+                <div className="flex items-center gap-1.5">
+                <button type="button" onClick={() => toggleReviewer(o)} aria-pressed={!!o.is_reviewer}
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${o.is_reviewer ? "border-health-teal bg-health-teal/15 text-health-teal" : "border-border text-muted-foreground hover:border-health-teal/50 hover:text-health-teal"}`}>
+                  {o.is_reviewer ? "✓ Reviewer" : "Make reviewer"}
+                </button>
                 <Button variant="ghost" size="icon" onClick={() => removeOfficer(o.id)} aria-label="Remove officer"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                </div>
               </div>
             ))}
           </div>
