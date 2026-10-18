@@ -33,6 +33,7 @@ import { loadProjectLogframe, saveProjectLogframe } from "@/lib/programmeModule/
 import { exportLogframeExcel, parseLogframeWorkbook } from "@/lib/programmeModule/logframeExcel";
 import { FileSpreadsheet, Pencil, Upload } from "lucide-react";
 import { parseDisaggCell } from "@/lib/programmeModule/disaggregationCatalog";
+import { offlineMutate, currentUserId } from "@/lib/programmeModule/offlineWrite";
 
 const db = supabase as unknown as {
   from: (t: string) => any; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -331,13 +332,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
     }
     setSaving(true);
     try {
-      const { data: auth } = await supabase.auth.getUser();
-      const { data: report, error } = await db
-        .from("programme_reports")
-        .insert({ project_id: projectId, period_label: period.trim() || "Unnamed period", report_year: Number(reportYear), notes: notes.trim() || null, created_by: auth.user?.id })
-        .select("id")
-        .single();
-      if (error) throw error;
+      const report = await offlineMutate({ table: "programme_reports", action: "insert", values: { project_id: projectId, period_label: period.trim() || "Unnamed period", report_year: Number(reportYear), notes: notes.trim() || null, created_by: await currentUserId() } });
       const rows = entries.map(({ ind, draft }) => ({
         report_id: report.id,
         indicator_code: ind.code,
@@ -346,9 +341,10 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
         risk: draft.risk.trim() || null,
         over_target_comment: draft.overTargetComment.trim() || null,
       }));
-      const { error: eErr } = await db.from("programme_report_entries").insert(rows);
-      if (eErr) throw eErr;
-      toast({ title: "Programme report saved", description: `${rows.length} indicator entries recorded for ${period}.` });
+      const ent = await offlineMutate({ table: "programme_report_entries", action: "insert", values: rows, forceQueue: report.queued });
+      toast(report.queued || ent.queued
+        ? { title: "Report saved offline", description: `${rows.length} indicator entries will sync automatically when you are back online.` }
+        : { title: "Programme report saved", description: `${rows.length} indicator entries recorded for ${period}.` });
       setDrafts({});
       setNotes("");
       await loadReports();

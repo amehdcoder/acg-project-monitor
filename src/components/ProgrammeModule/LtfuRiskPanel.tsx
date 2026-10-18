@@ -36,6 +36,7 @@ import {
   bandLabel, bandTone, rankLtfuRisk, type RiskInput, type RiskResult,
 } from "@/lib/programmeModule/ltfuRisk";
 import ChewVisitMap from "./ChewVisitMap";
+import { offlineMutate, currentUserId } from "@/lib/programmeModule/offlineWrite";
 
 interface Props {
   projectId: string;
@@ -177,8 +178,8 @@ const LtfuRiskPanel = ({
     if (!target) return;
     setBusy(true);
     try {
-      const { data: auth } = await supabase.auth.getUser();
-      const { error } = await db.from("beneficiary_home_visits").insert({
+      const uid = await currentUserId();
+      await offlineMutate({ table: "beneficiary_home_visits", action: "insert", values: {
         project_id: projectId,
         module_id: moduleId || null,
         beneficiary_id: target.beneficiaryId,
@@ -190,9 +191,8 @@ const LtfuRiskPanel = ({
         due_date: dueDate,
         status: "dispatched",
         outcome_notes: visitNotes || null,
-        created_by: auth.user?.id,
-      });
-      if (error) throw error;
+        created_by: uid,
+      } });
       toast({ title: "Home visit dispatched", description: `${target.name} — due ${new Date(dueDate).toLocaleDateString()}` });
       setOpen(false); setVisitNotes(""); setChewId("");
       await load();
@@ -202,9 +202,9 @@ const LtfuRiskPanel = ({
   };
 
   const updateVisit = async (id: string, patch: Record<string, unknown>) => {
-    const { error } = await db.from("beneficiary_home_visits").update(patch).eq("id", id);
-    if (error) {
-      toast({ title: "Could not update the visit", description: error.message, variant: "destructive" });
+    try { await offlineMutate({ table: "beneficiary_home_visits", action: "update", values: patch, id }); }
+    catch (error) {
+      toast({ title: "Could not update the visit", description: (error as Error).message, variant: "destructive" });
       return;
     }
     await load();

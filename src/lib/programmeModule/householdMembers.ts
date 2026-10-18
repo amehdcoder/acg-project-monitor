@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { NTD_DISEASES, type MdaRoundRow, type MdaTreatmentRow } from "./households";
+import { offlineMutate, currentUserId } from "./offlineWrite";
 
 const db = supabase as unknown as { from: (t: string) => any };
 
@@ -86,22 +87,17 @@ export const useMembersOfHousehold = (householdId?: string | null) => {
 export const saveHouseholdMember = async (
   row: Partial<HouseholdMemberRow> & { project_id: string; household_id: string; full_name: string },
 ): Promise<string> => {
-  const { data: auth } = await supabase.auth.getUser();
   if (row.id) {
     const { id, created_at: _c, ...rest } = row as Record<string, unknown> & { id: string };
-    const { error } = await db.from("household_members").update(rest).eq("id", id);
-    if (error) throw error;
+    await offlineMutate({ table: "household_members", action: "update", values: rest, id });
     return id;
   }
-  const { data, error } = await db.from("household_members")
-    .insert({ ...row, created_by: auth.user?.id }).select("id").single();
-  if (error) throw error;
-  return (data as { id: string }).id;
+  const res = await offlineMutate({ table: "household_members", action: "insert", values: { ...row, created_by: await currentUserId() } });
+  return res.id as string;
 };
 
 export const deleteHouseholdMember = async (id: string) => {
-  const { error } = await db.from("household_members").delete().eq("id", id);
-  if (error) throw error;
+  await offlineMutate({ table: "household_members", action: "delete", id });
 };
 
 export const MEMBER_RELATIONSHIPS = [

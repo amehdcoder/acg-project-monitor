@@ -19,6 +19,7 @@ import {
   useBeneficiaryHomeVisits, isVisitOpen, visitSummary,
 } from "@/lib/programmeModule/homeVisits";
 import HomeVisitOutcomeDialog from "./HomeVisitOutcomeDialog";
+import { offlineMutate, currentUserId } from "@/lib/programmeModule/offlineWrite";
 import type {
   BeneficiaryReferralRow, BeneficiaryRow, BeneficiaryServiceRow,
 } from "@/lib/programmeModule/types";
@@ -100,8 +101,8 @@ const BeneficiaryRiskCard = ({
   const dispatch = async () => {
     setDispatching(true);
     try {
-      const { data: auth } = await supabase.auth.getUser();
-      const { error } = await supabase.from("beneficiary_home_visits").insert({
+      const uid = await currentUserId();
+      await offlineMutate({ table: "beneficiary_home_visits", action: "insert", values: {
         project_id: projectId,
         beneficiary_id: beneficiary.id,
         risk_score: risk.score,
@@ -109,9 +110,8 @@ const BeneficiaryRiskCard = ({
         reasons: risk.reasons,
         due_date: beneficiary.next_follow_up_date,
         status: "dispatched",
-        created_by: auth.user?.id,
-      });
-      if (error) throw error;
+        created_by: uid,
+      } });
       setDispatched(true);
       toast({ title: "Home visit dispatched", description: risk.recommendation });
     } catch (e) {
