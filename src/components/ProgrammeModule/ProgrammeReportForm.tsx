@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { LOGFRAME, LOGFRAME_PROJECT, flatIndicators, numericTarget, type AutoKey, type FlatIndicator } from "@/lib/programmeModule/logframe";
 import { aggregateIndicators } from "@/lib/programmeModule/programmeReport";
 import DisaggregationEditor from "./DisaggregationEditor";
+import { parseDisaggCell } from "@/lib/programmeModule/disaggregationCatalog";
 
 const db = supabase as unknown as {
   from: (t: string) => any; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -37,8 +38,19 @@ interface EntryDraft {
   value: string;
   disaggregation: Record<string, string>;
   risk: string;
+  overTargetComment: string;
   auto: boolean;
 }
+
+/** Sum of all disaggregated option values across every dimension cell. */
+const disaggSum = (disaggregation: Record<string, string>): number =>
+  Object.values(disaggregation).reduce(
+    (total, cell) => total + Object.values(parseDisaggCell(cell)).reduce((s, v) => s + v, 0),
+    0,
+  );
+
+const hasDisaggValues = (disaggregation: Record<string, string>): boolean =>
+  Object.values(disaggregation).some((cell) => Object.values(parseDisaggCell(cell)).some((v) => v !== 0));
 
 interface ReportRow {
   id: string;
@@ -178,6 +190,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
               value: String(v),
               disaggregation: existing?.disaggregation || {},
               risk: existing?.risk || "",
+              overTargetComment: existing?.overTargetComment || "",
               auto: true,
             };
           }
@@ -201,7 +214,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
   const setDraft = (code: string, patch: Partial<EntryDraft>) => {
     setDrafts((prev) => ({
       ...prev,
-      [code]: { value: "", disaggregation: {}, risk: "", auto: false, ...prev[code], ...patch },
+      [code]: { value: "", disaggregation: {}, risk: "", overTargetComment: "", auto: false, ...prev[code], ...patch },
     }));
   };
 
@@ -237,6 +250,39 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
       toast({ title: "Nothing to save", description: "Enter at least one indicator value or risk first.", variant: "destructive" });
       return;
     }
+    const yearIdx = Math.min(Math.max(Number(reportYear) - 1, 0), 3);
+    // 1. Disaggregation totals must equal the value entered for the period.
+    const mismatched = entries.filter(({ ind, draft }) => {
+      if (!ind.disaggregation || ind.disaggregation.length === 0) return false;
+      if (!hasDisaggValues(draft.disaggregation)) return false;
+      const value = Number(draft.value);
+      if (!Number.isFinite(value)) return false;
+      return disaggSum(draft.disaggregation) !== value;
+    });
+    if (mismatched.length > 0) {
+      toast({
+        title: "Disaggregation does not add up",
+        description: `The disaggregated figures must sum to the value for the period. Please review: ${mismatched.map(({ ind }) => ind.code).join(", ")}.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    // 2. Values above the target require a justification comment.
+    const overTarget = entries.filter(({ ind, draft }) => {
+      const value = Number(draft.value);
+      if (!Number.isFinite(value) || draft.value.trim() === "") return false;
+      const target = numericTarget(ind.targets[yearIdx]) ?? numericTarget(ind.totalTarget);
+      return target !== null && value > target;
+    });
+    const missingComment = overTarget.filter(({ draft }) => draft.overTargetComment.trim() === "");
+    if (missingComment.length > 0) {
+      toast({
+        title: "Target exceeded — comment required",
+        description: `The value entered is above the target for ${missingComment.map(({ ind }) => ind.code).join(", ")}. Please confirm this is correct and explain why the programme achieved beyond the target in the highlighted comment box.`,
+        variant: "destructive",
+      });
+      return;
+    }
     setSaving(true);
     try {
       const { data: auth } = await supabase.auth.getUser();
@@ -252,6 +298,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
         value: draft.value.trim() === "" ? null : Number(draft.value),
         disaggregation: draft.disaggregation,
         risk: draft.risk.trim() || null,
+        over_target_comment: draft.overTargetComment.trim() || null,
       }));
       const { error: eErr } = await db.from("programme_report_entries").insert(rows);
       if (eErr) throw eErr;
@@ -341,6 +388,15 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
     const cumulative = cumulativeFor(ind.code);
     const pct = yearTarget && yearTarget > 0 ? Math.min(100, Math.round((cumulative / yearTarget) * 100)) : null;
     const t = TONES[tone];
+    const valueNum = Number(draft?.value);
+    const hasValue = !!draft && draft.value.trim() !== "" && Number.isFinite(valueNum);
+    const disaggLabels = ind.disaggregation || [];
+    const disaggFilled = !!draft && hasDisaggValues(draft.disaggregation);
+    const disaggTotal = draft ? disaggSum(draft.disaggregation) : 0;
+    const sumMismatch = disaggLabels.length > 0 && disaggFilled && hasValue && disaggTotal !== valueNum;
+    const effectiveTarget = yearTarget ?? totalTarget;
+    const isOverTarget = hasValue && effectiveTarget !== null && valueNum > effectiveTarget;
+    const overTargetNeedsComment = isOverTarget && (draft?.overTargetComment.trim() ?? "") === "";
     return (
       <div key={ind.code} className={cn("rounded-lg border border-l-4 bg-card p-4 shadow-soft sm:p-5", t.border)}>
         <div className="flex flex-wrap items-start justify-between gap-2">
@@ -397,6 +453,40 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
             />
           )}
         </div>
+        {disaggLabels.length > 0 && disaggFilled && hasValue && (
+          <div className={cn(
+            "mt-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-xs font-medium",
+            sumMismatch
+              ? "border-status-danger/40 bg-status-danger/5 text-status-danger"
+              : "border-status-success/40 bg-status-success/5 text-status-success",
+          )}>
+            {sumMismatch ? <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> : <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />}
+            {sumMismatch
+              ? `Disaggregated figures add up to ${disaggTotal.toLocaleString()}, but the value for this period is ${valueNum.toLocaleString()}. Please adjust so they match before saving.`
+              : `Disaggregated figures add up correctly to ${valueNum.toLocaleString()}.`}
+          </div>
+        )}
+        {isOverTarget && (
+          <div className={cn(
+            "mt-3 rounded-lg border p-4",
+            overTargetNeedsComment ? "border-status-warning/50 bg-status-warning/5" : "border-status-success/40 bg-status-success/5",
+          )}>
+            <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Target className="h-4 w-4 text-status-warning" />
+              This value exceeds the target ({effectiveTarget?.toLocaleString()})
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Please confirm this is correct. To proceed, a comment explaining why the programme achieved beyond the target for this indicator is <span className="font-semibold text-foreground">required</span>.
+            </p>
+            <Textarea
+              aria-label={`Over-target justification for ${ind.code}`}
+              value={draft?.overTargetComment || ""}
+              onChange={(e) => setDraft(ind.code, { overTargetComment: e.target.value })}
+              placeholder="e.g. Additional outreach rounds conducted with partner support reached more communities than planned…"
+              className={cn("mt-3 min-h-20 text-sm", overTargetNeedsComment && "border-status-warning/60")}
+            />
+          </div>
+        )}
         <div className="mt-3">
           <Label htmlFor={`report-risk-${ind.code}`} className="inline-flex items-center gap-2 text-sm font-medium text-status-warning"><AlertTriangle className="h-3 w-3" /> Risks / challenges encountered</Label>
           <Textarea
