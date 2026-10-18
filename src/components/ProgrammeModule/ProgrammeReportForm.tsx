@@ -453,6 +453,40 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
             />
           )}
         </div>
+        {disaggLabels.length > 0 && disaggFilled && hasValue && (
+          <div className={cn(
+            "mt-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-xs font-medium",
+            sumMismatch
+              ? "border-status-danger/40 bg-status-danger/5 text-status-danger"
+              : "border-status-success/40 bg-status-success/5 text-status-success",
+          )}>
+            {sumMismatch ? <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> : <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />}
+            {sumMismatch
+              ? `Disaggregated figures add up to ${disaggTotal.toLocaleString()}, but the value for this period is ${valueNum.toLocaleString()}. Please adjust so they match before saving.`
+              : `Disaggregated figures add up correctly to ${valueNum.toLocaleString()}.`}
+          </div>
+        )}
+        {isOverTarget && (
+          <div className={cn(
+            "mt-3 rounded-lg border p-4",
+            overTargetNeedsComment ? "border-status-warning/50 bg-status-warning/5" : "border-status-success/40 bg-status-success/5",
+          )}>
+            <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Target className="h-4 w-4 text-status-warning" />
+              This value exceeds the target ({effectiveTarget?.toLocaleString()})
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Please confirm this is correct. To proceed, a comment explaining why the programme achieved beyond the target for this indicator is <span className="font-semibold text-foreground">required</span>.
+            </p>
+            <Textarea
+              aria-label={`Over-target justification for ${ind.code}`}
+              value={draft?.overTargetComment || ""}
+              onChange={(e) => setDraft(ind.code, { overTargetComment: e.target.value })}
+              placeholder="e.g. Additional outreach rounds conducted with partner support reached more communities than planned…"
+              className={cn("mt-3 min-h-20 text-sm", overTargetNeedsComment && "border-status-warning/60")}
+            />
+          </div>
+        )}
         <div className="mt-3">
           <Label htmlFor={`report-risk-${ind.code}`} className="inline-flex items-center gap-2 text-sm font-medium text-status-warning"><AlertTriangle className="h-3 w-3" /> Risks / challenges encountered</Label>
           <Textarea
