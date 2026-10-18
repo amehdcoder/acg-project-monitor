@@ -190,6 +190,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
               value: String(v),
               disaggregation: existing?.disaggregation || {},
               risk: existing?.risk || "",
+              overTargetComment: existing?.overTargetComment || "",
               auto: true,
             };
           }
