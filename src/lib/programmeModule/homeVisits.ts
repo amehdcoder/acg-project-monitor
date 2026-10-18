@@ -166,7 +166,7 @@ export const reportVisitOutcome = async (input: VisitOutcomeInput) => {
   }
 
   // Keep the visit on the care timeline alongside clinical services.
-  await db.from("beneficiary_services").insert({
+  await offlineMutate({ table: "beneficiary_services", action: "insert", values: {
     project_id: input.projectId,
     beneficiary_id: input.beneficiaryId,
     service_type: "home_visit",
@@ -177,7 +177,7 @@ export const reportVisitOutcome = async (input: VisitOutcomeInput) => {
     notes: [input.actionTaken, input.notes].filter(Boolean).join(" — ") || null,
     next_follow_up_date: input.nextAppointmentDate || null,
     created_by: uid,
-  });
+  } });
 };
 
 /** Visits still owed a report, oldest due first. */
