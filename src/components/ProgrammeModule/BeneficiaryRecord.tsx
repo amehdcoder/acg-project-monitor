@@ -285,6 +285,22 @@ const BeneficiaryRecord = ({
                         <dd className="break-words text-sm font-semibold text-foreground">{f.value || "—"}</dd>
                       </div>
                     ))}
+                    {(() => {
+                      const wg = readWgResult(profile);
+                      const palette = ["from-health-blue to-health-teal", "from-status-warning to-destructive", "from-health-teal to-status-success", "from-primary to-health-blue", "from-destructive to-status-warning", "from-status-success to-health-blue"];
+                      return (
+                        <div className="col-span-full min-w-0">
+                          <dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Disability domain (Washington Group)</dt>
+                          <dd className="mt-1 flex flex-wrap gap-1.5">
+                            {!wg && <span className="rounded-full border border-dashed border-border px-2.5 py-0.5 text-xs text-muted-foreground">Screening not completed</span>}
+                            {wg && !wg.hasDisability && <span className="rounded-full bg-status-success/15 px-2.5 py-0.5 text-xs font-semibold text-status-success">No functional difficulty identified</span>}
+                            {wg?.hasDisability && wg.disabilityDomains.map((d, i) => (
+                              <span key={d} className={`rounded-full bg-gradient-to-r ${palette[i % palette.length]} px-3 py-1 text-xs font-bold text-primary-foreground shadow-sm`}>{d}</span>
+                            ))}
+                          </dd>
+                        </div>
+                      );
+                    })()}
                   </dl>
                 </div>
                 <div className="flex shrink-0 items-start gap-2">
