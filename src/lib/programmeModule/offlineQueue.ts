@@ -62,17 +62,37 @@ const TABLES: Record<QueueKind, "beneficiaries" | "beneficiary_services" | "bene
 };
 
 let flushing = false;
+const ORDER: Record<QueueKind, number> = { beneficiary: 0, service: 1, referral: 2 };
+/** Exponential backoff per item (max 15 min) so failing rows don't hammer the server. */
+const readyToRetry = (item: QueuedItem & { next_try_at?: number }) => !item.next_try_at || item.next_try_at <= Date.now();
 
-/** Sends every queued item. Safe to call repeatedly; runs one flush at a time. */
+/**
+ * Sends every queued item. Only one tab per device flushes at a time (Web
+ * Locks), parents are sent before children, and failed items back off.
+ */
 export const flushQueue = async (): Promise<{ sent: number; failed: number }> => {
   if (flushing || !navigator.onLine) return { sent: 0, failed: 0 };
+  const locks = (navigator as Navigator & { locks?: { request: (n: string, o: { ifAvailable: boolean }, cb: (l: unknown) => Promise<unknown>) => Promise<unknown> } }).locks;
+  if (locks) {
+    let result = { sent: 0, failed: 0 };
+    await locks.request("amehnities-records-flush", { ifAvailable: true }, async (lock) => {
+      if (lock) result = await flushInner();
+    });
+    return result;
+  }
+  return flushInner();
+};
+
+const flushInner = async (): Promise<{ sent: number; failed: number }> => {
+  if (flushing) return { sent: 0, failed: 0 };
   flushing = true;
   let sent = 0;
   let failed = 0;
   try {
-    const items = read();
+    const items = [...read()].sort((a, b) => ORDER[a.kind] - ORDER[b.kind] || a.queued_at.localeCompare(b.queued_at));
     const remaining: QueuedItem[] = [];
     for (const item of items) {
+      if (!readyToRetry(item)) { remaining.push(item); continue; }
       try {
         const { error } = await supabase
           .from(TABLES[item.kind])
@@ -85,10 +105,13 @@ export const flushQueue = async (): Promise<{ sent: number; failed: number }> =>
           ...item,
           attempts: item.attempts + 1,
           last_error: (e as Error).message,
-        });
+          next_try_at: Date.now() + Math.min(15 * 60_000, 2_000 * 2 ** item.attempts),
+        } as QueuedItem);
       }
     }
-    write(remaining);
+    // Keep anything queued while this flush was running.
+    const sentOrKept = new Set(items.map((i) => i.submission_uuid));
+    write([...remaining, ...read().filter((i) => !sentOrKept.has(i.submission_uuid))]);
   } finally {
     flushing = false;
   }
@@ -103,6 +126,10 @@ let listenerBound = false;
 export const bindQueueAutoFlush = () => {
   if (listenerBound) return;
   listenerBound = true;
-  window.addEventListener("online", () => { void flushQueue(); });
+  // Random 0–20 s delay on reconnect so many devices coming back online at
+  // once don't all hit the server in the same instant.
+  window.addEventListener("online", () => { setTimeout(() => { void flushQueue(); }, Math.random() * 20_000); });
+  // Periodic retry for items that backed off or devices that never fire "online".
+  setInterval(() => { if (read().length) void flushQueue(); }, 60_000);
   void flushQueue();
 };
