@@ -31,6 +31,10 @@ import { isMmdpVisit } from "@/lib/programmeModule/mmdp";
 import { resolveIcon } from "./icons";
 import { useBeneficiaryRecord } from "./useProgrammeModule";
 import ServiceEntryDialog from "./ServiceEntryDialog";
+import GraduationPathwayPanel from "./GraduationPathwayPanel";
+import WashingtonGroupDialog from "./WashingtonGroupDialog";
+import { componentKind } from "@/lib/programmeModule/componentOutcomes";
+import { buildWgRecord, WG_DOMAINS } from "@/lib/programmeModule/washingtonGroup";
 import ReferralDialog from "./ReferralDialog";
 import BeneficiaryFormDialog from "./BeneficiaryFormDialog";
 import LongitudinalOutcome from "./LongitudinalOutcome";
@@ -107,6 +111,8 @@ const BeneficiaryRecord = ({
   const [referralOpen, setReferralOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [serviceComponent, setServiceComponent] = useState<string | undefined>();
+  const [serviceDefault, setServiceDefault] = useState<string | undefined>();
+  const [wgOpen, setWgOpen] = useState(false);
   const [tab, setTab] = useState("overview");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteReason, setDeleteReason] = useState("");
@@ -422,6 +428,17 @@ const BeneficiaryRecord = ({
                 })}
               </div>
 
+              {(() => {
+                const lv = components.find((c) => componentKind(c.key, c.label) === "livelihood");
+                return lv ? (
+                  <GraduationPathwayPanel
+                    beneficiary={beneficiary} componentKey={lv.key} services={services}
+                    onRecord={(k, name) => { setServiceComponent(k); setServiceDefault(name); setServiceOpen(true); }}
+                    onChanged={() => { void reload(); onChanged(); }}
+                  />
+                ) : null;
+              })()}
+
               <div className="grid gap-4 lg:grid-cols-3">
                 {config.sections
                   .filter((s) => !s.hidden && s.placement === "personal")
@@ -461,8 +478,8 @@ const BeneficiaryRecord = ({
                           <p className="text-sm text-muted-foreground">
                             The six-question disability screening has not been completed for this beneficiary.
                           </p>
-                          <Button variant="link" size="sm" className="h-auto px-0" onClick={() => setEditOpen(true)}>
-                            Complete screening
+                          <Button size="sm" className="gap-1" onClick={() => setWgOpen(true)}>
+                            <Accessibility className="h-4 w-4" /> Open WG-SS questionnaire
                           </Button>
                         </div>
                       );
@@ -483,9 +500,28 @@ const BeneficiaryRecord = ({
                             ))}
                           </div>
                         )}
-                        <p className="text-xs text-muted-foreground">
-                          Screened {new Date(wg.completed_at).toLocaleDateString()}
-                        </p>
+                        <ul className="grid grid-cols-2 gap-1.5 pt-1">
+                          {WG_DOMAINS.map((d) => {
+                            const lvl = wg.answers[d.key];
+                            const tone = lvl === "cannot" ? "border-destructive/40 bg-destructive/10 text-destructive"
+                              : lvl === "a_lot" ? "border-status-warning/50 bg-status-warning/10 text-status-warning"
+                              : lvl === "some" ? "border-health-blue/30 bg-health-blue/10 text-health-blue"
+                              : "border-status-success/30 bg-status-success/10 text-status-success";
+                            const label = { none: "No difficulty", some: "Some difficulty", a_lot: "A lot of difficulty", cannot: "Cannot do at all" }[lvl as string] || "Not answered";
+                            return (
+                              <li key={d.key} className={cn("rounded-lg border px-2 py-1.5", tone)}>
+                                <p className="text-[11px] font-bold uppercase tracking-wide">{d.label}</p>
+                                <p className="text-xs">{label}</p>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs text-muted-foreground">
+                            Screened {new Date(wg.completed_at).toLocaleDateString()}
+                          </p>
+                          <Button variant="link" size="sm" className="h-auto px-0" onClick={() => setWgOpen(true)}>Re-screen</Button>
+                        </div>
                       </div>
                     );
                   })()}
@@ -793,10 +829,24 @@ const BeneficiaryRecord = ({
       </div>
 
       <ServiceEntryDialog
-        open={serviceOpen} onOpenChange={setServiceOpen} config={config}
+        open={serviceOpen} onOpenChange={(v) => { setServiceOpen(v); if (!v) setServiceDefault(undefined); }} config={config}
         beneficiary={beneficiary} moduleId={moduleId} projectId={projectId}
-        defaultComponent={serviceComponent} priorServices={services} componentFilter={componentFilter}
+        defaultComponent={serviceComponent} defaultService={serviceDefault} priorServices={services} componentFilter={componentFilter}
         onSaved={() => { void reload(); onChanged(); }}
+      />
+      <WashingtonGroupDialog
+        open={wgOpen}
+        beneficiaryName={beneficiary.full_name}
+        initial={readWgResult(beneficiary.profile as Record<string, unknown>)?.answers}
+        onSkip={() => setWgOpen(false)}
+        onSave={async (answers) => {
+          const profile = { ...((beneficiary.profile || {}) as Record<string, unknown>), wg_ss: buildWgRecord(answers) };
+          const { error } = await supabase.from("beneficiaries").update({ profile } as never).eq("id", beneficiary.id);
+          if (error) { toast({ title: "Screening save failed", description: error.message, variant: "destructive" }); return; }
+          toast({ title: "Disability screening saved" });
+          setWgOpen(false);
+          void reload(); onChanged();
+        }}
       />
       <ReferralDialog
         open={referralOpen} onOpenChange={setReferralOpen} config={config}
