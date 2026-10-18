@@ -154,7 +154,7 @@ const FeedbackForm = ({ projectId }: { projectId?: string }) => {
 
   if (reference) {
     return (
-      <div className="form-scroll h-[100dvh] bg-gradient-to-b from-teal-50 via-white to-slate-50 px-4 py-14">
+      <div className="form-scroll mobile-form-text h-[100dvh] bg-gradient-to-b from-teal-50 via-white to-slate-50 px-4 py-14">
         <div className="mx-auto max-w-lg rounded-2xl border border-teal-100 bg-white p-8 text-center shadow-[0_18px_50px_-24px_rgba(13,148,136,0.35)]">
           <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-teal-50">
             <CheckCircle2 className="h-9 w-9 text-teal-600" />
@@ -176,7 +176,7 @@ const FeedbackForm = ({ projectId }: { projectId?: string }) => {
   }
 
   return (
-    <div className="form-scroll h-[100dvh] bg-gradient-to-b from-teal-50/70 via-white to-slate-50 pb-20">
+    <div className="form-scroll mobile-form-text h-[100dvh] bg-gradient-to-b from-teal-50/70 via-white to-slate-50 pb-20">
       {/* Header */}
       <header className="border-b border-teal-100/70 bg-white/80 backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-4">
