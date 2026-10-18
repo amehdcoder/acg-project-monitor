@@ -5,8 +5,9 @@ import ProgrammeReportForm from "./ProgrammeReportForm";
 vi.mock("@/lib/programmeModule/programmeReport", () => ({ aggregateIndicators: vi.fn(async () => ({})) }));
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: vi.fn() }) }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {
+  auth: { getUser: async () => ({ data: { user: null } }) },
   from: () => {
-    const query = { select: () => query, eq: () => query, order: async () => ({ data: [] }), then: (resolve: (data: { data: [] }) => void) => resolve({ data: [] }) };
+    const query = { select: () => query, eq: () => query, in: () => query, maybeSingle: async () => ({ data: null }), order: async () => ({ data: [] }), then: (resolve: (data: { data: [] }) => void) => resolve({ data: [] }) };
     return query;
   },
 } }));

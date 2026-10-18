@@ -9940,6 +9940,27 @@ export type Database = {
         }
         Relationships: []
       }
+      programme_logframes: {
+        Row: {
+          data: Json
+          project_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          data: Json
+          project_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          data?: Json
+          project_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       programme_modules: {
         Row: {
           case_seq: number

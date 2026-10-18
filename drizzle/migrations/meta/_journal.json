@@ -71,6 +71,13 @@
       "when": 1792356856581,
       "tag": "0009_sms_followup_reminders",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792357817378,
+      "tag": "0010_programme_logframes",
+      "breakpoints": true
     }
   ]
 }

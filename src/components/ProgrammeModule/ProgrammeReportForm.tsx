@@ -25,9 +25,13 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { LOGFRAME, LOGFRAME_PROJECT, flatIndicators, numericTarget, type AutoKey, type FlatIndicator } from "@/lib/programmeModule/logframe";
+import { defaultLogframe, flatIndicators, type ProjectLogframe, numericTarget, type AutoKey, type FlatIndicator } from "@/lib/programmeModule/logframe";
 import { aggregateIndicators } from "@/lib/programmeModule/programmeReport";
 import DisaggregationEditor from "./DisaggregationEditor";
+import LogframeEditor from "./LogframeEditor";
+import { loadProjectLogframe, saveProjectLogframe } from "@/lib/programmeModule/logframeStore";
+import { exportLogframeExcel, parseLogframeWorkbook } from "@/lib/programmeModule/logframeExcel";
+import { FileSpreadsheet, Pencil, Upload } from "lucide-react";
 import { parseDisaggCell } from "@/lib/programmeModule/disaggregationCatalog";
 
 const db = supabase as unknown as {
@@ -114,7 +118,45 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
   useEffect(() => { void supabase.auth.getUser().then(({ data }) => setMyUserId(data.user?.id ?? null)); }, []);
   const canReview = canManage || officers.some((o) => o.user_id === myUserId && o.is_reviewer);
 
-  const indicators = useMemo(() => flatIndicators(), []);
+  const [logframe, setLogframe] = useState<ProjectLogframe>(() => defaultLogframe());
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [importMode, setImportMode] = useState<"replace" | "update" | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const LOGFRAME = logframe.objectives;
+  const LOGFRAME_PROJECT = logframe.project;
+  useEffect(() => { let c = false; void loadProjectLogframe(projectId).then((lf) => { if (!c) setLogframe(lf); }); return () => { c = true; }; }, [projectId]);
+  const indicators = useMemo(() => flatIndicators(logframe.objectives), [logframe]);
+  const persistLogframe = async (lf: ProjectLogframe) => {
+    try { await saveProjectLogframe(projectId, lf); setLogframe(lf); toast({ title: "Framework saved", description: "The report form now uses your updated framework." }); }
+    catch (e) { toast({ title: "Could not save framework", description: (e as Error).message, variant: "destructive" }); throw e; }
+  };
+  const handleExportExcel = async () => {
+    try { await exportLogframeExcel(logframe, { period, reportYear, notes, drafts }); }
+    catch (e) { toast({ title: "Export failed", description: (e as Error).message, variant: "destructive" }); }
+  };
+  const handleImportFile = async (file: File) => {
+    const mode = importMode || "update";
+    try {
+      const parsed = await parseLogframeWorkbook(await file.arrayBuffer());
+      const lf: ProjectLogframe = {
+        project: mode === "replace" ? parsed.logframe.project : {
+          id: parsed.logframe.project.id || logframe.project.id, name: parsed.logframe.project.name || logframe.project.name,
+          country: parsed.logframe.project.country || logframe.project.country, impact: parsed.logframe.project.impact || logframe.project.impact,
+        },
+        objectives: parsed.logframe.objectives,
+      };
+      await persistLogframe(lf);
+      const incoming = Object.fromEntries(Object.entries(parsed.state.drafts).map(([k, d]) => [k, { ...d, auto: false }]));
+      setDrafts((prev) => (mode === "replace" ? incoming : { ...prev, ...incoming }));
+      if (parsed.state.period) setPeriod(parsed.state.period);
+      if (parsed.state.reportYear) setReportYear(parsed.state.reportYear);
+      if (mode === "replace" || parsed.state.notes) setNotes(parsed.state.notes);
+      setImportOpen(false);
+      toast({ title: mode === "replace" ? "Report replaced from Excel" : "Report updated from Excel", description: `${flatIndicators(lf.objectives).length} indicators loaded, ${Object.keys(incoming).length} with values.` });
+    } catch (e) {
+      toast({ title: "Import failed", description: (e as Error).message, variant: "destructive" });
+    } finally { setImportMode(null); }
+  };
 
   const loadHistoryEntries = useCallback(async (rows: ReportRow[]) => {
     if (rows.length === 0) { setHistoryEntries({}); return; }
@@ -539,6 +581,15 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
                   <Users className="h-4 w-4" /> Programme Officers
                 </Button>
               )}
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setEditorOpen(true)}>
+                <Pencil className="h-4 w-4" /> Edit framework
+              </Button>
+              <Button variant="outline" size="sm" className="gap-1.5 border-health-teal/40 text-health-teal" onClick={() => void handleExportExcel()}>
+                <FileSpreadsheet className="h-4 w-4" /> Export Excel
+              </Button>
+              <Button variant="outline" size="sm" className="gap-1.5 border-health-blue/40 text-health-blue" onClick={() => setImportOpen(true)}>
+                <Upload className="h-4 w-4" /> Import Excel
+              </Button>
               <Button variant="outline" size="sm" className="gap-1.5" onClick={openHistory}>
                 <History className="h-4 w-4" /> Report history ({reports.length})
               </Button>
@@ -882,6 +933,24 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
             ))}
           </div>
           <DialogFooter />
+        </DialogContent>
+      </Dialog>
+      <LogframeEditor open={editorOpen} onOpenChange={setEditorOpen} value={logframe} onSave={persistLogframe} />
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Import filled Excel template</DialogTitle>
+            <DialogDescription>Upload a Programme Report template exported from here. The framework in the file becomes this project's framework.</DialogDescription>
+          </DialogHeader>
+          <input id="programme-report-import" type="file" accept=".xlsx" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void handleImportFile(f); }} />
+          <div className="grid gap-3">
+            <Button className="h-auto flex-col items-start gap-0.5 py-3 text-left" onClick={() => { setImportMode("update"); document.getElementById("programme-report-import")?.click(); }}>
+              <span className="font-semibold">Update</span><span className="text-xs font-normal opacity-80">Keep current entries; apply values filled in the file</span>
+            </Button>
+            <Button variant="outline" className="h-auto flex-col items-start gap-0.5 py-3 text-left" onClick={() => { setImportMode("replace"); document.getElementById("programme-report-import")?.click(); }}>
+              <span className="font-semibold">Replace</span><span className="text-xs font-normal text-muted-foreground">Clear the form and use everything from the file</span>
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
