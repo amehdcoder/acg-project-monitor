@@ -250,6 +250,39 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
       toast({ title: "Nothing to save", description: "Enter at least one indicator value or risk first.", variant: "destructive" });
       return;
     }
+    const yearIdx = Math.min(Math.max(Number(reportYear) - 1, 0), 3);
+    // 1. Disaggregation totals must equal the value entered for the period.
+    const mismatched = entries.filter(({ ind, draft }) => {
+      if (!ind.disaggregation || ind.disaggregation.length === 0) return false;
+      if (!hasDisaggValues(draft.disaggregation)) return false;
+      const value = Number(draft.value);
+      if (!Number.isFinite(value)) return false;
+      return disaggSum(draft.disaggregation) !== value;
+    });
+    if (mismatched.length > 0) {
+      toast({
+        title: "Disaggregation does not add up",
+        description: `The disaggregated figures must sum to the value for the period. Please review: ${mismatched.map(({ ind }) => ind.code).join(", ")}.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    // 2. Values above the target require a justification comment.
+    const overTarget = entries.filter(({ ind, draft }) => {
+      const value = Number(draft.value);
+      if (!Number.isFinite(value) || draft.value.trim() === "") return false;
+      const target = numericTarget(ind.targets[yearIdx]) ?? numericTarget(ind.totalTarget);
+      return target !== null && value > target;
+    });
+    const missingComment = overTarget.filter(({ draft }) => draft.overTargetComment.trim() === "");
+    if (missingComment.length > 0) {
+      toast({
+        title: "Target exceeded — comment required",
+        description: `The value entered is above the target for ${missingComment.map(({ ind }) => ind.code).join(", ")}. Please confirm this is correct and explain why the programme achieved beyond the target in the highlighted comment box.`,
+        variant: "destructive",
+      });
+      return;
+    }
     setSaving(true);
     try {
       const { data: auth } = await supabase.auth.getUser();
