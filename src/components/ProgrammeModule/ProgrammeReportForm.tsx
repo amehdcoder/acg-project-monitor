@@ -213,7 +213,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
   const setDraft = (code: string, patch: Partial<EntryDraft>) => {
     setDrafts((prev) => ({
       ...prev,
-      [code]: { value: "", disaggregation: {}, risk: "", auto: false, ...prev[code], ...patch },
+      [code]: { value: "", disaggregation: {}, risk: "", overTargetComment: "", auto: false, ...prev[code], ...patch },
     }));
   };
 
