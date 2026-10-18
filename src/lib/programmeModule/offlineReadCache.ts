@@ -66,3 +66,29 @@ export async function cachedRead<T>(
     return { data: await cacheGet<T>(key), fromCache: true };
   }
 }
+
+/** Applies a change to a row inside every cached list whose key starts with `prefix`. */
+export async function cachePatchRows(prefix: string, id: string, patch: Record<string, unknown> | null): Promise<void> {
+  const db = await openDb();
+  if (!db) return;
+  await new Promise<void>((resolve) => {
+    const tx = db.transaction(STORE, "readwrite");
+    const store = tx.objectStore(STORE);
+    const req = store.openCursor();
+    req.onsuccess = () => {
+      const cur = req.result;
+      if (!cur) return;
+      const key = String(cur.key);
+      const entry = cur.value as { value: unknown; saved_at: number };
+      if (key.startsWith(prefix) && Array.isArray(entry.value)) {
+        const rows = (entry.value as Record<string, unknown>[])
+          .map((r) => (r.id === id ? (patch ? { ...r, ...patch } : null) : r))
+          .filter(Boolean);
+        cur.update({ ...entry, value: rows });
+      }
+      cur.continue();
+    };
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => resolve();
+  });
+}
