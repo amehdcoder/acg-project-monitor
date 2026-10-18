@@ -19,12 +19,12 @@ export const PRIORITY_LIVELIHOOD_SERVICES = [
   "Participant orientation: Graduation Approach, rights & safeguarding",
   "Life skills, social empowerment, inclusion & safeguarding (PSEA)",
   "Skills acquisition training",
-  "Financial literacy & entrepreneurship training",
+  "Financial literacy training",
   "Financial literacy & entrepreneurship refresher",
   "Monthly cash transfer (time-bound social protection)",
   "Quarterly enterprise coaching, mentoring & business support",
-  "Productive assets, inputs, start-up grants & working capital",
-  "VSLA membership (savings & credit)",
+  "Start-up grants",
+  "Savings group (VSLA) enrolment",
   "Market linkages: suppliers, aggregators & buyers",
 ];
 
@@ -58,9 +58,7 @@ export const KIND_SERVICES: Record<Kind, string[]> = {
   ],
   livelihood: [
     ...PRIORITY_LIVELIHOOD_SERVICES,
-    "Vulnerability assessment", "Ground verification", "Poultry input", "Skills training", "Cash grant",
-    "Savings group (VSLA) enrolment", "Business start-up kit",
-    "Financial literacy training", "Business monitoring visit",
+    "Vulnerability assessment", "Poultry input", "Business monitoring visit",
   ],
   health_system: [
     "PHC referral", "Referral follow-up", "Home visit (LTFU tracing)", "Facility supportive supervision",

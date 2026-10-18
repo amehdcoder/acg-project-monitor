@@ -1354,3 +1354,16 @@ select option {
 .lbr-type .text-lg { font-size: 1.25rem; line-height: 1.75rem; }
 .lbr-type .text-xl { font-size: 1.375rem; line-height: 1.9rem; }
 .lbr-type .text-2xl { font-size: 1.625rem; line-height: 2.1rem; }
+
+/* Touch-friendly vertical scroll for long forms */
+.form-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.45) transparent;
+}
+.form-scroll::-webkit-scrollbar { width: 8px; }
+.form-scroll::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.45); border-radius: 9999px; }
+.form-scroll::-webkit-scrollbar-track { background: transparent; }
