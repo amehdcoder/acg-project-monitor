@@ -8,13 +8,14 @@
 
 - Render Hand Cards on a protected standalone route using the same live record-backed document as exports; rely on record RLS for access — why: consistent viewing/downloads, no public beneficiary data.
 
-- Serialize hand-card camera start/stop operations and cancel stale sessions; expose torch only when the running track supports it — why: prevents leaked cameras and false device-ready states.
-- Hand-card exports capture the same naturally flowing front/back layouts, with independent page aspect ratios — why: long beneficiary details must not collide with fixed footers or become cropped in downloads.
+- Serialize hand-card camera start/stop operations and cancel stale sessions; expose torch only when the running track supports it — why: no leaked cameras.
+- Hand-card exports capture the same naturally flowing front/back layouts, with independent page aspect ratios — why: no cropping or collisions.
 
-- Route all DHIS2 reporting/dashboard imports through `health-exchange`; maps use bundled Nigeria LGA/State/National boundaries — why: credentials stay server-side and geography exact.
-- Revoke browser EXECUTE on SECURITY DEFINER trigger/internal functions; keep it only for RLS helpers and app-called RPCs — why: shrinks the callable surface without breaking policies.
-- Self-hosting: Dockerfile + nginx.conf static build, backend on Lovable Cloud — why: no badge, no data migration.
-- Route every in-app Street View through the shared Google panorama viewer, with official imagery preferred and street-level fallback — why: keeps map drill-down quality and failure handling consistent.
+- Route all DHIS2 reporting/dashboard imports through `health-exchange`; maps use bundled Nigeria LGA/State/National boundaries — why: secrets server-side, exact geography.
+- Revoke browser EXECUTE on SECURITY DEFINER trigger/internal functions; keep it only for RLS helpers and app-called RPCs — why: smaller attack surface.
+- Self-hosting: Dockerfile + nginx.conf, backend on Lovable Cloud — why: no badge.
+- Records reads go through `offlineReadCache.cachedRead` (IndexedDB); queue flush is Web-Lock single-tab, parent-first, backoff, jittered reconnect — why: offline use, no reconnect stampedes.
+- Route every in-app Street View through the shared Google panorama viewer, with official imagery preferred and street-level fallback — why: consistent quality/fallbacks.
 - Data Cleaner has no hand-written validation rules; all flags come from the on-device autoencoder + transformer brain worker (dataCleanerBrain.worker.ts) with IndexedDB memory — why: "normal" is learned cumulatively from cleaned history.
 - Record quality brain trains in the browser worker and, once past 5,000 steps, in the `brain-train` edge function every 30 min (pg_cron, lease via `claim_brain_for_training`); checkpoint in `brain_models` (most-trained wins), flags/resolutions in `brain_flags`; `_shared/brain/*` mirrors `src/lib/dataCleaner/neural/*` — why: cumulative shared learning even with nobody online, within edge CPU limits.
 - Microplanning DHIS2 push/pull runs as `mp_*` actions in `health-exchange`, with KPI matching in `_shared/microplanExchange.ts`, mappings stored as `mp:<kpi>` rows and pulled rows upserted by `microplan_entries.external_ref` — why: one server-side exchange path, idempotent re-pulls.

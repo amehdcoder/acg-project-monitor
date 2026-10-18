@@ -9,6 +9,7 @@ import type {
   ProgrammeModuleConfig,
   ProgrammeModuleRow,
 } from "@/lib/programmeModule/types";
+import { cachedRead } from "@/lib/programmeModule/offlineReadCache";
 import { bindQueueAutoFlush, flushQueue, listQueued, pendingFor } from "@/lib/programmeModule/offlineQueue";
 
 /** Programme modules configured on a project. */
@@ -19,11 +20,11 @@ export const useProgrammeModules = (projectId?: string) => {
   const load = useCallback(async () => {
     if (!projectId) { setModules([]); setLoading(false); return; }
     setLoading(true);
-    const { data } = await supabase
+    const { data } = await cachedRead(`modules:${projectId}`, () => supabase
       .from("programme_modules")
       .select("*")
       .eq("project_id", projectId)
-      .order("created_at", { ascending: true });
+      .order("created_at", { ascending: true }));
     setModules(((data as unknown as ProgrammeModuleRow[]) || []).map((m) => ({
       ...m,
       config: normalizeConfig(m.config),
@@ -44,12 +45,12 @@ export const useBeneficiaries = (moduleId?: string) => {
   const load = useCallback(async () => {
     if (!moduleId) { setRows([]); setLoading(false); return; }
     setLoading(true);
-    const { data } = await supabase
+    const { data } = await cachedRead(`beneficiaries:${moduleId}`, () => supabase
       .from("beneficiaries")
       .select("*")
       .eq("module_id", moduleId)
       .order("created_at", { ascending: false })
-      .limit(500);
+      .limit(500));
     const server = (data as unknown as BeneficiaryRow[]) || [];
     const serverUuids = new Set(listQueued().map((q) => q.submission_uuid));
     const queued = pendingFor("beneficiary", (p) => p.module_id === moduleId)
@@ -77,9 +78,10 @@ export const useBeneficiaries = (moduleId?: string) => {
   useEffect(() => {
     bindQueueAutoFlush();
     void load();
-    const onQueue = () => { void load(); };
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const onQueue = () => { clearTimeout(t); t = setTimeout(() => { void load(); }, 400); };
     window.addEventListener("programme-module-queue", onQueue);
-    return () => window.removeEventListener("programme-module-queue", onQueue);
+    return () => { clearTimeout(t); window.removeEventListener("programme-module-queue", onQueue); };
   }, [load]);
 
   // Anything saved on another device or by a colleague appears without a reload.
@@ -118,12 +120,12 @@ export const useBeneficiaryRecord = (beneficiaryId?: string) => {
     if (!beneficiaryId) return;
     setLoading(true);
     const [s, r, a] = await Promise.all([
-      supabase.from("beneficiary_services").select("*").eq("beneficiary_id", beneficiaryId)
-        .order("service_date", { ascending: false }),
-      supabase.from("beneficiary_referrals").select("*").eq("beneficiary_id", beneficiaryId)
-        .order("referral_date", { ascending: false }),
-      supabase.from("beneficiary_audit").select("*").eq("beneficiary_id", beneficiaryId)
-        .order("created_at", { ascending: false }).limit(100),
+      cachedRead(`services:${beneficiaryId}`, () => supabase.from("beneficiary_services").select("*").eq("beneficiary_id", beneficiaryId)
+        .order("service_date", { ascending: false })),
+      cachedRead(`referrals:${beneficiaryId}`, () => supabase.from("beneficiary_referrals").select("*").eq("beneficiary_id", beneficiaryId)
+        .order("referral_date", { ascending: false })),
+      cachedRead(`audit:${beneficiaryId}`, () => supabase.from("beneficiary_audit").select("*").eq("beneficiary_id", beneficiaryId)
+        .order("created_at", { ascending: false }).limit(100)),
     ]);
     const queuedServices = pendingFor("service", (p) => p.beneficiary_id === beneficiaryId)
       .map((p) => ({ ...(p as unknown as BeneficiaryServiceRow), id: p.submission_uuid as string, __pending: true }));
@@ -137,9 +139,10 @@ export const useBeneficiaryRecord = (beneficiaryId?: string) => {
 
   useEffect(() => {
     void load();
-    const onQueue = () => { void load(); };
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const onQueue = () => { clearTimeout(t); t = setTimeout(() => { void load(); }, 400); };
     window.addEventListener("programme-module-queue", onQueue);
-    return () => window.removeEventListener("programme-module-queue", onQueue);
+    return () => { clearTimeout(t); window.removeEventListener("programme-module-queue", onQueue); };
   }, [load]);
 
   return { services, referrals, audit, loading, reload: load };
