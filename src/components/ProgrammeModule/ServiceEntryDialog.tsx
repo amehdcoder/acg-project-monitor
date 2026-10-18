@@ -34,6 +34,7 @@ interface Props {
   moduleId: string;
   projectId: string;
   defaultComponent?: string;
+  defaultService?: string;
   /** Existing services — used by MMDP visits to compare with previous visits. */
   priorServices?: BeneficiaryServiceRow[];
   componentFilter?: (c: { key: string; label?: string }) => boolean;
@@ -41,7 +42,7 @@ interface Props {
 }
 
 const ServiceEntryDialog = ({
-  open, onOpenChange, config, beneficiary, moduleId, projectId, defaultComponent,
+  open, onOpenChange, config, beneficiary, moduleId, projectId, defaultComponent, defaultService,
   priorServices = [], onSaved, componentFilter,
 }: Props) => {
   const beneficiaryId = beneficiary.id;
@@ -67,8 +68,8 @@ const ServiceEntryDialog = ({
   useEffect(() => {
     if (!open) return;
     setComponentKey(defaultComponent || components[0]?.key || "");
-    setServiceName(""); setResult(""); setResultOther(false);
-  }, [open, defaultComponent]); // eslint-disable-line react-hooks/exhaustive-deps
+    setServiceName(defaultService || ""); setResult(""); setResultOther(false);
+  }, [open, defaultComponent, defaultService]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [resultOther, setResultOther] = useState(false);
   const component = components.find((c) => c.key === componentKey);
@@ -203,6 +204,7 @@ const ServiceEntryDialog = ({
               <ServicePicker
                 key={componentKey}
                 componentKey={componentKey}
+                projectId={projectId}
                 options={serviceOptions}
                 recent={priorServices.filter((p) => (p as { component_key?: string }).component_key === componentKey).map((p) => (p as { service_name?: string | null }).service_name || "").filter(Boolean)}
                 value={serviceName}

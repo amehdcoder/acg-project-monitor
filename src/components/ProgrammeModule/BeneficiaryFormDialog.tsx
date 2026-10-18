@@ -25,7 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useProjectMhgapDrugs } from "./MhgapDrugsManager";
 import { BLOOD_GROUPS, HEALTH_FIELDS, healthValue } from "@/lib/programmeModule/healthFields";
 import WashingtonGroupDialog from "./WashingtonGroupDialog";
-import { classifyWg, readWgResult, WgAnswers } from "@/lib/programmeModule/washingtonGroup";
+import { buildWgRecord, classifyWg, readWgResult, WgAnswers } from "@/lib/programmeModule/washingtonGroup";
 
 interface Props {
   open: boolean;
@@ -189,7 +189,7 @@ const BeneficiaryFormDialog = ({
     const classification = classifyWg(wgAnswers);
     const profile = {
       ...(wgRow.profile || {}),
-      wg_ss: { answers: wgAnswers, ...classification, completed_at: new Date().toISOString() },
+      wg_ss: buildWgRecord(wgAnswers),
     };
     const { data, error } = await supabase.from("beneficiaries")
       .update({ profile } as never).eq("id", wgRow.id).select("*").single();

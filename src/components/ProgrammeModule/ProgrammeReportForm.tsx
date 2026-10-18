@@ -527,9 +527,9 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex rounded-lg border border-border bg-card p-0.5">
+              <div className="flex w-full overflow-x-auto rounded-lg border border-border bg-card p-0.5 sm:w-auto">
                 {([["entry", "New report", ClipboardList], ["review", `Review queue (${pendingCount})`, CheckCircle2], ["dashboard", "Dashboard", BarChart3]] as const).map(([key, label, Icon]) => (
-                  <Button key={key} variant={view === key ? "default" : "ghost"} size="sm" className="gap-1.5" onClick={() => setView(key)}>
+                  <Button key={key} variant={view === key ? "default" : "ghost"} size="sm" className="h-10 flex-1 shrink-0 gap-1.5 whitespace-nowrap sm:flex-none" onClick={() => setView(key)}>
                     <Icon className="h-4 w-4" /> {label}
                   </Button>
                 ))}
@@ -560,25 +560,25 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
         </div>
 
         {view === "entry" && (
-        <div className="flex flex-wrap items-end gap-4 border-t border-border px-4 py-5 sm:px-6">
-          <div>
+        <div className="grid grid-cols-2 items-end gap-3 border-t border-border px-4 py-5 sm:flex sm:flex-wrap sm:gap-4 sm:px-6">
+          <div className="col-span-2 sm:col-span-1">
             <Label htmlFor="programme-report-period" className="text-sm font-medium">Reporting period</Label>
             <Input id="programme-report-period" value={period} onChange={(e) => setPeriod(e.target.value)} className="mt-2 h-[52px] w-full sm:w-52" placeholder="e.g. October 2026" />
           </div>
           <div>
             <Label htmlFor="programme-report-year" className="text-sm font-medium">Programme year</Label>
             <Select value={reportYear} onValueChange={setReportYear}>
-              <SelectTrigger id="programme-report-year" className="mt-2 h-[52px] w-36"><SelectValue /></SelectTrigger>
+              <SelectTrigger id="programme-report-year" className="mt-2 h-[52px] w-full sm:w-36"><SelectValue /></SelectTrigger>
               <SelectContent className="z-[1200] bg-popover">
                 {["1", "2", "3", "4"].map((y) => <SelectItem key={y} value={y}>Year {y}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
-          <div className="flex-1" />
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => void runAggregation()} disabled={autoLoading}>
+          <div className="hidden flex-1 sm:block" />
+          <Button variant="outline" size="sm" className="h-[52px] gap-1.5 sm:h-9" onClick={() => void runAggregation()} disabled={autoLoading}>
             {autoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Re-aggregate from records
           </Button>
-          <Button size="sm" className="gap-1.5" onClick={save} disabled={saving}>
+          <Button size="sm" className="hidden gap-1.5 sm:inline-flex" onClick={save} disabled={saving}>
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save report
           </Button>
         </div>
@@ -654,12 +654,18 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
       <section className="border-t border-border pt-5">
         <Label htmlFor="programme-report-notes" className="text-base font-semibold">Overall narrative notes for this period</Label>
         <Textarea id="programme-report-notes" value={notes} onChange={(e) => setNotes(e.target.value)} className="mt-3 min-h-28" placeholder="Summary of progress, cross-cutting risks, and support needed…" />
-        <div className="mt-3 flex justify-end">
+        <div className="mt-3 hidden justify-end sm:flex">
           <Button className="gap-1.5" onClick={save} disabled={saving}>
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save report
           </Button>
         </div>
       </section>
+      {/* Mobile: thumb-reachable save bar always in view */}
+      <div className="sticky bottom-0 z-20 -mx-1 border-t border-border bg-background/95 px-3 py-3 backdrop-blur sm:hidden">
+        <Button className="h-[52px] w-full gap-2 text-base" onClick={save} disabled={saving}>
+          {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />} Save report
+        </Button>
+      </div>
       </>)}
 
       {view === "review" && (

@@ -60,3 +60,35 @@ export const readWgResult = (profile: Record<string, unknown> | undefined | null
   if (!raw || typeof raw !== "object" || !raw.answers) return null;
   return raw;
 };
+
+export interface WgDomainResult {
+  label: string;
+  level: WgLevel;
+  levelLabel: string;
+  /** True when the answer is "A lot of difficulty" or "Cannot do at all". */
+  disability: boolean;
+}
+
+/** Per-domain result for each of the six WG-SS domains (only answered ones). */
+export const wgDomainResults = (answers: WgAnswers): Record<string, WgDomainResult> => {
+  const out: Record<string, WgDomainResult> = {};
+  for (const d of WG_DOMAINS) {
+    const level = answers[d.key];
+    if (!level) continue;
+    out[d.key] = {
+      label: d.label,
+      level,
+      levelLabel: WG_LEVELS.find((l) => l.value === level)?.label || level,
+      disability: level === "a_lot" || level === "cannot",
+    };
+  }
+  return out;
+};
+
+/** Full record saved to beneficiary profile.wg_ss. */
+export const buildWgRecord = (answers: WgAnswers) => ({
+  answers,
+  ...classifyWg(answers),
+  domains: wgDomainResults(answers),
+  completed_at: new Date().toISOString(),
+});
