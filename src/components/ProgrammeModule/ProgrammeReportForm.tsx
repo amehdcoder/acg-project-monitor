@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { LOGFRAME, LOGFRAME_PROJECT, flatIndicators, numericTarget, type AutoKey, type FlatIndicator } from "@/lib/programmeModule/logframe";
 import { aggregateIndicators } from "@/lib/programmeModule/programmeReport";
 import DisaggregationEditor from "./DisaggregationEditor";
+import { parseDisaggCell } from "@/lib/programmeModule/disaggregationCatalog";
 
 const db = supabase as unknown as {
   from: (t: string) => any; // eslint-disable-line @typescript-eslint/no-explicit-any
