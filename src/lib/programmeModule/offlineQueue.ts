@@ -19,6 +19,7 @@ export interface QueuedItem {
   queued_at: string;
   attempts: number;
   last_error?: string;
+  next_try_at?: number;
 }
 
 const read = (): QueuedItem[] => {
