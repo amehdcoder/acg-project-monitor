@@ -125,6 +125,13 @@ const LtfuRiskPanel = ({
       byBeneficiary.set(v.beneficiary_id, [...(byBeneficiary.get(v.beneficiary_id) || []), v]);
     }
     const facilityById = new Map(facilities.map((f) => [f.id, f]));
+    // An open CHEW dispatch books the visit: its due date is the appointment.
+    const bookedVisit = new Map<string, string>();
+    for (const d of dispatches) {
+      if ((d.status === "dispatched" || d.status === "in_progress") && d.due_date && !bookedVisit.has(d.beneficiary_id)) {
+        bookedVisit.set(d.beneficiary_id, d.due_date);
+      }
+    }
 
     const inputs: RiskInput[] = beneficiaries
       .filter((b) => !["exited", "deceased", "completed"].includes(String(b.status)))
@@ -142,7 +149,7 @@ const LtfuRiskPanel = ({
           name: b.full_name,
           caseId: b.case_id,
           visitDates: rows.map((r) => r.service_date),
-          nextFollowUp: b.next_follow_up_date,
+          nextFollowUp: b.next_follow_up_date || bookedVisit.get(b.id) || null,
           lat: b.latitude, lng: b.longitude,
           facilityLat: facility?.latitude ?? null,
           facilityLng: facility?.longitude ?? null,
@@ -153,7 +160,10 @@ const LtfuRiskPanel = ({
         };
       });
     return rankLtfuRisk(inputs);
-  }, [beneficiaries, visits, facilities]);
+  }, [beneficiaries, visits, facilities, dispatches]);
+
+  const openBooked = useMemo(() => new Set(dispatches
+    .filter((d) => d.status === "dispatched" || d.status === "in_progress").map((d) => d.beneficiary_id)), [dispatches]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -193,7 +203,13 @@ const LtfuRiskPanel = ({
         outcome_notes: visitNotes || null,
         created_by: uid,
       } });
-      toast({ title: "Home visit dispatched", description: `${target.name} — due ${new Date(dueDate).toLocaleDateString()}` });
+      // Track the booking on the beneficiary record (drives reminders & risk).
+      const ben = beneficiaries.find((x) => x.id === target.beneficiaryId);
+      if (ben && (!ben.next_follow_up_date || new Date(ben.next_follow_up_date) < new Date(new Date().toDateString()))) {
+        await offlineMutate({ table: "beneficiaries", action: "update", id: ben.id, values: { next_follow_up_date: dueDate } });
+        ben.next_follow_up_date = dueDate;
+      }
+      toast({ title: "Home visit booked", description: `${target.name} — due ${new Date(dueDate).toLocaleDateString()}` });
       setOpen(false); setVisitNotes(""); setChewId("");
       await load();
     } catch (e) {
@@ -294,6 +310,7 @@ const LtfuRiskPanel = ({
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-sm">
                       {r.daysToAppointment == null ? "Not booked"
+                        : openBooked.has(r.beneficiaryId) && r.daysToAppointment >= 0 ? `Booked · CHEW visit in ${r.daysToAppointment} days`
                         : r.daysToAppointment < 0 ? `${Math.abs(r.daysToAppointment)} days overdue`
                           : `in ${r.daysToAppointment} days`}
                     </TableCell>
