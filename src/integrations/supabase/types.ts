@@ -5515,6 +5515,50 @@ export type Database = {
           },
         ]
       }
+      followup_reminders: {
+        Row: {
+          beneficiary_id: string
+          created_at: string
+          id: string
+          overdue_sent: boolean
+          project_id: string
+          reminder_1d_sent: boolean
+          reminder_2d_sent: boolean
+          reminder_day_sent: boolean
+          scheduled_date: string
+        }
+        Insert: {
+          beneficiary_id: string
+          created_at?: string
+          id?: string
+          overdue_sent?: boolean
+          project_id: string
+          reminder_1d_sent?: boolean
+          reminder_2d_sent?: boolean
+          reminder_day_sent?: boolean
+          scheduled_date: string
+        }
+        Update: {
+          beneficiary_id?: string
+          created_at?: string
+          id?: string
+          overdue_sent?: boolean
+          project_id?: string
+          reminder_1d_sent?: boolean
+          reminder_2d_sent?: boolean
+          reminder_day_sent?: boolean
+          scheduled_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "followup_reminders_beneficiary_id_fkey"
+            columns: ["beneficiary_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiaries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       form_bulk_permissions: {
         Row: {
           can_export: boolean
@@ -13098,6 +13142,92 @@ export type Database = {
             foreignKeyName: "vr_simulations_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_notification_log: {
+        Row: {
+          beneficiary_id: string | null
+          created_at: string
+          error: string | null
+          id: string
+          kind: string
+          message_id: string | null
+          phone: string | null
+          project_id: string | null
+          status: string
+        }
+        Insert: {
+          beneficiary_id?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          kind: string
+          message_id?: string | null
+          phone?: string | null
+          project_id?: string | null
+          status: string
+        }
+        Update: {
+          beneficiary_id?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          kind?: string
+          message_id?: string | null
+          phone?: string | null
+          project_id?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
+      whatsapp_settings: {
+        Row: {
+          access_token: string | null
+          business_account_id: string | null
+          enabled: boolean
+          phone_number_id: string | null
+          project_id: string
+          project_label: string
+          template_language: string
+          template_overdue: string
+          template_upcoming: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          access_token?: string | null
+          business_account_id?: string | null
+          enabled?: boolean
+          phone_number_id?: string | null
+          project_id: string
+          project_label?: string
+          template_language?: string
+          template_overdue?: string
+          template_upcoming?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          access_token?: string | null
+          business_account_id?: string | null
+          enabled?: boolean
+          phone_number_id?: string | null
+          project_id?: string
+          project_label?: string
+          template_language?: string
+          template_overdue?: string
+          template_upcoming?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_settings_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
