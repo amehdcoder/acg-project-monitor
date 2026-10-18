@@ -388,6 +388,15 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
     const cumulative = cumulativeFor(ind.code);
     const pct = yearTarget && yearTarget > 0 ? Math.min(100, Math.round((cumulative / yearTarget) * 100)) : null;
     const t = TONES[tone];
+    const valueNum = Number(draft?.value);
+    const hasValue = !!draft && draft.value.trim() !== "" && Number.isFinite(valueNum);
+    const disaggLabels = ind.disaggregation || [];
+    const disaggFilled = !!draft && hasDisaggValues(draft.disaggregation);
+    const disaggTotal = draft ? disaggSum(draft.disaggregation) : 0;
+    const sumMismatch = disaggLabels.length > 0 && disaggFilled && hasValue && disaggTotal !== valueNum;
+    const effectiveTarget = yearTarget ?? totalTarget;
+    const isOverTarget = hasValue && effectiveTarget !== null && valueNum > effectiveTarget;
+    const overTargetNeedsComment = isOverTarget && (draft?.overTargetComment.trim() ?? "") === "";
     return (
       <div key={ind.code} className={cn("rounded-lg border border-l-4 bg-card p-4 shadow-soft sm:p-5", t.border)}>
         <div className="flex flex-wrap items-start justify-between gap-2">
