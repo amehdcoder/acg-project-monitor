@@ -60,6 +60,7 @@ import GeneralDashboard from "./GeneralDashboard";
 import FeedbackReportsPanel from "./FeedbackReportsPanel";
 import ProgrammeReportForm from "./ProgrammeReportForm";
 import WhatsAppRemindersDialog from "./WhatsAppRemindersDialog";
+import SmsRemindersDialog from "./SmsRemindersDialog";
 import { MessageCircle } from "lucide-react";
 import WorkspaceMajorTabs, { type MajorTab } from "./WorkspaceMajorTabs";
 import WorkspaceNavigation, { type WorkspaceNavGroup, type WorkspaceView } from "./WorkspaceNavigation";
@@ -96,6 +97,7 @@ const ProgrammeModuleWorkspace = ({
   const [registryOpen, setRegistryOpen] = useState(false);
   const [drugsOpen, setDrugsOpen] = useState(false);
   const [whatsappOpen, setWhatsappOpen] = useState(false);
+  const [smsOpen, setSmsOpen] = useState(false);
   const { levels: facilityLevels } = useMyFacilityAccess();
   const [focalFacilityId, setFocalFacilityId] = useState<string | undefined>(undefined);
   const [registerOpen, setRegisterOpen] = useState(false);
@@ -405,6 +407,7 @@ const ProgrammeModuleWorkspace = ({
             {(canConfigure || can("manage_team") || onTeamRegister) && <DropdownMenuItem onSelect={() => setView("team")}><Users className="mr-2 h-4 w-4" /> Project team</DropdownMenuItem>}
             {canConfigure && <DropdownMenuItem onSelect={() => setDrugsOpen(true)}><Settings2 className="mr-2 h-4 w-4" /> mhGAP medicines</DropdownMenuItem>}
             {canConfigure && <DropdownMenuItem onSelect={() => setWhatsappOpen(true)}><MessageCircle className="mr-2 h-4 w-4" /> WhatsApp reminders</DropdownMenuItem>}
+            {canConfigure && <DropdownMenuItem onSelect={() => setSmsOpen(true)}><MessageCircle className="mr-2 h-4 w-4" /> SMS reminders</DropdownMenuItem>}
             {canConfigure && <DropdownMenuItem onSelect={() => setOfficersOpen(true)}><ShieldCheck className="mr-2 h-4 w-4" /> Safeguarding officers</DropdownMenuItem>}
             {canConfigure && active && <DropdownMenuItem onSelect={() => setConfigOpen(true)}><Settings2 className="mr-2 h-4 w-4" /> Configure module</DropdownMenuItem>}
             {isSuperAdmin && <DropdownMenuItem onSelect={() => setProjectsOpen(true)}><Layers className="mr-2 h-4 w-4" /> Records on projects</DropdownMenuItem>}
@@ -757,6 +760,7 @@ const ProgrammeModuleWorkspace = ({
         </>
       )}
       <WhatsAppRemindersDialog open={whatsappOpen} onOpenChange={setWhatsappOpen} projectId={projectId} />
+      <SmsRemindersDialog open={smsOpen} onOpenChange={setSmsOpen} projectId={projectId} />
     </div>
   );
 };

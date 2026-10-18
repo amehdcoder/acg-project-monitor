@@ -64,6 +64,13 @@
       "when": 1792356278992,
       "tag": "0008_whatsapp_followup_reminders",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792356856581,
+      "tag": "0009_sms_followup_reminders",
+      "breakpoints": true
     }
   ]
 }

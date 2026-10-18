@@ -5526,6 +5526,10 @@ export type Database = {
           reminder_2d_sent: boolean
           reminder_day_sent: boolean
           scheduled_date: string
+          sms_overdue_sent: boolean
+          sms_reminder_1d_sent: boolean
+          sms_reminder_2d_sent: boolean
+          sms_reminder_day_sent: boolean
         }
         Insert: {
           beneficiary_id: string
@@ -5537,6 +5541,10 @@ export type Database = {
           reminder_2d_sent?: boolean
           reminder_day_sent?: boolean
           scheduled_date: string
+          sms_overdue_sent?: boolean
+          sms_reminder_1d_sent?: boolean
+          sms_reminder_2d_sent?: boolean
+          sms_reminder_day_sent?: boolean
         }
         Update: {
           beneficiary_id?: string
@@ -5548,6 +5556,10 @@ export type Database = {
           reminder_2d_sent?: boolean
           reminder_day_sent?: boolean
           scheduled_date?: string
+          sms_overdue_sent?: boolean
+          sms_reminder_1d_sent?: boolean
+          sms_reminder_2d_sent?: boolean
+          sms_reminder_day_sent?: boolean
         }
         Relationships: [
           {
@@ -12028,6 +12040,81 @@ export type Database = {
           team_members?: Json
           updated_at?: string
           ward?: string | null
+        }
+        Relationships: []
+      }
+      sms_notification_log: {
+        Row: {
+          beneficiary_id: string | null
+          created_at: string
+          error: string | null
+          id: string
+          kind: string
+          message_id: string | null
+          phone: string | null
+          project_id: string
+          status: string
+        }
+        Insert: {
+          beneficiary_id?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          kind: string
+          message_id?: string | null
+          phone?: string | null
+          project_id: string
+          status: string
+        }
+        Update: {
+          beneficiary_id?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          kind?: string
+          message_id?: string | null
+          phone?: string | null
+          project_id?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      sms_settings: {
+        Row: {
+          enabled: boolean
+          gateway_url: string
+          message_overdue: string | null
+          message_upcoming: string | null
+          password: string | null
+          project_id: string
+          project_label: string | null
+          updated_at: string
+          updated_by: string | null
+          username: string | null
+        }
+        Insert: {
+          enabled?: boolean
+          gateway_url?: string
+          message_overdue?: string | null
+          message_upcoming?: string | null
+          password?: string | null
+          project_id: string
+          project_label?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          username?: string | null
+        }
+        Update: {
+          enabled?: boolean
+          gateway_url?: string
+          message_overdue?: string | null
+          message_upcoming?: string | null
+          password?: string | null
+          project_id?: string
+          project_label?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          username?: string | null
         }
         Relationships: []
       }
