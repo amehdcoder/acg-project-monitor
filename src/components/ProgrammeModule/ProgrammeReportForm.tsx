@@ -38,8 +38,19 @@ interface EntryDraft {
   value: string;
   disaggregation: Record<string, string>;
   risk: string;
+  overTargetComment: string;
   auto: boolean;
 }
+
+/** Sum of all disaggregated option values across every dimension cell. */
+const disaggSum = (disaggregation: Record<string, string>): number =>
+  Object.values(disaggregation).reduce(
+    (total, cell) => total + Object.values(parseDisaggCell(cell)).reduce((s, v) => s + v, 0),
+    0,
+  );
+
+const hasDisaggValues = (disaggregation: Record<string, string>): boolean =>
+  Object.values(disaggregation).some((cell) => Object.values(parseDisaggCell(cell)).some((v) => v !== 0));
 
 interface ReportRow {
   id: string;
