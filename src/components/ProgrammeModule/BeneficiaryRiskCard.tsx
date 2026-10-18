@@ -19,8 +19,8 @@ import {
   useBeneficiaryHomeVisits, isVisitOpen, visitSummary,
 } from "@/lib/programmeModule/homeVisits";
 import HomeVisitOutcomeDialog from "./HomeVisitOutcomeDialog";
-import type {
 import { offlineMutate, currentUserId } from "@/lib/programmeModule/offlineWrite";
+import type {
   BeneficiaryReferralRow, BeneficiaryRow, BeneficiaryServiceRow,
 } from "@/lib/programmeModule/types";
 
