@@ -298,6 +298,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
         value: draft.value.trim() === "" ? null : Number(draft.value),
         disaggregation: draft.disaggregation,
         risk: draft.risk.trim() || null,
+        over_target_comment: draft.overTargetComment.trim() || null,
       }));
       const { error: eErr } = await db.from("programme_report_entries").insert(rows);
       if (eErr) throw eErr;
