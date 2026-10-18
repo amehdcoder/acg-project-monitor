@@ -341,7 +341,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
         risk: draft.risk.trim() || null,
         over_target_comment: draft.overTargetComment.trim() || null,
       }));
-      const ent = await offlineMutate({ table: "programme_report_entries", action: "insert", values: rows });
+      const ent = await offlineMutate({ table: "programme_report_entries", action: "insert", values: rows, forceQueue: report.queued });
       toast(report.queued || ent.queued
         ? { title: "Report saved offline", description: `${rows.length} indicator entries will sync automatically when you are back online.` }
         : { title: "Programme report saved", description: `${rows.length} indicator entries recorded for ${period}.` });

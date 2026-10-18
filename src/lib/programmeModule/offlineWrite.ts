@@ -44,8 +44,9 @@ export async function currentUserId(): Promise<string | undefined> {
  * Saves a change, queuing it on the device when offline. Returns the row id
  * (generated for inserts) and whether it was queued.
  */
-export async function offlineMutate(op: OpPayload): Promise<{ id?: string; queued: boolean }> {
-  const prepared: OpPayload = { ...op };
+export async function offlineMutate(op: OpPayload & { forceQueue?: boolean }): Promise<{ id?: string; queued: boolean }> {
+  const { forceQueue: _f, ...rest } = op;
+  const prepared: OpPayload = { ...rest };
   if (op.action === "insert") {
     const add = (v: Record<string, unknown>) => ({ ...v, id: (v.id as string) || newUuid() });
     prepared.values = Array.isArray(op.values) ? op.values.map(add) : add(op.values || {});
@@ -64,7 +65,7 @@ export async function offlineMutate(op: OpPayload): Promise<{ id?: string; queue
     return { id, queued: true };
   };
 
-  if (!navigator.onLine) return queue();
+  if (!navigator.onLine || op.forceQueue) return queue();
   try {
     await runOp(prepared);
     void flushQueue();
