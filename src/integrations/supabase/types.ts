@@ -9977,6 +9977,7 @@ export type Database = {
           created_at: string
           granted_by: string | null
           id: string
+          is_reviewer: boolean
           project_id: string
           user_id: string
         }
@@ -9984,6 +9985,7 @@ export type Database = {
           created_at?: string
           granted_by?: string | null
           id?: string
+          is_reviewer?: boolean
           project_id: string
           user_id: string
         }
@@ -9991,6 +9993,7 @@ export type Database = {
           created_at?: string
           granted_by?: string | null
           id?: string
+          is_reviewer?: boolean
           project_id?: string
           user_id?: string
         }

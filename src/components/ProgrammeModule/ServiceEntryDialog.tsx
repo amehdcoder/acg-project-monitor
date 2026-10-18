@@ -21,6 +21,7 @@ import MentalHealthServiceForm, { mhFormForService } from "./MentalHealthService
 import MhgapSupportEngine, { isMentalHealthComponent, type MhgapValue } from "./MhgapSupportEngine";
 import MmdpServiceForm, { isMmdpService } from "./MmdpServiceForm";
 import DocumentsServiceForm, { isDocumentsComponent } from "./DocumentsServiceForm";
+import ServicePicker from "./ServicePicker";
 import FollowUpFields, { emptyFollowUp } from "./FollowUpFields";
 import type { FollowUpValue } from "./FollowUpFields";
 import type { BeneficiaryRow, BeneficiaryServiceRow } from "@/lib/programmeModule/types";
@@ -196,15 +197,17 @@ const ServiceEntryDialog = ({
             </Select>
           </div>
 
-          {!!serviceOptions.length && (
+          {component && (
             <div className="space-y-1.5">
               <Label>Service</Label>
-              <Select value={serviceName} onValueChange={setServiceName}>
-                <SelectTrigger><SelectValue placeholder="Select service…" /></SelectTrigger>
-                <SelectContent className="z-[1200] bg-popover">
-                  {serviceOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <ServicePicker
+                key={componentKey}
+                componentKey={componentKey}
+                options={serviceOptions}
+                recent={priorServices.filter((p) => (p as { component_key?: string }).component_key === componentKey).map((p) => (p as { service_name?: string | null }).service_name || "").filter(Boolean)}
+                value={serviceName}
+                onChange={setServiceName}
+              />
             </div>
           )}
 
