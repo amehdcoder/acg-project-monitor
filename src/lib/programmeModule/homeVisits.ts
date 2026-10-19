@@ -122,6 +122,8 @@ export interface VisitOutcomeInput {
   visitorName: string;
   cddId?: string | null;
   visitedOn: string;
+  /** Time of day the visit happened (HH:MM, local). Optional. */
+  visitTime?: string | null;
   foundAtHome: boolean;
   outcome: string;
   nextAppointmentDate?: string | null;
@@ -140,6 +142,14 @@ export const reportVisitOutcome = async (input: VisitOutcomeInput) => {
   const uid = await currentUserId();
   const def = outcomeDef(input.outcome);
 
+  // Combine the reported date and time into the visit timestamp; fall back to
+  // now when no time was given.
+  let visitedAt = new Date().toISOString();
+  if (input.visitTime) {
+    const combined = new Date(`${input.visitedOn}T${input.visitTime}`);
+    if (!Number.isNaN(combined.getTime())) visitedAt = combined.toISOString();
+  }
+
   await offlineMutate({ table: "beneficiary_home_visits", action: "update", id: input.visitId, values: {
     status: "completed",
     outcome: input.outcome,
@@ -148,7 +158,7 @@ export const reportVisitOutcome = async (input: VisitOutcomeInput) => {
     visitor_name: input.visitorName || null,
     cdd_id: input.cddId || null,
     visited_on: input.visitedOn,
-    visited_at: new Date().toISOString(),
+    visited_at: visitedAt,
     found_at_home: input.foundAtHome,
     next_appointment_date: input.nextAppointmentDate || null,
     action_taken: input.actionTaken || null,
