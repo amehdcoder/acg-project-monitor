@@ -38,6 +38,10 @@ interface Props {
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
+const nowTime = () => {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+};
 
 const HomeVisitOutcomeDialog = ({
   open, onOpenChange, projectId, visit, beneficiaryName, facilityId, onReported,
@@ -50,6 +54,7 @@ const HomeVisitOutcomeDialog = ({
   const [cddId, setCddId] = useState("");
   const [visitorName, setVisitorName] = useState("");
   const [visitedOn, setVisitedOn] = useState(today);
+  const [visitTime, setVisitTime] = useState(nowTime);
   const [foundAtHome, setFoundAtHome] = useState("yes");
   const [outcome, setOutcome] = useState("seen_rebooked");
   const [nextDate, setNextDate] = useState("");
@@ -59,7 +64,7 @@ const HomeVisitOutcomeDialog = ({
   useEffect(() => {
     if (!open) return;
     setVisitorRole("cdd"); setCddId(""); setVisitorName("");
-    setVisitedOn(today()); setFoundAtHome("yes"); setOutcome("seen_rebooked");
+    setVisitedOn(today()); setVisitTime(nowTime()); setFoundAtHome("yes"); setOutcome("seen_rebooked");
     const d = new Date(); d.setDate(d.getDate() + 14);
     setNextDate(d.toISOString().slice(0, 10));
     setAction(""); setNotes("");
@@ -95,6 +100,7 @@ const HomeVisitOutcomeDialog = ({
           visitorName: name.trim(),
           cddId: visitorRole === "cdd" ? cddId || null : null,
           visitedOn,
+          visitTime: visitTime || null,
           foundAtHome: foundAtHome === "yes",
           outcome,
           nextAppointmentDate: def?.needsAppointment ? nextDate || null : null,
@@ -147,6 +153,18 @@ const HomeVisitOutcomeDialog = ({
             <div>
               <Label className="text-sm">Date of visit</Label>
               <Input type="date" className="mt-1" value={visitedOn} onChange={(e) => setVisitedOn(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <Label className="text-sm">Time of visit</Label>
+              <Input type="time" className="mt-1" value={visitTime} onChange={(e) => setVisitTime(e.target.value)} />
+            </div>
+            <div className="flex items-end pb-1">
+              <p className="text-xs text-muted-foreground">
+                The date and time are saved on the visit and the person's care timeline.
+              </p>
             </div>
           </div>
 
