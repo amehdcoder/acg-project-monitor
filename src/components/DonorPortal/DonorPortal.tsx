@@ -142,6 +142,25 @@ export default function DonorPortal({ userId }: { userId: string }) {
               <Kpi icon={<MessageSquareHeart />} label="Community feedback" value={fmt(agg.feedback_total)} />
             </section>
 
+            {reports.length > 0 && (
+              <section className="donor-card flex flex-wrap items-center gap-3 p-4 sm:p-6">
+                <div className="donor-kpi-icon"><FileText /></div>
+                <div className="min-w-0 flex-1">
+                  <p className="donor-eyebrow">Latest programme report</p>
+                  <p className="donor-heading text-base">
+                    {reports[0].period_label}{reports[0].report_year ? ` · ${reports[0].report_year}` : ""}
+                  </p>
+                  <p className="text-xs opacity-70">
+                    {reports[0].entries.length} indicators · {fmt(reportTotal(reports[0]))} total reported ·{" "}
+                    {new Date(reports[0].created_at).toLocaleDateString()}
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setSection("report")}>
+                  View reports
+                </Button>
+              </section>
+            )}
+
             <section className="donor-card p-4 sm:p-6">
               <h2 className="donor-heading mb-1 text-lg">Where people are reached</h2>
               <p className="mb-3 text-sm opacity-70">Beneficiaries by Local Government Area — deeper blue means more people reached.</p>
