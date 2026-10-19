@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   listDonorGrants, loadDonorAggregates, loadDonorFieldActivity, loadDonorReports,
-  loadDonorLogframe, choroplethCells, mergeMonthly,
+  loadDonorLogframe, choroplethCells, mergeMonthly, reportCsv, reportTotal,
   type DonorAggregates, type DonorActivityItem, type DonorGrant, type DonorReport,
 } from "@/lib/donorPortal";
 import type { ProjectLogframe } from "@/lib/programmeModule/logframe";
@@ -12,7 +12,17 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   AreaChart, Area, CartesianGrid, PieChart, Pie, Cell, Legend,
 } from "recharts";
-import { Users, HeartHandshake, Stethoscope, Home, ArrowRightLeft, MessageSquareHeart, LogOut } from "lucide-react";
+import { Users, HeartHandshake, Stethoscope, Home, ArrowRightLeft, MessageSquareHeart, LogOut, Download, FileText } from "lucide-react";
+
+function downloadReportCsv(report: DonorReport, projectName: string) {
+  const blob = new Blob([reportCsv(report)], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${projectName.replace(/\s+/g, "-")}-report-${report.period_label.replace(/\s+/g, "-")}${report.report_year ? `-${report.report_year}` : ""}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 type Section = "overview" | "report" | "logframe" | "activity";
 
