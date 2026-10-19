@@ -32,3 +32,5 @@
 
 - [x] Build CiSKuLA-2 Programme Report Form (logframe indicators, targets, disaggregation, risks, history, auto-aggregation) with Programme Officer designation.
 - [ ] Verify programme report save/history end-to-end with a designated officer account.
+- [x] Verify CHEW dispatch marks beneficiary "Booked · CHEW visit in X days" live (CiSKuLA 2, Joseph Ameh record, due 10/21/2026) and visit tracked in Home visits dispatched + map.
+- [ ] Investigate what set the Super Admin profile inactive (recurring preview sign-outs) — re-activated via trigger bypass; watch for automatic re-deactivation.
