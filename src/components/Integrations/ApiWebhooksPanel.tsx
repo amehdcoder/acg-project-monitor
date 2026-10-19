@@ -45,16 +45,6 @@ interface DeliveryRow {
   attempts: number; duration_ms: number | null; created_at: string; response_snippet: string | null;
 }
 
-const randomHex = (bytes: number) => {
-  const arr = new Uint8Array(bytes);
-  crypto.getRandomValues(arr);
-  return Array.from(arr).map((b) => b.toString(16).padStart(2, "0")).join("");
-};
-
-const sha256Hex = async (input: string) => {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
-  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
-};
 
 const ApiWebhooksPanel = ({ projects }: { projects: { id: string; name: string }[] }) => {
   const [projectId, setProjectId] = useState("");
@@ -113,11 +103,11 @@ const ApiWebhooksPanel = ({ projects }: { projects: { id: string; name: string }
       toast({ title: "Name required", description: "Give this key a name, e.g. \"Donor MEL dashboard\".", variant: "destructive" });
       return;
     }
-    const raw = `amk_${randomHex(24)}`;
+    const { raw, prefix } = generateApiKey();
     const hash = await sha256Hex(raw);
     const { data: { user } } = await supabase.auth.getUser();
     const { error } = await supabase.from("api_keys").insert({
-      project_id: projectId, name: newKeyName.trim(), key_prefix: raw.slice(0, 12),
+      project_id: projectId, name: newKeyName.trim(), key_prefix: prefix,
       key_hash: hash, scopes: newKeyScopes, created_by: user?.id,
     });
     if (error) {
@@ -145,7 +135,7 @@ const ApiWebhooksPanel = ({ projects }: { projects: { id: string; name: string }
       toast({ title: "Pick at least one event", variant: "destructive" });
       return;
     }
-    const secret = `whs_${randomHex(24)}`;
+    const secret = generateWebhookSecret();
     const { data: { user } } = await supabase.auth.getUser();
     const { error } = await supabase.from("webhook_endpoints").insert({
       project_id: projectId, url: newUrl.trim(), description: newDesc.trim() || null,
