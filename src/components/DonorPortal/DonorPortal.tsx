@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   listDonorGrants, loadDonorAggregates, loadDonorFieldActivity, loadDonorReports,
-  loadDonorLogframe, choroplethCells, mergeMonthly,
+  loadDonorLogframe, choroplethCells, mergeMonthly, reportCsv, reportTotal,
   type DonorAggregates, type DonorActivityItem, type DonorGrant, type DonorReport,
 } from "@/lib/donorPortal";
 import type { ProjectLogframe } from "@/lib/programmeModule/logframe";
@@ -12,7 +12,17 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   AreaChart, Area, CartesianGrid, PieChart, Pie, Cell, Legend,
 } from "recharts";
-import { Users, HeartHandshake, Stethoscope, Home, ArrowRightLeft, MessageSquareHeart, LogOut } from "lucide-react";
+import { Users, HeartHandshake, Stethoscope, Home, ArrowRightLeft, MessageSquareHeart, LogOut, Download, FileText } from "lucide-react";
+
+function downloadReportCsv(report: DonorReport, projectName: string) {
+  const blob = new Blob([reportCsv(report)], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${projectName.replace(/\s+/g, "-")}-report-${report.period_label.replace(/\s+/g, "-")}${report.report_year ? `-${report.report_year}` : ""}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 type Section = "overview" | "report" | "logframe" | "activity";
 
@@ -132,6 +142,25 @@ export default function DonorPortal({ userId }: { userId: string }) {
               <Kpi icon={<MessageSquareHeart />} label="Community feedback" value={fmt(agg.feedback_total)} />
             </section>
 
+            {reports.length > 0 && (
+              <section className="donor-card flex flex-wrap items-center gap-3 p-4 sm:p-6">
+                <div className="donor-kpi-icon"><FileText /></div>
+                <div className="min-w-0 flex-1">
+                  <p className="donor-eyebrow">Latest programme report</p>
+                  <p className="donor-heading text-base">
+                    {reports[0].period_label}{reports[0].report_year ? ` · ${reports[0].report_year}` : ""}
+                  </p>
+                  <p className="text-xs opacity-70">
+                    {reports[0].entries.length} indicators · {fmt(reportTotal(reports[0]))} total reported ·{" "}
+                    {new Date(reports[0].created_at).toLocaleDateString()}
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setSection("report")}>
+                  View reports
+                </Button>
+              </section>
+            )}
+
             <section className="donor-card p-4 sm:p-6">
               <h2 className="donor-heading mb-1 text-lg">Where people are reached</h2>
               <p className="mb-3 text-sm opacity-70">Beneficiaries by Local Government Area — deeper blue means more people reached.</p>
@@ -199,10 +228,20 @@ export default function DonorPortal({ userId }: { userId: string }) {
             {reports.length === 0 && <p className="donor-card p-6 text-sm opacity-70">No reports have been submitted for this project yet.</p>}
             {reports.map((r) => (
               <article key={r.id} className="donor-card p-4 sm:p-6">
-                <header className="mb-3 flex flex-wrap items-baseline gap-2">
+                <header className="mb-3 flex flex-wrap items-center gap-2">
                   <h3 className="donor-heading text-lg">{r.period_label}{r.report_year ? ` · ${r.report_year}` : ""}</h3>
                   {r.status && <span className="donor-chip">{r.status}</span>}
-                  <time className="ml-auto text-xs opacity-60">{new Date(r.created_at).toLocaleDateString()}</time>
+                  <span className="ml-auto flex items-center gap-2">
+                    <time className="text-xs opacity-60">{new Date(r.created_at).toLocaleDateString()}</time>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => downloadReportCsv(r, project?.project?.name ?? "project")}
+                      aria-label={`Download ${r.period_label} report as CSV`}
+                    >
+                      <Download className="mr-1 h-3.5 w-3.5" /> CSV
+                    </Button>
+                  </span>
                 </header>
                 {r.notes && <p className="mb-3 text-sm opacity-80">{r.notes}</p>}
                 {r.entries.length > 0 ? (
@@ -225,6 +264,13 @@ export default function DonorPortal({ userId }: { userId: string }) {
                           </tr>
                         ))}
                       </tbody>
+                      <tfoot>
+                        <tr>
+                          <td className="font-semibold">Total</td>
+                          <td className="text-right donor-kpi-number !text-base">{fmt(reportTotal(r))}</td>
+                          <td colSpan={2} />
+                        </tr>
+                      </tfoot>
                     </table>
                   </div>
                 ) : (

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { choroplethCells, mergeMonthly, type DonorAggregates } from "./donorPortal";
+import { choroplethCells, mergeMonthly, reportCsv, reportTotal, type DonorAggregates, type DonorReport } from "./donorPortal";
 
 const baseAgg: DonorAggregates = {
   total_beneficiaries: 10,

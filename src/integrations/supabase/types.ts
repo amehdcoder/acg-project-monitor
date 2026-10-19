@@ -14113,6 +14113,7 @@ export type Database = {
         Args: { _event: string; _payload: Json; _project_id: string }
         Returns: undefined
       }
+      enqueue_monthly_report_sync: { Args: never; Returns: undefined }
       ensure_ces_field_roles: {
         Args: { _project_id: string }
         Returns: undefined

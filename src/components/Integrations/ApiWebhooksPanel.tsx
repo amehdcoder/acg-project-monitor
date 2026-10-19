@@ -28,7 +28,8 @@ const EVENT_CATALOGUE = [
   { id: "service.recorded", label: "Service recorded" },
   { id: "home_visit.reported", label: "Home visit reported" },
   { id: "feedback.submitted", label: "Community feedback submitted" },
-  { id: "programme_report.submitted", label: "Programme report submitted" },
+  { id: "programme_report.submitted", label: "Programme report submitted (full report, instant)" },
+  { id: "programme_report.monthly_sync", label: "Programme report monthly sync (1st of each month)" },
   { id: "*", label: "All events" },
 ];
 
