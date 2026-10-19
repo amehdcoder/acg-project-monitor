@@ -35,11 +35,11 @@ describe("choroplethCells", () => {
     expect(l(deep)).toBeLessThan(l(light));
   });
 
-  it("never includes row-level data — only counts in popups", () => {
+  it("never includes row-level data — popups carry only place names and counts", () => {
     const cells = choroplethCells(baseAgg);
     for (const cell of cells.values()) {
-      expect(cell.popupHtml).not.toMatch(/case|name|id/i.replace("beneficiaries", ""));
       expect(cell.popupHtml).toContain("beneficiar");
+      expect(cell.popupHtml).not.toMatch(/case id|full_name|beneficiary_id/i);
     }
   });
 
