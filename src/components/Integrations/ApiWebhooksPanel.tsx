@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { generateApiKey, generateWebhookSecret, sha256Hex } from "@/lib/integrations/apiKeys";
 
 const API_SCOPES = [
   { id: "records:read", label: "Read beneficiary records" },
