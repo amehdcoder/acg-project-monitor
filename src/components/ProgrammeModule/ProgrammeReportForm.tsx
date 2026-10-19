@@ -581,10 +581,10 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
                 <Pencil className="h-4 w-4" /> Edit framework
               </Button>
               <Button variant="outline" size="sm" className="gap-1.5 border-health-teal/40 text-health-teal" onClick={() => void handleExportExcel()}>
-                <FileSpreadsheet className="h-4 w-4" /> Export Excel
+                <FileSpreadsheet className="h-4 w-4" /> Export Logframe Template
               </Button>
               <Button variant="outline" size="sm" className="gap-1.5 border-health-blue/40 text-health-blue" onClick={() => setImportOpen(true)}>
-                <Upload className="h-4 w-4" /> Import Excel
+                <Upload className="h-4 w-4" /> Import Logframe
               </Button>
               <Button variant="outline" size="sm" className="gap-1.5" onClick={openHistory}>
                 <History className="h-4 w-4" /> Report history ({reports.length})
