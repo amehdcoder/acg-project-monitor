@@ -135,7 +135,8 @@ export async function listProjectDonors(projectId: string): Promise<DonorGrantRo
     .from("profiles")
     .select("user_id, first_name, last_name, email")
     .in("user_id", rows.map((r) => r.user_id));
-  const byUser = new Map((profiles ?? []).map((p: any) => [p.user_id, p])); // eslint-disable-line @typescript-eslint/no-explicit-any
+  const profileRows = (profiles ?? []) as { user_id: string; first_name?: string | null; last_name?: string | null; email?: string | null }[];
+  const byUser = new Map(profileRows.map((p) => [p.user_id, p]));
   return rows.map((r) => {
     const p = byUser.get(r.user_id);
     return {
