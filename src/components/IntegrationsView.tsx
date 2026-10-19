@@ -33,6 +33,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import GoogleAccountConnect from "@/components/Integrations/GoogleAccountConnect";
 import Dhis2IntegrationsHub from "@/components/Integrations/Dhis2IntegrationsHub";
+import ApiWebhooksPanel from "@/components/Integrations/ApiWebhooksPanel";
 
 interface Form {
   id: string;
@@ -514,6 +515,8 @@ const IntegrationsView = () => {
       </div>
 
       <Dhis2IntegrationsHub projects={projects} />
+
+      <ApiWebhooksPanel projects={projects} />
 
       {/* Integration Cards */}
       <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">

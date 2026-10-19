@@ -1172,6 +1172,56 @@ export type Database = {
           },
         ]
       }
+      api_keys: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          key_hash: string
+          key_prefix: string
+          last_used_at: string | null
+          name: string
+          project_id: string
+          revoked_at: string | null
+          scopes: string[]
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          key_hash: string
+          key_prefix: string
+          last_used_at?: string | null
+          name: string
+          project_id: string
+          revoked_at?: string | null
+          scopes?: string[]
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          key_hash?: string
+          key_prefix?: string
+          last_used_at?: string | null
+          name?: string
+          project_id?: string
+          revoked_at?: string | null
+          scopes?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_keys_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       app_update_notifications: {
         Row: {
           created_at: string
@@ -13255,6 +13305,145 @@ export type Database = {
           },
         ]
       }
+      webhook_deliveries: {
+        Row: {
+          attempts: number
+          created_at: string
+          delivered_at: string | null
+          duration_ms: number | null
+          endpoint_id: string
+          event: string
+          event_id: string | null
+          http_status: number | null
+          id: string
+          next_retry_at: string | null
+          response_snippet: string | null
+          status: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          delivered_at?: string | null
+          duration_ms?: number | null
+          endpoint_id: string
+          event: string
+          event_id?: string | null
+          http_status?: number | null
+          id?: string
+          next_retry_at?: string | null
+          response_snippet?: string | null
+          status?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          delivered_at?: string | null
+          duration_ms?: number | null
+          endpoint_id?: string
+          event?: string
+          event_id?: string | null
+          http_status?: number | null
+          id?: string
+          next_retry_at?: string | null
+          response_snippet?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_deliveries_endpoint_id_fkey"
+            columns: ["endpoint_id"]
+            isOneToOne: false
+            referencedRelation: "webhook_endpoints"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "webhook_deliveries_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "webhook_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webhook_endpoints: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          events: string[]
+          id: string
+          is_active: boolean
+          project_id: string
+          secret: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          events?: string[]
+          id?: string
+          is_active?: boolean
+          project_id: string
+          secret: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          events?: string[]
+          id?: string
+          is_active?: boolean
+          project_id?: string
+          secret?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_endpoints_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webhook_events: {
+        Row: {
+          created_at: string
+          event: string
+          id: string
+          payload: Json
+          processed: boolean
+          project_id: string
+        }
+        Insert: {
+          created_at?: string
+          event: string
+          id?: string
+          payload: Json
+          processed?: boolean
+          project_id: string
+        }
+        Update: {
+          created_at?: string
+          event?: string
+          id?: string
+          payload?: Json
+          processed?: boolean
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_events_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_notification_log: {
         Row: {
           beneficiary_id: string | null
@@ -13867,6 +14056,10 @@ export type Database = {
         Returns: undefined
       }
       derive_facility_code: { Args: { _name: string }; Returns: string }
+      emit_webhook_event: {
+        Args: { _event: string; _payload: Json; _project_id: string }
+        Returns: undefined
+      }
       ensure_ces_field_roles: {
         Args: { _project_id: string }
         Returns: undefined
@@ -14443,6 +14636,14 @@ export type Database = {
         Args: { _project: string; _uid: string }
         Returns: string[]
       }
+      validate_api_key: {
+        Args: { _key_hash: string }
+        Returns: {
+          key_id: string
+          project_id: string
+          scopes: string[]
+        }[]
+      }
       visible_form_submission_counts: {
         Args: { _form_ids: string[] }
         Returns: {
@@ -14492,6 +14693,7 @@ export type Database = {
           within_geofence: boolean
         }[]
       }
+      wake_webhook_dispatcher: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role: "super_admin" | "systems_admin" | "user"
