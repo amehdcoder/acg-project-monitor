@@ -23,6 +23,7 @@ import CaseLink from "./pages/CaseLink";
 import MhgapGuide from "./pages/MhgapGuide";
 import PublicFeedbackRoute from "./components/PublicFeedbackRoute";
 import { isPublicFeedbackLocation } from "@/lib/publicFeedback";
+import DonorPortalRoute from "./components/DonorPortal/DonorPortalRoute";
 import DataCleaner from "./pages/DataCleaner";
 import KoboHubPage from "./components/KoboHub/KoboHubPage";
 import MdaAnalysesHarness from "./pages/MdaAnalysesHarness";
@@ -222,7 +223,11 @@ const WorkspaceApp = () => (
 
 const AppContent = () => {
   const location = useLocation();
-  return isPublicFeedbackLocation(location) ? <PublicFeedbackRoute /> : <WorkspaceApp />;
+  if (isPublicFeedbackLocation(location)) return <PublicFeedbackRoute />;
+  // Donor portal: standalone read-only shell with its own auth check — no
+  // workspace providers, record navigation or editing affordances mount here.
+  if (location.pathname.startsWith("/donor")) return <DonorPortalRoute />;
+  return <WorkspaceApp />;
 };
 
 const App = () => <BrowserRouter><AppContent /></BrowserRouter>;

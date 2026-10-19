@@ -475,11 +475,14 @@ const ProgrammeModuleWorkspace = ({
       )}
 
       {view === "team" && (
-        <ProjectTeamPanel
-          projectId={projectId}
-          moduleId={active?.id}
-          canManage={canConfigure || can("manage_team")}
-        />
+        <div className="space-y-4">
+          <ProjectTeamPanel
+            projectId={projectId}
+            moduleId={active?.id}
+            canManage={canConfigure || can("manage_team")}
+          />
+          <DonorAccessPanel projectId={projectId} canManage={canConfigure || can("manage_team")} />
+        </div>
       )}
 
       {view === "journey" && (
