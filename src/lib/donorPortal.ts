@@ -209,3 +209,34 @@ function lgaKeyOf(state: string, lga: string): string {
 export function mergeMonthly(series: { month: string; count: number }[]): { month: string; count: number }[] {
   return [...series].sort((a, b) => a.month.localeCompare(b.month));
 }
+
+/** Sum of all indicator values in a report (nulls count as zero). */
+export function reportTotal(report: DonorReport): number {
+  return report.entries.reduce((sum, e) => sum + (e.value ?? 0), 0);
+}
+
+/** Donor-friendly CSV export of one programme report (Excel-safe, RFC-4180 quoting). */
+export function reportCsv(report: DonorReport): string {
+  const esc = (v: string | number | null | undefined) => {
+    const s = v == null ? "" : String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const lines = [
+    ["Period", "Year", "Status", "Submitted"].map(esc).join(","),
+    [report.period_label, report.report_year, report.status, report.created_at].map(esc).join(","),
+    "",
+    ["Indicator", "Value", "Disaggregation", "Risk / note"].map(esc).join(","),
+    ...report.entries.map((e) =>
+      [
+        e.indicator_code,
+        e.value,
+        e.disaggregation
+          ? Object.entries(e.disaggregation).map(([k, v]) => `${k}: ${v}`).join("; ")
+          : "",
+        e.risk,
+      ].map(esc).join(","),
+    ),
+    ["Total", reportTotal(report), "", ""].map(esc).join(","),
+  ];
+  return `﻿${lines.join("\r\n")}`;
+}
