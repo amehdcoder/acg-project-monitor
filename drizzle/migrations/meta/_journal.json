@@ -85,6 +85,13 @@
       "when": 1792384139233,
       "tag": "0011_api_keys_webhooks_integration",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792384306247,
+      "tag": "0012_fix_validate_api_key_volatility",
+      "breakpoints": true
     }
   ]
 }
