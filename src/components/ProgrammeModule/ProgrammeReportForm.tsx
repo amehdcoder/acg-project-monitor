@@ -554,8 +554,8 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
     <div className="form-scroll mobile-form-text max-h-[calc(100dvh-7rem)] space-y-6 pr-1">
       <section className="overflow-hidden border-b border-border">
         <div className="border-t-4 border-health-teal bg-health-surface px-4 py-6 sm:px-6">
-          <div className="flex flex-col items-start justify-between gap-4 lg:flex-row">
-            <div className="flex min-w-0 flex-1 items-start gap-3">
+          <div className="flex flex-col items-start justify-between gap-4">
+            <div className="flex w-full min-w-0 items-start gap-3">
               <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-health-teal/10 text-health-teal"><ClipboardList className="h-5 w-5" /></span>
               <div className="min-w-0 flex-1">
                 <p className="text-[10px] font-bold uppercase text-health-blue">Programme Report — {LOGFRAME_PROJECT.id}</p>
@@ -564,7 +564,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
                 <p className="text-xs text-muted-foreground">{LOGFRAME_PROJECT.impact}</p>
               </div>
             </div>
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <div className="flex w-full min-w-0 flex-wrap items-center gap-2">
               <div className="flex w-full overflow-x-auto rounded-lg border border-border bg-card p-0.5 sm:w-auto">
                 {([["entry", "New report", ClipboardList], ["review", `Review queue (${pendingCount})`, CheckCircle2], ["dashboard", "Dashboard", BarChart3]] as const).map(([key, label, Icon]) => (
                   <Button key={key} variant={view === key ? "default" : "ghost"} size="sm" className="h-10 flex-1 shrink-0 gap-1.5 whitespace-nowrap sm:flex-none" onClick={() => setView(key)}>
