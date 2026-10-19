@@ -1490,3 +1490,8 @@ select option {
 .donor-dot-service { background: hsl(var(--donor-blue)); }
 .donor-dot-home_visit { background: hsl(186 60% 45%); }
 .donor-dot-feedback { background: hsl(40 80% 55%); }
+
+/* Donor portal: no Street View affordance on the aggregate map */
+.donor-portal .leaflet-control-streetview,
+.donor-portal [class*="streetview" i],
+.donor-portal button[title*="Street View" i] { display: none !important; }
