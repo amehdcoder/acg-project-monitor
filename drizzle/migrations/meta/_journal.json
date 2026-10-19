@@ -113,6 +113,13 @@
       "when": 1792385553419,
       "tag": "0015_report_sync_full_payload_and_monthly",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1792385574181,
+      "tag": "0016_fix_monthly_sync_event_match",
+      "breakpoints": true
     }
   ]
 }
