@@ -36,6 +36,7 @@ import BeneficiaryRecord from "./BeneficiaryRecord";
 import RecordQualityBar from "./RecordQualityBar";
 import BeneficiaryFormDialog from "./BeneficiaryFormDialog";
 import ProjectTeamPanel from "./ProjectTeamPanel";
+import DonorAccessPanel from "./DonorAccessPanel";
 import { useMyTeamPermissions, isHealthWorkerComponent, componentInAreas } from "@/lib/programmeModule/projectTeam";
 import ModuleConfigurator from "./ModuleConfigurator";
 import ModuleProjectsDialog from "./ModuleProjectsDialog";
@@ -475,11 +476,14 @@ const ProgrammeModuleWorkspace = ({
       )}
 
       {view === "team" && (
-        <ProjectTeamPanel
-          projectId={projectId}
-          moduleId={active?.id}
-          canManage={canConfigure || can("manage_team")}
-        />
+        <div className="space-y-4">
+          <ProjectTeamPanel
+            projectId={projectId}
+            moduleId={active?.id}
+            canManage={canConfigure || can("manage_team")}
+          />
+          <DonorAccessPanel projectId={projectId} canManage={canConfigure || can("manage_team")} />
+        </div>
       )}
 
       {view === "journey" && (

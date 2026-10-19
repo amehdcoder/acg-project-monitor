@@ -5347,6 +5347,50 @@ export type Database = {
         }
         Relationships: []
       }
+      donor_viewers: {
+        Row: {
+          active: boolean
+          created_at: string
+          granted_by: string | null
+          id: string
+          label: string | null
+          organization: string | null
+          project_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          label?: string | null
+          organization?: string | null
+          project_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          label?: string | null
+          organization?: string | null
+          project_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "donor_viewers_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       facility_commodity_stock: {
         Row: {
           category: string
@@ -13959,6 +14003,10 @@ export type Database = {
         Returns: boolean
       }
       can_manage_dashboards: { Args: { _user_id: string }; Returns: boolean }
+      can_manage_donor_viewers: {
+        Args: { _project_id: string }
+        Returns: boolean
+      }
       can_manage_form: {
         Args: { _form_id: string; _user_id: string }
         Returns: boolean
@@ -14056,6 +14104,11 @@ export type Database = {
         Returns: undefined
       }
       derive_facility_code: { Args: { _name: string }; Returns: string }
+      donor_field_activity: {
+        Args: { _limit?: number; _project_id: string }
+        Returns: Json
+      }
+      donor_project_aggregates: { Args: { _project_id: string }; Returns: Json }
       emit_webhook_event: {
         Args: { _event: string; _payload: Json; _project_id: string }
         Returns: undefined
@@ -14240,6 +14293,7 @@ export type Database = {
       }
       is_co_owner: { Args: { _user_id: string }; Returns: boolean }
       is_dashboard_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_donor_viewer: { Args: { _project_id: string }; Returns: boolean }
       is_email_deleted: { Args: { _email: string }; Returns: boolean }
       is_facility_focal: {
         Args: { _facility_id: string; _user_id: string }
