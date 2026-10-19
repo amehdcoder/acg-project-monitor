@@ -36,6 +36,7 @@ import BeneficiaryRecord from "./BeneficiaryRecord";
 import RecordQualityBar from "./RecordQualityBar";
 import BeneficiaryFormDialog from "./BeneficiaryFormDialog";
 import ProjectTeamPanel from "./ProjectTeamPanel";
+import DonorAccessPanel from "./DonorAccessPanel";
 import { useMyTeamPermissions, isHealthWorkerComponent, componentInAreas } from "@/lib/programmeModule/projectTeam";
 import ModuleConfigurator from "./ModuleConfigurator";
 import ModuleProjectsDialog from "./ModuleProjectsDialog";
