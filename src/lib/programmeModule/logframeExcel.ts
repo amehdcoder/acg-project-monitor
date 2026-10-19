@@ -259,14 +259,14 @@ export async function buildLogframeWorkbook(lf: ProjectLogframe, state: ReportSh
   help.columns = [{ width: 4 }, { width: 110 }];
   const lines = [
     "HOW TO USE THIS TEMPLATE",
-    "1. Cover sheet: edit the project title, impact statement, reporting period, programme year and narrative notes in the blue cells.",
+    "1. Cover sheet: edit the project title, impact statement, reporting period, programme year and narrative notes in the blue cells. The Objectives block is editable too — change a Specific Objective's title or narrative in its coloured row.",
     "2. Logframe sheet: one row per indicator or activity. Every column can be edited — objective narratives, result areas, codes, indicator names, baselines, yearly and total targets.",
     "3. Rows with the same Objective ID belong to one Specific Objective; rows with the same Result ID belong to one result area. Add a row to add an indicator; delete a row to remove it.",
     "4. Level: Outcome (objective-level indicator), Result (result-area indicator) or Activity. For Activity rows, put the activity name in 'Activity' and its indicator in 'Indicator'.",
     "5. Disaggregations: list dimension names separated by semicolons, e.g. Sex; NTD age band; State; LGA; Ward.",
     "6. Disaggregated values: one dimension per line, e.g. Sex: Male=12, Female=9. Values in each dimension should add up to 'Value this period'.",
     "7. Do not edit the 'Auto-source' column — it links indicators to automatic counts from beneficiary records.",
-    "8. Upload in the Programme Report → Import Excel. Choose 'Replace' to overwrite everything, or 'Update' to keep current entries and only apply filled values.",
+    "8. Upload in the Programme Report → Import Logframe. Choose 'Replace' to overwrite everything, or 'Update' to keep current entries and only apply filled values.",
   ];
   lines.forEach((l, i) => {
     const c = help.getCell(2 + i, 2);
@@ -311,6 +311,21 @@ export async function parseLogframeWorkbook(data: ArrayBuffer): Promise<ParsedTe
     const k = cellText(row.getCell(2).value);
     if (k) meta[k.toLowerCase()] = cellText(row.getCell(3).value);
   });
+
+  // The Cover "Objectives" block is editable: title in column B, narrative in
+  // column C, one row per Specific Objective in logframe order.
+  const coverObjectives: { title: string; statement: string }[] = [];
+  if (cover) {
+    let inLegend = false;
+    cover.eachRow((row) => {
+      const k = cellText(row.getCell(2).value);
+      const v = cellText(row.getCell(3).value);
+      if (!inLegend) { if (k.toLowerCase() === "objectives") inLegend = true; return; }
+      if (!k && !v) { inLegend = false; return; }
+      if (k.toLowerCase().startsWith("generated ")) { inLegend = false; return; }
+      coverObjectives.push({ title: k, statement: v });
+    });
+  }
 
   // Locate header row by "Code" column.
   let headerRow = 3;
@@ -365,6 +380,13 @@ export async function parseLogframeWorkbook(data: ArrayBuffer): Promise<ParsedTe
   }
   if (!objectives.length) throw new Error("No objectives or indicators were found in the Logframe sheet.");
   void errors;
+
+  // Apply edited objective titles/narratives from the Cover sheet.
+  coverObjectives.forEach((co, i) => {
+    if (!objectives[i]) return;
+    if (co.title) objectives[i].title = co.title;
+    if (co.statement) objectives[i].statement = co.statement;
+  });
 
   return {
     logframe: {
