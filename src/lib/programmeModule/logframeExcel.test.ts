@@ -16,4 +16,20 @@ describe("Programme Report Excel template", () => {
     expect(out.state.drafts[code].value).toBe("5");
     expect(JSON.parse(out.state.drafts[code].disaggregation.Sex)).toEqual({ Male: 3, Female: 2 });
   });
+
+  it("applies Specific Objective titles and narratives edited on the Cover sheet", async () => {
+    const lf = defaultLogframe();
+    const wb = await buildLogframeWorkbook(lf, { period: "Oct 2026", reportYear: "1", notes: "", drafts: {} });
+    const cover = wb.getWorksheet("Cover")!;
+    // Legend block starts after the 7 meta rows + "Objectives" heading.
+    const firstObjRow = 5 + 7 + 2 + 1;
+    cover.getCell(firstObjRow, 2).value = "Edited Objective One";
+    cover.getCell(firstObjRow, 3).value = "Edited objective narrative";
+    const buf = await wb.xlsx.writeBuffer();
+    const out = await parseLogframeWorkbook(buf as ArrayBuffer);
+    expect(out.logframe.objectives[0].title).toBe("Edited Objective One");
+    expect(out.logframe.objectives[0].statement).toBe("Edited objective narrative");
+    // Untouched objectives keep their original text.
+    expect(out.logframe.objectives[1].title).toBe(lf.objectives[1].title);
+  });
 });
