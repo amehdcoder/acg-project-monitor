@@ -1503,3 +1503,6 @@ select option {
 @media (prefers-reduced-motion: reduce) {
   .donor-card { animation: none; }
 }
+
+.donor-nav.donor-nav-active:hover { background: hsl(var(--donor-navy-2)); color: hsl(var(--primary-foreground)); }
+.donor-portal .leaflet-container { background: hsl(var(--donor-ice)); }

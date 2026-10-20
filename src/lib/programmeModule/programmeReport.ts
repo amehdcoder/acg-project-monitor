@@ -5,6 +5,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { AutoKey } from "./logframe";
 import { referralCompletionPercent } from "./referralMetrics";
+import { cachedRead } from "./offlineReadCache";
 
 const db = supabase as unknown as {
   from: (t: string) => any; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -20,18 +21,33 @@ export const aggregateIndicators = async (
 ): Promise<Partial<Record<AutoKey, number>>> => {
   const out: Partial<Record<AutoKey, number>> = {};
 
-  const [{ data: bens }, { data: services }, { data: referrals }, { data: visits }, { data: livelihood }, { data: feedback }] =
-    await Promise.all([
-      db.from("beneficiaries").select("id, profile").eq("project_id", projectId),
-      db.from("beneficiary_services").select("beneficiary_id, component, service_type, outcome, created_at").eq("project_id", projectId),
-      db.from("beneficiary_referrals").select("id, status").eq("project_id", projectId),
-      db.from("beneficiary_home_visits").select("id").eq("project_id", projectId),
-      db.from("livelihood_assessments").select("id, beneficiary_id").eq("project_id", projectId),
-      db.from("project_feedback").select("id, status").eq("project_id", projectId),
-    ]);
+  const readAll = async (table: string, columns: string, completedOnly = false) => {
+    const { data } = await cachedRead<unknown[]>(`report-aggregate:${projectId}:${table}`, async () => {
+      const rows: unknown[] = [];
+      for (let offset = 0; ; offset += 1000) {
+        let query = db.from(table).select(columns).eq("project_id", projectId).order("id").range(offset, offset + 999);
+        if (completedOnly) query = query.eq("status", "completed");
+        const result = await query;
+        if (result.error) return { data: null, error: result.error };
+        rows.push(...(result.data || []));
+        if ((result.data || []).length < 1000) break;
+      }
+      return { data: rows, error: null };
+    });
+    if (data === null) throw new Error("Report totals are unavailable. Reconnect to load project records.");
+    return data;
+  };
+  const [bens, services, referrals, visits, livelihood, feedback] = await Promise.all([
+    readAll("beneficiaries", "id, profile"),
+    readAll("beneficiary_services", "id, beneficiary_id, component_key, service_name, result, created_at"),
+    readAll("beneficiary_referrals", "id, status"),
+    readAll("beneficiary_home_visits", "id", true),
+    readAll("livelihood_assessments", "id, beneficiary_id"),
+    readAll("project_feedback", "id, status"),
+  ]);
 
   const benList = (bens || []) as { id: string; profile?: { wg_ss?: { has_disability?: boolean } } | null }[];
-  const svcList = (services || []) as { beneficiary_id: string; component?: string | null; service_type?: string | null; outcome?: string | null }[];
+  const svcList = (services as { beneficiary_id: string; component_key?: string | null; service_name?: string | null; result?: string | null }[]).map(s => ({ beneficiary_id: s.beneficiary_id, component: s.component_key, service_type: s.service_name, outcome: s.result }));
   const refList = (referrals || []) as { status?: string | null }[];
   const fbList = (feedback || []) as { status?: string | null }[];
 
