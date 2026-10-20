@@ -7,7 +7,8 @@ const { tables } = vi.hoisted(() => ({ tables: {
 } as Record<string, unknown[]> }));
 vi.mock("./offlineReadCache", () => ({ cachedRead: async (_key: string, fetcher: () => Promise<unknown>) => fetcher() }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { from: (table: string) => {
-  const query = { select: () => query, eq: () => query, order: () => query, range: async (start: number, end: number) => ({ data: tables[table].slice(start, end + 1), error: null }) };
+  let start = 0; let end = 999;
+  const query = { select: () => query, eq: () => query, order: () => query, range: (a: number, b: number) => { start = a; end = b; return query; }, then: (resolve: (value: unknown) => void) => resolve({ data: tables[table].slice(start, end + 1), error: null }) };
   return query;
 } } }));
 import { aggregateIndicators } from "./programmeReport";

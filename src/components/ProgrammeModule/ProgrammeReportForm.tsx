@@ -298,6 +298,10 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
       return;
     }
     const yearIdx = Math.min(Math.max(Number(reportYear) - 1, 0), 3);
+    if (entries.some(({ ind, draft }) => ind.autoKey === "referral_completion" && draft.value.trim() !== "" && (!Number.isFinite(Number(draft.value)) || Number(draft.value) < 0 || Number(draft.value) > 100))) {
+      toast({ title: "Invalid referral percentage", description: "Referral completion must be between 0 and 100%.", variant: "destructive" });
+      return;
+    }
     // 1. Disaggregation totals must equal the value entered for the period.
     const mismatched = entries.filter(({ ind, draft }) => {
       if (!ind.disaggregation || ind.disaggregation.length === 0) return false;
