@@ -148,6 +148,20 @@
       "when": 1792471678536,
       "tag": "0020_longitudinal_quiz_external_imports",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1792472546682,
+      "tag": "0021_quiz_logframe_activity_knowledge",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1792472786691,
+      "tag": "0022_knowledge_unique_activity_participants",
+      "breakpoints": true
     }
   ]
 }

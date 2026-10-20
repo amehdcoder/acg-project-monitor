@@ -1,5 +1,8 @@
 # Roadmap
 
+- [x] Add named participant progress/search/pagination, distributions, median scores, outcomes and participant Excel export; include native/imported/Kobo assessments.
+- [x] Link quizzes to exact training activity codes; reporting aggregates use post-test month and prior pre-tests; count improved people for count indicators, mean gain for percentage indicators; preserve manual entries.
+- [x] Verify live training link and report auto-fill (1 improved participant, 1 pair, 40 pp); 13 tests passed; temporary quiz removed. Existing map transition error remains outside this request.
 - [x] Add project-scoped quizzes to Longitudinal Beneficiary Records, reuse protected quiz creation/taking and pre/post analytics.
 - [x] Add reviewed external questions/answer keys and results imports, source links, cohort/state/LGA/cadre comparisons, gain confidence intervals and Excel exports.
 - [x] Verify authenticated imports and saved-results dashboard: 40% pre, 80% post, +40 pp; test quiz removed; 13 tests passed. Existing map transition error observed outside quiz components.

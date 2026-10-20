@@ -27,6 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { defaultLogframe, flatIndicators, type ProjectLogframe, numericTarget, type AutoKey, type FlatIndicator } from "@/lib/programmeModule/logframe";
 import { aggregateIndicators } from "@/lib/programmeModule/programmeReport";
+import {loadKnowledgeMetrics,type KnowledgeMetric} from '@/lib/quizAssessments/knowledge';
 import DisaggregationEditor from "./DisaggregationEditor";
 import LogframeEditor from "./LogframeEditor";
 import { loadProjectLogframe, saveProjectLogframe } from "@/lib/programmeModule/logframeStore";
@@ -99,6 +100,8 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
   const [drafts, setDrafts] = useState<Record<string, EntryDraft>>({});
   const [autoValues, setAutoValues] = useState<Partial<Record<AutoKey, number>>>({});
   const [autoLoading, setAutoLoading] = useState(false);
+  const [knowledgeMetrics,setKnowledgeMetrics] = useState<Record<string,KnowledgeMetric>>({});
+  const [knowledgeError,setKnowledgeError] = useState('');
   const [saving, setSaving] = useState(false);
   const [reports, setReports] = useState<ReportRow[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -224,14 +227,21 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
     setAutoLoading(true);
     try {
       const values = await aggregateIndicators(projectId);
+      let knowledge:Record<string,KnowledgeMetric> = {};
+      try {knowledge = await loadKnowledgeMetrics(projectId,period);setKnowledgeMetrics(knowledge);setKnowledgeError('');}
+      catch {setKnowledgeMetrics({});setKnowledgeError('Knowledge-change totals could not be refreshed. Existing entries remain available for review.');}
       setAutoValues(values);
       setDrafts((prev) => {
         const next = { ...prev };
         for (const ind of indicators) {
-          if (!ind.autoKey) continue;
-          const v = values[ind.autoKey];
-          if (v === undefined) continue;
+          const isKnowledge = /change.*knowledge/i.test(ind.title);
+          const metric = isKnowledge ? knowledge[ind.code] : undefined;
+          const v = isKnowledge ? (metric ? Number((ind.isPercent ? metric.mean_gain : metric.improved).toFixed(2)) : undefined) : ind.autoKey ? values[ind.autoKey] : undefined;
           const existing = next[ind.code];
+          if (v === undefined) {
+            if(isKnowledge && existing?.auto) next[ind.code] = {...existing,value:'',auto:true};
+            continue;
+          }
           if (!existing || existing.auto) {
             next[ind.code] = {
               value: String(v),
@@ -249,7 +259,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
     } finally {
       setAutoLoading(false);
     }
-  }, [projectId, indicators]);
+  }, [projectId, indicators, period]);
 
   useEffect(() => {
     void loadReports();
@@ -439,7 +449,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
     const yearTarget = numericTarget(ind.targets[yearIdx]);
     const totalTarget = numericTarget(ind.totalTarget);
     // A completion rate is a point-in-time ratio, not a sum across reports.
-    const cumulative = ind.autoKey === "referral_completion" ? Number(draft?.value || 0) : cumulativeFor(ind.code);
+    const cumulative = ind.autoKey === "referral_completion" || (/change.*knowledge/i.test(ind.title) && ind.isPercent) ? Number(draft?.value || 0) : cumulativeFor(ind.code);
     const pct = yearTarget && yearTarget > 0 ? Math.min(100, Math.round((cumulative / yearTarget) * 100)) : null;
     const t = TONES[tone];
     const valueNum = Number(draft?.value);
@@ -465,6 +475,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
             </div>
             <p className="mt-2 text-base font-semibold leading-relaxed text-foreground">{ind.title}</p>
             {ind.mov && <p className="mt-0.5 text-xs text-muted-foreground">MoV: {ind.mov}</p>}
+            {/change.*knowledge/i.test(ind.title) && <div className="mt-2 border-l-2 border-health-teal pl-3 text-sm text-health-teal">{knowledgeMetrics[ind.code] ? <><span className="font-semibold">{knowledgeMetrics[ind.code].improved} improved · {knowledgeMetrics[ind.code].paired} matched participants</span><p>Mean gain {Number(knowledgeMetrics[ind.code].mean_gain).toFixed(1)} pp · {knowledgeMetrics[ind.code].quiz_count} linked assessments · {period}</p><p>{ind.isPercent ? 'Value: mean knowledge gain (percentage points).' : 'Value: number of participants whose knowledge score improved.'}</p></> : <span>No matched results for this activity and reporting period. Link its assessment under Quizzes & assessments.</span>}</div>}
           </div>
           <div className="flex w-full flex-col gap-2 border-t border-border/60 pt-3 xl:w-auto xl:items-end xl:border-0 xl:pt-0">
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -639,6 +650,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
         </div>
         )}
       </section>
+      {knowledgeError && <p role="alert" className="text-sm text-destructive">{knowledgeError}</p>}
 
       {view === "entry" && (<>
       <div className="flex flex-wrap items-center gap-3">

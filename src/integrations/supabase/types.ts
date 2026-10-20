@@ -11425,6 +11425,7 @@ export type Database = {
           fail_message: string | null
           id: string
           is_published: boolean | null
+          logframe_activity_code: string | null
           open_test_type: string | null
           pass_message: string | null
           passing_score: number | null
@@ -11448,6 +11449,7 @@ export type Database = {
           fail_message?: string | null
           id?: string
           is_published?: boolean | null
+          logframe_activity_code?: string | null
           open_test_type?: string | null
           pass_message?: string | null
           passing_score?: number | null
@@ -11471,6 +11473,7 @@ export type Database = {
           fail_message?: string | null
           id?: string
           is_published?: boolean | null
+          logframe_activity_code?: string | null
           open_test_type?: string | null
           pass_message?: string | null
           passing_score?: number | null
@@ -14583,6 +14586,16 @@ export type Database = {
       programme_area_matches: {
         Args: { _areas: string[]; _component: string }
         Returns: boolean
+      }
+      programme_knowledge_metrics: {
+        Args: { _end: string; _project_id: string; _start: string }
+        Returns: {
+          activity_code: string
+          improved: number
+          mean_gain: number
+          paired: number
+          quiz_count: number
+        }[]
       }
       prune_mda_lens_access_events: { Args: never; Returns: undefined }
       record_inactive_login_attempt: {

@@ -8,7 +8,7 @@
 - Revoke browser EXECUTE on SECURITY DEFINER trigger/internal functions; keep it only for RLS helpers and app-called RPCs — why: smaller attack surface.
 - Self-hosting: Dockerfile + nginx.conf, backend on Lovable Cloud — why: no badge.
 - Records/report: reads via `offlineReadCache.cachedRead`; writes via `offlineWrite.offlineMutate` (client ids, queued ops); single-tab, backoff, jittered flush — why: full offline use, no stampedes.
-- Route every in-app Street View through the shared Google panorama viewer, official imagery preferred with street-level fallback — why: consistent quality/fallbacks.
+- Street View uses the shared Google panorama viewer with official imagery and street-level fallback — why: consistent quality.
 - Data Cleaner / record quality brain: no hand-written rules; flags come from the on-device autoencoder + transformer worker (dataCleanerBrain.worker.ts, IndexedDB memory) and, past 5,000 steps, the `brain-train` edge function every 30 min (pg_cron, lease via `claim_brain_for_training`); checkpoint in `brain_models` (most-trained wins), flags in `brain_flags`; `_shared/brain/*` mirrors `src/lib/dataCleaner/neural/*` — why: "normal" is learned cumulatively, even with nobody online, within edge CPU limits.
 - Microplanning DHIS2 push/pull runs as `mp_*` actions in `health-exchange`, KPI matching in `_shared/microplanExchange.ts`, mappings as `mp:<kpi>` rows, pulled rows upserted by `microplan_entries.external_ref` — why: one server-side exchange path, idempotent re-pulls.
 - Geo Microplanning workspace locks live in `microplan_workspace_locks` (user_id NULL = whole project); Owner/Co-owner/Super Admin manage and are never locked — why: mirrors the records-only shell without a side menu.
@@ -20,4 +20,4 @@
 - External integrations: project-scoped hashed `amk_` keys and HMAC webhooks, wake-on-enqueue + hourly retry; validate cursors and public HTTPS destinations, reject redirects — why: signed data, no browser credentials or internal destinations.
 - Donors: own Auth accounts, standalone login/signup/recovery; dashboard API uses donor RPCs/RLS + protected donor_viewers associations, never project assignments; local selection is not authorization; server risk totals — why: private aggregate-only dashboards. Report events follow entries; retries retain payloads.
 
-- Assessments reuse project-scoped QuizBuilder/server scoring; reviewed keys append atomically to unpublished quizzes; results pair by quiz + participant ID; caches are user-scoped — why: no guessed answers or cross-quiz pairing.
+- Assessments reuse QuizBuilder/server scoring; keys append to unpublished quizzes; pair by quiz/source/person. Exact activity links feed reporting-only aggregates by post-test month; dedup activity/person; user-scoped caches — why: no wrong-training totals.
