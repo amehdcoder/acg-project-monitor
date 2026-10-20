@@ -548,7 +548,7 @@ const QuizBuilder = ({ projectId }: { projectId?: string } = {}) => {
           target_project_name: targetName,
           source_quiz_title: original.title,
           copied_by: user?.id || "",
-          copied_by_email: user!.email ?? null,
+          copied_by_email: user?.email ?? null,
         });
       } catch (auditErr) {
         console.warn("Quiz copy audit log failed:", auditErr);
