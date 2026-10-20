@@ -514,6 +514,7 @@ export interface TargetingResult {
   preferenceFit: number;
   preferenceNotes: string[];
   travelWillingnessKm: number | null;
+  assessmentComplete: boolean;
 }
 
 const num = (v: unknown): number | null => {

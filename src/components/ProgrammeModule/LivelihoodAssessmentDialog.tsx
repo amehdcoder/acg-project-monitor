@@ -22,6 +22,10 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { toneClasses } from "@/lib/programmeModule/defaults";
 import type { BeneficiaryRow } from "@/lib/programmeModule/types";
+import { useLivelihoodEvidence } from "@/lib/programmeModule/useLivelihoodEvidence";
+import { gateFromAssessment, readGate } from "@/lib/programmeModule/graduation";
+import { offlineMutate, currentUserId } from "@/lib/programmeModule/offlineWrite";
+import { livelihoodDisability } from "@/lib/programmeModule/livelihoodDisability";
 import {
   ASSESSMENT_SECTIONS, BAND_LABELS, BAND_TONE, DOMAIN_LABELS,
   saveAssessment, scoreLivelihood,
@@ -38,7 +42,7 @@ interface Props {
   /** Record-derived signals, so the score is never blank. */
   signals?: Omit<TargetingInput, "beneficiary" | "answers">;
   opportunityId?: string | null;
-  onSaved?: (result: ReturnType<typeof scoreLivelihood>) => void;
+  onSaved?: (result: ReturnType<typeof scoreLivelihood>) => void | Promise<void>;
 }
 
 const LivelihoodAssessmentDialog = ({
@@ -48,6 +52,7 @@ const LivelihoodAssessmentDialog = ({
   const { toast } = useToast();
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [saving, setSaving] = useState(false);
+  const evidence = useLivelihoodEvidence(projectId);
 
   useEffect(() => {
     if (!open) return;
@@ -64,8 +69,8 @@ const LivelihoodAssessmentDialog = ({
 
   const result = useMemo(() => {
     if (!beneficiary) return null;
-    return scoreLivelihood({ beneficiary, answers, ...(signals || {}) });
-  }, [beneficiary, answers, signals]);
+    return scoreLivelihood({ beneficiary, answers, ...evidence.signalsFor(beneficiary.id), ...(signals || {}) });
+  }, [beneficiary, answers, signals, evidence.data]);
 
   const set = (name: string, value: unknown) =>
     setAnswers((prev) => ({ ...prev, [name]: value }));
@@ -83,8 +88,12 @@ const LivelihoodAssessmentDialog = ({
         answers,
         result,
       });
-      toast({ title: "Assessment saved", description: `${beneficiary.full_name} scored ${result.vulnerability}/100.` });
-      onSaved?.(result);
+      const profile = beneficiary.profile || {};
+      const gate = gateFromAssessment(result, readGate(profile), new Date().toISOString(), await currentUserId());
+      await offlineMutate({ table: "beneficiaries", action: "update", id: beneficiary.id,
+        values: { profile: { ...profile, graduation: { ...gate, opportunity_id: opportunityId || existing?.opportunity_id || undefined } } } });
+      toast({ title: "Assessment & Graduation pathway saved", description: `${beneficiary.full_name} scored ${result.vulnerability}/100 · ${gate.status.replace("_", " ")}.` });
+      await onSaved?.(result);
       onOpenChange(false);
     } catch (e) {
       toast({
@@ -127,6 +136,9 @@ const LivelihoodAssessmentDialog = ({
 
             {result && (
               <Card className="space-y-2 p-3">
+                <p className="text-sm font-medium">Disability evidence</p>
+                <p className="text-xs text-muted-foreground">{livelihoodDisability(beneficiary.profile || {}).source}</p>
+                {evidence.error && <p role="alert" className="text-sm text-destructive">{evidence.error}</p>}
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   What is driving the score
                 </p>
@@ -221,7 +233,7 @@ const LivelihoodAssessmentDialog = ({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={() => void save()} disabled={saving || !beneficiary}>
+          <Button onClick={() => void save()} disabled={saving || !beneficiary || !evidence.ready}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Save assessment
           </Button>

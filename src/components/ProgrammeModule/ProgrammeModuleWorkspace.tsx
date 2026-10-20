@@ -591,6 +591,8 @@ const ProgrammeModuleWorkspace = ({
           canManage={canConfigure || can("manage_livelihood")}
           canAssess={canConfigure || can("assess_livelihood") || can("manage_livelihood")}
           canVerify={canConfigure || can("verify_livelihood") || can("manage_livelihood")}
+          onChanged={() => void reloadBeneficiaries()}
+          onOverview={() => setView("graduation")}
           onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }}
         />
       )}
