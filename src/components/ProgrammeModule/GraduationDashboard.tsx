@@ -1,5 +1,6 @@
 // Graduation Approach dashboard — sequential view of every livelihood
 // beneficiary from mapping → verification → selection → delivery stages → graduation.
+import VulnerabilityScore from "./VulnerabilityScore";
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Circle, ExternalLink, ArrowDown, GraduationCap, Loader2, MapPin, Search, Sprout, Target, UserCheck, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -163,7 +164,8 @@ function IndividualPathway({ beneficiary, services, onOpen }: { beneficiary?: Be
     { label: "Graduated — all stages completed", done: gate?.status === "selected" && progress.every(p => p.count > 0), date: null, note: null },
   ];
   return (
-    <div className="mt-1 rounded-md border border-border bg-muted/40 p-3">
+    <div className="mt-1 space-y-3 rounded-md border border-border bg-muted/40 p-3">
+      <VulnerabilityScore beneficiaryId={beneficiary.id} />
       <ol className="relative space-y-2 border-l-2 border-border pl-4">
         {steps.map((s, i) => (
           <li key={s.label} className="relative">
