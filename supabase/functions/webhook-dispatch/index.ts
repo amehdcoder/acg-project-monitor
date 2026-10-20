@@ -5,6 +5,7 @@ import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { guardRequest } from '../_shared/authGuard.ts'
 import { retryEvent } from './retry.ts'
+import { publicDestination } from './destination.ts'
 
 const MAX_ATTEMPTS = 5
 
@@ -59,8 +60,10 @@ async function deliver(
   let snippet = ''
   let ok = false
   try {
-    const res = await fetch(endpoint.url, {
+    const destination = await publicDestination(endpoint.url)
+    const res = await fetch(destination, {
       method: 'POST',
+      redirect: 'error',
       headers: {
         'Content-Type': 'application/json',
         'User-Agent': 'Amehnities-Webhooks/1.0',
