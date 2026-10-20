@@ -487,18 +487,46 @@ const LivelihoodPanel = ({
 
       <LivelihoodChecklistShowcase />
 
-      <LivelihoodAssessmentRegister
-        beneficiaries={beneficiaries}
-        assessed={byBeneficiary as never}
-        canAssess={canAssess || canManage}
-        onAssess={setAssessing}
-        onOpen={onOpenBeneficiary}
-      />
-
-      {!opportunity && (
-        <Card className="p-6 text-center text-sm text-muted-foreground">
-          No livelihood opportunity set up yet. Assessments above still map and select households for the
-          Graduation pathway; add an opportunity with the number of places to build a ranked shortlist.
+      {opportunity ? (
+        <div id="needs-assessment-register">
+          <LivelihoodAssessmentRegister
+            beneficiaries={beneficiaries}
+            assessed={byBeneficiary as never}
+            canAssess={canAssess || canManage}
+            onAssess={setAssessing}
+            onOpen={onOpenBeneficiary}
+          />
+        </div>
+      ) : (
+        <Card className="overflow-hidden animate-fade-in">
+          <div className="flex flex-col items-center gap-4 bg-primary/5 p-8 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/15 text-primary">
+              <Briefcase className="h-6 w-6" />
+            </div>
+            <div className="max-w-xl space-y-2">
+              <p className="text-lg font-semibold">Create a livelihood opportunity to begin the Needs Assessment</p>
+              <p className="text-sm text-muted-foreground">
+                The Needs Assessment is completed against a specific opportunity — its location, places available
+                and inclusion quotas. Once it is set up, the register of all {beneficiaries.length} beneficiaries
+                opens here so each person can be assessed, scored and selected for the Graduation pathway.
+              </p>
+            </div>
+            <ol className="grid w-full max-w-2xl gap-2 text-left text-xs sm:grid-cols-3">
+              {["Create the opportunity", "Fill each beneficiary's Needs Assessment", "Review the ranked shortlist"].map((t, i) => (
+                <li key={t} className="flex items-center gap-2 rounded-lg border bg-background p-3">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">{i + 1}</span>
+                  {t}
+                </li>
+              ))}
+            </ol>
+            {canManage ? (
+              <Button className="gap-1" onClick={() => { setForm({ ...emptyOpportunity }); setFormOpen(true); }}>
+                <Plus className="h-4 w-4" /> Create opportunity & proceed
+              </Button>
+            ) : (
+              <p className="text-xs text-muted-foreground">Ask a project Admin to create a livelihood opportunity.</p>
+            )}
+          </div>
         </Card>
       )}
 
