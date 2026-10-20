@@ -777,7 +777,22 @@ const LivelihoodPanel = ({
         existing={assessing ? byBeneficiary.get(assessing.id) : null}
         signals={assessing ? signalsFor(assessing) : undefined}
         opportunityId={opportunityId || null}
-        onSaved={() => void reloadAssessments()}
+        onSaved={(r) => {
+          void reloadAssessments();
+          const b = assessing;
+          if (!b || !r) return;
+          void (async () => {
+            const { data: auth } = await supabase.auth.getUser();
+            const profile = (b.profile || {}) as Record<string, unknown>;
+            const next = gateFromAssessment(r as never, readGate(profile), new Date().toISOString(), auth.user?.id);
+            try {
+              await offlineMutate({ table: "beneficiaries", action: "update", values: { profile: { ...profile, graduation: next } }, id: b.id });
+              toast({ title: next.status === "selected" ? `${b.full_name} selected for the Graduation pathway` : `${b.full_name} not selected`, description: next.status === "selected" ? "Delivery stages are now unlocked." : next.reason });
+            } catch (e) {
+              toast({ title: "Assessment saved, but pathway not updated", description: (e as Error).message, variant: "destructive" });
+            }
+          })();
+        }}
       />
 
       <LivelihoodVerificationDialog
