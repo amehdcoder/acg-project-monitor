@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  listDonorGrants, loadDonorAggregates, loadDonorFieldActivity, loadDonorReports,
-  loadDonorLogframe, choroplethCells, mergeMonthly, reportCsv, reportTotal,
+  listDonorGrants, loadDonorDashboard, choroplethCells, mergeMonthly, reportCsv,
   type DonorAggregates, type DonorActivityItem, type DonorGrant, type DonorReport,
 } from "@/lib/donorPortal";
 import type { ProjectLogframe } from "@/lib/programmeModule/logframe";
@@ -56,14 +55,17 @@ export default function DonorPortal({ userId }: { userId: string }) {
   useEffect(() => {
     if (!projectId) return;
     setError(null);
-    Promise.all([
-      loadDonorAggregates(projectId),
-      loadDonorFieldActivity(projectId),
-      loadDonorReports(projectId),
-      loadDonorLogframe(projectId),
-    ])
-      .then(([a, act, rep, lf]) => { setAgg(a); setActivity(act); setReports(rep); setLogframe(lf); })
-      .catch((e) => setError(e.message));
+    let active = true;
+    setAgg(null); setActivity([]); setReports([]); setLogframe(null);
+    const refresh = () => loadDonorDashboard(projectId)
+      .then(({ aggregates, activity, reports, logframe }) => {
+        if (!active) return;
+        setAgg(aggregates); setActivity(activity); setReports(reports); setLogframe(logframe); setError(null);
+      })
+      .catch((e) => { if (active) setError(e.message); });
+    void refresh();
+    const timer = window.setInterval(() => { if (document.visibilityState === "visible") void refresh(); }, 60000);
+    return () => { active = false; window.clearInterval(timer); };
   }, [projectId]);
 
   const cells = useMemo(() => (agg ? choroplethCells(agg) : new Map()), [agg]);
@@ -119,13 +121,13 @@ export default function DonorPortal({ userId }: { userId: string }) {
         </div>
         <nav className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-4 pb-2 sm:px-6" aria-label="Portal sections">
           {SECTIONS.map((s) => (
-            <button
+            <Button variant="ghost"
               key={s.key}
               onClick={() => setSection(s.key)}
               className={`donor-nav ${section === s.key ? "donor-nav-active" : ""}`}
             >
               {s.label}
-            </button>
+            </Button>
           ))}
         </nav>
       </header>
@@ -151,7 +153,7 @@ export default function DonorPortal({ userId }: { userId: string }) {
                     {reports[0].period_label}{reports[0].report_year ? ` · ${reports[0].report_year}` : ""}
                   </p>
                   <p className="text-xs opacity-70">
-                    {reports[0].entries.length} indicators · {fmt(reportTotal(reports[0]))} total reported ·{" "}
+                    {reports[0].entries.length} indicators ·{" "}
                     {new Date(reports[0].created_at).toLocaleDateString()}
                   </p>
                 </div>
@@ -264,13 +266,6 @@ export default function DonorPortal({ userId }: { userId: string }) {
                           </tr>
                         ))}
                       </tbody>
-                      <tfoot>
-                        <tr>
-                          <td className="font-semibold">Total</td>
-                          <td className="text-right donor-kpi-number !text-base">{fmt(reportTotal(r))}</td>
-                          <td colSpan={2} />
-                        </tr>
-                      </tfoot>
                     </table>
                   </div>
                 ) : (

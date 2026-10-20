@@ -28,8 +28,8 @@ describe("choroplethCells", () => {
 
   it("gives the highest-count LGA the deepest blue", () => {
     const cells = choroplethCells(baseAgg);
-    const deep = cells.get("kano|gwale")!.fill;
-    const light = cells.get("kano|tarauni")!.fill;
+    const deep = cells.get("kano|gwale")?.fill ?? "";
+    const light = cells.get("kano|tarauni")?.fill ?? "";
     // lightness channel: deeper colour = lower lightness
     const l = (s: string) => Number(s.match(/(\d+)%\)/)?.[1]);
     expect(l(deep)).toBeLessThan(l(light));
@@ -46,6 +46,26 @@ describe("choroplethCells", () => {
   it("handles an empty LGA map without dividing by zero", () => {
     const cells = choroplethCells({ ...baseAgg, by_lga: {} });
     expect(cells.size).toBe(0);
+  });
+});
+
+describe("programme report export", () => {
+  const report: DonorReport = {
+    id: "report-1", period_label: "October", report_year: 2026,
+    notes: null, status: "pending", created_at: "2026-10-20T04:00:00Z",
+    entries: [
+      { indicator_code: "1.1", value: 12, disaggregation: { Male: 5, Female: 7 }, risk: 'Risk, with "quotes"' },
+      { indicator_code: "1.2", value: null, disaggregation: null, risk: null },
+    ],
+  };
+  it("preserves indicator values and treats missing values as zero", () => {
+    expect(reportTotal(report)).toBe(12);
+    expect(reportTotal({ ...report, entries: [] })).toBe(0);
+  });
+  it("exports disaggregations and quotes comma-containing risks without losing values", () => {
+    const csv = reportCsv(report);
+    expect(csv).toContain('1.1,12,Male: 5; Female: 7,"Risk, with ""quotes"""');
+    expect(csv).toContain("1.2,,,");
   });
 });
 

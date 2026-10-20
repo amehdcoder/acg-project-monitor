@@ -79,6 +79,21 @@ export async function loadDonorAggregates(projectId: string): Promise<DonorAggre
   return data as DonorAggregates;
 }
 
+/** Session-authenticated API; no integration key is placed in the browser. */
+export async function loadDonorDashboard(projectId: string): Promise<{
+  aggregates: DonorAggregates; activity: DonorActivityItem[];
+  reports: DonorReport[]; logframe: ProjectLogframe;
+}> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error("Please sign in again.");
+  const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/external-api/v1/dashboard?project_id=${encodeURIComponent(projectId)}`, {
+    headers: { Authorization: `Bearer ${session.access_token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+  });
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.error ?? "Could not load donor dashboard.");
+  return { ...body.data, logframe: body.data.logframe ?? defaultLogframe() };
+}
+
 export async function loadDonorFieldActivity(projectId: string, limit = 30): Promise<DonorActivityItem[]> {
   const { data, error } = await db.rpc("donor_field_activity", { _project_id: projectId, _limit: limit });
   if (error) throw new Error(error.message);

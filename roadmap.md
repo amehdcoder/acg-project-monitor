@@ -1,5 +1,8 @@
 # Roadmap
 
+- [ ] Complete automatic full Programme Report delivery, preserve payloads on retry, and verify report syncing.
+- [ ] Connect the donor dashboard to the authenticated Amehnities API and verify reports, downloads and access boundaries.
+
 - [x] Move Programme Report to the major tab between Beneficiary Records and Record Quality Brain; refine the reporting interface and verify isolated tab navigation and desktop/mobile layout.
 - [ ] Verify updated report navigation in the authenticated live workspace — managed preview session is immediately signed out; isolated form/tab tests passed.
 
