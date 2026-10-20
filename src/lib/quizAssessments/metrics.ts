@@ -10,7 +10,9 @@ export function participantAnalysis(rows:AssessmentResult[]){
  });
 }
 export function knowledgeByActivity(rows:AssessmentResult[],links:Record<string,string|null>,start:string,end:string){
- const inPeriod=participantAnalysis(rows).filter(p=>p.completed_at&&p.completed_at>=start&&p.completed_at<end&&links[p.quiz_id]&&p.gain!==null);
+ const eligible=participantAnalysis(rows.filter(r=>r.assessment_type==='pre_test'||(r.submitted_at>=start&&r.submitted_at<end))).filter(p=>p.completed_at&&links[p.quiz_id]&&p.gain!==null).sort((a,b)=>String(b.completed_at).localeCompare(String(a.completed_at)));
+ const unique=new Map<string,typeof eligible[number]>();for(const p of eligible){const key=`${links[p.quiz_id]}:${p.participant_key}`;if(!unique.has(key))unique.set(key,p);}
+ const inPeriod=[...unique.values()];
  const codes=[...new Set(inPeriod.map(p=>links[p.quiz_id]))];
  return Object.fromEntries(codes.map(code=>{const pairs=inPeriod.filter(p=>links[p.quiz_id]===code);return [code,{paired:pairs.length,improved:pairs.filter(p=>Number(p.gain)>0).length,mean_gain:pairs.reduce((sum,p)=>sum+Number(p.gain),0)/pairs.length}];}));
 }

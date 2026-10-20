@@ -239,7 +239,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
           const v = isKnowledge ? (metric ? Number((ind.isPercent ? metric.mean_gain : metric.improved).toFixed(2)) : undefined) : ind.autoKey ? values[ind.autoKey] : undefined;
           const existing = next[ind.code];
           if (v === undefined) {
-            if(isKnowledge && existing?.auto) next[ind.code] = {...existing,value:'',auto:false};
+            if(isKnowledge && existing?.auto) next[ind.code] = {...existing,value:'',auto:true};
             continue;
           }
           if (!existing || existing.auto) {

@@ -10,4 +10,5 @@ describe('Activity-bound knowledge reporting',()=>{
  it('never infers an activity for an unlinked quiz',()=>{expect(knowledgeByActivity([row('q','a','pre_test',40),row('q','a','post_test',80)],{},'2026-10-01','2026-11-01')).toEqual({});});
  it('includes prior pre-tests but excludes post-tests outside the report month',()=>{const rows=[row('q','a','pre_test',40,'2026-09-30'),row('q','a','post_test',80,'2026-10-20'),row('q','b','pre_test',50,'2026-10-20'),row('q','b','post_test',90,'2026-11-01')];expect(knowledgeByActivity(rows,{q:'A'},'2026-10-01','2026-11-01').A.improved).toBe(1);});
  it('never pairs a later pre-test with an earlier post-test',()=>{expect(participantAnalysis([row('q','a','pre_test',40,'2026-10-21'),row('q','a','post_test',80,'2026-10-20')])[0].gain).toBeNull();});
+ it('counts a participant only once across quizzes linked to the same activity',()=>{const rows=[row('q1','a','pre_test',40),row('q1','a','post_test',80),row('q2','a','pre_test',40),row('q2','a','post_test',90,'2026-10-21')];expect(knowledgeByActivity(rows,{q1:'A',q2:'A'},'2026-10-01','2026-11-01').A).toEqual({paired:1,improved:1,mean_gain:50});});
 });
