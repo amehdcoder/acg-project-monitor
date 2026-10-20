@@ -127,6 +127,13 @@
       "when": 1792469718582,
       "tag": "0017_complete_report_webhook_after_entries",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792470507642,
+      "tag": "0018_donor_reports_submitted_only",
+      "breakpoints": true
     }
   ]
 }
