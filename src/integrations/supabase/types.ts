@@ -11079,6 +11079,59 @@ export type Database = {
         }
         Relationships: []
       }
+      quiz_external_results: {
+        Row: {
+          assessment_type: string
+          cohort: string | null
+          designation: string | null
+          id: string
+          imported_by: string
+          lga: string | null
+          participant_key: string
+          participant_name: string
+          percentage: number
+          quiz_id: string
+          state: string | null
+          submitted_at: string
+        }
+        Insert: {
+          assessment_type: string
+          cohort?: string | null
+          designation?: string | null
+          id?: string
+          imported_by: string
+          lga?: string | null
+          participant_key: string
+          participant_name: string
+          percentage: number
+          quiz_id: string
+          state?: string | null
+          submitted_at: string
+        }
+        Update: {
+          assessment_type?: string
+          cohort?: string | null
+          designation?: string | null
+          id?: string
+          imported_by?: string
+          lga?: string | null
+          participant_key?: string
+          participant_name?: string
+          percentage?: number
+          quiz_id?: string
+          state?: string | null
+          submitted_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_external_results_quiz_id_fkey"
+            columns: ["quiz_id"]
+            isOneToOne: false
+            referencedRelation: "quizzes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quiz_kobo_archived_submissions: {
         Row: {
           answers: Json
@@ -11382,6 +11435,8 @@ export type Database = {
           pre_fail_message: string | null
           pre_pass_message: string | null
           project_id: string
+          source_platform: string | null
+          source_url: string | null
           time_limit_minutes: number | null
           title: string
           updated_at: string | null
@@ -11403,6 +11458,8 @@ export type Database = {
           pre_fail_message?: string | null
           pre_pass_message?: string | null
           project_id: string
+          source_platform?: string | null
+          source_url?: string | null
           time_limit_minutes?: number | null
           title: string
           updated_at?: string | null
@@ -11424,6 +11481,8 @@ export type Database = {
           pre_fail_message?: string | null
           pre_pass_message?: string | null
           project_id?: string
+          source_platform?: string | null
+          source_url?: string | null
           time_limit_minutes?: number | null
           title?: string
           updated_at?: string | null
@@ -14257,6 +14316,10 @@ export type Database = {
       has_standard_form: {
         Args: { _code: string; _user_id: string }
         Returns: boolean
+      }
+      import_quiz_questions: {
+        Args: { p_questions: Json; p_quiz_id: string }
+        Returns: number
       }
       increment_device_records: {
         Args: { _count: number; _device_row_id: string }

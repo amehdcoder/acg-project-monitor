@@ -1,0 +1,10 @@
+import {describe,it,expect} from 'vitest';
+import {detectQuestions,questionSchema,normalizeResults,detectColumns,platformFromUrl} from './import';
+import {assessmentSummary} from './metrics';
+describe('Assessment imports and comparisons',()=>{
+ it('detects Google quiz grading without inventing absent keys',()=>{const q=detectQuestions({items:[{title:'Question',questionItem:{question:{choiceQuestion:{type:'RADIO',options:[{value:'A'},{value:'B'}]},grading:{pointValue:2,correctAnswers:{answers:[{value:'B'}]}}}}}]});expect(q[0].correct_answer).toBe('B');expect(questionSchema.safeParse(q[0]).success).toBe(true);const missing=detectQuestions([{Question:'Q',options:['A','B']}]);expect(questionSchema.safeParse(missing[0]).success).toBe(false);});
+ it('maps exported pre/post scores to real percentages',()=>{const rows=[{Email:'a@b.org',Name:'A','Test type':'post','Total points':3,'Max score':4,Timestamp:'2026-10-20T04:00:00Z'}];const r=normalizeResults(rows,detectColumns(Object.keys(rows[0])));expect(r[0].percentage).toBe(75);expect(r[0].assessment_type).toBe('post_test');});
+ it('rejects invalid scores and missing dates',()=>{const map=detectColumns(['Email','Name','Test type','Percentage','Timestamp']);expect(()=>normalizeResults([{Email:'a',Name:'A','Test type':'pre',Percentage:101,Timestamp:'2026-10-20'}],map)).toThrow();});
+ it('compares paired people within the same quiz only',()=>{const r=(quiz_id:string,participant_key:string,assessment_type:string,percentage:number)=>({quiz_id,participant_key,participant_name:participant_key,assessment_type,percentage,submitted_at:'2026-10-20'});const s=assessmentSummary([r('q1','a','pre_test',40),r('q1','a','post_test',80),r('q2','a','pre_test',60),r('q2','b','post_test',90)]);expect(s.paired).toBe(1);expect(s.gain).toBe(40);expect(s.incomplete).toBe(2);});
+ it('rejects unsafe source protocols',()=>{expect(()=>platformFromUrl('javascript:alert(1)')).toThrow();expect(platformFromUrl('https://forms.office.com/r/abc')).toBe('Microsoft Forms');});
+});

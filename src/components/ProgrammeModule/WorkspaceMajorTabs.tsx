@@ -1,18 +1,20 @@
-import { Brain, BookOpenCheck, ClipboardList, Layers } from "lucide-react";
+import { Brain, BookOpenCheck, ClipboardList, Layers, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-export type MajorTab = "records" | "report" | "brain" | "guide";
+export type MajorTab = "records" | "report" | "assessments" | "brain" | "guide";
 
-export default function WorkspaceMajorTabs({ selected, canReport, canBrain, onSelect }: {
+export default function WorkspaceMajorTabs({ selected, canReport, canBrain, canAssessments = false, onSelect }: {
   selected: MajorTab;
   canReport: boolean;
   canBrain: boolean;
+  canAssessments?: boolean;
   onSelect: (tab: MajorTab) => void;
 }) {
   const tabs = [
     { key: "records", label: "Beneficiary records", icon: Layers, show: canBrain },
     { key: "report", label: "Programme report", icon: ClipboardList, show: canReport },
+    { key: "assessments", label: "Quizzes & assessments", icon: GraduationCap, show: canAssessments },
     { key: "brain", label: "Record quality brain", icon: Brain, show: canBrain },
     { key: "guide", label: "Field guide", icon: BookOpenCheck, show: canBrain },
   ] as const;

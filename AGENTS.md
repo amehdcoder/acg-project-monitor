@@ -1,8 +1,8 @@
 # Architecture rules
 
-- Keep major longitudinal workspace tabs separate from grouped record navigation, with Programme Report using the same project-scoped access gate — why: reporting is directly reachable without duplicating Overview entries or bypassing permissions.
+- Keep major longitudinal tabs separate from grouped navigation and project-gated — why: direct reporting without duplicate entries or permission bypass.
 - Dispatch CCFF paths to a standalone form-only shell before mounting workspace providers; use anonymous public-function requests and published QR origins — why: community visitors cannot enter records through form navigation, shared overlays, error states or editor-only links.
-- Filter the beneficiary workflow tour through the workspace's visible destinations, effective permissions and configured component list — why: guidance stays aligned with actual access and project forms without a separate permission system.
+- Filter tours by visible destinations, effective permissions and configured components — why: guidance matches access.
 - Hand Cards: protected standalone route rendering the same live record-backed document as exports; exports capture the naturally flowing front/back layouts with independent page aspect ratios; camera start/stop serialized with stale sessions cancelled, torch only when the running track supports it — why: consistent viewing/downloads, no public beneficiary data, no cropping or leaked cameras.
 - Route all DHIS2 reporting/dashboard imports through `health-exchange`; maps use bundled Nigeria LGA/State/National boundaries — why: secrets server-side, exact geography.
 - Revoke browser EXECUTE on SECURITY DEFINER trigger/internal functions; keep it only for RLS helpers and app-called RPCs — why: smaller attack surface.
@@ -19,3 +19,5 @@
 - Logframes: project JSON, staged editor, unique codes, Excel round-trip; referral completion = completed/all × 100, not cumulative — why: consistent reporting.
 - External integrations: project-scoped hashed `amk_` keys and HMAC webhooks, wake-on-enqueue + hourly retry; validate cursors and public HTTPS destinations, reject redirects — why: signed data, no browser credentials or internal destinations.
 - Donors: own Auth accounts, standalone login/signup/recovery; dashboard API uses donor RPCs/RLS + protected donor_viewers associations, never project assignments; local selection is not authorization; server risk totals — why: private aggregate-only dashboards. Report events follow entries; retries retain payloads.
+
+- Assessments reuse project-scoped QuizBuilder/server scoring; reviewed keys append atomically to unpublished quizzes; results pair by quiz + participant ID; caches are user-scoped — why: no guessed answers or cross-quiz pairing.
