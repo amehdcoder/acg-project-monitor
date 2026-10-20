@@ -44,6 +44,10 @@ import {
 } from "@/lib/programmeModule/livelihoodVerification";
 import LivelihoodAssessmentDialog from "./LivelihoodAssessmentDialog";
 import LivelihoodChecklistShowcase from "./LivelihoodChecklistShowcase";
+import LivelihoodAssessmentRegister from "./LivelihoodAssessmentRegister";
+import { gateFromAssessment, readGate } from "@/lib/programmeModule/graduation";
+import { offlineMutate } from "@/lib/programmeModule/offlineWrite";
+import { supabase } from "@/integrations/supabase/client";
 import LivelihoodVerificationDialog from "./LivelihoodVerificationDialog";
 import GeoCascadeFields from "./GeoCascadeFields";
 import { useFacilities } from "@/lib/programmeModule/facilities";
@@ -483,10 +487,18 @@ const LivelihoodPanel = ({
 
       <LivelihoodChecklistShowcase />
 
+      <LivelihoodAssessmentRegister
+        beneficiaries={beneficiaries}
+        assessed={byBeneficiary as never}
+        canAssess={canAssess || canManage}
+        onAssess={setAssessing}
+        onOpen={onOpenBeneficiary}
+      />
+
       {!opportunity && (
-        <Card className="p-10 text-center text-sm text-muted-foreground">
-          No livelihood opportunity set up yet. Add one with the number of places available and the
-          shortlist builds itself.
+        <Card className="p-6 text-center text-sm text-muted-foreground">
+          No livelihood opportunity set up yet. Assessments above still map and select households for the
+          Graduation pathway; add an opportunity with the number of places to build a ranked shortlist.
         </Card>
       )}
 
@@ -765,7 +777,22 @@ const LivelihoodPanel = ({
         existing={assessing ? byBeneficiary.get(assessing.id) : null}
         signals={assessing ? signalsFor(assessing) : undefined}
         opportunityId={opportunityId || null}
-        onSaved={() => void reloadAssessments()}
+        onSaved={(r) => {
+          void reloadAssessments();
+          const b = assessing;
+          if (!b || !r) return;
+          void (async () => {
+            const { data: auth } = await supabase.auth.getUser();
+            const profile = (b.profile || {}) as Record<string, unknown>;
+            const next = gateFromAssessment(r as never, readGate(profile), new Date().toISOString(), auth.user?.id);
+            try {
+              await offlineMutate({ table: "beneficiaries", action: "update", values: { profile: { ...profile, graduation: next } }, id: b.id });
+              toast({ title: next.status === "selected" ? `${b.full_name} selected for the Graduation pathway` : `${b.full_name} not selected`, description: next.status === "selected" ? "Delivery stages are now unlocked." : next.reason });
+            } catch (e) {
+              toast({ title: "Assessment saved, but pathway not updated", description: (e as Error).message, variant: "destructive" });
+            }
+          })();
+        }}
       />
 
       <LivelihoodVerificationDialog
