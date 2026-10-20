@@ -1,0 +1,2 @@
+ALTER POLICY "Donors view programme reports" ON public.programme_reports USING (public.is_donor_viewer(project_id) AND status IN ('submitted', 'resolved'));
+ALTER POLICY "Donors view programme report entries" ON public.programme_report_entries USING (EXISTS (SELECT 1 FROM public.programme_reports r WHERE r.id = programme_report_entries.report_id AND public.is_donor_viewer(r.project_id) AND r.status IN ('submitted', 'resolved')));

@@ -10,6 +10,7 @@
 //   /external-api/v1/reports
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { parseCursor } from './cursor.ts'
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
@@ -43,7 +44,7 @@ Deno.serve(async (req) => {
     if (denied) return json({ error: 'No donor access to this project' }, 403)
     const [activity, reports, logframe] = await Promise.all([
       client.rpc('donor_field_activity', { _project_id: projectId, _limit: 30 }),
-      client.from('programme_reports').select('id, period_label, report_year, notes, status, created_at, entries:programme_report_entries(indicator_code, value, disaggregation, risk)').eq('project_id', projectId).order('created_at', { ascending: false }),
+      client.from('programme_reports').select('id, period_label, report_year, notes, status, created_at, entries:programme_report_entries(indicator_code, value, disaggregation, risk)').eq('project_id', projectId).in('status', ['submitted', 'resolved']).order('created_at', { ascending: false }),
       client.from('programme_logframes').select('data').eq('project_id', projectId).maybeSingle(),
     ])
     if (activity.error || reports.error || logframe.error) return json({ error: 'Could not load programme data' }, 500)
@@ -104,10 +105,9 @@ Deno.serve(async (req) => {
         .limit(limit + 1)
       if (updatedSince && !Number.isNaN(Date.parse(updatedSince))) query = query.gte('updated_at', updatedSince)
       if (cursor) {
-        const [ts, id] = cursor.split('|')
-        if (ts && id && !Number.isNaN(Date.parse(ts))) {
-          query = query.or(`updated_at.gt.${ts},and(updated_at.eq.${ts},id.gt.${id})`)
-        }
+        const parsed = parseCursor(cursor)
+        if (!parsed) return json({ error: 'Invalid cursor' }, 400)
+        query = query.or(`updated_at.gt.${parsed.timestamp},and(updated_at.eq.${parsed.timestamp},id.gt.${parsed.id})`)
       }
       const { data, error } = await query
       if (error) return json({ error: error.message }, 500)
@@ -138,10 +138,9 @@ Deno.serve(async (req) => {
       if (from && !Number.isNaN(Date.parse(from))) query = query.gte('service_date', from)
       if (to && !Number.isNaN(Date.parse(to))) query = query.lte('service_date', to)
       if (cursor) {
-        const [ts, id] = cursor.split('|')
-        if (ts && id && !Number.isNaN(Date.parse(ts))) {
-          query = query.or(`created_at.gt.${ts},and(created_at.eq.${ts},id.gt.${id})`)
-        }
+        const parsed = parseCursor(cursor)
+        if (!parsed) return json({ error: 'Invalid cursor' }, 400)
+        query = query.or(`created_at.gt.${parsed.timestamp},and(created_at.eq.${parsed.timestamp},id.gt.${parsed.id})`)
       }
       const { data, error } = await query
       if (error) return json({ error: error.message }, 500)
@@ -201,6 +200,7 @@ Deno.serve(async (req) => {
         .from('programme_reports')
         .select('id, period_label, report_year, status, notes, created_at, reviewed_at, resolution_note, entries:programme_report_entries(indicator_code, value, disaggregation, risk, over_target_comment)')
         .eq('project_id', key.project_id)
+        .in('status', ['submitted', 'resolved'])
         .order('created_at', { ascending: false })
         .limit(100)
       if (error) return json({ error: error.message }, 500)
