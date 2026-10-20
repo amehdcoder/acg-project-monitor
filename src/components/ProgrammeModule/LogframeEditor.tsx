@@ -28,7 +28,7 @@ const TONE_CLS: Record<string, string> = {
 };
 
 const Field = ({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) => (
-  <div className={cn("min-w-0", className)}><Label className="text-[11px] font-semibold text-muted-foreground">{label}</Label><div className="mt-1">{children}</div></div>
+  <div className={cn("min-w-0", className)}><Label className="text-sm font-semibold text-muted-foreground">{label}</Label><div className="mt-1">{children}</div></div>
 );
 
 const STEPS = ["Project & impact", "Specific objectives", "Results & outcomes", "Indicators", "Activities", "Review"];
@@ -46,14 +46,14 @@ export default function LogframeEditor({ open, onOpenChange, value, onSave }: Pr
   const mutate = (fn: (d: ProjectLogframe) => void) => setLf((prev) => { const d = JSON.parse(JSON.stringify(prev)) as ProjectLogframe; fn(d); return d; });
 
   const targetInputs = (targets: (string | null)[], set: (i: number, v: string) => void) => (
-    <div className="grid grid-cols-4 gap-1.5">
+    <div className="logframe-targets grid grid-cols-4 gap-1.5">
       {[0, 1, 2, 3].map((i) => <Input key={i} aria-label={`Year ${i + 1} target`} placeholder={`Y${i + 1}`} value={targets[i] ?? ""} onChange={(e) => set(i, e.target.value)} className="h-9 px-2 text-xs" />)}
     </div>
   );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[92dvh] max-w-5xl flex-col gap-0 overflow-hidden p-0">
+      <DialogContent className="logframe-wizard flex h-[88dvh] max-h-[92dvh] max-w-5xl flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="border-b border-border px-5 pt-5 pb-3">
           <DialogTitle>Build programme logframe</DialogTitle>
           <DialogDescription>Step {step + 1} of {STEPS.length} · {STEPS[step]}</DialogDescription>

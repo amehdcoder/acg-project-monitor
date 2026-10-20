@@ -1506,3 +1506,6 @@ select option {
 
 .donor-nav.donor-nav-active:hover { background: hsl(var(--donor-navy-2)); color: hsl(var(--primary-foreground)); }
 .donor-portal .leaflet-container { background: hsl(var(--donor-ice)); }
+
+[role="dialog"].logframe-wizard { height: 88dvh; overflow: hidden !important; margin: 0; }
+.logframe-wizard .logframe-targets { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
