@@ -6,7 +6,8 @@ export function participantAnalysis(rows:AssessmentResult[]){
   const sorted=[...items].sort((a,b)=>Date.parse(b.submitted_at)-Date.parse(a.submitted_at));const post=sorted.find(r=>r.assessment_type==='post_test');
   const pre=sorted.find(r=>r.assessment_type==='pre_test'&&(!post||Date.parse(r.submitted_at)<=Date.parse(post.submitted_at)));
   const latest=post||pre||sorted[0];const gain=pre&&post?post.percentage-pre.percentage:null;
-  return {key,quiz_id:latest.quiz_id,participant_key:latest.participant_key,name:latest.participant_name,cohort:latest.cohort,pre:pre?.percentage??null,post:post?.percentage??null,gain,completed_at:post?.submitted_at??null,status:gain===null?'Incomplete':gain>0?'Improved':gain<0?'Declined':'Unchanged'};
+  const pick=(f:'cohort'|'state'|'lga'|'designation')=>latest[f]||sorted.find(r=>r[f])?.[f]||null;
+  return {key,quiz_id:latest.quiz_id,participant_key:latest.participant_key,name:latest.participant_name,cohort:pick('cohort'),state:pick('state'),lga:pick('lga'),designation:pick('designation'),pre:pre?.percentage??null,post:post?.percentage??null,gain,completed_at:post?.submitted_at??null,status:gain===null?'Incomplete':gain>0?'Improved':gain<0?'Declined':'Unchanged'};
  });
 }
 export function knowledgeByActivity(rows:AssessmentResult[],links:Record<string,string|null>,start:string,end:string){
