@@ -169,6 +169,13 @@
       "when": 1792474642724,
       "tag": "0023_external_assessment_sync",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1792474732738,
+      "tag": "0024_atomic_external_quiz_response_ingestion",
+      "breakpoints": true
     }
   ]
 }

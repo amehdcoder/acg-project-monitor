@@ -14770,6 +14770,10 @@ export type Database = {
         Args: { _other: string }
         Returns: string
       }
+      store_external_quiz_responses: {
+        Args: { p_responses: Json; p_sync_id: string }
+        Returns: number
+      }
       submit_bloomberg_validation: { Args: { _row: Json }; Returns: Json }
       submit_quiz_attempt: {
         Args: {
