@@ -6,13 +6,14 @@ export function livelihoodDisability(profile: Record<string, unknown>) {
   const wg = readWgResult(profile);
   const classified = classifyWg(wg?.answers ?? {});
   const values = [profile.disability_status, profile.disability, profile.disability_type,
-    profile.disability_types, profile.vulnerability_status].flatMap(v => Array.isArray(v) ? v : [v]);
+    profile.disability_types, profile.vulnerability_status, profile.vulnerability_factors].flatMap(v => Array.isArray(v) ? v : [v]);
   const registered = values.some(v => {
     if (v === true) return true;
     if (typeof v !== "string") return false;
     const s = v.trim().toLowerCase();
-    if (!s || /^(no\b|none\b|not\b|unknown\b|prefer\b)/.test(s)) return false;
-    return /^(yes\b|pwd\b)|person.*disability|difficulty|cannot|visual|hearing|physical|mobility|intellectual|communication|self.care|albinism/.test(s);
+    if (!s || /^(no\b|none\b|not\b|unknown\b|prefer\b|suspected\b)/.test(s)) return false;
+    if (profile.disability_status === "Suspected disability" && v !== profile.vulnerability_factors) return false;
+    return /^(yes\b|pwd\b)|disability identified|multiple disabilities|person.*disability|difficulty|cannot|visual|hearing|physical|mobility|intellectual|psychosocial|communication|self.care|albinism/.test(s);
   });
   const completed = !!wg && wgComplete(wg.answers);
   const severe = WG_DOMAINS.some(d => wg?.answers[d.key] === "cannot");

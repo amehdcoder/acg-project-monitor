@@ -30,6 +30,8 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { BeneficiaryRow } from "./types";
 import { livelihoodDisability } from "./livelihoodDisability";
+import { cachedRead, cacheSet, cacheGet } from "./offlineReadCache";
+import { offlineMutate, currentUserId } from "./offlineWrite";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as unknown as { from: (t: string) => any };
@@ -549,12 +551,17 @@ const recordSignals = (input: TargetingInput) => {
   const add: Partial<Record<DomainKey, number[]>> = {};
   const push = (d: DomainKey, v: number) => { (add[d] ||= []).push(clamp01(v)); };
 
-  const vuln = text(p.vulnerability_status ?? p.vulnerability);
+  const vuln = text([p.vulnerability_status, p.vulnerability, ...(Array.isArray(p.vulnerability_factors) ? p.vulnerability_factors : [p.vulnerability_factors])].filter(Boolean).join("; "));
   if (vuln.includes("extreme")) { push("economic", 1); reasons.push("Registered as extremely vulnerable."); }
   if (vuln.includes("displaced") || vuln.includes("idp")) { push("shocks", 0.9); reasons.push("Internally displaced."); }
   if (vuln.includes("female-headed")) { push("dependency", 0.8); reasons.push("Female-headed household."); }
   if (vuln.includes("child-headed")) { push("dependency", 1); reasons.push("Child-headed household."); }
   if (vuln.includes("elderly")) { push("dependency", 0.8); reasons.push("Elderly without a caregiver."); }
+  if (vuln.includes("limited livelihood")) { push("economic", 0.8); reasons.push("Registered household with limited livelihood."); }
+  if (vuln.includes("older person")) { push("dependency", 0.65); reasons.push("Registered older person."); }
+  if (vuln.includes("caregiver support")) { push("dependency", 0.8); reasons.push("Registered need for caregiver support."); }
+  if (vuln.includes("affected by ntd")) { push("disease", 0.45); reasons.push("Registered NTD-related vulnerability."); }
+  if (/(^|; )child(;|$)/.test(vuln)) { push("dependency", 0.7); reasons.push("Child — household-level support required."); }
 
   const occ = text(p.occupation);
   if (occ.includes("unemployed")) { push("economic", 1); reasons.push("Unemployed at registration."); }
@@ -1028,8 +1035,9 @@ export const useLivelihoodOpportunities = (projectId?: string) => {
   const load = useCallback(async () => {
     if (!projectId) { setRows([]); setLoading(false); return; }
     setLoading(true);
-    const { data } = await db.from("livelihood_opportunities")
-      .select("*").eq("project_id", projectId).order("created_at", { ascending: false });
+    const user = await currentUserId();
+    const { data } = await cachedRead<LivelihoodOpportunityRow[]>(`livelihood-opportunities:${user}:${projectId}`, () => db.from("livelihood_opportunities")
+      .select("*").eq("project_id", projectId).order("created_at", { ascending: false }));
     setRows((data as LivelihoodOpportunityRow[]) || []);
     setLoading(false);
   }, [projectId]);
@@ -1038,15 +1046,24 @@ export const useLivelihoodOpportunities = (projectId?: string) => {
   return { opportunities: rows, loading, reload: load };
 };
 
-export const useLivelihoodAssessments = (projectId?: string) => {
+export const useLivelihoodAssessments = (projectId?: string, opportunityId?: string) => {
   const [rows, setRows] = useState<LivelihoodAssessmentRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     if (!projectId) { setRows([]); setLoading(false); return; }
     setLoading(true);
-    const { data } = await db.from("livelihood_assessments")
-      .select("*").eq("project_id", projectId).order("created_at", { ascending: false }).limit(2000);
+    const user = await currentUserId();
+    const { data } = await cachedRead<LivelihoodAssessmentRow[]>(`livelihood-assessments:${user}:${projectId}`, async () => {
+      const all: LivelihoodAssessmentRow[] = [];
+      for (let from = 0; ; from += 1000) {
+        const r = await db.from("livelihood_assessments").select("*").eq("project_id", projectId)
+          .order("created_at", { ascending: false }).order("id").range(from, from + 999);
+        if (r.error) return { data: null, error: r.error };
+        all.push(...(r.data || [])); if ((r.data || []).length < 1000) break;
+      }
+      return { data: all, error: null };
+    });
     setRows((data as LivelihoodAssessmentRow[]) || []);
     setLoading(false);
   }, [projectId]);
@@ -1055,7 +1072,7 @@ export const useLivelihoodAssessments = (projectId?: string) => {
 
   /** Latest assessment per beneficiary. */
   const byBeneficiary = new Map<string, LivelihoodAssessmentRow>();
-  for (const r of rows) if (!byBeneficiary.has(r.beneficiary_id)) byBeneficiary.set(r.beneficiary_id, r);
+  for (const r of rows) if ((!opportunityId || r.opportunity_id === opportunityId) && !byBeneficiary.has(r.beneficiary_id)) byBeneficiary.set(r.beneficiary_id, r);
 
   return { assessments: rows, byBeneficiary, loading, reload: load };
 };
@@ -1071,7 +1088,7 @@ export const saveAssessment = async (payload: {
   decision?: string;
   decision_notes?: string | null;
 }) => {
-  const { data: auth } = await supabase.auth.getUser();
+  const user = await currentUserId();
   const row = {
     project_id: payload.project_id,
     module_id: payload.module_id || null,
@@ -1083,15 +1100,14 @@ export const saveAssessment = async (payload: {
     priority_band: payload.result.band,
     domain_scores: payload.result.domains,
     recommended_package: payload.result.package,
-    decision: payload.decision || "assessed",
+    decision: payload.decision || (payload.result.assessmentComplete && payload.result.consentGiven && !payload.result.protectionConcern && ["extreme", "high"].includes(payload.result.band) ? "selected" : "assessed"),
     decision_notes: payload.decision_notes || null,
-    assessed_by: auth.user?.id || null,
+    assessed_by: user || null,
   };
-  const q = payload.id
-    ? db.from("livelihood_assessments").update(row).eq("id", payload.id)
-    : db.from("livelihood_assessments").insert(row);
-  const { error } = await q;
-  if (error) throw error;
+  const saved = await offlineMutate({ table: "livelihood_assessments", action: payload.id ? "update" : "insert", id: payload.id, values: row });
+  const key = `livelihood-assessments:${user}:${payload.project_id}`;
+  const cached = await cacheGet<LivelihoodAssessmentRow[]>(key) ?? [];
+  await cacheSet(key, [{ ...row, id: saved.id, created_at: new Date().toISOString() }, ...cached.filter(r => r.id !== saved.id)]);
 };
 
 export const setAssessmentDecision = async (id: string, decision: string, notes?: string) => {
