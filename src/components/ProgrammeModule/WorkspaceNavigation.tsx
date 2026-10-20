@@ -11,7 +11,7 @@ export type WorkspaceView =
   | "brain"
   | "guide"
   | "assessments" | "report" | "dashboard" | "records" | "journey" | "facility" | "followups" | "households"
-  | "clusters" | "network" | "risk" | "casesearch" | "livelihood" | "safeguarding"
+  | "clusters" | "graduation" | "network" | "risk" | "casesearch" | "livelihood" | "safeguarding"
   | "safeguarding_dashboard" | "team" | "exchange" | "feedback";
 
 export interface WorkspaceNavItem {
