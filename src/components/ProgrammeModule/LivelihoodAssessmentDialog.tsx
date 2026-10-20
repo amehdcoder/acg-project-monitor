@@ -38,7 +38,7 @@ interface Props {
   /** Record-derived signals, so the score is never blank. */
   signals?: Omit<TargetingInput, "beneficiary" | "answers">;
   opportunityId?: string | null;
-  onSaved?: () => void;
+  onSaved?: (result: ReturnType<typeof scoreLivelihood>) => void;
 }
 
 const LivelihoodAssessmentDialog = ({
@@ -84,7 +84,7 @@ const LivelihoodAssessmentDialog = ({
         result,
       });
       toast({ title: "Assessment saved", description: `${beneficiary.full_name} scored ${result.vulnerability}/100.` });
-      onSaved?.();
+      onSaved?.(result);
       onOpenChange(false);
     } catch (e) {
       toast({

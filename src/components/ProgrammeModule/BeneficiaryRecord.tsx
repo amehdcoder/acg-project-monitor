@@ -431,6 +431,7 @@ const BeneficiaryRecord = ({
                 const lv = components.find((c) => componentKind(c.key, c.label) === "livelihood");
                 return lv ? (
                   <GraduationPathwayPanel
+                    projectId={projectId} moduleId={moduleId}
                     beneficiary={beneficiary} componentKey={lv.key} services={services}
                     onRecord={(k, name) => { setServiceComponent(k); setServiceDefault(name); setServiceOpen(true); }}
                     onChanged={() => { void reload(); onChanged(); }}

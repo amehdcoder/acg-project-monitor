@@ -1,6 +1,8 @@
 import VulnerabilityScore from "./VulnerabilityScore";
+import LivelihoodAssessmentDialog from "./LivelihoodAssessmentDialog";
+import type { LivelihoodAssessmentRow } from "@/lib/programmeModule/livelihood";
 import { useMemo, useState } from "react";
-import { CheckCircle2, Circle, Loader2, MapPin, Plus, ShieldCheck, UserCheck, XCircle } from "lucide-react";
+import { ClipboardCheck, Sparkles, CheckCircle2, Circle, Loader2, MapPin, Plus, ShieldCheck, UserCheck, XCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,12 +11,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
-  GraduationGate, SelectionStatus, SELECTION_STEPS, pathwayPercent, readGate, stageProgress,
+  GraduationGate, SelectionStatus, gateFromAssessment, SELECTION_STEPS, pathwayPercent, readGate, stageProgress,
 } from "@/lib/programmeModule/graduation";
 import type { BeneficiaryRow } from "@/lib/programmeModule/types";
 import { offlineMutate, currentUserId } from "@/lib/programmeModule/offlineWrite";
 
 interface Props {
+  projectId: string;
+  moduleId?: string;
   beneficiary: BeneficiaryRow;
   componentKey: string;
   services: { component_key?: string; service_name?: string | null; service_date?: string | null }[];
@@ -25,13 +29,39 @@ interface Props {
 const ORDER: SelectionStatus[] = ["mapped", "verified", "selected"];
 const STEP_ICON = { mapped: MapPin, verified: ShieldCheck, selected: UserCheck } as const;
 
-const GraduationPathwayPanel = ({ beneficiary, componentKey, services, onRecord, onChanged }: Props) => {
+const GraduationPathwayPanel = ({ projectId, moduleId, beneficiary, componentKey, services, onRecord, onChanged }: Props) => {
   const { toast } = useToast();
   const profile = (beneficiary.profile || {}) as Record<string, unknown>;
   const gate = readGate(profile);
   const [busy, setBusy] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState("");
+  const [assessOpen, setAssessOpen] = useState(false);
+  const [existing, setExisting] = useState<LivelihoodAssessmentRow | null>(null);
+  const [scoreKey, setScoreKey] = useState(0);
+
+  const openAssessment = async () => {
+    const { data } = await (supabase as unknown as { from: (t: string) => any }).from("livelihood_assessments")
+      .select("*").eq("beneficiary_id", beneficiary.id).order("created_at", { ascending: false }).limit(1);
+    setExisting((data?.[0] as LivelihoodAssessmentRow) ?? null);
+    setAssessOpen(true);
+  };
+
+  const applyAssessment = async (r: Parameters<typeof gateFromAssessment>[0]) => {
+    const { data: auth } = await supabase.auth.getUser();
+    const next = gateFromAssessment(r, gate, new Date().toISOString(), auth.user?.id);
+    try {
+      await offlineMutate({ table: "beneficiaries", action: "update", values: { profile: { ...profile, graduation: next } }, id: beneficiary.id });
+      toast({
+        title: next.status === "selected" ? "Selected for the Graduation pathway" : "Not selected",
+        description: next.status === "selected" ? `Vulnerability ${r.vulnerability}/100 — delivery stages are now unlocked.` : next.reason,
+      });
+    } catch (e) {
+      toast({ title: "Assessment saved, but pathway not updated", description: (e as Error).message, variant: "destructive" });
+    }
+    setScoreKey((k) => k + 1);
+    onChanged();
+  };
 
   const livelihood = useMemo(() => services.filter((s) => s.component_key === componentKey), [services, componentKey]);
   const progress = useMemo(() => stageProgress(livelihood), [livelihood]);
@@ -78,7 +108,23 @@ const GraduationPathwayPanel = ({ beneficiary, componentKey, services, onRecord,
           {selected && <span className="rounded-full bg-primary-foreground/20 px-3 py-1 text-xs font-bold">{pct}% complete</span>}
         </div>
       </div>
-      <div className="px-4 pt-3"><VulnerabilityScore beneficiaryId={beneficiary.id} /></div>
+      <div className="space-y-3 px-4 pt-3">
+        <button type="button" onClick={() => void openAssessment()}
+          className="group relative flex w-full items-center gap-3 overflow-hidden rounded-xl border border-health-teal/40 bg-gradient-to-r from-health-teal/10 via-health-blue/10 to-transparent p-3 text-left transition-all hover:shadow-md">
+          <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-health-teal text-primary-foreground">
+            <span className="absolute inset-0 animate-ping rounded-lg bg-health-teal/30" style={{ animationDuration: "2.5s" }} />
+            <ClipboardCheck className="relative h-5 w-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-1 text-sm font-semibold text-health-ink">Livelihood Needs Assessment <Sparkles className="h-3.5 w-3.5 text-health-amber" /></span>
+            <span className="block text-xs text-muted-foreground">Every beneficiary is eligible. Completing it maps and verifies the household; the vulnerability score decides selection.</span>
+          </span>
+          <span className="shrink-0 rounded-full bg-health-teal px-3 py-1 text-xs font-bold text-primary-foreground transition-transform group-hover:scale-105">{gate ? "Update" : "Fill form"}</span>
+        </button>
+        <VulnerabilityScore key={scoreKey} beneficiaryId={beneficiary.id} />
+      </div>
+      <LivelihoodAssessmentDialog open={assessOpen} onOpenChange={setAssessOpen} projectId={projectId} moduleId={moduleId}
+        beneficiary={beneficiary} existing={existing} onSaved={(r) => void applyAssessment(r)} />
 
       <div className="space-y-4 p-4">
         {/* Mapping → verification → selection */}
@@ -149,7 +195,7 @@ const GraduationPathwayPanel = ({ beneficiary, componentKey, services, onRecord,
             </ul>
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground">Delivery stages unlock once the household is selected for the Graduation pathway.</p>
+          <p className="text-xs text-muted-foreground">Delivery stages unlock once the Needs Assessment selects the household (extreme or high vulnerability, with consent). An officer can still override the decision above.</p>
         )}
       </div>
     </Card>
