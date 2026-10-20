@@ -100,8 +100,8 @@ export default function LivelihoodAssessmentRegister({ beneficiaries, assessed, 
                   </p>
                 </button>
                 <div className="flex items-center gap-2">
-                  {gate.status === "selected" && <Badge>Selected</Badge>}
-                  {gate.status === "not_selected" && <Badge variant="outline">Not selected</Badge>}
+                  {gate?.status === "selected" && <Badge>Selected</Badge>}
+                  {gate?.status === "not_selected" && <Badge variant="outline">Not selected</Badge>}
                   {a ? (
                     <Badge variant="secondary">Assessed{when ? ` ${new Date(when).toLocaleDateString()}` : ""}</Badge>
                   ) : (
