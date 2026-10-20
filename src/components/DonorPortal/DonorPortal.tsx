@@ -5,6 +5,7 @@ import {
   type DonorAggregates, type DonorActivityItem, type DonorGrant, type DonorReport,
 } from "@/lib/donorPortal";
 import type { ProjectLogframe } from "@/lib/programmeModule/logframe";
+import { flatIndicators } from "@/lib/programmeModule/logframe";
 import NigeriaChoropleth from "@/components/Dashboard/ops/NigeriaChoropleth";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +13,7 @@ import {
   AreaChart, Area, CartesianGrid, PieChart, Pie, Cell, Legend,
 } from "recharts";
 import { Users, HeartHandshake, Stethoscope, Home, ArrowRightLeft, MessageSquareHeart, LogOut, Download, FileText } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 function downloadReportCsv(report: DonorReport, projectName: string) {
   const blob = new Blob([reportCsv(report)], { type: "text/csv;charset=utf-8" });
@@ -32,7 +34,7 @@ const SECTIONS: { key: Section; label: string }[] = [
   { key: "activity", label: "Field Activity" },
 ];
 
-const PIE_COLORS = ["hsl(199 100% 42%)", "hsl(213 62% 30%)", "hsl(186 60% 45%)", "hsl(214 40% 55%)", "hsl(40 60% 55%)"];
+const PIE_COLORS = ["hsl(var(--donor-blue))", "hsl(var(--donor-navy-2))", "hsl(var(--health-teal))", "hsl(var(--chart-secondary))", "hsl(var(--status-warning))"];
 
 const fmt = (n: number | null | undefined) => (n ?? 0).toLocaleString();
 
@@ -48,12 +50,13 @@ export default function DonorPortal({ userId }: { userId: string }) {
 
   useEffect(() => {
     listDonorGrants(userId)
-      .then((g) => { setGrants(g); setProjectId(g[0]?.project_id ?? null); })
+      .then((g) => { setGrants(g); const saved = localStorage.getItem(`donor-project:${userId}`); setProjectId(g.find(item => item.project_id === saved)?.project_id ?? g[0]?.project_id ?? null); })
       .catch((e) => setError(e.message));
   }, [userId]);
 
   useEffect(() => {
     if (!projectId) return;
+    localStorage.setItem(`donor-project:${userId}`, projectId);
     setError(null);
     let active = true;
     setAgg(null); setActivity([]); setReports([]); setLogframe(null);
@@ -66,10 +69,11 @@ export default function DonorPortal({ userId }: { userId: string }) {
     void refresh();
     const timer = window.setInterval(() => { if (document.visibilityState === "visible") void refresh(); }, 60000);
     return () => { active = false; window.clearInterval(timer); };
-  }, [projectId]);
+  }, [projectId, userId]);
 
   const cells = useMemo(() => (agg ? choroplethCells(agg) : new Map()), [agg]);
   const project = grants?.find((g) => g.project_id === projectId);
+  const indicatorLookup = useMemo(() => new Map(logframe ? flatIndicators(logframe.objectives).map(i => [i.code, i]) : []), [logframe]);
 
   if (error) {
     return (
@@ -86,7 +90,7 @@ export default function DonorPortal({ userId }: { userId: string }) {
         <p className="donor-eyebrow">Amehnities · Donor Portal</p>
         <h1 className="donor-heading text-2xl">No project access yet</h1>
         <p className="max-w-md text-sm opacity-70">
-          Your account has not been granted donor access to a project. Please ask the programme team to add you as a donor viewer.
+          Your donor account is ready. Ask the programme team to connect your organisation to its project.
         </p>
         <Button variant="outline" onClick={() => void supabase.auth.signOut()}>Sign out</Button>
       </main>
@@ -103,16 +107,7 @@ export default function DonorPortal({ userId }: { userId: string }) {
           </div>
           <div className="ml-auto flex items-center gap-2">
             {grants && grants.length > 1 && (
-              <select
-                className="donor-select"
-                value={projectId ?? ""}
-                onChange={(e) => setProjectId(e.target.value)}
-                aria-label="Switch project"
-              >
-                {grants.map((g) => (
-                  <option key={g.id} value={g.project_id}>{g.project?.name ?? g.project_id}</option>
-                ))}
-              </select>
+              <Select value={projectId ?? ""} onValueChange={setProjectId}><SelectTrigger className="w-48" aria-label="Switch project"><SelectValue /></SelectTrigger><SelectContent>{grants.map(g => <SelectItem key={g.id} value={g.project_id}>{g.project?.name ?? "Project"}</SelectItem>)}</SelectContent></Select>
             )}
             <Button variant="ghost" size="sm" onClick={() => void supabase.auth.signOut()} aria-label="Sign out">
               <LogOut className="h-4 w-4" />
@@ -135,6 +130,7 @@ export default function DonorPortal({ userId }: { userId: string }) {
       <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6">
         {section === "overview" && agg && (
           <>
+            <section className="border-b border-border pb-5"><p className="donor-eyebrow">Programme intelligence</p><h2 className="donor-heading mt-2 text-2xl">Your impact, in focus</h2><p className="mt-2 text-sm opacity-70">{project?.organization || "Project portfolio"} · {reports.length} submitted reports · {Object.keys(agg.by_state).length} states reached</p></section>
             <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
               <Kpi icon={<Users />} label="People reached" value={fmt(agg.total_beneficiaries)} />
               <Kpi icon={<HeartHandshake />} label="Active in care" value={fmt(agg.active_beneficiaries)} />
@@ -142,6 +138,16 @@ export default function DonorPortal({ userId }: { userId: string }) {
               <Kpi icon={<Home />} label="Home visits" value={fmt(agg.home_visits_completed)} />
               <Kpi icon={<ArrowRightLeft />} label="Referrals" value={fmt(agg.referrals_total)} />
               <Kpi icon={<MessageSquareHeart />} label="Community feedback" value={fmt(agg.feedback_total)} />
+            </section>
+
+            <section aria-label="Programme risks" className="border-y border-border py-5">
+              <h2 className="donor-heading mb-4 text-lg">Care continuity & programme risks</h2>
+              <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">
+                <div><p className="donor-eyebrow">Referral completion</p><p className="donor-kpi-number mt-2">{agg.referral_completion_pct == null ? "—" : `${agg.referral_completion_pct}%`}</p><p className="mt-2 text-xs opacity-70">{fmt(agg.referrals_completed)} completed / {fmt(agg.referrals_total)} recorded</p></div>
+                <div><p className="text-sm font-medium text-status-warning">Overdue follow-ups</p><p className="donor-kpi-number mt-2">{fmt(agg.overdue_followups)}</p><p className="mt-2 text-xs opacity-70">Active care appointments past due</p></div>
+                <div><p className="text-sm font-medium text-status-danger">Overdue home visits</p><p className="donor-kpi-number mt-2">{fmt(agg.overdue_home_visits)}</p><p className="mt-2 text-xs opacity-70">Dispatched visits awaiting completion</p></div>
+                <div><p className="text-sm font-medium">Recorded risk levels</p><ul className="mt-2 space-y-1 text-sm">{Object.entries(agg.risk_by_level ?? {}).map(([level, count]) => <li key={level} className="flex justify-between gap-2"><span className="capitalize">{level}</span><span className="font-semibold">{fmt(count)}</span></li>)}</ul></div>
+              </div>
             </section>
 
             {reports.length > 0 && (
@@ -174,11 +180,11 @@ export default function DonorPortal({ userId }: { userId: string }) {
                 <h2 className="donor-heading mb-3 text-lg">Registrations over time</h2>
                 <ResponsiveContainer width="100%" height={240}>
                   <AreaChart data={mergeMonthly(agg.registrations_by_month)}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(210 30% 88%)" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--donor-border))" />
                     <XAxis dataKey="month" fontSize={11} />
                     <YAxis fontSize={11} allowDecimals={false} />
                     <Tooltip />
-                    <Area type="monotone" dataKey="count" stroke="hsl(199 100% 42%)" fill="hsl(199 100% 42% / 0.18)" name="Registrations" />
+                    <Area type="monotone" dataKey="count" stroke="hsl(var(--donor-blue))" fill="hsl(var(--donor-blue) / 0.18)" name="Registrations" />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -186,11 +192,11 @@ export default function DonorPortal({ userId }: { userId: string }) {
                 <h2 className="donor-heading mb-3 text-lg">Services over time</h2>
                 <ResponsiveContainer width="100%" height={240}>
                   <BarChart data={mergeMonthly(agg.services_by_month)}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(210 30% 88%)" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--donor-border))" />
                     <XAxis dataKey="month" fontSize={11} />
                     <YAxis fontSize={11} allowDecimals={false} />
                     <Tooltip />
-                    <Bar dataKey="count" fill="hsl(213 62% 30%)" radius={[4, 4, 0, 0]} name="Services" />
+                    <Bar dataKey="count" fill="hsl(var(--donor-navy-2))" radius={[4, 4, 0, 0]} name="Services" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -221,6 +227,7 @@ export default function DonorPortal({ userId }: { userId: string }) {
                 </PieChart>
               </ResponsiveContainer>
             </section>
+            <section className="border-t border-border pt-5"><div className="mb-3 flex items-center justify-between gap-3"><h2 className="donor-heading text-lg">Latest field activity</h2><Button variant="link" onClick={() => setSection("activity")}>View all</Button></div><ol className="donor-timeline">{activity.slice(0, 5).map((a, i) => <li key={i} className="donor-timeline-item"><span className={`donor-dot donor-dot-${a.kind}`} /><div><p className="text-sm font-medium">{a.summary}</p><p className="text-xs opacity-60">{[a.component, a.lga, a.state].filter(Boolean).join(" · ")} · {new Date(a.occurred_at).toLocaleDateString()}</p></div></li>)}</ol>{activity.length === 0 && <p className="text-sm opacity-70">No field activity recorded yet.</p>}</section>
           </>
         )}
 
@@ -255,8 +262,8 @@ export default function DonorPortal({ userId }: { userId: string }) {
                       <tbody>
                         {r.entries.map((e, i) => (
                           <tr key={i}>
-                            <td className="font-medium">{e.indicator_code}</td>
-                            <td className="text-right donor-kpi-number !text-base">{fmt(e.value)}</td>
+                            <td className="font-medium"><span className="donor-chip">{e.indicator_code}</span><p className="mt-1">{indicatorLookup.get(e.indicator_code)?.title}</p></td>
+                            <td className="text-right donor-kpi-number !text-base">{fmt(e.value)}{indicatorLookup.get(e.indicator_code)?.isPercent ? "%" : ""}</td>
                             <td className="text-xs opacity-80">
                               {e.disaggregation
                                 ? Object.entries(e.disaggregation).map(([k, v]) => `${k}: ${v}`).join(" · ")
@@ -296,9 +303,10 @@ export default function DonorPortal({ userId }: { userId: string }) {
                           <li key={ind.code} className="donor-indicator">
                             <span className="donor-chip">{ind.code}</span>
                             <span className="flex-1 text-sm">{ind.title}</span>
-                            {ind.totalTarget && <span className="text-xs font-semibold opacity-70">Target: {ind.totalTarget}</span>}
+                            {ind.totalTarget && <span className="text-xs font-semibold opacity-70">Target: {ind.totalTarget}{ind.isPercent ? "%" : ""}</span>}
                           </li>
                         ))}
+                        {res.activities.map(activity => <li key={activity.code} className="donor-indicator"><span className="donor-chip">{activity.code}</span><div className="flex-1"><p className="text-sm font-medium">{activity.title}</p><p className="text-xs opacity-70">{activity.indicator}</p></div></li>)}
                       </ul>
                     </div>
                   ))}

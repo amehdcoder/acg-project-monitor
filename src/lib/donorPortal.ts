@@ -32,6 +32,11 @@ export interface DonorAggregates {
   registrations_by_month: { month: string; count: number }[];
   home_visits_completed: number;
   referrals_total: number;
+  referrals_completed?: number;
+  referral_completion_pct?: number;
+  risk_by_level?: Record<string, number>;
+  overdue_followups?: number;
+  overdue_home_visits?: number;
   feedback_total: number;
 }
 
