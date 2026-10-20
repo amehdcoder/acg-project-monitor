@@ -1,5 +1,8 @@
 # Roadmap
 
+- [ ] Make Build Logframe generic with explicit Impact/Outcome/Output levels, editable verification, custom disaggregation options and arbitrary colours; preserve reports and Excel round-trip.
+- [ ] Build secure automatic external form ingestion and provider connection workflows; verify supported provider paths and state any authorization blockers.
+
 - [x] Add named participant progress/search/pagination, distributions, median scores, outcomes and participant Excel export; include native/imported/Kobo assessments.
 - [x] Link quizzes to exact training activity codes; reporting aggregates use post-test month and prior pre-tests; count improved people for count indicators, mean gain for percentage indicators; preserve manual entries.
 - [x] Verify live training link and report auto-fill (1 improved participant, 1 pair, 40 pp); 13 tests passed; temporary quiz removed. Existing map transition error remains outside this request.
