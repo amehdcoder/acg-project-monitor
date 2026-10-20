@@ -857,6 +857,8 @@ export interface ShortlistOptions {
   state?: string | null;
   lga?: string | null;
   ward?: string | null;
+  /** Explicit opportunity decisions override automated ranking. */
+  decisions?: Record<string, string>;
 }
 
 export interface ShortlistEntry {
@@ -905,6 +907,10 @@ export const buildShortlist = (
   const eligible: TargetingResult[] = [];
 
   for (const r of results) {
+    const decision = opts.decisions?.[r.beneficiaryId];
+    if (decision && !["assessed", "shortlisted", "selected"].includes(decision)) {
+      excluded.push({ result: r, why: `User decision: ${decision.replaceAll("_", " ")}` }); continue;
+    }
     const loc = locationOf?.(r) || {};
     if (opts.state && loc.state && loc.state !== opts.state) {
       excluded.push({ result: r, why: `Outside ${opts.state}` }); continue;
@@ -920,7 +926,6 @@ export const buildShortlist = (
       excluded.push({ result: r, why: "Safeguarding concern — refer before enrolling" }); continue;
     }
     if (!r.assessmentComplete) { excluded.push({ result: r, why: "Needs Assessment vulnerability domains are incomplete" }); continue; }
-    if (r.band === "low" || r.band === "moderate") { excluded.push({ result: r, why: "Below the high-vulnerability selection threshold" }); continue; }
     eligible.push(r);
   }
 
@@ -960,6 +965,11 @@ export const buildShortlist = (
     picked.push({ result: r, rank: picked.length + 1, basis: basisFor(r, basis) });
   };
 
+  // A recorded human selection takes precedence over score and inclusion floors.
+  for (const r of pool) {
+    if (opts.decisions?.[r.beneficiaryId] === "selected") take(r, "Selected by user");
+  }
+
   // 1. Reserve the inclusion floors with the most vulnerable who qualify.
   for (const r of pool) {
     if (picked.length >= target) break;
@@ -981,7 +991,6 @@ export const buildShortlist = (
 
   const waitlist = pool
     .filter((r) => !taken.has(r.beneficiaryId))
-    .slice(0, Math.max(5, Math.ceil(target * 0.3)))
     .map((r, i) => ({ result: r, rank: i + 1, basis: "Next in line if a place opens" }));
 
   const women = picked.filter((e) => e.result.female).length;

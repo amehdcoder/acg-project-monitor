@@ -87,10 +87,19 @@ const LivelihoodAssessmentDialog = ({
         opportunity_id: opportunityId || existing?.opportunity_id || null,
         answers,
         result,
-        decision: existing?.decision === "selected" && (!result.assessmentComplete || !result.consentGiven || result.protectionConcern || !["extreme", "high"].includes(result.band)) ? "assessed" : existing?.decision,
+        decision: existing?.decision,
+        decision_notes: existing?.decision_notes,
       });
       const profile = beneficiary.profile || {};
-      const gate = gateFromAssessment(result, readGate(profile), new Date().toISOString(), await currentUserId());
+      const assessmentOpportunity = opportunityId || existing?.opportunity_id || undefined;
+      const previous = readGate(profile);
+      const sameOpportunity = previous?.opportunity_id === assessmentOpportunity;
+      const gate = gateFromAssessment(result, sameOpportunity ? previous : null, new Date().toISOString(), await currentUserId());
+      if (existing && ["selected", "not_eligible", "declined", "waitlisted"].includes(existing.decision)) {
+        gate.status = existing.decision === "selected" ? "selected" : "not_selected";
+        gate.decision_source = "manual";
+        gate.reason = existing.decision_notes || `User decision: ${existing.decision.replaceAll("_", " ")}`;
+      }
       await offlineMutate({ table: "beneficiaries", action: "update", id: beneficiary.id,
         values: { profile: { ...profile, graduation: { ...gate, opportunity_id: opportunityId || existing?.opportunity_id || undefined } } } });
       toast({ title: "Assessment & Graduation pathway saved", description: `${beneficiary.full_name} scored ${result.vulnerability}/100 · ${gate.status.replace("_", " ")}.` });

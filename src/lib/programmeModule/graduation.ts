@@ -15,6 +15,7 @@ export interface GraduationGate {
   vulnerability_band?: string;
   evidence_reasons?: string[];
   opportunity_id?: string;
+  decision_source?: "manual" | "assessment";
 }
 
 export const SELECTION_STEPS: { value: SelectionStatus; label: string; hint: string }[] = [
@@ -103,6 +104,9 @@ export function gateFromAssessment(
   r: { vulnerability: number; band: "extreme" | "high" | "moderate" | "low"; consentGiven: boolean; protectionConcern?: boolean; assessmentComplete?: boolean; reasons?: string[] },
   prev: GraduationGate | null, now: string, userId?: string,
 ): GraduationGate {
+  if (prev?.decision_source === "manual" && (prev.status === "selected" || prev.status === "not_selected")) {
+    return { ...prev, vulnerability_score: r.vulnerability, vulnerability_band: r.band, evidence_reasons: r.reasons };
+  }
   const selected = r.consentGiven && !r.protectionConcern && r.assessmentComplete !== false && (r.band === "extreme" || r.band === "high");
   const reason = selected ? undefined
     : !r.consentGiven ? "Did not consent to the livelihood assessment"
@@ -114,7 +118,7 @@ export function gateFromAssessment(
     mapped_at: prev?.mapped_at || now,
     verified_at: r.assessmentComplete === false ? prev?.verified_at : prev?.verified_at || now,
     decided_at: r.assessmentComplete === false ? prev?.decided_at : now,
-    reason, updated_by: userId,
+    reason, updated_by: userId, decision_source: "assessment",
     vulnerability_score: r.vulnerability, vulnerability_band: r.band, evidence_reasons: r.reasons,
   };
 }
