@@ -475,6 +475,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
             </div>
             <p className="mt-2 text-base font-semibold leading-relaxed text-foreground">{ind.title}</p>
             {ind.mov && <p className="mt-0.5 text-xs text-muted-foreground">MoV: {ind.mov}</p>}
+            {/change.*knowledge/i.test(ind.title) && <div className="mt-2 border-l-2 border-health-teal pl-3 text-sm text-health-teal">{knowledgeMetrics[ind.code] ? <><span className="font-semibold">{knowledgeMetrics[ind.code].improved} improved · {knowledgeMetrics[ind.code].paired} matched participants</span><p>Mean gain {Number(knowledgeMetrics[ind.code].mean_gain).toFixed(1)} pp · {knowledgeMetrics[ind.code].quiz_count} linked assessments · {period}</p><p>{ind.isPercent ? 'Value: mean knowledge gain (percentage points).' : 'Value: number of participants whose knowledge score improved.'}</p></> : <span>No matched results for this activity and reporting period. Link its assessment under Quizzes & assessments.</span>}</div>}
           </div>
           <div className="flex w-full flex-col gap-2 border-t border-border/60 pt-3 xl:w-auto xl:items-end xl:border-0 xl:pt-0">
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -649,6 +650,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
         </div>
         )}
       </section>
+      {knowledgeError && <p role="alert" className="text-sm text-destructive">{knowledgeError}</p>}
 
       {view === "entry" && (<>
       <div className="flex flex-wrap items-center gap-3">
