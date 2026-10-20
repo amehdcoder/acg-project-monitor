@@ -4,6 +4,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import type { AutoKey } from "./logframe";
+import { referralCompletionPercent } from "./referralMetrics";
 
 const db = supabase as unknown as {
   from: (t: string) => any; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -69,7 +70,7 @@ export const aggregateIndicators = async (
 
   const completed = refList.filter((r) => r.status === "completed").length;
   out.completed_referrals = completed;
-  out.referral_completion = refList.length > 0 ? Math.round((completed / refList.length) * 100) / 100 : 0;
+  out.referral_completion = referralCompletionPercent(completed, refList.length);
 
   const resolved = fbList.filter((f) => f.status === "resolved" || f.status === "closed").length;
   out.ccfm_cases = fbList.length;

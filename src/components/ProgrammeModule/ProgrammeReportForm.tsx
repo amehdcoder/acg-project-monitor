@@ -434,7 +434,8 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
     const yearIdx = Math.min(Math.max(Number(reportYear) - 1, 0), 3);
     const yearTarget = numericTarget(ind.targets[yearIdx]);
     const totalTarget = numericTarget(ind.totalTarget);
-    const cumulative = cumulativeFor(ind.code);
+    // A completion rate is a point-in-time ratio, not a sum across reports.
+    const cumulative = ind.autoKey === "referral_completion" ? Number(draft?.value || 0) : cumulativeFor(ind.code);
     const pct = yearTarget && yearTarget > 0 ? Math.min(100, Math.round((cumulative / yearTarget) * 100)) : null;
     const t = TONES[tone];
     const valueNum = Number(draft?.value);
@@ -483,10 +484,13 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
 
         <div className="mt-5 grid gap-5 lg:grid-cols-[200px_1fr]">
           <div>
-            <Label htmlFor={`report-value-${ind.code}`} className="text-sm font-medium text-foreground">Value this period{ind.isPercent ? " (% / proportion)" : ""}</Label>
+            <Label htmlFor={`report-value-${ind.code}`} className="text-sm font-medium text-foreground">Value this period{ind.isPercent ? " (%)" : ""}</Label>
             <Input
               id={`report-value-${ind.code}`}
               type="number"
+              min={ind.autoKey === "referral_completion" ? 0 : undefined}
+              max={ind.autoKey === "referral_completion" ? 100 : undefined}
+              step="any"
               value={draft?.value || ""}
               onChange={(e) => setDraft(ind.code, { value: e.target.value, auto: false })}
               placeholder={ind.autoKey ? "Auto from records" : "Enter value"}
@@ -578,7 +582,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
                 </Button>
               )}
               <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setEditorOpen(true)}>
-                <Pencil className="h-4 w-4" /> Edit framework
+                <Pencil className="h-4 w-4" /> Build logframe
               </Button>
               <Button variant="outline" size="sm" className="gap-1.5 border-health-teal/40 text-health-teal" onClick={() => void handleExportExcel()}>
                 <FileSpreadsheet className="h-4 w-4" /> Export Logframe Template

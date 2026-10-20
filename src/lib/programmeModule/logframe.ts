@@ -225,8 +225,8 @@ export const LOGFRAME: LogframeObjective[] = [
             title: "Referral completion rate among identified cases",
             mov: "DHIS2 reports, referral tracking records",
             baseline: "0",
-            targets: ["0", "0.3", "0.6", "0.8"],
-            totalTarget: "0.8",
+            targets: ["0", "30", "60", "80"],
+            totalTarget: "80",
             disaggregation: ["Sex", "Age band", "Disease condition", "Services"],
             autoKey: "referral_completion",
             isPercent: true,
@@ -512,7 +512,7 @@ export const flatIndicators = (objectives: LogframeObjective[] = LOGFRAME): Flat
 
 export const numericTarget = (raw?: string | null): number | null => {
   if (!raw) return null;
-  const cleaned = raw.replace(/,/g, "").trim();
+  const cleaned = raw.replace(/[,٪%]/g, "").trim();
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : null;
 };

@@ -10,7 +10,18 @@ const db = supabase as unknown as { from: (t: string) => any }; // eslint-disabl
 export async function loadProjectLogframe(projectId: string): Promise<ProjectLogframe> {
   const { data } = await cachedRead<{ data: unknown }>(`logframe:${projectId}`, () => db.from("programme_logframes").select("data").eq("project_id", projectId).maybeSingle());
   const lf = data?.data as ProjectLogframe | undefined;
-  if (lf && Array.isArray(lf.objectives) && lf.project) return lf;
+  if (lf && Array.isArray(lf.objectives) && lf.project) {
+    // Upgrade only the exact legacy bundled referral targets; custom values stay intact.
+    for (const objective of lf.objectives) for (const result of objective.results) {
+      for (const indicator of result.indicators) {
+        if (indicator.autoKey === "referral_completion" && JSON.stringify(indicator.targets) === JSON.stringify(["0", "0.3", "0.6", "0.8"]) && indicator.totalTarget === "0.8") {
+          indicator.targets = ["0", "30", "60", "80"];
+          indicator.totalTarget = "80";
+        }
+      }
+    }
+    return lf;
+  }
   return defaultLogframe();
 }
 
