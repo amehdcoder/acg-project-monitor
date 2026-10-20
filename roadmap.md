@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Allow manual livelihood selection regardless of vulnerability band; fill spare opportunity places with lower-scoring recommendations and preserve user decisions across reassessment; verify tests and live flow.
+
 - [x] Strengthen livelihood recommendations with registration, WG-SS, clinical/visit evidence; scope assessments per opportunity, link decisions/services to Graduation. Verified 14 tests and live temporary assessment → score/WG evidence → Overview → full record; all assessment dropdowns exercised; test data removed.
 
 - [x] Make Build Logframe generic with explicit Impact/Outcome/Output levels, editable verification, custom disaggregation options and arbitrary colours; preserve reports and Excel round-trip.

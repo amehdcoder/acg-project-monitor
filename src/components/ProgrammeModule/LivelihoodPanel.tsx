@@ -45,7 +45,7 @@ import LivelihoodAssessmentDialog from "./LivelihoodAssessmentDialog";
 import LivelihoodChecklistShowcase from "./LivelihoodChecklistShowcase";
 import LivelihoodAssessmentRegister from "./LivelihoodAssessmentRegister";
 import { gateFromAssessment, readGate } from "@/lib/programmeModule/graduation";
-import { offlineMutate } from "@/lib/programmeModule/offlineWrite";
+import { offlineMutate, currentUserId } from "@/lib/programmeModule/offlineWrite";
 import { supabase } from "@/integrations/supabase/client";
 import LivelihoodVerificationDialog from "./LivelihoodVerificationDialog";
 import GeoCascadeFields from "./GeoCascadeFields";
@@ -226,6 +226,7 @@ const LivelihoodPanel = ({
       state: opportunity.state,
       lga: opportunity.lga,
       ward: opportunity.ward,
+      decisions: Object.fromEntries([...byBeneficiary].map(([id, row]) => [id, row.decision])),
     }, (r) => {
       const b = locationById.get(r.beneficiaryId);
       const ans = (byBeneficiary.get(r.beneficiaryId)?.answers as Record<string, unknown>) || {};
@@ -288,6 +289,7 @@ const LivelihoodPanel = ({
   };
 
   const decide = async (beneficiaryId: string, decision: string) => {
+    if (!canManage) return;
     const row = byBeneficiary.get(beneficiaryId);
     if (!row) {
       toast({
@@ -299,8 +301,8 @@ const LivelihoodPanel = ({
     const b = locationById.get(beneficiaryId);
     const result = results.find(r => r.beneficiaryId === beneficiaryId);
     if (!b || !result) return;
-    if (decision === "selected" && (!evidence.ready || !outcome?.selected.some(e => e.result.beneficiaryId === beneficiaryId))) {
-      toast({ title: "Selection needs review", description: "Only complete, consenting, high-vulnerability assessments within the opportunity’s available places can be selected.", variant: "destructive" }); return;
+    if (decision === "selected" && (!evidence.ready || !result.assessmentComplete || !result.consentGiven || result.protectionConcern)) {
+      toast({ title: "Selection needs review", description: "Complete the assessment, confirm consent and resolve any safeguarding concern before enrolment. Vulnerability score does not prevent selection.", variant: "destructive" }); return;
     }
     try {
       await setAssessmentDecision(row.id, decision);
@@ -309,7 +311,7 @@ const LivelihoodPanel = ({
       const prev = readGate(profile);
       const gate = { ...gateFromAssessment(result, prev, now),
         status: decision === "selected" ? "selected" : decision === "not_eligible" || decision === "declined" ? "not_selected" : "mapped",
-        opportunity_id: opportunityId,
+        opportunity_id: opportunityId, decision_source: "manual" as const, updated_by: await currentUserId(), decided_at: now,
         reason: decision === "selected" ? undefined : `Opportunity decision: ${decision.replace("_", " ")}` };
       await offlineMutate({ table: "beneficiaries", action: "update", id: b.id, values: { profile: { ...profile, graduation: gate } } });
       await reloadAssessments(); onChanged?.();
