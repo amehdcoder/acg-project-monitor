@@ -20,6 +20,7 @@ interface NigeriaChoroplethProps {
   selectedLga?: string;
   /** Reference basemap labels on/off. */
   showBasemap?: boolean;
+  showStreetView?: boolean;
   className?: string;
   /**
    * Fires when a boundary is clicked so the dashboard can drill down to that
@@ -41,6 +42,7 @@ export default function NigeriaChoropleth({
   selectedState = "All",
   selectedLga = "All",
   showBasemap = true,
+  showStreetView = true,
   className,
   onSelectUnit,
 }: NigeriaChoroplethProps) {
@@ -76,7 +78,7 @@ export default function NigeriaChoropleth({
         }
         map.setView([9.082, 8.6753], 6);
         mapRef.current = map;
-        attachSv(map);
+        if (showStreetView) attachSv(map);
         setTimeout(() => { try { map.invalidateSize(); } catch { /* noop */ } }, 0);
         setTick((t) => t + 1);
       } catch (e) { console.warn("Choropleth init failed", e); }
@@ -92,7 +94,7 @@ export default function NigeriaChoropleth({
       return () => ro.disconnect();
     }
     init();
-  }, [showBasemap]);
+  }, [showBasemap, showStreetView]);
 
   useEffect(() => () => { if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } }, []);
 
@@ -189,7 +191,7 @@ export default function NigeriaChoropleth({
   return (
     <>
       <div ref={containerRef} className={className} style={{ width: "100%", height }} />
-      {streetViewPanel}
+      {showStreetView && streetViewPanel}
     </>
   );
 }
