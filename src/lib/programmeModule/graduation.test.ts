@@ -38,3 +38,15 @@ describe("graduationOverview", () => {
     expect(o.totals.avgPercent).toBe(100);
   });
 });
+
+import { gateFromAssessment } from "./graduation";
+describe("gateFromAssessment", () => {
+  it("selects extreme/high vulnerability with consent", () => {
+    expect(gateFromAssessment({ vulnerability: 80, band: "extreme", consentGiven: true }, null, "t").status).toBe("selected");
+    expect(gateFromAssessment({ vulnerability: 62, band: "high", consentGiven: true }, null, "t").status).toBe("selected");
+  });
+  it("does not select moderate/low or non-consenting households", () => {
+    expect(gateFromAssessment({ vulnerability: 40, band: "moderate", consentGiven: true }, null, "t").status).toBe("not_selected");
+    expect(gateFromAssessment({ vulnerability: 90, band: "extreme", consentGiven: false }, null, "t").status).toBe("not_selected");
+  });
+});

@@ -89,3 +89,20 @@ export function graduationOverview(
     totals: { tracked: participants.length, selected: selected.length, notSelected: reached(p => p.status === "not_selected"), unmapped: reached(p => p.status === "unmapped"), avgPercent: selected.length ? Math.round(selected.reduce((a, p) => a + p.percent, 0) / selected.length) : 0, graduated: counts[counts.length - 1].count },
   };
 }
+
+/** Selection decided by the Needs Assessment: completing it maps & verifies the
+ * household; extreme/high vulnerability with consent selects it. */
+export function gateFromAssessment(
+  r: { vulnerability: number; band: "extreme" | "high" | "moderate" | "low"; consentGiven: boolean; protectionConcern?: boolean },
+  prev: GraduationGate | null, now: string, userId?: string,
+): GraduationGate {
+  const selected = r.consentGiven && (r.band === "extreme" || r.band === "high");
+  const reason = selected ? undefined
+    : !r.consentGiven ? "Did not consent to the livelihood assessment"
+    : `Needs Assessment score ${r.vulnerability}/100 (${r.band}) is below the selection threshold`;
+  return {
+    ...(prev || {}), status: selected ? "selected" : "not_selected",
+    mapped_at: prev?.mapped_at || now, verified_at: prev?.verified_at || now, decided_at: now,
+    reason, updated_by: userId,
+  };
+}
