@@ -98,7 +98,7 @@ const LivelihoodAssessmentDialog = ({
       if (existing && ["selected", "not_eligible", "declined", "waitlisted"].includes(existing.decision)) {
         gate.status = existing.decision === "selected" ? "selected" : "not_selected";
         gate.decision_source = "manual";
-        gate.reason = existing.decision_notes || `User decision: ${existing.decision.replaceAll("_", " ")}`;
+        gate.reason = existing.decision_notes || `User decision: ${existing.decision.replace(/_/g, " ")}`;
       }
       await offlineMutate({ table: "beneficiaries", action: "update", id: beneficiary.id,
         values: { profile: { ...profile, graduation: { ...gate, opportunity_id: opportunityId || existing?.opportunity_id || undefined } } } });

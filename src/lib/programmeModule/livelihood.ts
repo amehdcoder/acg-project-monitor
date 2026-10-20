@@ -909,7 +909,7 @@ export const buildShortlist = (
   for (const r of results) {
     const decision = opts.decisions?.[r.beneficiaryId];
     if (decision && !["assessed", "shortlisted", "selected"].includes(decision)) {
-      excluded.push({ result: r, why: `User decision: ${decision.replaceAll("_", " ")}` }); continue;
+      excluded.push({ result: r, why: `User decision: ${decision.replace(/_/g, " ")}` }); continue;
     }
     const loc = locationOf?.(r) || {};
     if (opts.state && loc.state && loc.state !== opts.state) {
