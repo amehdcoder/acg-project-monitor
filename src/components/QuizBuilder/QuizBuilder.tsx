@@ -39,6 +39,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import QuizTaker from "./QuizTaker";
+import ExternalQuizImport from "./ExternalQuizImport";
+import AssessmentDashboard from "./AssessmentDashboard";
 import QuizAnalytics from "./QuizAnalytics";
 import QuizOpenedDialog from "./QuizOpenedDialog";
 
@@ -71,9 +73,11 @@ interface Quiz {
   post_pass_message: string | null;
   post_fail_message: string | null;
   created_at: string;
+  source_url?: string | null;
+  source_platform?: string | null;
 }
 
-const QuizBuilder = () => {
+const QuizBuilder = ({ projectId }: { projectId?: string } = {}) => {
   const { user, isAdmin, isOwner } = useAuth();
   const [confirmDeleteQuiz, setConfirmDeleteQuiz] = useState<Quiz | null>(null);
   const [confirmClearQuiz, setConfirmClearQuiz] = useState<Quiz | null>(null);
@@ -94,7 +98,7 @@ const QuizBuilder = () => {
   // New quiz form
   const [newTitle, setNewTitle] = useState("");
   const [newDesc, setNewDesc] = useState("");
-  const [newProjectId, setNewProjectId] = useState("");
+  const [newProjectId, setNewProjectId] = useState(projectId || "");
   const [newPostTestDate, setNewPostTestDate] = useState<Date | undefined>(undefined);
   const [newPostTestTime, setNewPostTestTime] = useState("09:00");
   const [newTimeLimit, setNewTimeLimit] = useState<number | "">("");
@@ -235,15 +239,28 @@ const QuizBuilder = () => {
   useEffect(() => {
     fetchQuizzes();
     if (isAdmin) fetchProjects();
-  }, [isAdmin]);
+  }, [isAdmin, projectId, user?.id]);
 
   const fetchProjects = async () => {
-    const { data } = await supabase.from("projects").select("id, name").order("name");
+    let query = supabase.from("projects").select("id, name").order("name");
+    if (projectId) query = query.eq("id", projectId);
+    const { data } = await query;
     if (data) setProjects(data);
   };
 
   const fetchQuizzes = async () => {
     setLoading(true);
+    setSelectedQuiz(null); setShowAnalytics(null); setShowTaker(null); setQuestions([]);
+    setNewProjectId(projectId || "");
+    if (!user) { setQuizzes([]); setLoading(false); return; }
+    if (projectId) {
+      let query = supabase.from("quizzes").select("*").eq("project_id", projectId).order("created_at", { ascending: false });
+      if (!isAdmin) query = query.eq("is_published", true);
+      const { data, error } = await query;
+      setQuizzes((data || []) as Quiz[]);
+      if(error) toast({title:"Could not load project assessments",description:error.message,variant:"destructive"});
+      setLoading(false); return;
+    }
     if (isAdmin) {
       const { data, error } = await supabase
         .from("quizzes")
@@ -259,13 +276,13 @@ const QuizBuilder = () => {
       const { data: assignments } = await supabase
         .from("quiz_user_assignments")
         .select("quiz_id")
-        .eq("user_id", user!.id);
+        .eq("user_id", user?.id || "");
       (assignments || []).forEach((a) => a.quiz_id && quizIds.add(a.quiz_id));
 
       const { data: projAssignments } = await supabase
         .from("user_project_assignments")
         .select("project_id")
-        .eq("user_id", user!.id);
+        .eq("user_id", user?.id || "");
       const projectIds = [...new Set((projAssignments || []).map((p) => p.project_id).filter(Boolean))];
 
       let projectQuizzes: Quiz[] = [];
@@ -329,8 +346,8 @@ const QuizBuilder = () => {
     const { data, error } = await supabase.from("quizzes").insert({
       title: newTitle.trim(),
       description: newDesc.trim() || null,
-      project_id: newProjectId,
-      created_by: user!.id,
+      project_id: projectId || newProjectId,
+      created_by: user?.id || "",
       post_test_delay_days: delayDays,
       post_test_datetime: postTestDt.toISOString(),
       time_limit_minutes: newTimeLimit || null,
@@ -342,7 +359,7 @@ const QuizBuilder = () => {
     }
     toast({ title: "Quiz created!" });
     setShowCreateDialog(false);
-    setNewTitle(""); setNewDesc(""); setNewProjectId(""); setNewPostTestDate(undefined); setNewPostTestTime("09:00"); setNewTimeLimit(""); setNewPassingScore(70);
+    setNewTitle(""); setNewDesc(""); setNewProjectId(projectId || ""); setNewPostTestDate(undefined); setNewPostTestTime("09:00"); setNewTimeLimit(""); setNewPassingScore(70);
     fetchQuizzes();
     if (data) {
       setSelectedQuiz(data as Quiz);
@@ -492,7 +509,7 @@ const QuizBuilder = () => {
           ...clonable,
           title: `${original.title} · ${targetName}`,
           project_id: copyTargetProject,
-          created_by: user!.id,
+          created_by: user?.id || "",
           is_published: false,
           open_test_type: null,
         })
@@ -530,7 +547,7 @@ const QuizBuilder = () => {
           target_project_id: copyTargetProject,
           target_project_name: targetName,
           source_quiz_title: original.title,
-          copied_by: user!.id,
+          copied_by: user?.id || "",
           copied_by_email: user!.email ?? null,
         });
       } catch (auditErr) {
@@ -892,7 +909,7 @@ const QuizBuilder = () => {
       .select("user_id, role");
 
     const adminIds = new Set((roles || []).filter(r => r.role === "super_admin" || r.role === "systems_admin").map(r => r.user_id));
-    const nonAdminProfiles = (profiles || []).filter(p => !adminIds.has(p.user_id) && p.user_id !== user!.id);
+    const nonAdminProfiles = (profiles || []).filter(p => !adminIds.has(p.user_id) && p.user_id !== user?.id || "");
     setAllUsers(nonAdminProfiles);
 
     // Fetch current assignments
@@ -960,7 +977,7 @@ const QuizBuilder = () => {
         <QuizOpenedDialog quizzes={quizzes} onTake={(q) => setShowTaker(q as Quiz)} />
       )}
 
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-fuchsia-600 to-amber-500 p-5 shadow-lg sm:p-6">
+      {projectId ? <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border py-4"><div className="flex items-center gap-3"><BookOpen className="h-8 w-8 text-health-teal"/><h1 className="font-report-display text-2xl font-bold text-health-ink">Project assessments</h1></div>{isAdmin && <Button onClick={()=>setShowCreateDialog(true)} className="gap-2"><Plus className="h-4 w-4"/>Create quiz</Button>}</div> : <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-fuchsia-600 to-amber-500 p-5 shadow-lg sm:p-6">
         <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/15 blur-2xl" />
         <div className="pointer-events-none absolute -bottom-12 left-1/3 h-36 w-36 rounded-full bg-white/10 blur-2xl" />
         <div className="relative flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
@@ -987,8 +1004,9 @@ const QuizBuilder = () => {
             </Button>
           )}
         </div>
-      </div>
+      </div>}
 
+      {projectId && isAdmin && !selectedQuiz && <AssessmentDashboard projectId={projectId} />}
 
       {selectedQuiz ? (
         <div className="space-y-4">
@@ -1022,6 +1040,9 @@ const QuizBuilder = () => {
                 />
               )}
               <div className="flex gap-2 flex-wrap pt-2">
+                {isAdmin && <ExternalQuizImport key={selectedQuiz.id} quiz={selectedQuiz} onImported={()=>{void fetchQuestions(selectedQuiz.id); window.dispatchEvent(new Event("quiz-assessment-updated"));}} />}
+                {selectedQuiz.source_url && <Button variant="outline" size="sm" asChild><a href={selectedQuiz.source_url} target="_blank" rel="noopener noreferrer">Open {selectedQuiz.source_platform || "external form"}</a></Button>}
+                {projectId && isAdmin && <Button size="sm" variant="outline" onClick={()=>{setSelectedQuiz(null);setQuestions([]);}}>Project comparisons</Button>}
                 {canViewAnalytics && (
                   <Button size="sm" variant="outline" onClick={() => setShowAnalytics(selectedQuiz)} className="gap-1">
                     <BarChart3 className="h-3 w-3" /> Analytics
@@ -1876,7 +1897,7 @@ const QuizBuilder = () => {
             </div>
             <div className="space-y-2">
               <Label className="form-label">Project *</Label>
-              <Select value={newProjectId} onValueChange={setNewProjectId}>
+              <Select value={newProjectId} onValueChange={setNewProjectId} disabled={Boolean(projectId)}>
                 <SelectTrigger className="form-input"><SelectValue placeholder="Select project" /></SelectTrigger>
                 <SelectContent>
                   {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}

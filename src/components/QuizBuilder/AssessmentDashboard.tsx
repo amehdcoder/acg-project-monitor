@@ -1,17 +1,19 @@
 import {useEffect,useMemo,useState} from 'react';
 import {supabase} from '@/integrations/supabase/client';
-import {cachedRead} from '@/lib/offlineReadCache';
+import {cachedRead} from '@/lib/programmeModule/offlineReadCache';
 import {assessmentSummary,type AssessmentResult} from '@/lib/quizAssessments/metrics';
+import {useAuth} from '@/hooks/useAuth';
 import {Button} from '@/components/ui/button';
 import {Select,SelectContent,SelectItem,SelectTrigger,SelectValue} from '@/components/ui/select';
 import {Users,TrendingUp,Target,BarChart3,Download,RefreshCw} from 'lucide-react';
 import {BarChart,Bar,CartesianGrid,XAxis,YAxis,Tooltip,Legend,ResponsiveContainer} from 'recharts';
 import * as XLSX from 'xlsx';
 export default function AssessmentDashboard({projectId}:{projectId:string}){
+ const {user}=useAuth();
  const [rows,setRows]=useState<AssessmentResult[]>([]);const [quizzes,setQuizzes]=useState<{id:string;title:string;passing_score:number}[]>([]);const [quiz,setQuiz]=useState('all');const [dimension,setDimension]=useState('cohort');const [group,setGroup]=useState('all');const [error,setError]=useState('');const [busy,setBusy]=useState(false);
- const load=async()=>{setBusy(true);setError('');try{const result=await cachedRead(`quiz-assessment-dashboard:${projectId}`,async()=>{
+ const load=async()=>{setBusy(true);setError('');try{const result=await cachedRead(`quiz-assessment-dashboard:${user?.id}:${projectId}`,async()=>{
  const {data:q,error:e}=await supabase.from('quizzes').select('id,title,passing_score').eq('project_id',projectId);if(e)throw e;const ids=(q||[]).map(r=>r.id);const data:AssessmentResult[]=[];if(ids.length){for(let offset=0;;offset+=500){const {data:r,error:er}=await supabase.from('quiz_external_results').select('*').in('quiz_id',ids).order('id').range(offset,offset+499);if(er)throw er;data.push(...(r||[]));if((r||[]).length<500)break;}for(let offset=0;;offset+=500){const {data:r,error:er}=await supabase.from('quiz_attempts').select('id,quiz_id,user_id,attempt_type,percentage,completed_at').in('quiz_id',ids).not('completed_at','is',null).order('id').range(offset,offset+499);if(er)throw er;data.push(...(r||[]).map(a=>({quiz_id:a.quiz_id,participant_key:a.user_id,participant_name:'Project participant',assessment_type:a.attempt_type,percentage:Number(a.percentage),submitted_at:a.completed_at||''})));if((r||[]).length<500)break;}}
- return {rows:data,quizzes:(q||[]).map(r=>({...r,passing_score:Number(r.passing_score)}))};});setRows(result.rows);setQuizzes(result.quizzes);}catch(e){setError(e instanceof Error?e.message:'Could not load assessment results');}finally{setBusy(false);}};
+ return {data:{rows:data,quizzes:(q||[]).map(r=>({...r,passing_score:Number(r.passing_score)}))},error:null};});if(!result.data)throw new Error('Assessment results unavailable; reconnect to refresh.');setRows(result.data.rows);setQuizzes(result.data.quizzes);}catch(e){setError(e instanceof Error?e.message:'Could not load assessment results');}finally{setBusy(false);}};
  useEffect(()=>{setQuiz('all');setGroup('all');void load();},[projectId]);
  const filtered=useMemo(()=>rows.filter(r=>(quiz==='all'||r.quiz_id===quiz)&&(group==='all'||String(r[dimension as keyof AssessmentResult]||'Not recorded')===group)),[rows,quiz,group,dimension]);
  const groups=[...new Set(rows.filter(r=>quiz==='all'||r.quiz_id===quiz).map(r=>String(r[dimension as keyof AssessmentResult]||'Not recorded')))];

@@ -60,6 +60,7 @@ import HealthExchangePanel from "./HealthExchangePanel";
 import GeneralDashboard from "./GeneralDashboard";
 import FeedbackReportsPanel from "./FeedbackReportsPanel";
 import ProgrammeReportForm from "./ProgrammeReportForm";
+import QuizBuilder from "@/components/QuizBuilder/QuizBuilder";
 import WhatsAppRemindersDialog from "./WhatsAppRemindersDialog";
 import SmsRemindersDialog from "./SmsRemindersDialog";
 import { MessageCircle } from "lucide-react";
@@ -231,10 +232,11 @@ const ProgrammeModuleWorkspace = ({
     },
   ];
 
+  const canAssessments = Boolean(projectId) && !safeguardingOnly && (canConfigure || can("view_records") || canDash);
   const canBrain = can("view_dashboards") || can("view_records");
   const [brainMounted, setBrainMounted] = useState(false);
   const [lastRecordsView, setLastRecordsView] = useState<WorkspaceView>("records");
-  const isSide = (v: WorkspaceView) => v === "brain" || v === "guide" || v === "report";
+  const isSide = (v: WorkspaceView) => v === "brain" || v === "guide" || v === "report" || v === "assessments";
   const openTab = (t: MajorTab) => {
     if (t === "records") { if (isSide(view)) setView(lastRecordsView); return; }
     if (!isSide(view)) setLastRecordsView(view);
@@ -244,10 +246,10 @@ const ProgrammeModuleWorkspace = ({
 
   useEffect(() => {
     if (permissionsLoading) return;
-    const visibleViews: WorkspaceView[] = [...navGroups.flatMap((group) => group.items).filter((item) => item.show).map((item) => item.key), ...(canReport ? ["report" as const] : [])];
+    const visibleViews: WorkspaceView[] = [...navGroups.flatMap((group) => group.items).filter((item) => item.show).map((item) => item.key), ...(canReport ? ["report" as const] : []), ...(canAssessments ? ["assessments" as const] : [])];
     if (view === "brain" || view === "guide") return;
     if (!visibleViews.includes(view)) setView(visibleViews.includes("records") ? "records" : visibleViews[0] || "records");
-  }, [permissionsLoading, view, canConfigure, canReport, isOfficer, onTeamRegister, isProgrammeStaff, areaKey]);
+  }, [permissionsLoading, view, canConfigure, canReport, canAssessments, isOfficer, onTeamRegister, isProgrammeStaff, areaKey]);
 
   useEffect(() => {
     bindQueueAutoFlush();
@@ -394,7 +396,7 @@ const ProgrammeModuleWorkspace = ({
       <WorkflowTour can={(k) => (k === "view_dashboards" ? canDash : can(k as Parameters<typeof teamCan>[0]))} canConfigure={canConfigure} isOfficer={isOfficer} ready={!permissionsLoading && Boolean(active)} visibleViews={[...navGroups.flatMap((g) => g.items).filter((i) => i.show).map((i) => i.key), ...(canBrain ? ["brain", "guide"] : [])]} components={(dashConfig?.components || []).filter((c) => !c.hidden)} onNavigate={(v) => { if (v === "brain" || v === "guide") openTab(v); else setView(v as WorkspaceView); }} />
 
       {!permissionsLoading && (canBrain || canReport) && active && (
-        <WorkspaceMajorTabs selected={isSide(view) ? view as MajorTab : "records"} canReport={canReport} canBrain={canBrain} onSelect={openTab} />
+        <WorkspaceMajorTabs selected={isSide(view) ? view as MajorTab : "records"} canReport={canReport} canBrain={canBrain} canAssessments={canAssessments} onSelect={openTab} />
       )}
 
       {!permissionsLoading && !isSide(view) && <WorkspaceNavigation groups={navGroups} view={view} onViewChange={setView} administration={
@@ -455,6 +457,8 @@ const ProgrammeModuleWorkspace = ({
           onRefresh={() => void reloadBeneficiaries()}
         />
       )}
+
+      {!permissionsLoading && active && view === "assessments" && projectId && canAssessments && <QuizBuilder key={projectId} projectId={projectId} />}
 
       {!permissionsLoading && active && view === "report" && projectId && canReport && (
         <ProgrammeReportForm projectId={projectId} canManage={canConfigure || isSuperAdmin} />
