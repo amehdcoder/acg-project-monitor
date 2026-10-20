@@ -43,6 +43,7 @@ import {
   verificationQueue, type AdjustedResult,
 } from "@/lib/programmeModule/livelihoodVerification";
 import LivelihoodAssessmentDialog from "./LivelihoodAssessmentDialog";
+import LivelihoodChecklistShowcase from "./LivelihoodChecklistShowcase";
 import LivelihoodVerificationDialog from "./LivelihoodVerificationDialog";
 import GeoCascadeFields from "./GeoCascadeFields";
 import { useFacilities } from "@/lib/programmeModule/facilities";
@@ -479,6 +480,8 @@ const LivelihoodPanel = ({
           )}
         </div>
       </Card>
+
+      <LivelihoodChecklistShowcase />
 
       {!opportunity && (
         <Card className="p-10 text-center text-sm text-muted-foreground">
