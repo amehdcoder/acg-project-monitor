@@ -1,6 +1,6 @@
 # Roadmap
 
-- [ ] Strengthen evidence-based livelihood recommendations, WG-SS disability targeting, and consistent assessment-to-Graduation service/dashboard linkage; verify scoring and the live flow.
+- [x] Strengthen livelihood recommendations with registration, WG-SS, clinical/visit evidence; scope assessments per opportunity, link decisions/services to Graduation. Verified 14 tests and live temporary assessment → score/WG evidence → Overview → full record; all assessment dropdowns exercised; test data removed.
 
 - [x] Make Build Logframe generic with explicit Impact/Outcome/Output levels, editable verification, custom disaggregation options and arbitrary colours; preserve reports and Excel round-trip.
 - [x] Build secure automatic external form ingestion and provider connection workflows; verify supported provider paths and state any authorization blockers.

@@ -24,11 +24,14 @@ describe("livelihood evidence and selection", () => {
     expect(score({ disability_status: "No disability reported" }).disability).toBe(false);
     expect(score({ disability_status: "Suspected disability", disability_type: ["Visual"] }).disability).toBe(false);
     expect(score({ vulnerability_factors: ["Person with disability"] }).disability).toBe(true);
+    expect(score({ disability_status: "Suspected disability", vulnerability_factors: ["Person with disability"] }).disability).toBe(true);
   });
   it("requires explicit consent and complete vulnerability assessment", () => {
     const partial = score({}, { consent: "yes", income_monthly: "none" });
     expect(partial.assessmentComplete).toBe(false);
     expect(gateFromAssessment(partial, null, "t").status).toBe("mapped");
+    expect(gateFromAssessment(partial, null, "t").verified_at).toBeUndefined();
+    expect(gateFromAssessment(partial, null, "t").decided_at).toBeUndefined();
     expect(buildShortlist([partial], { target: 1 }).selected).toHaveLength(0);
     expect(score({}, { ...full, consent: undefined }).consentGiven).toBe(false);
   });
