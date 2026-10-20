@@ -45,3 +45,47 @@ export const stageProgress = (
 
 export const pathwayPercent = (progress: StageProgress[]) =>
   progress.length ? Math.round((progress.filter((p) => p.count > 0).length / progress.length) * 100) : 0;
+
+export interface FunnelStep { key: string; label: string; phase: string; count: number; conversion: number | null }
+export interface GraduationParticipant { id: string; name: string; lga: string; status: SelectionStatus | "unmapped"; completed: number; percent: number; nextStage: string | null; lastActivity: string | null }
+
+// Phase for each delivery stage, in GRADUATION_STAGES order.
+const STAGE_PHASES = ["Social empowerment", "Social empowerment", "Skills & training", "Skills & training", "Skills & training", "Consumption support", "Enterprise & capital", "Enterprise & capital", "Savings & markets", "Savings & markets"];
+const PHASE: Record<string, string> = Object.fromEntries(GRADUATION_STAGES.map((s, i) => [s, STAGE_PHASES[i] ?? "Delivery"]));
+
+/** Sequential Graduation funnel: selection gate, then each delivery stage, then full completion. */
+export function graduationOverview(
+  beneficiaries: { id: string; full_name: string; lga: string | null; profile?: unknown }[],
+  services: { beneficiary_id: string; service_name?: string | null; service_date?: string | null }[],
+) {
+  const byBen = new Map<string, typeof services>();
+  for (const s of services) byBen.set(s.beneficiary_id, [...(byBen.get(s.beneficiary_id) ?? []), s]);
+  const participants: GraduationParticipant[] = beneficiaries.flatMap(b => {
+    const gate = readGate(b.profile as Record<string, unknown>);
+    const own = byBen.get(b.id) ?? [];
+    if (!gate && !own.length) return [];
+    const progress = stageProgress(own);
+    const completed = progress.filter(p => p.count > 0).length;
+    const dates = own.map(s => s.service_date || "").filter(Boolean).sort();
+    return [{ id: b.id, name: b.full_name, lga: b.lga || "Not recorded", status: gate?.status ?? "unmapped", completed, percent: pathwayPercent(progress), nextStage: progress.find(p => p.count === 0)?.stage ?? null, lastActivity: dates.pop() ?? null }];
+  });
+  const reached = (fn: (p: GraduationParticipant) => boolean) => participants.filter(fn).length;
+  const rank = { unmapped: 0, mapped: 1, verified: 2, selected: 3, not_selected: 2 } as const;
+  const counts: { key: string; label: string; phase: FunnelStep["phase"]; count: number }[] = [
+    { key: "mapped", label: "Mapped", phase: "Selection", count: reached(p => rank[p.status] >= 1) },
+    { key: "verified", label: "Verified", phase: "Selection", count: reached(p => rank[p.status] >= 2) },
+    { key: "selected", label: "Selected", phase: "Selection", count: reached(p => p.status === "selected") },
+    ...GRADUATION_STAGES.map(stage => ({ key: stage, label: stage, phase: PHASE[stage], count: participants.filter(p => p.status === "selected" && stageProgress((byBen.get(p.id) ?? [])).find(x => x.stage === stage)!.count > 0).length })),
+    { key: "graduated", label: "All stages completed", phase: "Graduation", count: reached(p => p.status === "selected" && p.completed === GRADUATION_STAGES.length) },
+  ];
+  const funnel: FunnelStep[] = counts.map((c, i) => ({ ...c, conversion: i === 0 ? null : (i <= 3 ? counts[i - 1].count : counts[2].count) ? Math.round(100 * c.count / (i <= 3 ? counts[i - 1].count : counts[2].count)) : null }));
+  const selected = participants.filter(p => p.status === "selected");
+  const lgas = [...new Set(participants.map(p => p.lga))].sort().map(lga => {
+    const rows = participants.filter(p => p.lga === lga); const sel = rows.filter(p => p.status === "selected");
+    return { lga, mapped: rows.filter(p => rank[p.status] >= 1).length, selected: sel.length, avgPercent: sel.length ? Math.round(sel.reduce((a, p) => a + p.percent, 0) / sel.length) : 0, graduated: sel.filter(p => p.completed === GRADUATION_STAGES.length).length };
+  });
+  return {
+    participants, funnel, lgas,
+    totals: { tracked: participants.length, selected: selected.length, notSelected: reached(p => p.status === "not_selected"), unmapped: reached(p => p.status === "unmapped"), avgPercent: selected.length ? Math.round(selected.reduce((a, p) => a + p.percent, 0) / selected.length) : 0, graduated: counts[counts.length - 1].count },
+  };
+}

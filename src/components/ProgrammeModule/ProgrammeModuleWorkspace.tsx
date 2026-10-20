@@ -54,6 +54,7 @@ import HouseholdsPanel from "./HouseholdsPanel";
 import KinshipGraphPanel from "./KinshipGraphPanel";
 import LtfuRiskPanel from "./LtfuRiskPanel";
 import ClusterDashboard from "./ClusterDashboard";
+import GraduationDashboard from "./GraduationDashboard";
 import CddCaseSearchPanel from "./CddCaseSearchPanel";
 import LivelihoodPanel from "./LivelihoodPanel";
 import HealthExchangePanel from "./HealthExchangePanel";
@@ -202,6 +203,7 @@ const ProgrammeModuleWorkspace = ({
         { key: "journey", label: "Beneficiary journey", description: "Change, feedback and service reach", icon: Route, show: canDash },
         { key: "facility", label: "Facility dashboard", description: "Facility caseloads and referral performance", icon: Hospital, show: canDash },
         { key: "clusters", label: "Community clusters", description: "Geographic concentrations and community patterns", icon: Layers, show: canDash },
+        { key: "graduation", label: "Graduation pathway", description: "Livelihood mapping, selection, delivery stages and graduation", icon: Briefcase, show: canDash && hasArea("livelihood") },
       ],
     },
     {
@@ -533,6 +535,10 @@ const ProgrammeModuleWorkspace = ({
           beneficiaries={scopedBeneficiaries}
           allowedFacilityIds={isFocalPerson ? Object.keys(facilityLevels) : null}
         />
+      )}
+
+      {view === "graduation" && projectId && (
+        <GraduationDashboard projectId={projectId} beneficiaries={scopedBeneficiaries} onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }} />
       )}
 
       {view === "guide" && canBrain && <FieldGuidePanel moduleId={active?.id} />}
