@@ -1,5 +1,8 @@
 # Roadmap
 
+- [ ] Add individual participant progress and assessment distributions.
+- [ ] Link assessments to exact logframe training activities and safely auto-populate knowledge-change indicators.
+- [ ] Verify matched activity calculations and authenticated report suggestions.
 - [x] Add project-scoped quizzes to Longitudinal Beneficiary Records, reuse protected quiz creation/taking and pre/post analytics.
 - [x] Add reviewed external questions/answer keys and results imports, source links, cohort/state/LGA/cadre comparisons, gain confidence intervals and Excel exports.
 - [x] Verify authenticated imports and saved-results dashboard: 40% pre, 80% post, +40 pp; test quiz removed; 13 tests passed. Existing map transition error observed outside quiz components.
