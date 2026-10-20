@@ -1,8 +1,9 @@
 # Roadmap
 
-- [ ] Add project-scoped quizzes to Longitudinal Beneficiary Records, reuse protected quiz creation/taking and pre/post analytics.
-- [ ] Add reviewed external quiz schema import and platform links without guessing unavailable answer keys.
-- [ ] Verify quiz import validation, project scoping and authenticated assessment workflow.
+- [x] Add project-scoped quizzes to Longitudinal Beneficiary Records, reuse protected quiz creation/taking and pre/post analytics.
+- [x] Add reviewed external questions/answer keys and results imports, source links, cohort/state/LGA/cadre comparisons, gain confidence intervals and Excel exports.
+- [x] Verify authenticated imports and saved-results dashboard: 40% pre, 80% post, +40 pp; test quiz removed; 13 tests passed. Existing map transition error observed outside quiz components.
+- [ ] Automatic external retrieval — blocked by missing Google Forms connector and undocumented Microsoft Forms/Mentimeter quiz-schema APIs; use authorized exports and verified keys.
 
 - [x] Add dedicated donor account sign-in, signup and recovery screens; preserve donor project selection. Screens verified; email confirmation and social redirects not exercised end-to-end.
 - [x] Enhance WHO-style donor overview with live aggregate risk indicators, referral completion percentage and field activity preview; authenticated desktop/mobile checks passed.
