@@ -196,7 +196,7 @@ const LivelihoodAssessmentDialog = ({
                           onValueChange={(v) => set(f.name, v)}
                         >
                           <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                          <SelectContent className="z-[120]">
+                          <SelectContent className="z-[10000]">
                             {(f.options || []).map((o) => (
                               <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
                             ))}

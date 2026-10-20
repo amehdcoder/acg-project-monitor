@@ -433,7 +433,7 @@ const LivelihoodPanel = ({
                 onValueChange={(v) => void decide(entry.result.beneficiaryId, v)}
               >
                 <SelectTrigger className="h-8 w-[9.5rem] text-xs"><SelectValue placeholder="Decision" /></SelectTrigger>
-                <SelectContent className="z-[120]">
+                <SelectContent className="z-[10000]">
                   {DECISIONS.map((d) => (
                     <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
                   ))}
@@ -463,7 +463,7 @@ const LivelihoodPanel = ({
           {opportunities.length > 0 && (
             <Select value={opportunityId} onValueChange={setOpportunityId}>
               <SelectTrigger className="w-[16rem]"><SelectValue placeholder="Choose opportunity" /></SelectTrigger>
-              <SelectContent className="z-[120]">
+              <SelectContent className="z-[10000]">
                 {opportunities.map((o) => (
                   <SelectItem key={o.id} value={o.id}>
                     {o.title} · {o.target_beneficiaries} places
@@ -680,7 +680,7 @@ const LivelihoodPanel = ({
                 onValueChange={(v) => setForm({ ...form, opportunity_type: v })}
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent className="z-[120]">
+                <SelectContent className="z-[10000]">
                   {OPPORTUNITY_TYPES.map((o) => (
                     <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
                   ))}

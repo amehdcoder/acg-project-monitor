@@ -180,7 +180,7 @@ const LivelihoodVerificationDialog = ({
             <Label className="text-xs">Role</Label>
             <Select value={verifierRole} onValueChange={setVerifierRole}>
               <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent className="z-[140]">
+              <SelectContent className="z-[10000]">
                 {VERIFIER_ROLES.map((r) => (
                   <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
                 ))}
@@ -200,7 +200,7 @@ const LivelihoodVerificationDialog = ({
                 onValueChange={(v) => setObserved((p) => ({ ...p, [f.name]: v }))}
               >
                 <SelectTrigger><SelectValue placeholder="Choose" /></SelectTrigger>
-                <SelectContent className="z-[140]">
+                <SelectContent className="z-[10000]">
                   {f.options.map((o) => (
                     <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
                   ))}
@@ -217,7 +217,7 @@ const LivelihoodVerificationDialog = ({
             <Label className="text-xs">Outcome of the visit</Label>
             <Select value={finding} onValueChange={(v) => { setTouchedFinding(true); setFinding(v); }}>
               <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent className="z-[140]">
+              <SelectContent className="z-[10000]">
                 {FINDINGS.map((f) => (
                   <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
                 ))}
@@ -231,7 +231,7 @@ const LivelihoodVerificationDialog = ({
             <Label className="text-xs">Recommendation</Label>
             <Select value={recommendation} onValueChange={setRecommendation}>
               <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent className="z-[140]">
+              <SelectContent className="z-[10000]">
                 {RECOMMENDATIONS.map((r) => (
                   <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
                 ))}
