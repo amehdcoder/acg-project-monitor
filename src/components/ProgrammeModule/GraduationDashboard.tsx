@@ -1,7 +1,7 @@
 // Graduation Approach dashboard — sequential view of every livelihood
 // beneficiary from mapping → verification → selection → delivery stages → graduation.
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, GraduationCap, Loader2, MapPin, Search, Sprout, Target, UserCheck, Users } from "lucide-react";
+import { CheckCircle2, Circle, ExternalLink, ArrowDown, GraduationCap, Loader2, MapPin, Search, Sprout, Target, UserCheck, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cachedRead } from "@/lib/programmeModule/offlineReadCache";
 import { PRIORITY_LIVELIHOOD_SERVICES } from "@/lib/programmeModule/componentOutcomes";
-import { graduationOverview } from "@/lib/programmeModule/graduation";
+import { GRADUATION_STAGES, graduationOverview, readGate, stageProgress } from "@/lib/programmeModule/graduation";
 import type { BeneficiaryRow } from "@/lib/programmeModule/types";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +33,7 @@ export default function GraduationDashboard({ projectId, beneficiaries, onOpenBe
   const [error, setError] = useState("");
   const [lga, setLga] = useState("all");
   const [search, setSearch] = useState("");
+  const [openId, setOpenId] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true; setLoading(true); setError("");
@@ -130,17 +131,50 @@ export default function GraduationDashboard({ projectId, beneficiaries, onOpenBe
           <ul className="max-h-96 space-y-2 overflow-y-auto pr-1">
             {people.map(p => (
               <li key={p.id}>
-                <button type="button" className="w-full rounded-md border border-border p-2 text-left" onClick={() => { const b = byId.get(p.id); if (b) onOpenBeneficiary?.(b); }}>
+                <button type="button" className="w-full rounded-md border border-border p-2 text-left" aria-expanded={openId === p.id} onClick={() => setOpenId(openId === p.id ? null : p.id)}>
                   <div className="flex items-center justify-between gap-2"><span className="truncate font-semibold">{p.name}</span><Badge variant="outline" className="capitalize">{p.status.replace("_", " ")}</Badge></div>
                   <div className="mt-1 flex items-center gap-2"><Progress value={p.percent} className="h-2 flex-1" /><span className="text-xs font-semibold">{p.percent}%</span></div>
                   <p className="mt-1 truncate text-xs text-muted-foreground">{p.lga} · {p.status === "selected" ? (p.nextStage ? `Next: ${p.nextStage}` : "All stages completed") : p.status === "not_selected" ? "Not selected for the pathway" : "Awaiting selection decision"}</p>
                 </button>
+                {openId === p.id && <IndividualPathway beneficiary={byId.get(p.id)} services={services.filter(s => s.beneficiary_id === p.id)} onOpen={onOpenBeneficiary} />}
               </li>
             ))}
             {!people.length && <li className="p-6 text-center text-sm text-muted-foreground">No matching beneficiaries.</li>}
           </ul>
         </Card>
       </div>
+    </div>
+  );
+}
+
+function IndividualPathway({ beneficiary, services, onOpen }: { beneficiary?: BeneficiaryRow; services: Svc[]; onOpen?: (b: BeneficiaryRow) => void }) {
+  if (!beneficiary) return null;
+  const gate = readGate((beneficiary.profile || {}) as Record<string, unknown>);
+  const fmt = (d?: string | null) => d ? new Date(d).toLocaleDateString() : null;
+  const rank = { mapped: 1, verified: 2, selected: 3, not_selected: 2 } as const;
+  const r = gate ? rank[gate.status] : 0;
+  const progress = stageProgress(services);
+  const nextIdx = gate?.status === "selected" ? progress.findIndex(p => p.count === 0) : -1;
+  const steps = [
+    { label: "Mapped", done: r >= 1, date: fmt(gate?.mapped_at), note: null as string | null },
+    { label: "Verified", done: r >= 2, date: fmt(gate?.verified_at), note: null },
+    { label: gate?.status === "not_selected" ? "Not selected" : "Selected", done: gate?.status === "selected", date: fmt(gate?.decided_at), note: gate?.status === "not_selected" ? gate.reason || "No reason recorded" : null },
+    ...progress.map((p, i) => ({ label: p.stage, done: p.count > 0, date: fmt(p.lastDate), note: p.count > 1 ? `${p.count} sessions` : i === nextIdx ? "Next stage" : null })),
+    { label: "Graduated — all stages completed", done: gate?.status === "selected" && progress.every(p => p.count > 0), date: null, note: null },
+  ];
+  return (
+    <div className="mt-1 rounded-md border border-border bg-muted/40 p-3">
+      <ol className="relative space-y-2 border-l-2 border-border pl-4">
+        {steps.map((s, i) => (
+          <li key={s.label} className="relative">
+            <span className="absolute -left-[1.6rem] top-0.5 bg-background">{s.done ? <CheckCircle2 className="h-4 w-4 text-health-teal" /> : <Circle className={cn("h-4 w-4", s.note === "Next stage" ? "text-health-amber" : "text-muted-foreground")} />}</span>
+            <p className={cn("text-sm leading-snug", s.done ? "font-semibold" : "text-muted-foreground")}>{i + 1}. {s.label}</p>
+            {(s.date || s.note) && <p className={cn("text-xs", s.note === "Next stage" ? "font-semibold text-health-amber" : "text-muted-foreground")}>{[s.date, s.note].filter(Boolean).join(" · ")}</p>}
+          </li>
+        ))}
+      </ol>
+      <p className="mt-2 text-xs text-muted-foreground">{progress.filter(p => p.count > 0).length} of {GRADUATION_STAGES.length} delivery stages recorded</p>
+      {onOpen && <button type="button" className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-health-blue" onClick={() => onOpen(beneficiary)}><ExternalLink className="h-3.5 w-3.5" />Open full record</button>}
     </div>
   );
 }
