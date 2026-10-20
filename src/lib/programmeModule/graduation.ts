@@ -46,11 +46,12 @@ export const stageProgress = (
 export const pathwayPercent = (progress: StageProgress[]) =>
   progress.length ? Math.round((progress.filter((p) => p.count > 0).length / progress.length) * 100) : 0;
 
-export interface FunnelStep { key: string; label: string; phase: "Selection" | "Consumption support" | "Skills & capital" | "Savings & markets" | "Graduation"; count: number; conversion: number | null }
+export interface FunnelStep { key: string; label: string; phase: string; count: number; conversion: number | null }
 export interface GraduationParticipant { id: string; name: string; lga: string; status: SelectionStatus | "unmapped"; completed: number; percent: number; nextStage: string | null; lastActivity: string | null }
 
-const PHASE: Record<string, FunnelStep["phase"]> = {};
-GRADUATION_STAGES.forEach((s, i) => { PHASE[s] = i < 2 ? "Selection" : i < 3 ? "Skills & capital" : i < 5 ? "Skills & capital" : i === 5 ? "Consumption support" : i < 8 ? "Skills & capital" : "Savings & markets"; });
+// Phase for each delivery stage, in GRADUATION_STAGES order.
+const STAGE_PHASES = ["Social empowerment", "Social empowerment", "Skills & training", "Skills & training", "Skills & training", "Consumption support", "Enterprise & capital", "Enterprise & capital", "Savings & markets", "Savings & markets"];
+const PHASE: Record<string, string> = Object.fromEntries(GRADUATION_STAGES.map((s, i) => [s, STAGE_PHASES[i] ?? "Delivery"]));
 
 /** Sequential Graduation funnel: selection gate, then each delivery stage, then full completion. */
 export function graduationOverview(
