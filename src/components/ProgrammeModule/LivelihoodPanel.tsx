@@ -31,7 +31,6 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { toneClasses } from "@/lib/programmeModule/defaults";
 import type { BeneficiaryRow } from "@/lib/programmeModule/types";
-import { useMorbidityRecords } from "@/lib/programmeModule/morbidity";
 import {
   BAND_LABELS, BAND_TONE, DECISIONS, OPPORTUNITY_TYPES,
   buildShortlist, saveOpportunity, scoreLivelihood, setAssessmentDecision,
@@ -106,15 +105,11 @@ const LivelihoodPanel = ({
   onOpenBeneficiary, onChanged, onOverview,
 }: Props) => {
   const { toast } = useToast();
+  const [opportunityId, setOpportunityId] = useState<string>("");
   const { opportunities, reload: reloadOpportunities } = useLivelihoodOpportunities(projectId);
-  const { byBeneficiary, reload: reloadAssessments } = useLivelihoodAssessments(projectId);
+  const { byBeneficiary, reload: reloadAssessments } = useLivelihoodAssessments(projectId, opportunityId);
   const { verifications, reload: reloadVerifications } = useLivelihoodVerifications(projectId);
   const evidence = useLivelihoodEvidence(projectId);
-  const { records: morbidity } = useMorbidityRecords(projectId) as unknown as {
-    records: { beneficiary_id: string | null; stage: string | null; acute_attacks_last_year: number | null; surgery_status: string | null }[];
-  };
-
-  const [opportunityId, setOpportunityId] = useState<string>("");
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<Record<string, unknown>>({ ...emptyOpportunity });
   const [saving, setSaving] = useState(false);
@@ -128,21 +123,6 @@ const LivelihoodPanel = ({
 
   const opportunity: LivelihoodOpportunityRow | undefined =
     opportunities.find((o) => o.id === opportunityId);
-
-  /** Clinical signals per person, so nobody scores zero for a blank form. */
-  const clinical = useMemo(() => {
-    const map = new Map<string, { stage: number | null; attacks: number; surgery: boolean }>();
-    for (const r of morbidity || []) {
-      if (!r.beneficiary_id) continue;
-      const cur = map.get(r.beneficiary_id) || { stage: null, attacks: 0, surgery: false };
-      const s = STAGE_NUMBER(r.stage);
-      if (s && (cur.stage == null || s > cur.stage)) cur.stage = s;
-      cur.attacks = Math.max(cur.attacks, Number(r.acute_attacks_last_year || 0));
-      if (r.surgery_status === "referred" || r.surgery_status === "scheduled") cur.surgery = true;
-      map.set(r.beneficiary_id, cur);
-    }
-    return map;
-  }, [morbidity]);
 
   const signalsFor = (b: BeneficiaryRow) => {
     return evidence.signalsFor(b.id);

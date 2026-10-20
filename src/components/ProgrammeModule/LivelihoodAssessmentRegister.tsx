@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { ClipboardCheck, Search, Users, CheckCircle2 } from "lucide-react";
+import { ClipboardCheck, Search, Users, CheckCircle2, Sprout } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BeneficiaryRow } from "@/lib/programmeModule/types";
 import { readGate } from "@/lib/programmeModule/graduation";
@@ -100,6 +100,8 @@ export default function LivelihoodAssessmentRegister({ beneficiaries, assessed, 
                   </p>
                 </button>
                 <div className="flex items-center gap-2">
+                  {gate && onOpen && <Button size="sm" variant="outline" className="gap-1" onClick={() => onOpen(b)}><Sprout className="h-3.5 w-3.5" />Graduation pathway</Button>}
+                  {gate?.vulnerability_score != null && <Badge variant="secondary">Vulnerability {gate.vulnerability_score}/100</Badge>}
                   {gate?.status === "selected" && <Badge>Selected</Badge>}
                   {gate?.status === "not_selected" && <Badge variant="outline">Not selected</Badge>}
                   {a ? (
