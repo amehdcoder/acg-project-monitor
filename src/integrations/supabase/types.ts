@@ -11539,6 +11539,7 @@ export type Database = {
           is_published: boolean | null
           logframe_activity_code: string | null
           open_test_type: string | null
+          participant_display_fields: string[]
           pass_message: string | null
           passing_score: number | null
           post_fail_message: string | null
@@ -11563,6 +11564,7 @@ export type Database = {
           is_published?: boolean | null
           logframe_activity_code?: string | null
           open_test_type?: string | null
+          participant_display_fields?: string[]
           pass_message?: string | null
           passing_score?: number | null
           post_fail_message?: string | null
@@ -11587,6 +11589,7 @@ export type Database = {
           is_published?: boolean | null
           logframe_activity_code?: string | null
           open_test_type?: string | null
+          participant_display_fields?: string[]
           pass_message?: string | null
           passing_score?: number | null
           post_fail_message?: string | null
