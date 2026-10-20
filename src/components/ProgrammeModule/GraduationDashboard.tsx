@@ -10,12 +10,14 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cachedRead } from "@/lib/programmeModule/offlineReadCache";
-import { PRIORITY_LIVELIHOOD_SERVICES } from "@/lib/programmeModule/componentOutcomes";
+import { componentKind } from "@/lib/programmeModule/componentOutcomes";
 import { GRADUATION_STAGES, graduationOverview, readGate, stageProgress } from "@/lib/programmeModule/graduation";
 import type { BeneficiaryRow } from "@/lib/programmeModule/types";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { currentUserId } from "@/lib/programmeModule/offlineWrite";
 
-type Svc = { beneficiary_id: string; service_name: string | null; service_date: string | null };
+type Svc = { beneficiary_id: string; service_name: string | null; service_date: string | null; component_key: string };
 const PHASE_TONE: Record<string, string> = {
   Selection: "border-health-blue text-health-blue",
   "Social empowerment": "border-health-teal text-health-teal",
@@ -38,20 +40,28 @@ export default function GraduationDashboard({ projectId, beneficiaries, onOpenBe
 
   useEffect(() => {
     let alive = true; setLoading(true); setError("");
-    void cachedRead<Svc[]>(`graduation-services:${projectId}`, async () => {
+    const load = async () => {
+    await cachedRead<Svc[]>(`graduation-services:${await currentUserId()}:${projectId}`, async () => {
       const all: Svc[] = [];
       for (let from = 0; ; from += 1000) {
-        const { data, error } = await supabase.from("beneficiary_services").select("beneficiary_id,service_name,service_date")
-          .eq("project_id", projectId).in("service_name", PRIORITY_LIVELIHOOD_SERVICES).order("id").range(from, from + 999);
+        const { data, error } = await supabase.from("beneficiary_services").select("beneficiary_id,service_name,service_date,component_key")
+          .eq("project_id", projectId).order("id").range(from, from + 999);
         if (error) return { data: null, error };
-        all.push(...(data ?? []) as Svc[]);
+        all.push(...((data ?? []) as Svc[]).filter(s => componentKind(s.component_key) === "livelihood"));
         if ((data ?? []).length < 1000) break;
       }
       return { data: all, error: null };
     }).then(r => { if (!alive) return; if (r.data) setServices(r.data); else setError("Livelihood services could not be loaded; reconnect to refresh."); })
       .catch(() => alive && setError("Livelihood services could not be loaded."))
       .finally(() => alive && setLoading(false));
-    return () => { alive = false; };
+    };
+    void load();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const channel = supabase.channel(`graduation-services:${projectId}`).on("postgres_changes", {
+      event: "*", schema: "public", table: "beneficiary_services", filter: `project_id=eq.${projectId}`,
+    }, () => { clearTimeout(timer); timer = setTimeout(() => void load(), 800); }).subscribe();
+    window.addEventListener("online", load);
+    return () => { alive = false; clearTimeout(timer); window.removeEventListener("online", load); void supabase.removeChannel(channel); };
   }, [projectId]);
 
   const scoped = useMemo(() => lga === "all" ? beneficiaries : beneficiaries.filter(b => (b.lga || "Not recorded") === lga), [beneficiaries, lga]);
@@ -134,6 +144,7 @@ export default function GraduationDashboard({ projectId, beneficiaries, onOpenBe
               <li key={p.id}>
                 <button type="button" className="w-full rounded-md border border-border p-2 text-left" aria-expanded={openId === p.id} onClick={() => setOpenId(openId === p.id ? null : p.id)}>
                   <div className="flex items-center justify-between gap-2"><span className="truncate font-semibold">{p.name}</span><Badge variant="outline" className="capitalize">{p.status.replace("_", " ")}</Badge></div>
+                  {readGate(byId.get(p.id)?.profile)?.vulnerability_score != null && <p className="mt-1 text-xs text-muted-foreground">Vulnerability {readGate(byId.get(p.id)?.profile)?.vulnerability_score}/100 · {readGate(byId.get(p.id)?.profile)?.vulnerability_band}</p>}
                   <div className="mt-1 flex items-center gap-2"><Progress value={p.percent} className="h-2 flex-1" /><span className="text-xs font-semibold">{p.percent}%</span></div>
                   <p className="mt-1 truncate text-xs text-muted-foreground">{p.lga} · {p.status === "selected" ? (p.nextStage ? `Next: ${p.nextStage}` : "All stages completed") : p.status === "not_selected" ? "Not selected for the pathway" : "Awaiting selection decision"}</p>
                 </button>
@@ -166,6 +177,7 @@ function IndividualPathway({ beneficiary, services, onOpen }: { beneficiary?: Be
   return (
     <div className="mt-1 space-y-3 rounded-md border border-border bg-muted/40 p-3">
       <VulnerabilityScore beneficiaryId={beneficiary.id} />
+      {!!gate?.evidence_reasons?.length && <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">{gate.evidence_reasons.map(reason => <li key={reason}>{reason}</li>)}</ul>}
       <ol className="relative space-y-2 border-l-2 border-border pl-4">
         {steps.map((s, i) => (
           <li key={s.label} className="relative">
@@ -176,7 +188,7 @@ function IndividualPathway({ beneficiary, services, onOpen }: { beneficiary?: Be
         ))}
       </ol>
       <p className="mt-2 text-xs text-muted-foreground">{progress.filter(p => p.count > 0).length} of {GRADUATION_STAGES.length} delivery stages recorded</p>
-      {onOpen && <button type="button" className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-health-blue" onClick={() => onOpen(beneficiary)}><ExternalLink className="h-3.5 w-3.5" />Open full record</button>}
+      {onOpen && <Button variant="outline" size="sm" className="mt-2 gap-1" onClick={() => onOpen(beneficiary)}><ExternalLink className="h-3.5 w-3.5" />Open record & Graduation services</Button>}
     </div>
   );
 }

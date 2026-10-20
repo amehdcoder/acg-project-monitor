@@ -29,6 +29,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { BeneficiaryRow } from "./types";
+import { livelihoodDisability } from "./livelihoodDisability";
+import { cachedRead, cacheSet, cacheGet } from "./offlineReadCache";
+import { offlineMutate, currentUserId } from "./offlineWrite";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as unknown as { from: (t: string) => any };
@@ -513,9 +516,11 @@ export interface TargetingResult {
   preferenceFit: number;
   preferenceNotes: string[];
   travelWillingnessKm: number | null;
+  assessmentComplete: boolean;
 }
 
 const num = (v: unknown): number | null => {
+  if (v === undefined || v === null || v === "") return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 };
@@ -546,12 +551,17 @@ const recordSignals = (input: TargetingInput) => {
   const add: Partial<Record<DomainKey, number[]>> = {};
   const push = (d: DomainKey, v: number) => { (add[d] ||= []).push(clamp01(v)); };
 
-  const vuln = text(p.vulnerability_status ?? p.vulnerability);
+  const vuln = text([p.vulnerability_status, p.vulnerability, ...(Array.isArray(p.vulnerability_factors) ? p.vulnerability_factors : [p.vulnerability_factors])].filter(Boolean).join("; "));
   if (vuln.includes("extreme")) { push("economic", 1); reasons.push("Registered as extremely vulnerable."); }
   if (vuln.includes("displaced") || vuln.includes("idp")) { push("shocks", 0.9); reasons.push("Internally displaced."); }
   if (vuln.includes("female-headed")) { push("dependency", 0.8); reasons.push("Female-headed household."); }
   if (vuln.includes("child-headed")) { push("dependency", 1); reasons.push("Child-headed household."); }
   if (vuln.includes("elderly")) { push("dependency", 0.8); reasons.push("Elderly without a caregiver."); }
+  if (vuln.includes("limited livelihood")) { push("economic", 0.8); reasons.push("Registered household with limited livelihood."); }
+  if (vuln.includes("older person")) { push("dependency", 0.65); reasons.push("Registered older person."); }
+  if (vuln.includes("caregiver support")) { push("dependency", 0.8); reasons.push("Registered need for caregiver support."); }
+  if (vuln.includes("affected by ntd")) { push("disease", 0.45); reasons.push("Registered NTD-related vulnerability."); }
+  if (/(^|; )child(;|$)/.test(vuln)) { push("dependency", 0.7); reasons.push("Child — household-level support required."); }
 
   const occ = text(p.occupation);
   if (occ.includes("unemployed")) { push("economic", 1); reasons.push("Unemployed at registration."); }
@@ -562,9 +572,15 @@ const recordSignals = (input: TargetingInput) => {
   if (inc.includes("no regular income")) { push("economic", 1); reasons.push("No regular income source recorded."); }
   else if (inc.includes("casual") || inc.includes("remittance") || inc.includes("humanitarian")) push("economic", 0.7);
 
-  const dis = text(p.disability_status ?? p.disability);
-  const hasDisability = dis.startsWith("yes") || dis.includes("difficulty") || dis.includes("cannot");
-  if (hasDisability) { push("disease", 0.8); reasons.push("Living with a disability."); }
+  const disability = livelihoodDisability(p);
+  if (disability.burden > 0) { push("disease", disability.burden); reasons.push(disability.source); }
+
+  const chronic = p.chronic_conditions;
+  if ((Array.isArray(chronic) ? chronic : [chronic]).some(v => v && !/^(none|no\b)/i.test(String(v)))) {
+    push("disease", 0.55); reasons.push("Registered chronic conditions add to care and earning burden.");
+  }
+  const age = num(p.age);
+  if (age != null && age >= 65) { push("dependency", 0.65); reasons.push("Older beneficiary — check household support needs."); }
 
   const living = text(p.living_arrangement);
   if (living.includes("alone")) { push("exclusion", 0.7); reasons.push("Lives alone."); }
@@ -596,8 +612,8 @@ const recordSignals = (input: TargetingInput) => {
 
   // Follow-up behaviour — repeated misses usually mean cost and distance.
   if (input.missedVisits && input.missedVisits > 0) {
-    push("economic", clamp01(input.missedVisits / 3));
-    reasons.push(`Missed ${input.missedVisits} scheduled visit${input.missedVisits === 1 ? "" : "s"} — often a cost barrier.`);
+    push("access", clamp01(input.missedVisits / 3));
+    reasons.push(`Missed ${input.missedVisits} scheduled visit${input.missedVisits === 1 ? "" : "s"} — investigate access barriers; poverty is not assumed.`);
   }
   if (input.ltfuScore != null && input.ltfuScore >= 55) {
     push("exclusion", clamp01(input.ltfuScore / 100));
@@ -643,6 +659,7 @@ export const scoreLivelihood = (input: TargetingInput): TargetingResult => {
       const w = answerWeight(f, answers[f.name]);
       if (w == null) continue;
       answered += 1;
+      if (f.name === "travel_willingness_km") continue;
       if (section.key === "readiness") readinessValues.push(w);
       else if (section.key === "protection" || section.key === "preference") continue;
       else domainValues[section.key].push(w);
@@ -731,10 +748,16 @@ export const scoreLivelihood = (input: TargetingInput): TargetingResult => {
   const band: TargetingResult["band"] =
     vulnScore >= 75 ? "extreme" : vulnScore >= 60 ? "high" : vulnScore >= 40 ? "moderate" : "low";
 
-  const consentGiven = String(answers.consent ?? "") !== "no";
+  const consentGiven = String(answers.consent ?? "") === "yes";
   const protectionConcern = String(answers.protection_risk ?? "") === "yes";
 
   const flags: string[] = [];
+  const disabilityEvidence = livelihoodDisability(input.beneficiary.profile || {});
+  if (!disabilityEvidence.completed) flags.push("Complete WG-SS for functional disability evidence");
+  if (disabilityEvidence.review) flags.push("Registration and WG-SS differ — review disability information");
+  const missingDomains = ASSESSMENT_SECTIONS.filter(s => s.key in DOMAIN_WEIGHTS)
+    .filter(s => s.fields.some(f => f.name !== "travel_willingness_km" && answerWeight(f, answers[f.name]) == null));
+  if (missingDomains.length) flags.push("Complete all vulnerability domains before confirming selection");
   if (!consentGiven) flags.push("Has not consented");
   if (protectionConcern) flags.push("Safeguarding concern — refer before enrolling");
   if (String(answers.id_documents ?? "") === "none") flags.push("No ID — support enrolment for payment");
@@ -754,6 +777,7 @@ export const scoreLivelihood = (input: TargetingInput): TargetingResult => {
   const pkg = (() => {
     if (band === "low") return "Not a priority for this round — keep on the register.";
     const wanted = choiceLabel ? ` Build it around their own choice: ${choiceLabel.toLowerCase()}.` : "";
+    if (String(answers.work_capacity ?? "") === "none") return "Care and consumption support first; adapt livelihood delivery to functional needs, with a support person where needed." + wanted;
     if (readiness >= 70) {
       return (band === "extreme"
         ? "Productive grant with close mentoring, plus three months of consumption support."
@@ -776,7 +800,6 @@ export const scoreLivelihood = (input: TargetingInput): TargetingResult => {
 
   const p = (input.beneficiary.profile || {}) as Record<string, unknown>;
   const sex = text(p.gender ?? p.sex);
-  const dis = text(p.disability_status ?? p.disability);
 
   return {
     beneficiaryId: input.beneficiary.id,
@@ -791,7 +814,7 @@ export const scoreLivelihood = (input: TargetingInput): TargetingResult => {
     completeness: askable ? Math.round((answered / askable) * 100) : 0,
     flags,
     female: sex.startsWith("f"),
-    disability: dis.startsWith("yes") || dis.includes("difficulty") || dis.includes("cannot"),
+    disability: disabilityEvidence.hasDisability,
     householdId: (input.beneficiary as unknown as { household_id?: string }).household_id || null,
     community: input.beneficiary.village || input.beneficiary.ward || "—",
     consentGiven,
@@ -806,6 +829,7 @@ export const scoreLivelihood = (input: TargetingInput): TargetingResult => {
     preferenceFit,
     preferenceNotes,
     travelWillingnessKm,
+    assessmentComplete: missingDomains.length === 0,
   };
 };
 
@@ -895,20 +919,17 @@ export const buildShortlist = (
     if (r.protectionConcern) {
       excluded.push({ result: r, why: "Safeguarding concern — refer before enrolling" }); continue;
     }
-    if (r.band === "low") { excluded.push({ result: r, why: "Lower vulnerability than the pool" }); continue; }
+    if (!r.assessmentComplete) { excluded.push({ result: r, why: "Needs Assessment vulnerability domains are incomplete" }); continue; }
+    if (r.band === "low" || r.band === "moderate") { excluded.push({ result: r, why: "Below the high-vulnerability selection threshold" }); continue; }
     eligible.push(r);
   }
 
   // Need comes first, but a place given to someone who wants a different trade
   // is a place wasted — so the person's own stated choice shapes the order too.
-  const suitability = (r: TargetingResult) =>
-    r.vulnerability * 0.75 + r.preferenceFit * 0.25;
-
   const order = (a: TargetingResult, b: TargetingResult) =>
-    suitability(b) - suitability(a)
-    || b.vulnerability - a.vulnerability
+    b.vulnerability - a.vulnerability
     || b.domains.disease - a.domains.disease
-    || b.readiness - a.readiness
+    || b.preferenceFit - a.preferenceFit
     || a.name.localeCompare(b.name);
 
   const basisFor = (r: TargetingResult, lead: string) => {
@@ -955,14 +976,6 @@ export const buildShortlist = (
     if (picked.length >= target) break;
     if (canTake(r)) take(r, "Vulnerability rank");
   }
-  // 3. If one-per-household left places empty, release the rule for the rest.
-  if (picked.length < target && opts.onePerHousehold) {
-    for (const r of pool) {
-      if (picked.length >= target) break;
-      if (!taken.has(r.beneficiaryId)) take(r, "Second place in a household — places still open");
-    }
-  }
-
   picked.sort((a, b) => order(a.result, b.result));
   picked.forEach((e, i) => { e.rank = i + 1; });
 
@@ -1023,8 +1036,9 @@ export const useLivelihoodOpportunities = (projectId?: string) => {
   const load = useCallback(async () => {
     if (!projectId) { setRows([]); setLoading(false); return; }
     setLoading(true);
-    const { data } = await db.from("livelihood_opportunities")
-      .select("*").eq("project_id", projectId).order("created_at", { ascending: false });
+    const user = await currentUserId();
+    const { data } = await cachedRead<LivelihoodOpportunityRow[]>(`livelihood-opportunities:${user}:${projectId}`, () => db.from("livelihood_opportunities")
+      .select("*").eq("project_id", projectId).order("created_at", { ascending: false }));
     setRows((data as LivelihoodOpportunityRow[]) || []);
     setLoading(false);
   }, [projectId]);
@@ -1033,15 +1047,24 @@ export const useLivelihoodOpportunities = (projectId?: string) => {
   return { opportunities: rows, loading, reload: load };
 };
 
-export const useLivelihoodAssessments = (projectId?: string) => {
+export const useLivelihoodAssessments = (projectId?: string, opportunityId?: string) => {
   const [rows, setRows] = useState<LivelihoodAssessmentRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     if (!projectId) { setRows([]); setLoading(false); return; }
     setLoading(true);
-    const { data } = await db.from("livelihood_assessments")
-      .select("*").eq("project_id", projectId).order("created_at", { ascending: false }).limit(2000);
+    const user = await currentUserId();
+    const { data } = await cachedRead<LivelihoodAssessmentRow[]>(`livelihood-assessments:${user}:${projectId}`, async () => {
+      const all: LivelihoodAssessmentRow[] = [];
+      for (let from = 0; ; from += 1000) {
+        const r = await db.from("livelihood_assessments").select("*").eq("project_id", projectId)
+          .order("created_at", { ascending: false }).order("id").range(from, from + 999);
+        if (r.error) return { data: null, error: r.error };
+        all.push(...(r.data || [])); if ((r.data || []).length < 1000) break;
+      }
+      return { data: all, error: null };
+    });
     setRows((data as LivelihoodAssessmentRow[]) || []);
     setLoading(false);
   }, [projectId]);
@@ -1050,7 +1073,7 @@ export const useLivelihoodAssessments = (projectId?: string) => {
 
   /** Latest assessment per beneficiary. */
   const byBeneficiary = new Map<string, LivelihoodAssessmentRow>();
-  for (const r of rows) if (!byBeneficiary.has(r.beneficiary_id)) byBeneficiary.set(r.beneficiary_id, r);
+  for (const r of rows) if ((!opportunityId || r.opportunity_id === opportunityId) && !byBeneficiary.has(r.beneficiary_id)) byBeneficiary.set(r.beneficiary_id, r);
 
   return { assessments: rows, byBeneficiary, loading, reload: load };
 };
@@ -1066,7 +1089,7 @@ export const saveAssessment = async (payload: {
   decision?: string;
   decision_notes?: string | null;
 }) => {
-  const { data: auth } = await supabase.auth.getUser();
+  const user = await currentUserId();
   const row = {
     project_id: payload.project_id,
     module_id: payload.module_id || null,
@@ -1080,13 +1103,12 @@ export const saveAssessment = async (payload: {
     recommended_package: payload.result.package,
     decision: payload.decision || "assessed",
     decision_notes: payload.decision_notes || null,
-    assessed_by: auth.user?.id || null,
+    assessed_by: user || null,
   };
-  const q = payload.id
-    ? db.from("livelihood_assessments").update(row).eq("id", payload.id)
-    : db.from("livelihood_assessments").insert(row);
-  const { error } = await q;
-  if (error) throw error;
+  const saved = await offlineMutate({ table: "livelihood_assessments", action: payload.id ? "update" : "insert", id: payload.id, values: row });
+  const key = `livelihood-assessments:${user}:${payload.project_id}`;
+  const cached = await cacheGet<LivelihoodAssessmentRow[]>(key) ?? [];
+  await cacheSet(key, [{ ...row, id: saved.id, created_at: new Date().toISOString() }, ...cached.filter(r => r.id !== saved.id)]);
 };
 
 export const setAssessmentDecision = async (id: string, decision: string, notes?: string) => {

@@ -15,6 +15,7 @@ import {
 } from "@/lib/programmeModule/graduation";
 import type { BeneficiaryRow } from "@/lib/programmeModule/types";
 import { offlineMutate, currentUserId } from "@/lib/programmeModule/offlineWrite";
+import { cachedRead } from "@/lib/programmeModule/offlineReadCache";
 
 interface Props {
   projectId: string;
@@ -41,24 +42,13 @@ const GraduationPathwayPanel = ({ projectId, moduleId, beneficiary, componentKey
   const [scoreKey, setScoreKey] = useState(0);
 
   const openAssessment = async () => {
-    const { data } = await (supabase as unknown as { from: (t: string) => any }).from("livelihood_assessments")
-      .select("*").eq("beneficiary_id", beneficiary.id).order("created_at", { ascending: false }).limit(1);
+    const { data } = await cachedRead<LivelihoodAssessmentRow[]>(`livelihood-person:${await currentUserId()}:${beneficiary.id}`, () => (supabase as unknown as { from: (t: string) => any }).from("livelihood_assessments")
+      .select("*").eq("beneficiary_id", beneficiary.id).order("created_at", { ascending: false }).limit(1));
     setExisting((data?.[0] as LivelihoodAssessmentRow) ?? null);
     setAssessOpen(true);
   };
 
-  const applyAssessment = async (r: Parameters<typeof gateFromAssessment>[0]) => {
-    const { data: auth } = await supabase.auth.getUser();
-    const next = gateFromAssessment(r, gate, new Date().toISOString(), auth.user?.id);
-    try {
-      await offlineMutate({ table: "beneficiaries", action: "update", values: { profile: { ...profile, graduation: next } }, id: beneficiary.id });
-      toast({
-        title: next.status === "selected" ? "Selected for the Graduation pathway" : "Not selected",
-        description: next.status === "selected" ? `Vulnerability ${r.vulnerability}/100 — delivery stages are now unlocked.` : next.reason,
-      });
-    } catch (e) {
-      toast({ title: "Assessment saved, but pathway not updated", description: (e as Error).message, variant: "destructive" });
-    }
+  const applyAssessment = async () => {
     setScoreKey((k) => k + 1);
     onChanged();
   };
@@ -109,10 +99,9 @@ const GraduationPathwayPanel = ({ projectId, moduleId, beneficiary, componentKey
         </div>
       </div>
       <div className="space-y-3 px-4 pt-3">
-        <button type="button" onClick={() => void openAssessment()}
-          className="group relative flex w-full items-center gap-3 overflow-hidden rounded-xl border border-health-teal/40 bg-gradient-to-r from-health-teal/10 via-health-blue/10 to-transparent p-3 text-left transition-all hover:shadow-md">
+        <Button variant="outline" onClick={() => void openAssessment()}
+          className="group relative flex h-auto w-full items-center gap-3 whitespace-normal rounded-lg border border-health-teal/40 bg-health-teal/10 p-3 text-left">
           <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-health-teal text-primary-foreground">
-            <span className="absolute inset-0 animate-ping rounded-lg bg-health-teal/30" style={{ animationDuration: "2.5s" }} />
             <ClipboardCheck className="relative h-5 w-5" />
           </span>
           <span className="min-w-0 flex-1">
@@ -120,11 +109,11 @@ const GraduationPathwayPanel = ({ projectId, moduleId, beneficiary, componentKey
             <span className="block text-xs text-muted-foreground">Every beneficiary is eligible. Completing it maps and verifies the household; the vulnerability score decides selection.</span>
           </span>
           <span className="shrink-0 rounded-full bg-health-teal px-3 py-1 text-xs font-bold text-primary-foreground transition-transform group-hover:scale-105">{gate ? "Update" : "Fill form"}</span>
-        </button>
+        </Button>
         <VulnerabilityScore key={scoreKey} beneficiaryId={beneficiary.id} />
       </div>
       <LivelihoodAssessmentDialog open={assessOpen} onOpenChange={setAssessOpen} projectId={projectId} moduleId={moduleId}
-        beneficiary={beneficiary} existing={existing} onSaved={(r) => void applyAssessment(r)} />
+        beneficiary={beneficiary} existing={existing} onSaved={applyAssessment} />
 
       <div className="space-y-4 p-4">
         {/* Mapping → verification → selection */}
@@ -154,7 +143,7 @@ const GraduationPathwayPanel = ({ projectId, moduleId, beneficiary, componentKey
             {!gate && <Button size="sm" disabled={busy} onClick={() => setStatus("mapped")}><MapPin className="mr-1 h-4 w-4" />Mark mapped</Button>}
             {gate?.status === "mapped" && <Button size="sm" disabled={busy} onClick={() => setStatus("verified")}><ShieldCheck className="mr-1 h-4 w-4" />Confirm verified</Button>}
             {(gate?.status === "verified" || gate?.status === "not_selected") && (
-              <Button size="sm" disabled={busy} onClick={() => setStatus("selected")}><UserCheck className="mr-1 h-4 w-4" />Select for Graduation</Button>
+              <Button size="sm" disabled={busy} onClick={() => void openAssessment()}><ClipboardCheck className="mr-1 h-4 w-4" />Review assessment for selection</Button>
             )}
             {gate?.status === "verified" && !rejecting && (
               <Button size="sm" variant="outline" disabled={busy} onClick={() => setRejecting(true)}>Not selected</Button>
@@ -195,7 +184,7 @@ const GraduationPathwayPanel = ({ projectId, moduleId, beneficiary, componentKey
             </ul>
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground">Delivery stages unlock once the Needs Assessment selects the household (extreme or high vulnerability, with consent). An officer can still override the decision above.</p>
+          <p className="text-xs text-muted-foreground">Delivery stages unlock after a complete high or extreme vulnerability assessment, with explicit consent and no unresolved protection concern.</p>
         )}
       </div>
     </Card>

@@ -31,7 +31,6 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { toneClasses } from "@/lib/programmeModule/defaults";
 import type { BeneficiaryRow } from "@/lib/programmeModule/types";
-import { useMorbidityRecords } from "@/lib/programmeModule/morbidity";
 import {
   BAND_LABELS, BAND_TONE, DECISIONS, OPPORTUNITY_TYPES,
   buildShortlist, saveOpportunity, scoreLivelihood, setAssessmentDecision,
@@ -52,6 +51,8 @@ import LivelihoodVerificationDialog from "./LivelihoodVerificationDialog";
 import GeoCascadeFields from "./GeoCascadeFields";
 import { useFacilities } from "@/lib/programmeModule/facilities";
 import { haversineKm } from "@/lib/microplanning/distance";
+import { useLivelihoodEvidence } from "@/lib/programmeModule/useLivelihoodEvidence";
+import { livelihoodDisability } from "@/lib/programmeModule/livelihoodDisability";
 
 interface Props {
   projectId: string;
@@ -63,6 +64,8 @@ interface Props {
   /** People allowed to verify a shortlisted person on the ground. */
   canVerify?: boolean;
   onOpenBeneficiary?: (b: BeneficiaryRow) => void;
+  onChanged?: () => void;
+  onOverview?: () => void;
 }
 
 const STAGE_NUMBER = (stage?: string | null) => {
@@ -99,17 +102,14 @@ const emptyOpportunity = {
 
 const LivelihoodPanel = ({
   projectId, moduleId, beneficiaries, canManage = false, canAssess = true, canVerify = true,
-  onOpenBeneficiary,
+  onOpenBeneficiary, onChanged, onOverview,
 }: Props) => {
   const { toast } = useToast();
-  const { opportunities, reload: reloadOpportunities } = useLivelihoodOpportunities(projectId);
-  const { byBeneficiary, reload: reloadAssessments } = useLivelihoodAssessments(projectId);
-  const { verifications, reload: reloadVerifications } = useLivelihoodVerifications(projectId);
-  const { records: morbidity } = useMorbidityRecords(projectId) as unknown as {
-    records: { beneficiary_id: string | null; stage: string | null; acute_attacks_last_year: number | null; surgery_status: string | null }[];
-  };
-
   const [opportunityId, setOpportunityId] = useState<string>("");
+  const { opportunities, reload: reloadOpportunities } = useLivelihoodOpportunities(projectId);
+  const { byBeneficiary, reload: reloadAssessments } = useLivelihoodAssessments(projectId, opportunityId);
+  const { verifications, reload: reloadVerifications } = useLivelihoodVerifications(projectId);
+  const evidence = useLivelihoodEvidence(projectId);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<Record<string, unknown>>({ ...emptyOpportunity });
   const [saving, setSaving] = useState(false);
@@ -124,31 +124,8 @@ const LivelihoodPanel = ({
   const opportunity: LivelihoodOpportunityRow | undefined =
     opportunities.find((o) => o.id === opportunityId);
 
-  /** Clinical signals per person, so nobody scores zero for a blank form. */
-  const clinical = useMemo(() => {
-    const map = new Map<string, { stage: number | null; attacks: number; surgery: boolean }>();
-    for (const r of morbidity || []) {
-      if (!r.beneficiary_id) continue;
-      const cur = map.get(r.beneficiary_id) || { stage: null, attacks: 0, surgery: false };
-      const s = STAGE_NUMBER(r.stage);
-      if (s && (cur.stage == null || s > cur.stage)) cur.stage = s;
-      cur.attacks = Math.max(cur.attacks, Number(r.acute_attacks_last_year || 0));
-      if (r.surgery_status === "referred" || r.surgery_status === "scheduled") cur.surgery = true;
-      map.set(r.beneficiary_id, cur);
-    }
-    return map;
-  }, [morbidity]);
-
   const signalsFor = (b: BeneficiaryRow) => {
-    const c = clinical.get(b.id);
-    const overdue = daysSince(b.next_follow_up_date);
-    const missed = overdue == null || overdue <= 0 ? 0 : overdue > 90 ? 2 : overdue > 30 ? 1 : 0;
-    return {
-      morbidityStage: c?.stage ?? null,
-      acuteAttacks: c?.attacks ?? null,
-      surgeryPending: c?.surgery ?? false,
-      missedVisits: missed,
-    };
+    return evidence.signalsFor(b.id);
   };
 
   /* ---- Distance: how far people really are from care and from the venue -- */
@@ -214,7 +191,7 @@ const LivelihoodPanel = ({
       ...geoFor(b),
     })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [beneficiaries, byBeneficiary, clinical, opportunity, facilityPoint, venuePoint],
+    [beneficiaries, byBeneficiary, evidence.data, opportunity, facilityPoint, venuePoint],
   );
 
   /** What the ground visits have taught the system so far. */
@@ -240,7 +217,7 @@ const LivelihoodPanel = ({
   }, [beneficiaries]);
 
   const outcome = useMemo(() => {
-    if (!opportunity) return null;
+    if (!opportunity || !evidence.ready) return null;
     return buildShortlist(results, {
       target: opportunity.target_beneficiaries,
       quotaWomenPct: opportunity.quota_women_pct,
@@ -260,7 +237,7 @@ const LivelihoodPanel = ({
         ward: pick("res_ward", b?.ward),
       };
     });
-  }, [opportunity, results, locationById, byBeneficiary]);
+  }, [opportunity, results, locationById, byBeneficiary, evidence.ready]);
 
   /** Who a verifier should be sent to next. */
   const queue = useMemo(() => {
@@ -319,8 +296,25 @@ const LivelihoodPanel = ({
       });
       return;
     }
-    await setAssessmentDecision(row.id, decision);
-    await reloadAssessments();
+    const b = locationById.get(beneficiaryId);
+    const result = results.find(r => r.beneficiaryId === beneficiaryId);
+    if (!b || !result) return;
+    if (decision === "selected" && (!evidence.ready || !outcome?.selected.some(e => e.result.beneficiaryId === beneficiaryId))) {
+      toast({ title: "Selection needs review", description: "Only complete, consenting, high-vulnerability assessments within the opportunity’s available places can be selected.", variant: "destructive" }); return;
+    }
+    try {
+      await setAssessmentDecision(row.id, decision);
+      const profile = b.profile || {};
+      const now = new Date().toISOString();
+      const prev = readGate(profile);
+      const gate = { ...gateFromAssessment(result, prev, now),
+        status: decision === "selected" ? "selected" : decision === "not_eligible" || decision === "declined" ? "not_selected" : "mapped",
+        opportunity_id: opportunityId,
+        reason: decision === "selected" ? undefined : `Opportunity decision: ${decision.replace("_", " ")}` };
+      await offlineMutate({ table: "beneficiaries", action: "update", id: b.id, values: { profile: { ...profile, graduation: gate } } });
+      await reloadAssessments(); onChanged?.();
+      toast({ title: "Decision linked to Graduation pathway" });
+    } catch (e) { toast({ title: "Could not save decision", description: (e as Error).message, variant: "destructive" }); }
   };
 
   const exportCsv = () => {
@@ -365,6 +359,7 @@ const LivelihoodPanel = ({
             {entry.result.name}
           </button>
           <p className="text-xs text-muted-foreground">{entry.result.caseId} · {entry.result.community}</p>
+          {b && <p className="mt-1 text-xs text-muted-foreground">{livelihoodDisability(b.profile || {}).source}</p>}
         </TableCell>
         <TableCell>
           <Badge className={cn("border", toneClasses[BAND_TONE[entry.result.band]])}>
@@ -414,6 +409,7 @@ const LivelihoodPanel = ({
         <TableCell className="text-xs">{entry.result.completeness}%</TableCell>
         <TableCell className="text-right">
           <div className="flex flex-wrap justify-end gap-1">
+            {b && readGate(b.profile)?.status && onOpenBeneficiary && <Button size="sm" variant="outline" onClick={() => onOpenBeneficiary(b)}>Graduation services</Button>}
             {(canAssess || canManage) && (
               <Button size="sm" variant="outline" className="gap-1" onClick={() => b && setAssessing(b)}>
                 <ClipboardCheck className="h-3.5 w-3.5" /> {assessed ? "Review" : "Assess"}
@@ -462,6 +458,7 @@ const LivelihoodPanel = ({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {onOverview && <Button size="sm" variant="outline" onClick={onOverview}>Graduation overview</Button>}
           {opportunities.length > 0 && (
             <Select value={opportunityId} onValueChange={setOpportunityId}>
               <SelectTrigger className="w-[16rem]"><SelectValue placeholder="Choose opportunity" /></SelectTrigger>
@@ -488,6 +485,8 @@ const LivelihoodPanel = ({
       </Card>
 
       <LivelihoodChecklistShowcase />
+      {evidence.error && <p role="alert" className="text-sm text-destructive">{evidence.error}</p>}
+      {!evidence.ready && !evidence.error && <p className="text-sm text-muted-foreground">Loading clinical and home-visit evidence…</p>}
 
       {opportunity ? (
         <div id="needs-assessment-register">
@@ -537,7 +536,7 @@ const LivelihoodPanel = ({
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {[
               { label: "Places available", value: outcome.summary.target },
-              { label: "Selected", value: outcome.summary.selected },
+              { label: "Suggested for selection", value: outcome.summary.selected },
               {
                 label: "Women",
                 value: `${outcome.summary.women} (${outcome.summary.womenPct}%)`,
@@ -620,7 +619,7 @@ const LivelihoodPanel = ({
 
           <Card className="space-y-3 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="font-semibold">Selected — {outcome.selected.length} of {outcome.summary.target} places</p>
+              <p className="font-semibold">Suggested selection — {outcome.selected.length} of {outcome.summary.target} places</p>
               <div className="relative">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -805,23 +804,10 @@ const LivelihoodPanel = ({
         moduleId={moduleId}
         beneficiary={assessing}
         existing={assessing ? byBeneficiary.get(assessing.id) : null}
-        signals={assessing ? signalsFor(assessing) : undefined}
+        signals={assessing ? geoFor(assessing) : undefined}
         opportunityId={opportunityId || null}
-        onSaved={(r) => {
-          void reloadAssessments();
-          const b = assessing;
-          if (!b || !r) return;
-          void (async () => {
-            const { data: auth } = await supabase.auth.getUser();
-            const profile = (b.profile || {}) as Record<string, unknown>;
-            const next = gateFromAssessment(r as never, readGate(profile), new Date().toISOString(), auth.user?.id);
-            try {
-              await offlineMutate({ table: "beneficiaries", action: "update", values: { profile: { ...profile, graduation: next } }, id: b.id });
-              toast({ title: next.status === "selected" ? `${b.full_name} selected for the Graduation pathway` : `${b.full_name} not selected`, description: next.status === "selected" ? "Delivery stages are now unlocked." : next.reason });
-            } catch (e) {
-              toast({ title: "Assessment saved, but pathway not updated", description: (e as Error).message, variant: "destructive" });
-            }
-          })();
+        onSaved={async () => {
+          await reloadAssessments(); onChanged?.();
         }}
       />
 
