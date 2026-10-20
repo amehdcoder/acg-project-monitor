@@ -777,6 +777,7 @@ export const scoreLivelihood = (input: TargetingInput): TargetingResult => {
   const pkg = (() => {
     if (band === "low") return "Not a priority for this round — keep on the register.";
     const wanted = choiceLabel ? ` Build it around their own choice: ${choiceLabel.toLowerCase()}.` : "";
+    if (String(answers.work_capacity ?? "") === "none") return "Care and consumption support first; adapt livelihood delivery to functional needs, with a support person where needed." + wanted;
     if (readiness >= 70) {
       return (band === "extreme"
         ? "Productive grant with close mentoring, plus three months of consumption support."

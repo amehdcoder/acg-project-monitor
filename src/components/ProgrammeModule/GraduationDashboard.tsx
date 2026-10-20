@@ -177,6 +177,7 @@ function IndividualPathway({ beneficiary, services, onOpen }: { beneficiary?: Be
   return (
     <div className="mt-1 space-y-3 rounded-md border border-border bg-muted/40 p-3">
       <VulnerabilityScore beneficiaryId={beneficiary.id} />
+      {!!gate?.evidence_reasons?.length && <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">{gate.evidence_reasons.map(reason => <li key={reason}>{reason}</li>)}</ul>}
       <ol className="relative space-y-2 border-l-2 border-border pl-4">
         {steps.map((s, i) => (
           <li key={s.label} className="relative">
