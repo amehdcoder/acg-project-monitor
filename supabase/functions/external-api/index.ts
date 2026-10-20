@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
     if (denied) return json({ error: 'No donor access to this project' }, 403)
     const [activity, reports, logframe] = await Promise.all([
       client.rpc('donor_field_activity', { _project_id: projectId, _limit: 30 }),
-      client.from('programme_reports').select('id, period_label, report_year, notes, status, created_at, entries:programme_report_entries(indicator_code, value, disaggregation, risk)').eq('project_id', projectId).order('created_at', { ascending: false }),
+      client.from('programme_reports').select('id, period_label, report_year, notes, status, created_at, entries:programme_report_entries(indicator_code, value, disaggregation, risk)').eq('project_id', projectId).in('status', ['submitted', 'resolved']).order('created_at', { ascending: false }),
       client.from('programme_logframes').select('data').eq('project_id', projectId).maybeSingle(),
     ])
     if (activity.error || reports.error || logframe.error) return json({ error: 'Could not load programme data' }, 500)
@@ -200,6 +200,7 @@ Deno.serve(async (req) => {
         .from('programme_reports')
         .select('id, period_label, report_year, status, notes, created_at, reviewed_at, resolution_note, entries:programme_report_entries(indicator_code, value, disaggregation, risk, over_target_comment)')
         .eq('project_id', key.project_id)
+        .in('status', ['submitted', 'resolved'])
         .order('created_at', { ascending: false })
         .limit(100)
       if (error) return json({ error: error.message }, 500)
