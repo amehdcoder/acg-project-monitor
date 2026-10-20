@@ -180,11 +180,11 @@ export default function DonorPortal({ userId }: { userId: string }) {
                 <h2 className="donor-heading mb-3 text-lg">Registrations over time</h2>
                 <ResponsiveContainer width="100%" height={240}>
                   <AreaChart data={mergeMonthly(agg.registrations_by_month)}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(210 30% 88%)" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--donor-border))" />
                     <XAxis dataKey="month" fontSize={11} />
                     <YAxis fontSize={11} allowDecimals={false} />
                     <Tooltip />
-                    <Area type="monotone" dataKey="count" stroke="hsl(199 100% 42%)" fill="hsl(199 100% 42% / 0.18)" name="Registrations" />
+                    <Area type="monotone" dataKey="count" stroke="hsl(var(--donor-blue))" fill="hsl(var(--donor-blue) / 0.18)" name="Registrations" />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -192,11 +192,11 @@ export default function DonorPortal({ userId }: { userId: string }) {
                 <h2 className="donor-heading mb-3 text-lg">Services over time</h2>
                 <ResponsiveContainer width="100%" height={240}>
                   <BarChart data={mergeMonthly(agg.services_by_month)}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(210 30% 88%)" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--donor-border))" />
                     <XAxis dataKey="month" fontSize={11} />
                     <YAxis fontSize={11} allowDecimals={false} />
                     <Tooltip />
-                    <Bar dataKey="count" fill="hsl(213 62% 30%)" radius={[4, 4, 0, 0]} name="Services" />
+                    <Bar dataKey="count" fill="hsl(var(--donor-navy-2))" radius={[4, 4, 0, 0]} name="Services" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -272,7 +272,6 @@ export default function DonorPortal({ userId }: { userId: string }) {
                             <td className="text-xs opacity-80">{e.risk ?? "—"}</td>
                           </tr>
                         ))}
-                        {res.activities.map(activity => <li key={activity.code} className="donor-indicator"><span className="donor-chip">{activity.code}</span><div className="flex-1"><p className="text-sm font-medium">{activity.title}</p><p className="text-xs opacity-70">{activity.indicator}</p></div></li>)}
                       </tbody>
                     </table>
                   </div>
@@ -304,9 +303,10 @@ export default function DonorPortal({ userId }: { userId: string }) {
                           <li key={ind.code} className="donor-indicator">
                             <span className="donor-chip">{ind.code}</span>
                             <span className="flex-1 text-sm">{ind.title}</span>
-                            {ind.totalTarget && <span className="text-xs font-semibold opacity-70">Target: {ind.totalTarget}</span>}
+                            {ind.totalTarget && <span className="text-xs font-semibold opacity-70">Target: {ind.totalTarget}{ind.isPercent ? "%" : ""}</span>}
                           </li>
                         ))}
+                        {res.activities.map(activity => <li key={activity.code} className="donor-indicator"><span className="donor-chip">{activity.code}</span><div className="flex-1"><p className="text-sm font-medium">{activity.title}</p><p className="text-xs opacity-70">{activity.indicator}</p></div></li>)}
                       </ul>
                     </div>
                   ))}
