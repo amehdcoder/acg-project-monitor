@@ -237,6 +237,7 @@ const QuizBuilder = ({ projectId }: { projectId?: string } = {}) => {
   })();
 
   useEffect(() => {
+    setSelectedQuiz(null); setShowAnalytics(null); setShowTaker(null); setQuestions([]);
     fetchQuizzes();
     if (isAdmin) fetchProjects();
   }, [isAdmin, projectId, user?.id]);
@@ -250,7 +251,6 @@ const QuizBuilder = ({ projectId }: { projectId?: string } = {}) => {
 
   const fetchQuizzes = async () => {
     setLoading(true);
-    setSelectedQuiz(null); setShowAnalytics(null); setShowTaker(null); setQuestions([]);
     setNewProjectId(projectId || "");
     if (!user) { setQuizzes([]); setLoading(false); return; }
     if (projectId) {
