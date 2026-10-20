@@ -15,10 +15,11 @@ export function detectQuestions(source: unknown): ImportedQuestion[] {
   return {question_text:String(row.question_text??row.Question??row.title??''),options,correct_answer:found?.value??'',points:Number(row.points??row.Points??google?.grading?.pointValue??1)};
  }).filter(q=>q.question_text.trim());
 }
+export interface ImportedResult {participant_key:string;participant_name:string;assessment_type:'pre_test'|'post_test';percentage:number;cohort:string|null;state:string|null;lga:string|null;designation:string|null;submitted_at:string}
 export const resultSchema=z.object({participant_key:z.string().trim().min(1),participant_name:z.string().trim().min(1),assessment_type:z.enum(['pre_test','post_test']),percentage:z.number().finite().min(0).max(100),cohort:z.string().nullable(),state:z.string().nullable(),lga:z.string().nullable(),designation:z.string().nullable(),submitted_at:z.string().datetime()});
 export const aliases:Record<string,string[]>={participant_key:['participant_key','participant id','email','email address','respondent email','id'],participant_name:['participant_name','name','full name','participant name'],assessment_type:['assessment_type','assessment','test type','pre/post'],percentage:['percentage','percentage score','score %'],score:['score','total points','total score'],max_score:['max_score','maximum points','max score'],cohort:['cohort','group','intervention group'],state:['state'],lga:['lga','local government area'],designation:['designation','role','cadre'],submitted_at:['submitted_at','completion time','timestamp','submitted at']};
 export function detectColumns(headers:string[]) { return Object.fromEntries(Object.entries(aliases).map(([key,names])=>[key,headers.find(h=>names.includes(h.toLowerCase().trim()))||''])); }
-export function normalizeResults(rows:Record<string,unknown>[],mapping:Record<string,string>) {
+export function normalizeResults(rows:Record<string,unknown>[],mapping:Record<string,string>): ImportedResult[] {
  const read=(r:Record<string,unknown>,k:string)=>r[mapping[k]];
  return rows.map((r,i)=>{
   const rawType=String(read(r,'assessment_type')||'').toLowerCase().trim().replace(/[ -]/g,'_');
@@ -29,7 +30,7 @@ export function normalizeResults(rows:Record<string,unknown>[],mapping:Record<st
   const d=new Date(String(date));
   const result=resultSchema.safeParse({participant_key:String(read(r,'participant_key')||'').trim().toLowerCase(),participant_name:String(read(r,'participant_name')||''),assessment_type:type,percentage,cohort:read(r,'cohort')?String(read(r,'cohort')):null,state:read(r,'state')?String(read(r,'state')):null,lga:read(r,'lga')?String(read(r,'lga')):null,designation:read(r,'designation')?String(read(r,'designation')):null,submitted_at:Number.isNaN(+d)?'':d.toISOString()});
   if(!result.success) throw new Error(`Row ${i+2}: ${result.error.issues.map(e=>`${e.path.join('.')}: ${e.message}`).join('; ')}`);
-  return result.data;
+  return result.data as ImportedResult;
  });
 }
 export function platformFromUrl(raw:string) {
