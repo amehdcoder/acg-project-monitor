@@ -1,3 +1,4 @@
+import VulnerabilityScore from "./VulnerabilityScore";
 import { useMemo, useState } from "react";
 import { CheckCircle2, Circle, Loader2, MapPin, Plus, ShieldCheck, UserCheck, XCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -77,6 +78,7 @@ const GraduationPathwayPanel = ({ beneficiary, componentKey, services, onRecord,
           {selected && <span className="rounded-full bg-primary-foreground/20 px-3 py-1 text-xs font-bold">{pct}% complete</span>}
         </div>
       </div>
+      <div className="px-4 pt-3"><VulnerabilityScore beneficiaryId={beneficiary.id} /></div>
 
       <div className="space-y-4 p-4">
         {/* Mapping → verification → selection */}
