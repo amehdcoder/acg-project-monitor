@@ -4,7 +4,7 @@
 // parses a filled template back into a logframe + report drafts.
 
 import ExcelJS from "exceljs";
-import type { AutoKey, LogframeObjective, ProjectLogframe } from "./logframe";
+import { resultLevel, type AutoKey, type LogframeObjective, type ProjectLogframe, type LogframeDisaggregation } from "./logframe";
 import { parseDisaggCell, serializeDisaggCell } from "./disaggregationCatalog";
 
 export interface ReportDraftLike {
@@ -30,7 +30,7 @@ const TONE_FILL: Record<string, { band: string; soft: string }> = {
   teal: { band: "FF0F7E7A", soft: "FFE3F4F2" },
   amber: { band: "FFB86E00", soft: "FFFDF1DE" },
 };
-const KIND_FILL: Record<string, string> = { Outcome: "FFEAF7EE", Result: "FFF1F5FB", Activity: "FFFFFBEA" };
+const KIND_FILL: Record<string, string> = { Impact: "FFEAF7EE", Outcome: "FFEAF7EE", Output: "FFF1F5FB", Result: "FFF1F5FB", Activity: "FFFFFBEA" };
 
 export const COLUMNS = [
   { key: "type", header: "Level", width: 12 },
@@ -57,6 +57,13 @@ export const COLUMNS = [
   { key: "disaggValues", header: "Disaggregated values (Dimension: Option=Value, …; one dimension per line)", width: 44 },
   { key: "risk", header: "Risks / challenges", width: 32 },
   { key: "over", header: "Over-target explanation", width: 32 },
+  { key: "objColor", header: "Objective hex colour", width: 18 },
+  { key: "resColor", header: "Result hex colour", width: 18 },
+  { key: "indColor", header: "Indicator hex colour", width: 18 },
+  { key: "resStatement", header: "Result statement", width: 40 },
+  { key: "assumptions", header: "Assumptions", width: 40 },
+  { key: "config", header: "Disaggregation options (JSON)", width: 48 },
+  { key: "resLevel", header: "Result level", width: 14 },
 ] as const;
 type ColKey = (typeof COLUMNS)[number]["key"];
 
@@ -226,17 +233,19 @@ export async function buildLogframeWorkbook(lf: ProjectLogframe, state: ReportSh
 
   for (const obj of lf.objectives) {
     for (const res of obj.results) {
-      const base = { objKey: obj.key, objTitle: obj.title, objStatement: obj.statement, tone: obj.tone, resKey: res.key, resTitle: res.title };
-      const kind = res.key.endsWith("outcome") ? "Outcome" : "Result";
+      const base = { objKey: obj.key, objTitle: obj.title, objStatement: obj.statement, tone: obj.tone, resKey: res.key, resTitle: res.title, objColor: obj.color ?? "", resColor: res.color ?? "", resStatement: res.statement ?? "", assumptions: res.assumptions ?? "", resLevel: resultLevel(res) };
+      const level = resultLevel(res);
+      const kind = level[0].toUpperCase() + level.slice(1);
       const items = [
-        ...res.indicators.map((ind) => ({ kind, code: ind.code, activity: "", indicator: ind.title, mov: ind.mov, baseline: ind.baseline, targets: ind.targets, totalTarget: ind.totalTarget, disaggregation: ind.disaggregation, autoKey: ind.autoKey, isPercent: ind.isPercent })),
-        ...res.activities.map((a) => ({ kind: "Activity", code: a.code, activity: a.title, indicator: a.indicator, mov: a.mov, baseline: "", targets: a.targets, totalTarget: a.totalTarget, disaggregation: a.disaggregation, autoKey: a.autoKey, isPercent: a.isPercent })),
+        ...res.indicators.map((ind) => ({ ...ind, kind, activity: "", indicator: ind.title })),
+        ...res.activities.map((a) => ({ ...a, kind: "Activity", activity: a.title, baseline: "" })),
       ];
       if (!items.length) add({ ...base, type: kind }, obj.tone, kind);
       for (const it of items) {
         const d = state.drafts[it.code];
         add({
           ...base, type: it.kind, code: it.code, activity: it.activity, indicator: it.indicator,
+          indColor: it.color ?? "", config: it.disaggregationConfig ? JSON.stringify(it.disaggregationConfig) : "",
           mov: it.mov || "", baseline: it.baseline || "",
           y1: it.targets[0] ?? "", y2: it.targets[1] ?? "", y3: it.targets[2] ?? "", y4: it.targets[3] ?? "",
           total: it.totalTarget || "", disagg: (it.disaggregation || []).join("; "),
@@ -248,7 +257,7 @@ export async function buildLogframeWorkbook(lf: ProjectLogframe, state: ReportSh
   }
   const last = ws.rowCount;
   for (let r = 4; r <= Math.max(last + 200, 300); r++) {
-    ws.getCell(r, 1).dataValidation = { type: "list", allowBlank: true, formulae: ['"Outcome,Result,Activity"'] };
+    ws.getCell(r, 1).dataValidation = { type: "list", allowBlank: true, formulae: ['"Impact,Outcome,Output,Result,Activity"'] };
     ws.getCell(r, 5).dataValidation = { type: "list", allowBlank: true, formulae: ['"blue,teal,amber"'] };
     ws.getCell(r, 19).dataValidation = { type: "list", allowBlank: true, formulae: ['"Yes,No"'] };
   }
@@ -262,7 +271,7 @@ export async function buildLogframeWorkbook(lf: ProjectLogframe, state: ReportSh
     "1. Cover sheet: edit the project title, impact statement, reporting period, programme year and narrative notes in the blue cells. The Objectives block is editable too — change a Specific Objective's title or narrative in its coloured row.",
     "2. Logframe sheet: one row per indicator or activity. Every column can be edited — objective narratives, result areas, codes, indicator names, baselines, yearly and total targets.",
     "3. Rows with the same Objective ID belong to one Specific Objective; rows with the same Result ID belong to one result area. Add a row to add an indicator; delete a row to remove it.",
-    "4. Level: Outcome (objective-level indicator), Result (result-area indicator) or Activity. For Activity rows, put the activity name in 'Activity' and its indicator in 'Indicator'.",
+    "4. Level: Impact, Outcome, Output or Activity. Legacy Result rows remain supported. For Activity rows, put the activity name in 'Activity' and its indicator in 'Indicator'.",
     "5. Disaggregations: list dimension names separated by semicolons, e.g. Sex; NTD age band; State; LGA; Ward.",
     "6. Disaggregated values: one dimension per line, e.g. Sex: Male=12, Female=9. Values in each dimension should add up to 'Value this period'.",
     "7. Do not edit the 'Auto-source' column — it links indicators to automatic counts from beneficiary records.",
@@ -356,14 +365,16 @@ export async function parseLogframeWorkbook(data: ArrayBuffer): Promise<ParsedTe
     let obj = objectives.find((o) => o.key === objKeyRaw);
     if (!obj) {
       const tone = (["blue", "teal", "amber"].includes(g("tone")) ? g("tone") : (["blue", "teal", "amber"] as const)[objectives.length % 3]) as LogframeObjective["tone"];
-      obj = { key: objKeyRaw || `so${objectives.length + 1}`, title: objTitle || `Specific Objective ${objectives.length + 1}`, statement: g("objStatement"), tone, results: [] };
+      obj = { key: objKeyRaw || `so${objectives.length + 1}`, title: objTitle || `Specific Objective ${objectives.length + 1}`, statement: g("objStatement"), tone, color: g("objColor") || undefined, results: [] };
       objectives.push(obj);
     }
     lastObj = obj;
     const type = g("type").toLowerCase();
     const resKey = g("resKey") || `${obj.key}-${type === "outcome" ? "outcome" : "r1"}`;
     let res = obj.results.find((x) => x.key === resKey);
-    if (!res) { res = { key: resKey, title: g("resTitle") || resKey, indicators: [], activities: [] }; obj.results.push(res); }
+    if (!res) { res = { key: resKey, title: g("resTitle") || resKey, level: type === "impact" ? "impact" : type === "outcome" ? "outcome" : type === "output" || type === "result" ? "output" : undefined, color: g("resColor") || undefined, statement: g("resStatement") || undefined, assumptions: g("assumptions") || undefined, indicators: [], activities: [] }; obj.results.push(res); }
+    if (type === "impact" || type === "outcome" || type === "output") res.level = type;
+    if (["impact", "outcome", "output"].includes(g("resLevel"))) res.level = g("resLevel") as "impact" | "outcome" | "output";
     if (!code) continue;
     if (seen.has(code)) { errors.push(`Row ${r}: duplicate code ${code} skipped`); continue; }
     seen.add(code);
@@ -371,7 +382,13 @@ export async function parseLogframeWorkbook(data: ArrayBuffer): Promise<ParsedTe
     const disaggregation = g("disagg").split(/[;\n]/).map((s) => s.trim()).filter(Boolean);
     const isPercent = /^y/i.test(g("percent"));
     const autoKey = (g("auto") || undefined) as AutoKey | undefined;
-    const common = { code, mov: g("mov") || undefined, targets, totalTarget: g("total") || undefined, disaggregation: disaggregation.length ? disaggregation : undefined, autoKey, isPercent: isPercent || undefined };
+    let disaggregationConfig: LogframeDisaggregation[] | undefined;
+    if (g("config")) {
+      const parsed: unknown = JSON.parse(g("config"));
+      if (!Array.isArray(parsed) || parsed.some(d => !d || typeof d.label !== "string" || !["options", "location"].includes(d.kind) || (d.options && (!Array.isArray(d.options) || d.options.some((o: unknown) => typeof o !== "string"))))) throw new Error(`Row ${r}: invalid disaggregation options`);
+      disaggregationConfig = parsed;
+    }
+    const common = { code, mov: g("mov") || undefined, targets, totalTarget: g("total") || undefined, disaggregation: disaggregation.length ? disaggregation : undefined, autoKey, isPercent: isPercent || undefined, color: g("indColor") || undefined, disaggregationConfig };
     if (type === "activity") res.activities.push({ ...common, title: g("activity") || g("indicator"), indicator: g("indicator") });
     else res.indicators.push({ ...common, title: g("indicator"), baseline: g("baseline") || undefined });
 

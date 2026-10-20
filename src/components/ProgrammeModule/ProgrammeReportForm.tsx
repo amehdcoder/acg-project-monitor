@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { defaultLogframe, flatIndicators, type ProjectLogframe, numericTarget, type AutoKey, type FlatIndicator } from "@/lib/programmeModule/logframe";
+import { defaultLogframe, resultLevel, flatIndicators, type ProjectLogframe, numericTarget, type AutoKey, type FlatIndicator } from "@/lib/programmeModule/logframe";
 import { aggregateIndicators } from "@/lib/programmeModule/programmeReport";
 import {loadKnowledgeMetrics,type KnowledgeMetric} from '@/lib/quizAssessments/knowledge';
 import DisaggregationEditor from "./DisaggregationEditor";
@@ -34,6 +34,7 @@ import { loadProjectLogframe, saveProjectLogframe } from "@/lib/programmeModule/
 import { exportLogframeExcel, parseLogframeWorkbook } from "@/lib/programmeModule/logframeExcel";
 import { FileSpreadsheet, Pencil, Upload } from "lucide-react";
 import { parseDisaggCell } from "@/lib/programmeModule/disaggregationCatalog";
+import { logframeColorStyle } from "@/lib/programmeModule/logframeColor";
 import { offlineMutate, currentUserId } from "@/lib/programmeModule/offlineWrite";
 
 const db = supabase as unknown as {
@@ -443,7 +444,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
     await loadOfficers();
   };
 
-  const renderIndicator = (ind: FlatIndicator, tone: keyof typeof TONES) => {
+  const renderIndicator = (ind: FlatIndicator, tone: keyof typeof TONES, color?: string) => {
     const draft = drafts[ind.code];
     const yearIdx = Math.min(Math.max(Number(reportYear) - 1, 0), 3);
     const yearTarget = numericTarget(ind.targets[yearIdx]);
@@ -462,7 +463,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
     const isOverTarget = hasValue && effectiveTarget !== null && valueNum > effectiveTarget;
     const overTargetNeedsComment = isOverTarget && (draft?.overTargetComment.trim() ?? "") === "";
     return (
-      <div key={ind.code} className={cn("rounded-lg border border-l-4 bg-card p-4 shadow-soft sm:p-5", t.border)}>
+      <div key={ind.code} style={logframeColorStyle(ind.color ?? color)} className={cn("rounded-lg border border-l-4 bg-card p-4 shadow-soft sm:p-5", t.border, (ind.color ?? color) && "logframe-custom-accent")}>
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
@@ -515,6 +516,7 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
           {ind.disaggregation && ind.disaggregation.length > 0 && (
             <DisaggregationEditor
               labels={ind.disaggregation}
+              config={ind.disaggregationConfig}
               values={draft?.disaggregation || {}}
               onChange={(next) => setDraft(ind.code, { disaggregation: next })}
               idPrefix={`report-${ind.code}`}
@@ -668,8 +670,8 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
         const results = obj.results.filter((res) => [...res.indicators, ...res.activities].some(matches));
         if (!results.length) return null;
         return (
-          <section key={obj.key} className="space-y-4">
-            <div className={cn("flex items-start gap-3 rounded-lg border-l-4 px-5 py-4", t.soft, t.border)}>
+          <section key={obj.key} style={logframeColorStyle(obj.color)} className="space-y-4">
+            <div className={cn("flex items-start gap-3 rounded-lg border-l-4 px-5 py-4", t.soft, t.border, obj.color && "logframe-custom-accent")}>
               <Target className="mt-1 h-6 w-6 shrink-0" /><div>
               <p className="text-[10px] font-bold uppercase">{obj.title}</p>
               <p className="mt-1 text-base font-semibold leading-relaxed">{obj.statement}</p>
@@ -686,15 +688,15 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
                       onClick={() => setExpanded((p) => ({ ...p, [res.key]: !isOpen }))}
                     >
                       {isOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                      <span className="flex-1 text-sm font-semibold text-health-ink">{res.title}</span>
+                      <span className="flex-1 text-sm font-semibold text-health-ink">{resultLevel(res).toUpperCase()} · {res.title}</span>
                       <span className="shrink-0 text-xs font-medium text-muted-foreground">{[...res.indicators, ...res.activities].filter((ind) => drafts[ind.code]?.value.trim()).length}/{count}</span>
                     </Button>
                     {isOpen && (
                       <div className="space-y-4">
                         {res.indicators.filter(matches).map((ind) =>
                           renderIndicator(
-                            { ...ind, objectiveKey: obj.key, objectiveTitle: obj.title, resultKey: res.key, resultTitle: res.title, kind: res.key.endsWith("outcome") ? "outcome" : "result" },
-                            obj.tone,
+                            { ...ind, objectiveKey: obj.key, objectiveTitle: obj.title, resultKey: res.key, resultTitle: res.title, kind: resultLevel(res) },
+                            obj.tone, res.color ?? obj.color,
                           ),
                         )}
                         {res.activities.filter(matches).map((act) =>
@@ -702,10 +704,10 @@ const ProgrammeReportForm = ({ projectId, canManage }: Props) => {
                             {
                               code: act.code, title: `${act.title} — ${act.indicator}`, mov: act.mov,
                               targets: act.targets, totalTarget: act.totalTarget, disaggregation: act.disaggregation,
-                              autoKey: act.autoKey, isPercent: act.isPercent,
+                              autoKey: act.autoKey, isPercent: act.isPercent, color: act.color, disaggregationConfig: act.disaggregationConfig,
                               objectiveKey: obj.key, objectiveTitle: obj.title, resultKey: res.key, resultTitle: res.title, kind: "activity",
                             },
-                            obj.tone,
+                            obj.tone, res.color ?? obj.color,
                           ),
                         )}
                       </div>

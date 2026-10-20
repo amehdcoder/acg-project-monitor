@@ -40,6 +40,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import QuizTaker from "./QuizTaker";
 import ExternalQuizImport from "./ExternalQuizImport";
+import ExternalFormSync from "./ExternalFormSync";
 import AssessmentDashboard from "./AssessmentDashboard";
 import QuizAnalytics from "./QuizAnalytics";
 import QuizOpenedDialog from "./QuizOpenedDialog";
@@ -1041,6 +1042,7 @@ const QuizBuilder = ({ projectId }: { projectId?: string } = {}) => {
               )}
               <div className="flex gap-2 flex-wrap pt-2">
                 {isAdmin && <ExternalQuizImport key={selectedQuiz.id} quiz={selectedQuiz} onImported={()=>{void fetchQuestions(selectedQuiz.id); window.dispatchEvent(new Event("quiz-assessment-updated"));}} />}
+                {isAdmin && <ExternalFormSync key={`sync-${selectedQuiz.id}`} quiz={selectedQuiz} onUpdated={()=>{void fetchQuestions(selectedQuiz.id); window.dispatchEvent(new Event("quiz-assessment-updated"));}} />}
                 {selectedQuiz.source_url && <Button variant="outline" size="sm" asChild><a href={selectedQuiz.source_url} target="_blank" rel="noopener noreferrer">Open {selectedQuiz.source_platform || "external form"}</a></Button>}
                 {projectId && isAdmin && <Button size="sm" variant="outline" onClick={()=>{setSelectedQuiz(null);setQuestions([]);}}>Project comparisons</Button>}
                 {canViewAnalytics && (

@@ -162,6 +162,20 @@
       "when": 1792472786691,
       "tag": "0022_knowledge_unique_activity_participants",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1792474642724,
+      "tag": "0023_external_assessment_sync",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1792474732738,
+      "tag": "0024_atomic_external_quiz_response_ingestion",
+      "breakpoints": true
     }
   ]
 }

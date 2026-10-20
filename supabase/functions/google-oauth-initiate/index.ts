@@ -12,6 +12,8 @@ const corsHeaders = {
 const SCOPES = [
   "https://www.googleapis.com/auth/spreadsheets",
   "https://www.googleapis.com/auth/drive.file",
+  "https://www.googleapis.com/auth/forms.body.readonly",
+  "https://www.googleapis.com/auth/forms.responses.readonly",
   "openid",
   "email",
 ].join(" ");

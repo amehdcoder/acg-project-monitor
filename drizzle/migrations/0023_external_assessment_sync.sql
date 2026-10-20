@@ -1,0 +1,15 @@
+CREATE TABLE public.quiz_external_syncs (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), quiz_id uuid NOT NULL REFERENCES public.quizzes(id) ON DELETE CASCADE, provider text NOT NULL CHECK (provider IN ('google','microsoft','mentimeter','other')), form_id text NOT NULL, owner_id uuid NOT NULL, assessment_type text NOT NULL CHECK (assessment_type IN ('pre_test','post_test')), mapping jsonb NOT NULL DEFAULT '{}'::jsonb, enabled boolean NOT NULL DEFAULT true, cursor_at timestamptz, page_token text, schema_hash text, schema_json jsonb, last_sync_at timestamptz, last_error text, imported_count integer NOT NULL DEFAULT 0, secret_hash text, lease_until timestamptz, created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(quiz_id,provider,form_id));
+GRANT SELECT,INSERT,UPDATE,DELETE ON public.quiz_external_syncs TO authenticated;
+GRANT ALL ON public.quiz_external_syncs TO service_role;
+ALTER TABLE public.quiz_external_syncs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Admins manage their sync connections" ON public.quiz_external_syncs FOR ALL TO authenticated USING (owner_id=auth.uid() AND public.is_admin(auth.uid())) WITH CHECK (owner_id=auth.uid() AND public.is_admin(auth.uid()) AND EXISTS(SELECT 1 FROM public.quizzes q WHERE q.id=quiz_id));
+CREATE TABLE public.quiz_external_responses (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), sync_id uuid NOT NULL REFERENCES public.quiz_external_syncs(id) ON DELETE CASCADE, response_id text NOT NULL, participant_key text NOT NULL, submitted_at timestamptz NOT NULL, answers jsonb NOT NULL DEFAULT '{}'::jsonb, schema_hash text, created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(sync_id,response_id));
+GRANT SELECT ON public.quiz_external_responses TO authenticated;
+GRANT ALL ON public.quiz_external_responses TO service_role;
+ALTER TABLE public.quiz_external_responses ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Admins read sync answers" ON public.quiz_external_responses FOR SELECT TO authenticated USING (public.is_admin(auth.uid()));
+CREATE OR REPLACE FUNCTION public.claim_external_quiz_sync(p_id uuid) RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$ BEGIN UPDATE public.quiz_external_syncs SET lease_until=now()+interval '2 minutes' WHERE id=p_id AND enabled AND (lease_until IS NULL OR lease_until<now()); RETURN FOUND; END $$;
+REVOKE ALL ON FUNCTION public.claim_external_quiz_sync(uuid) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.claim_external_quiz_sync(uuid) TO service_role;
+REVOKE ALL ON public.user_google_oauth_tokens FROM anon,authenticated;
+GRANT ALL ON public.user_google_oauth_tokens TO service_role;

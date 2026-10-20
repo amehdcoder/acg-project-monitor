@@ -11079,6 +11079,47 @@ export type Database = {
         }
         Relationships: []
       }
+      quiz_external_responses: {
+        Row: {
+          answers: Json
+          created_at: string
+          id: string
+          participant_key: string
+          response_id: string
+          schema_hash: string | null
+          submitted_at: string
+          sync_id: string
+        }
+        Insert: {
+          answers?: Json
+          created_at?: string
+          id?: string
+          participant_key: string
+          response_id: string
+          schema_hash?: string | null
+          submitted_at: string
+          sync_id: string
+        }
+        Update: {
+          answers?: Json
+          created_at?: string
+          id?: string
+          participant_key?: string
+          response_id?: string
+          schema_hash?: string | null
+          submitted_at?: string
+          sync_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_external_responses_sync_id_fkey"
+            columns: ["sync_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_external_syncs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quiz_external_results: {
         Row: {
           assessment_type: string
@@ -11125,6 +11166,77 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "quiz_external_results_quiz_id_fkey"
+            columns: ["quiz_id"]
+            isOneToOne: false
+            referencedRelation: "quizzes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quiz_external_syncs: {
+        Row: {
+          assessment_type: string
+          created_at: string
+          cursor_at: string | null
+          enabled: boolean
+          form_id: string
+          id: string
+          imported_count: number
+          last_error: string | null
+          last_sync_at: string | null
+          lease_until: string | null
+          mapping: Json
+          owner_id: string
+          page_token: string | null
+          provider: string
+          quiz_id: string
+          schema_hash: string | null
+          schema_json: Json | null
+          secret_hash: string | null
+        }
+        Insert: {
+          assessment_type: string
+          created_at?: string
+          cursor_at?: string | null
+          enabled?: boolean
+          form_id: string
+          id?: string
+          imported_count?: number
+          last_error?: string | null
+          last_sync_at?: string | null
+          lease_until?: string | null
+          mapping?: Json
+          owner_id: string
+          page_token?: string | null
+          provider: string
+          quiz_id: string
+          schema_hash?: string | null
+          schema_json?: Json | null
+          secret_hash?: string | null
+        }
+        Update: {
+          assessment_type?: string
+          created_at?: string
+          cursor_at?: string | null
+          enabled?: boolean
+          form_id?: string
+          id?: string
+          imported_count?: number
+          last_error?: string | null
+          last_sync_at?: string | null
+          lease_until?: string | null
+          mapping?: Json
+          owner_id?: string
+          page_token?: string | null
+          provider?: string
+          quiz_id?: string
+          schema_hash?: string | null
+          schema_json?: Json | null
+          secret_hash?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_external_syncs_quiz_id_fkey"
             columns: ["quiz_id"]
             isOneToOne: false
             referencedRelation: "quizzes"
@@ -14156,6 +14268,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      claim_external_quiz_sync: { Args: { p_id: string }; Returns: boolean }
       current_user_can_build_mda_followups: { Args: never; Returns: boolean }
       current_user_can_build_mda_followups_for_project: {
         Args: { p_project_id: string }
@@ -14656,6 +14769,10 @@ export type Database = {
       start_proximity_conversation: {
         Args: { _other: string }
         Returns: string
+      }
+      store_external_quiz_responses: {
+        Args: { p_responses: Json; p_sync_id: string }
+        Returns: number
       }
       submit_bloomberg_validation: { Args: { _row: Json }; Returns: Json }
       submit_quiz_attempt: {

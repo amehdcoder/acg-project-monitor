@@ -22,6 +22,15 @@ export type AutoKey =
   | "livelihood_participants"
   | "livelihood_assessed";
 
+export type LogframeLevel = "impact" | "outcome" | "output";
+export interface LogframeDisaggregation {
+  label: string;
+  kind: "options" | "location";
+  options?: string[];
+  level?: "state" | "lga" | "ward";
+  allowOther?: boolean;
+}
+
 export interface LogframeIndicator {
   code: string;
   title: string;
@@ -32,6 +41,8 @@ export interface LogframeIndicator {
   disaggregation?: string[];
   autoKey?: AutoKey;
   isPercent?: boolean;
+  color?: string;
+  disaggregationConfig?: LogframeDisaggregation[];
 }
 
 export interface LogframeActivity {
@@ -44,6 +55,8 @@ export interface LogframeActivity {
   disaggregation?: string[];
   autoKey?: AutoKey;
   isPercent?: boolean;
+  color?: string;
+  disaggregationConfig?: LogframeDisaggregation[];
 }
 
 export interface LogframeResult {
@@ -51,6 +64,10 @@ export interface LogframeResult {
   title: string;
   indicators: LogframeIndicator[];
   activities: LogframeActivity[];
+  level?: LogframeLevel;
+  statement?: string;
+  assumptions?: string;
+  color?: string;
 }
 
 export interface LogframeObjective {
@@ -58,6 +75,7 @@ export interface LogframeObjective {
   title: string;
   statement: string;
   tone: "blue" | "teal" | "amber";
+  color?: string;
   results: LogframeResult[];
 }
 
@@ -477,12 +495,17 @@ export interface FlatIndicator {
   disaggregation?: string[];
   autoKey?: AutoKey;
   isPercent?: boolean;
+  color?: string;
+  disaggregationConfig?: LogframeDisaggregation[];
   objectiveKey: string;
   objectiveTitle: string;
   resultKey: string;
   resultTitle: string;
-  kind: "outcome" | "result" | "activity";
+  kind: "impact" | "outcome" | "output" | "result" | "activity";
 }
+
+export const resultLevel = (result: LogframeResult): LogframeLevel =>
+  result.level ?? (result.key.endsWith("outcome") ? "outcome" : "output");
 
 export const flatIndicators = (objectives: LogframeObjective[] = LOGFRAME): FlatIndicator[] => {
   const out: FlatIndicator[] = [];
@@ -493,7 +516,7 @@ export const flatIndicators = (objectives: LogframeObjective[] = LOGFRAME): Flat
           ...ind,
           objectiveKey: obj.key, objectiveTitle: obj.title,
           resultKey: res.key, resultTitle: res.title,
-          kind: res.key.endsWith("outcome") ? "outcome" : "result",
+          kind: resultLevel(res),
         });
       }
       for (const act of res.activities) {
@@ -501,6 +524,7 @@ export const flatIndicators = (objectives: LogframeObjective[] = LOGFRAME): Flat
           code: act.code, title: `${act.title} — ${act.indicator}`, mov: act.mov,
           targets: act.targets, totalTarget: act.totalTarget,
           disaggregation: act.disaggregation, autoKey: act.autoKey, isPercent: act.isPercent,
+          color: act.color, disaggregationConfig: act.disaggregationConfig,
           objectiveKey: obj.key, objectiveTitle: obj.title,
           resultKey: res.key, resultTitle: res.title, kind: "activity",
         });
@@ -519,3 +543,9 @@ export const numericTarget = (raw?: string | null): number | null => {
 
 export const defaultLogframe = (): ProjectLogframe =>
   JSON.parse(JSON.stringify({ project: LOGFRAME_PROJECT, objectives: LOGFRAME }));
+
+/** A new design never inherits indicators from another programme. */
+export const blankLogframe = (project: Partial<LogframeProjectInfo> = {}): ProjectLogframe => ({
+  project: { id: "", name: "", country: "", impact: "", ...project },
+  objectives: [],
+});

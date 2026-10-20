@@ -27,21 +27,26 @@ serve(async (req) => {
       });
     }
 
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!serviceKey) throw new Error("Account connection service unavailable");
+    const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
     const action: string = body.action ?? "status";
 
     if (action === "disconnect") {
-      await supabase
+      const { error: disconnectError } = await admin
         .from("user_google_oauth_tokens")
         .delete()
         .eq("user_id", userRes.user.id)
         .eq("provider", "google");
+      if (disconnectError) throw disconnectError;
       return new Response(JSON.stringify({ connected: false }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await admin
       .from("user_google_oauth_tokens")
       .select("google_email, expires_at, scope, updated_at")
       .eq("user_id", userRes.user.id)
