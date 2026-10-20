@@ -1,9 +1,9 @@
 # Roadmap
 
-- [ ] Add dedicated donor account sign-in and preserve each donor's project dashboard.
-- [ ] Enhance WHO-style donor overview with risk indicators, referral completion percentage and field activity preview.
-- [ ] Add step-by-step creation/editing of all logframe components.
-- [ ] Display and calculate referral completion consistently as a percentage.
+- [x] Add dedicated donor account sign-in, signup and recovery screens; preserve donor project selection. Screens verified; email confirmation and social redirects not exercised end-to-end.
+- [x] Enhance WHO-style donor overview with live aggregate risk indicators, referral completion percentage and field activity preview; authenticated desktop/mobile checks passed.
+- [x] Add step-by-step creation/editing of all logframe components; authenticated unchanged-framework save and draft creation verified.
+- [x] Display and calculate referral completion as a percentage; regression tests passed.
 
 - [x] Complete automatic full Programme Report delivery and payload-preserving retries; synthetic receiver returned HTTP 200.
 - [x] Connect donor dashboard to authenticated Amehnities API; verify reports, downloads, draft exclusion and access boundaries.
