@@ -1388,6 +1388,10 @@ select option {
   --donor-navy: 213 76% 18%;         /* #0B2E4F */
   --donor-navy-2: 213 62% 30%;       /* #1B4F8A */
   --donor-ice: 207 64% 97%;          /* #F4F9FC */
+  --primary: var(--donor-blue);
+  --foreground: var(--donor-navy);
+  --background: var(--donor-ice);
+  --donor-border: 207 40% 88%;
   background: hsl(var(--donor-ice));
   color: hsl(var(--donor-navy));
   font-family: "IBM Plex Sans", "Plus Jakarta Sans", sans-serif;
@@ -1395,7 +1399,7 @@ select option {
 .donor-heading {
   font-family: "Libre Baskerville", "Playfair Display", serif;
   color: hsl(var(--donor-navy));
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 .donor-eyebrow {
   font-size: 0.68rem;
@@ -1407,8 +1411,8 @@ select option {
 .donor-card {
   background: hsl(0 0% 100% / 0.85);
   backdrop-filter: blur(8px);
-  border: 1px solid hsl(207 40% 88%);
-  border-radius: 1rem;
+  border: 1px solid hsl(var(--donor-border));
+  border-radius: 0.5rem;
   box-shadow: 0 1px 2px hsl(213 76% 18% / 0.05), 0 8px 24px -12px hsl(213 76% 18% / 0.12);
   animation: donor-rise 0.45s ease both;
 }
@@ -1495,3 +1499,7 @@ select option {
 .donor-portal .leaflet-control-streetview,
 .donor-portal [class*="streetview" i],
 .donor-portal button[title*="Street View" i] { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .donor-card { animation: none; }
+}
