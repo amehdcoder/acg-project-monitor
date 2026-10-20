@@ -159,8 +159,7 @@ export function GoogleAccountConnect() {
             )}
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Sync exports to <strong>your own</strong> Google Sheets — separate from the
-            shared service account. Tokens are stored securely and only used on your behalf.
+            Google Sheets & Forms
           </p>
           {status?.connected && status.google_email && (
             <p className="text-xs mt-1">

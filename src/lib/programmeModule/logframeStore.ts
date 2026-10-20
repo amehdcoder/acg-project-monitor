@@ -3,7 +3,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { cachedRead, cacheSet } from "./offlineReadCache";
-import { defaultLogframe, type ProjectLogframe } from "./logframe";
+import { blankLogframe, defaultLogframe, type ProjectLogframe } from "./logframe";
 
 const db = supabase as unknown as { from: (t: string) => any }; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -22,7 +22,10 @@ export async function loadProjectLogframe(projectId: string): Promise<ProjectLog
     }
     return lf;
   }
-  return defaultLogframe();
+  const { data: project } = await cachedRead<{ data: { name?: string } | null }>(`logframe-project:${projectId}`, () => db.from("projects").select("name").eq("id", projectId).maybeSingle());
+  // Preserve the historic starter only for its intended programme.
+  if (/ciskula|ci[sš]kula/i.test(project?.data?.name ?? "")) return defaultLogframe();
+  return blankLogframe({ name: project?.data?.name ?? "", id: projectId });
 }
 
 export async function saveProjectLogframe(projectId: string, lf: ProjectLogframe): Promise<void> {

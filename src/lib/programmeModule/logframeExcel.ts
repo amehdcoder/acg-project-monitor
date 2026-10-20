@@ -30,7 +30,7 @@ const TONE_FILL: Record<string, { band: string; soft: string }> = {
   teal: { band: "FF0F7E7A", soft: "FFE3F4F2" },
   amber: { band: "FFB86E00", soft: "FFFDF1DE" },
 };
-const KIND_FILL: Record<string, string> = { Outcome: "FFEAF7EE", Result: "FFF1F5FB", Activity: "FFFFFBEA" };
+const KIND_FILL: Record<string, string> = { Impact: "FFEAF7EE", Outcome: "FFEAF7EE", Output: "FFF1F5FB", Result: "FFF1F5FB", Activity: "FFFFFBEA" };
 
 export const COLUMNS = [
   { key: "type", header: "Level", width: 12 },
@@ -63,6 +63,7 @@ export const COLUMNS = [
   { key: "resStatement", header: "Result statement", width: 40 },
   { key: "assumptions", header: "Assumptions", width: 40 },
   { key: "config", header: "Disaggregation options (JSON)", width: 48 },
+  { key: "resLevel", header: "Result level", width: 14 },
 ] as const;
 type ColKey = (typeof COLUMNS)[number]["key"];
 
@@ -232,7 +233,7 @@ export async function buildLogframeWorkbook(lf: ProjectLogframe, state: ReportSh
 
   for (const obj of lf.objectives) {
     for (const res of obj.results) {
-      const base = { objKey: obj.key, objTitle: obj.title, objStatement: obj.statement, tone: obj.tone, resKey: res.key, resTitle: res.title, objColor: obj.color ?? "", resColor: res.color ?? "", resStatement: res.statement ?? "", assumptions: res.assumptions ?? "" };
+      const base = { objKey: obj.key, objTitle: obj.title, objStatement: obj.statement, tone: obj.tone, resKey: res.key, resTitle: res.title, objColor: obj.color ?? "", resColor: res.color ?? "", resStatement: res.statement ?? "", assumptions: res.assumptions ?? "", resLevel: resultLevel(res) };
       const level = resultLevel(res);
       const kind = level[0].toUpperCase() + level.slice(1);
       const items = [
@@ -373,6 +374,7 @@ export async function parseLogframeWorkbook(data: ArrayBuffer): Promise<ParsedTe
     let res = obj.results.find((x) => x.key === resKey);
     if (!res) { res = { key: resKey, title: g("resTitle") || resKey, level: type === "impact" ? "impact" : type === "outcome" ? "outcome" : type === "output" || type === "result" ? "output" : undefined, color: g("resColor") || undefined, statement: g("resStatement") || undefined, assumptions: g("assumptions") || undefined, indicators: [], activities: [] }; obj.results.push(res); }
     if (type === "impact" || type === "outcome" || type === "output") res.level = type;
+    if (["impact", "outcome", "output"].includes(g("resLevel"))) res.level = g("resLevel") as "impact" | "outcome" | "output";
     if (!code) continue;
     if (seen.has(code)) { errors.push(`Row ${r}: duplicate code ${code} skipped`); continue; }
     seen.add(code);
