@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cachedRead } from "@/lib/programmeModule/offlineReadCache";
-import { PRIORITY_LIVELIHOOD_SERVICES } from "@/lib/programmeModule/componentOutcomes";
+import { componentKind } from "@/lib/programmeModule/componentOutcomes";
 import { GRADUATION_STAGES, graduationOverview, readGate, stageProgress } from "@/lib/programmeModule/graduation";
 import type { BeneficiaryRow } from "@/lib/programmeModule/types";
 import { cn } from "@/lib/utils";
@@ -47,7 +47,7 @@ export default function GraduationDashboard({ projectId, beneficiaries, onOpenBe
         const { data, error } = await supabase.from("beneficiary_services").select("beneficiary_id,service_name,service_date,component_key")
           .eq("project_id", projectId).order("id").range(from, from + 999);
         if (error) return { data: null, error };
-        all.push(...(data ?? []) as Svc[]);
+        all.push(...((data ?? []) as Svc[]).filter(s => componentKind(s.component_key) === "livelihood"));
         if ((data ?? []).length < 1000) break;
       }
       return { data: all, error: null };

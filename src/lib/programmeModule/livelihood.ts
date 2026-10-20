@@ -1100,7 +1100,7 @@ export const saveAssessment = async (payload: {
     priority_band: payload.result.band,
     domain_scores: payload.result.domains,
     recommended_package: payload.result.package,
-    decision: payload.decision || (payload.result.assessmentComplete && payload.result.consentGiven && !payload.result.protectionConcern && ["extreme", "high"].includes(payload.result.band) ? "selected" : "assessed"),
+    decision: payload.decision || "assessed",
     decision_notes: payload.decision_notes || null,
     assessed_by: user || null,
   };

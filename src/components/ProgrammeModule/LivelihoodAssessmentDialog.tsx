@@ -87,6 +87,7 @@ const LivelihoodAssessmentDialog = ({
         opportunity_id: opportunityId || existing?.opportunity_id || null,
         answers,
         result,
+        decision: existing?.decision === "selected" && (!result.assessmentComplete || !result.consentGiven || result.protectionConcern || !["extreme", "high"].includes(result.band)) ? "assessed" : existing?.decision,
       });
       const profile = beneficiary.profile || {};
       const gate = gateFromAssessment(result, readGate(profile), new Date().toISOString(), await currentUserId());
