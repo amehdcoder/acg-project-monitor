@@ -1509,3 +1509,6 @@ select option {
 
 [role="dialog"].logframe-wizard { height: 88dvh; overflow: hidden !important; margin: 0; }
 .logframe-wizard .logframe-targets { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+
+/* Scoped user-defined logframe accent, validated as a six-digit hex value. */
+.logframe-custom-accent { border-left-color: var(--logframe-accent); }

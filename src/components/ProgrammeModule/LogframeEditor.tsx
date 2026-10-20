@@ -9,10 +9,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, Plus, RotateCcw, Save, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { defaultLogframe, type LogframeObjective, type ProjectLogframe } from "@/lib/programmeModule/logframe";
+import { blankLogframe, defaultLogframe, resultLevel, type LogframeObjective, type ProjectLogframe } from "@/lib/programmeModule/logframe";
 import { validateLogframe } from "@/lib/programmeModule/logframeValidation";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import LogframeDisaggregationBuilder from "./LogframeDisaggregationBuilder";
+import LogframeColorField from "./LogframeColorField";
+import { logframeColorStyle } from "@/lib/programmeModule/logframeColor";
 
 interface Props {
   open: boolean;
@@ -31,7 +34,7 @@ const Field = ({ label, children, className }: { label: string; children: React.
   <div className={cn("min-w-0", className)}><Label className="text-sm font-semibold text-muted-foreground">{label}</Label><div className="mt-1">{children}</div></div>
 );
 
-const STEPS = ["Project & impact", "Specific objectives", "Results & outcomes", "Indicators", "Activities", "Review"];
+const STEPS = ["Project & impact", "Specific objectives", "Impact, outcomes & outputs", "Indicators", "Activities", "Review"];
 const AUTO_SOURCES = ["people_accessing_services", "pwd_accessing_services", "people_screened", "people_treated", "referral_completion", "eye_screenings", "eye_surgeries", "spectacles_distributed", "followup_visits", "home_visits", "mhpss_services", "morbidity_services", "completed_referrals", "ccfm_resolved_pct", "ccfm_cases", "livelihood_participants", "livelihood_assessed"] as const;
 
 export default function LogframeEditor({ open, onOpenChange, value, onSave }: Props) {
@@ -77,21 +80,27 @@ export default function LogframeEditor({ open, onOpenChange, value, onSave }: Pr
             <section key={oi} className="space-y-4">
               {step === 1 ? <><div className="flex flex-wrap items-end gap-2">
                 <Field label="Objective title" className="flex-1 basis-48"><Input value={obj.title} onChange={(e) => mutate((d) => { d.objectives[oi].title = e.target.value; })} /></Field>
-                <Field label="Colour">
+                <Field label="Default palette">
                   <div className="flex gap-1">{(["blue", "teal", "amber"] as const).map((t) => (
                     <Button key={t} type="button" size="sm" variant={obj.tone === t ? "default" : "outline"} className="h-10 capitalize" onClick={() => mutate((d) => { d.objectives[oi].tone = t; })}>{t}</Button>
                   ))}</div>
                 </Field>
-                <Button variant="ghost" size="icon" aria-label="Remove objective" onClick={() => mutate((d) => { d.objectives.splice(oi, 1); })}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                <Button variant="ghost" size="icon" aria-label="Remove objective" onClick={() => mutate((d) => { d.objectives.splice(oi, 1); setObjectiveIndex(Math.max(0, oi - 1)); setResultIndex(0); })}><Trash2 className="h-4 w-4 text-destructive" /></Button>
               </div>
+              <Field label="Objective colour"><LogframeColorField label={`Objective ${oi + 1} colour`} value={obj.color} onChange={color => mutate(d => { d.objectives[oi].color = color; })} /></Field>
               <Field label="Objective narrative"><Textarea rows={3} value={obj.statement} onChange={(e) => mutate((d) => { d.objectives[oi].statement = e.target.value; })} /></Field></> : <p className="font-semibold text-health-teal">{obj.title} · {obj.statement}</p>}
 
               {step >= 2 && obj.results.map((res, ri) => ri === resultIndex ? (
                 <div key={ri} className="space-y-4">
-                  {step === 2 && <div className="flex items-end gap-2">
+                  {step === 2 && <><div className="flex items-end gap-2">
                     <Field label="Result area" className="flex-1"><Input value={res.title} onChange={(e) => mutate((d) => { d.objectives[oi].results[ri].title = e.target.value; })} /></Field>
-                    <Button variant="ghost" size="icon" aria-label="Remove result area" onClick={() => mutate((d) => { d.objectives[oi].results.splice(ri, 1); })}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                  </div>}
+                    <Button variant="ghost" size="icon" aria-label="Remove result area" onClick={() => mutate((d) => { d.objectives[oi].results.splice(ri, 1); setResultIndex(Math.max(0, ri - 1)); })}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                  </div><div className="grid gap-3 sm:grid-cols-2">
+                    <Field label="Results-chain level"><Select value={resultLevel(res)} onValueChange={v => mutate(d => { d.objectives[oi].results[ri].level = v as "impact" | "outcome" | "output"; })}><SelectTrigger aria-label="Results-chain level"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="impact">Impact</SelectItem><SelectItem value="outcome">Outcome</SelectItem><SelectItem value="output">Output</SelectItem></SelectContent></Select></Field>
+                    <Field label="Result colour"><LogframeColorField label="Result colour" value={res.color} onChange={color => mutate(d => { d.objectives[oi].results[ri].color = color; })} /></Field>
+                    <Field label="Result statement" className="sm:col-span-2"><Textarea value={res.statement ?? ""} onChange={e => mutate(d => { d.objectives[oi].results[ri].statement = e.target.value; })} /></Field>
+                    <Field label="Assumptions & risks" className="sm:col-span-2"><Textarea value={res.assumptions ?? ""} onChange={e => mutate(d => { d.objectives[oi].results[ri].assumptions = e.target.value; })} /></Field>
+                  </div></>}
                   {step === 3 && res.indicators.map((ind, ii) => (
                     <div key={ii} className="grid gap-2 rounded-md border border-health-blue/20 bg-health-blue/5 p-3 sm:grid-cols-6">
                       <Field label="Code"><Input value={ind.code} onChange={(e) => mutate((d) => { d.objectives[oi].results[ri].indicators[ii].code = e.target.value; })} className="font-mono text-xs" /></Field>
@@ -100,7 +109,7 @@ export default function LogframeEditor({ open, onOpenChange, value, onSave }: Pr
                       <Field label="Baseline"><Input value={ind.baseline || ""} onChange={(e) => mutate((d) => { d.objectives[oi].results[ri].indicators[ii].baseline = e.target.value; })} /></Field>
                       <Field label="Year 1–4 targets" className="sm:col-span-2">{targetInputs(ind.targets, (i, v) => mutate((d) => { d.objectives[oi].results[ri].indicators[ii].targets[i] = v || null; }))}</Field>
                       <Field label="Total target"><Input value={ind.totalTarget || ""} onChange={(e) => mutate((d) => { d.objectives[oi].results[ri].indicators[ii].totalTarget = e.target.value; })} /></Field>
-                      <Field label="Disaggregations (comma separated)" className="sm:col-span-4"><Input value={(ind.disaggregation || []).join(", ")} onChange={(e) => mutate((d) => { d.objectives[oi].results[ri].indicators[ii].disaggregation = e.target.value.split(",").map((s) => s.trim()).filter(Boolean); })} /></Field>
+                      <div className="sm:col-span-6"><LogframeDisaggregationBuilder labels={ind.disaggregation ?? []} config={ind.disaggregationConfig} onChange={(labels, config) => mutate(d => { const item = d.objectives[oi].results[ri].indicators[ii]; item.disaggregation = labels; item.disaggregationConfig = config; })} /></div><Field label="Indicator colour" className="sm:col-span-3"><LogframeColorField label={`Indicator ${ind.code} colour`} value={ind.color} onChange={color => mutate(d => { d.objectives[oi].results[ri].indicators[ii].color = color; })} /></Field>
                       <Field label="Auto-fill from records" className="sm:col-span-6"><Select value={ind.autoKey || "manual"} onValueChange={v => mutate(d => { const entry = d.objectives[oi].results[ri].indicators[ii]; entry.autoKey = v === "manual" ? undefined : AUTO_SOURCES.find(s => s === v); if (entry.autoKey === "referral_completion") entry.isPercent = true; })}><SelectTrigger aria-label={`Auto source ${ind.code}`}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="manual">Manual entry</SelectItem>{AUTO_SOURCES.map(source => <SelectItem key={source} value={source}>{source.replace(/_/g, " ")}{source === "referral_completion" ? " (%)" : ""}</SelectItem>)}</SelectContent></Select></Field>
                       <div className="flex items-end gap-2 sm:col-span-2">
                         <Button type="button" size="sm" variant={ind.isPercent ? "default" : "outline"} className="h-10" onClick={() => mutate((d) => { d.objectives[oi].results[ri].indicators[ii].isPercent = !ind.isPercent; })}>%</Button>
@@ -116,7 +125,7 @@ export default function LogframeEditor({ open, onOpenChange, value, onSave }: Pr
                       <Field label="Means of verification" className="sm:col-span-3"><Input value={act.mov || ""} onChange={(e) => mutate((d) => { d.objectives[oi].results[ri].activities[ai].mov = e.target.value; })} /></Field>
                       <Field label="Year 1–4 targets" className="sm:col-span-2">{targetInputs(act.targets, (i, v) => mutate((d) => { d.objectives[oi].results[ri].activities[ai].targets[i] = v || null; }))}</Field>
                       <Field label="Total target"><Input value={act.totalTarget || ""} onChange={(e) => mutate((d) => { d.objectives[oi].results[ri].activities[ai].totalTarget = e.target.value; })} /></Field>
-                      <Field label="Disaggregations" className="sm:col-span-2"><Input value={(act.disaggregation || []).join(", ")} onChange={(e) => mutate((d) => { d.objectives[oi].results[ri].activities[ai].disaggregation = e.target.value.split(",").map((s) => s.trim()).filter(Boolean); })} /></Field>
+                      <div className="sm:col-span-6"><LogframeDisaggregationBuilder labels={act.disaggregation ?? []} config={act.disaggregationConfig} onChange={(labels, config) => mutate(d => { const item = d.objectives[oi].results[ri].activities[ai]; item.disaggregation = labels; item.disaggregationConfig = config; })} /></div><Field label="Activity colour" className="sm:col-span-3"><LogframeColorField label={`Activity ${act.code} colour`} value={act.color} onChange={color => mutate(d => { d.objectives[oi].results[ri].activities[ai].color = color; })} /></Field>
                       <Field label="Auto-fill from records" className="sm:col-span-4"><Select value={act.autoKey || "manual"} onValueChange={v => mutate(d => { const entry = d.objectives[oi].results[ri].activities[ai]; entry.autoKey = v === "manual" ? undefined : AUTO_SOURCES.find(s => s === v); if (entry.autoKey === "referral_completion") entry.isPercent = true; })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="manual">Manual entry</SelectItem>{AUTO_SOURCES.map(source => <SelectItem key={source} value={source}>{source.replace(/_/g, " ")}</SelectItem>)}</SelectContent></Select></Field>
                       <Field label="Percentage (%)"><Switch checked={!!act.isPercent} onCheckedChange={checked => mutate(d => { d.objectives[oi].results[ri].activities[ai].isPercent = checked; })} aria-label={`Percentage for ${act.code}`} /></Field>
                       <div className="flex items-end"><Button variant="ghost" size="sm" className="h-10 text-destructive" onClick={() => mutate((d) => { d.objectives[oi].results[ri].activities.splice(ai, 1); })}><Trash2 className="mr-1 h-4 w-4" /> Remove</Button></div>
@@ -128,15 +137,16 @@ export default function LogframeEditor({ open, onOpenChange, value, onSave }: Pr
                   </div>
                 </div>
               ) : null)}
-              {step === 2 && <Button variant="outline" size="sm" onClick={() => { setResultIndex(obj.results.length); mutate((d) => { d.objectives[oi].results.push({ key: `${obj.key}-r-${crypto.randomUUID()}`, title: "", indicators: [], activities: [] }); }); }}><Plus className="mr-1 h-4 w-4" /> Add result area</Button>}
+              {step === 2 && <Button variant="outline" size="sm" onClick={() => { setResultIndex(obj.results.length); mutate((d) => { d.objectives[oi].results.push({ key: `${obj.key}-r-${crypto.randomUUID()}`, title: "New output", level: "output", indicators: [], activities: [] }); }); }}><Plus className="mr-1 h-4 w-4" /> Add result area</Button>}
             </section>
           ) : null)}
           {step === 1 && <Button variant="outline" onClick={() => { setObjectiveIndex(lf.objectives.length); setResultIndex(0); mutate((d) => { const n = d.objectives.length + 1; d.objectives.push({ key: `so-${crypto.randomUUID()}`, title: `Specific Objective ${n}`, statement: "", tone: (["blue", "teal", "amber"] as LogframeObjective["tone"][])[n % 3], results: [] }); }); }}><Plus className="mr-1 h-4 w-4" /> Add Specific Objective</Button>}
-          {step === 5 && <section className="space-y-5"><h3 className="text-xl font-semibold">{lf.project.name}</h3><p className="text-muted-foreground">{lf.project.impact}</p>{lf.objectives.map(o => <div key={o.key} className={cn("border-l-4 pl-4", TONE_CLS[o.tone])}><h4 className="font-semibold">{o.title}</h4><p className="text-sm">{o.statement}</p>{o.results.map(r => <div key={r.key} className="mt-3"><p className="font-medium">{r.title}</p><p className="text-sm text-muted-foreground">{r.indicators.length} indicators · {r.activities.length} activities</p>{[...r.indicators, ...r.activities].map(i => <p key={i.code} className="mt-1 text-sm"><span className="font-mono text-health-blue">{i.code}</span> · {i.title} · Target {i.totalTarget || "—"}{i.isPercent ? "%" : ""}</p>)}</div>)}</div>)}</section>}
+          {step === 5 && <section className="space-y-5"><h3 className="text-xl font-semibold">{lf.project.name}</h3><p className="text-muted-foreground">{lf.project.impact}</p>{lf.objectives.map(o => <div key={o.key} style={logframeColorStyle(o.color)} className={cn("border-l-4 pl-4", TONE_CLS[o.tone], o.color && "logframe-custom-accent")}><h4 className="font-semibold">{o.title}</h4><p className="text-sm">{o.statement}</p>{o.results.map(r => <div key={r.key} className="mt-3"><p className="font-medium">{resultLevel(r).toUpperCase()} · {r.title}</p><p className="text-sm text-muted-foreground">{r.indicators.length} indicators · {r.activities.length} activities</p>{[...r.indicators, ...r.activities].map(i => <p key={i.code} className="mt-1 text-sm"><span className="font-mono text-health-blue">{i.code}</span> · {i.title} · Target {i.totalTarget || "—"}{i.isPercent ? "%" : ""}</p>)}</div>)}</div>)}</section>}
           {errors.length > 0 && <div role="alert" className="border-l-4 border-destructive bg-destructive/5 p-3 text-sm text-destructive"><ul>{errors.map(error => <li key={error}>{error}</li>)}</ul></div>}
         </div>
         <DialogFooter className="shrink-0 flex-wrap gap-2 border-t border-border px-5 py-3">
-          <Button variant="ghost" onClick={() => { setLf(defaultLogframe()); setStep(0); }}><RotateCcw className="mr-1 h-4 w-4" /> Restore original</Button>
+          <Button variant="outline" onClick={() => { if (!window.confirm("Start a new design? Unsaved changes will be cleared; the saved framework remains unchanged until you save.")) return; setLf(blankLogframe(lf.project)); setObjectiveIndex(0); setResultIndex(0); setStep(0); }}>New blank design</Button>
+          <Button variant="ghost" onClick={() => { if (!window.confirm("Load the CiSKuLA example? Unsaved changes will be cleared.")) return; setLf(defaultLogframe()); setStep(0); }}><RotateCcw className="mr-1 h-4 w-4" /> Load CiSKuLA example</Button>
           <Button variant="outline" disabled={step === 0 || busy} onClick={() => setStep(s => s - 1)}><ArrowLeft className="mr-1 h-4 w-4" /> Back</Button>
           {step < 5 ? <Button onClick={() => setStep(s => s + 1)}>Continue <ArrowRight className="ml-1 h-4 w-4" /></Button> : <Button disabled={busy} onClick={async () => { const issues = validateLogframe(lf); setErrors(issues); if (issues.length) return; setBusy(true); try { await onSave(lf); onOpenChange(false); } catch (e) { setErrors([(e as Error).message]); } finally { setBusy(false); } }}>
             {busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-1 h-4 w-4" />} Save framework
