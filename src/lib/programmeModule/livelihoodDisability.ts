@@ -12,7 +12,7 @@ export function livelihoodDisability(profile: Record<string, unknown>) {
     if (typeof v !== "string") return false;
     const s = v.trim().toLowerCase();
     if (!s || /^(no\b|none\b|not\b|unknown\b|prefer\b|suspected\b)/.test(s)) return false;
-    if (profile.disability_status === "Suspected disability" && v !== profile.vulnerability_factors) return false;
+    if (profile.disability_status === "Suspected disability" && !/person.*disability/.test(s)) return false;
     return /^(yes\b|pwd\b)|disability identified|multiple disabilities|person.*disability|difficulty|cannot|visual|hearing|physical|mobility|intellectual|psychosocial|communication|self.care|albinism/.test(s);
   });
   const completed = !!wg && wgComplete(wg.answers);

@@ -111,7 +111,9 @@ export function gateFromAssessment(
     : `Needs Assessment score ${r.vulnerability}/100 (${r.band}) is below the selection threshold`;
   return {
     ...(prev || {}), status: r.assessmentComplete === false ? "mapped" : selected ? "selected" : "not_selected",
-    mapped_at: prev?.mapped_at || now, verified_at: prev?.verified_at || now, decided_at: now,
+    mapped_at: prev?.mapped_at || now,
+    verified_at: r.assessmentComplete === false ? prev?.verified_at : prev?.verified_at || now,
+    decided_at: r.assessmentComplete === false ? prev?.decided_at : now,
     reason, updated_by: userId,
     vulnerability_score: r.vulnerability, vulnerability_band: r.band, evidence_reasons: r.reasons,
   };
