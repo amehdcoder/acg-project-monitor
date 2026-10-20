@@ -4,6 +4,7 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { guardRequest } from '../_shared/authGuard.ts'
+import { retryEvent } from './retry.ts'
 
 const MAX_ATTEMPTS = 5
 
@@ -141,11 +142,9 @@ Deno.serve(async (req) => {
     const ep = (d as Record<string, unknown>).webhook_endpoints as Endpoint | null
     if (!ep || !ep.is_active) continue
     const original = (d as Record<string, unknown>).webhook_events as { payload: unknown } | null
-    if (!original && d.event_id) continue
-    await deliver(supabase, ep, {
-      id: d.event_id, event: d.event, project_id: ep.project_id,
-      payload: original?.payload ?? { message: 'Amehnities test webhook' },
-    }, { id: d.id, attempts: d.attempts })
+    const event = retryEvent(d, original, ep.project_id)
+    if (!event) continue
+    await deliver(supabase, ep, event, { id: d.id, attempts: d.attempts })
   }
 
   // 2. Deliver new unprocessed events

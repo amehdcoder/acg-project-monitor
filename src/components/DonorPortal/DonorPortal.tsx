@@ -166,7 +166,7 @@ export default function DonorPortal({ userId }: { userId: string }) {
             <section className="donor-card p-4 sm:p-6">
               <h2 className="donor-heading mb-1 text-lg">Where people are reached</h2>
               <p className="mb-3 text-sm opacity-70">Beneficiaries by Local Government Area — deeper blue means more people reached.</p>
-              <NigeriaChoropleth cells={cells} height={440} showBasemap={false} />
+              <NigeriaChoropleth cells={cells} height={440} showBasemap={false} showStreetView={false} />
             </section>
 
             <section className="grid gap-4 lg:grid-cols-2">
