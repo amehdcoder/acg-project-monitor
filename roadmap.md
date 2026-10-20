@@ -1,5 +1,9 @@
 # Roadmap
 
+- [ ] Add project-scoped quizzes to Longitudinal Beneficiary Records, reuse protected quiz creation/taking and pre/post analytics.
+- [ ] Add reviewed external quiz schema import and platform links without guessing unavailable answer keys.
+- [ ] Verify quiz import validation, project scoping and authenticated assessment workflow.
+
 - [x] Add dedicated donor account sign-in, signup and recovery screens; preserve donor project selection. Screens verified; email confirmation and social redirects not exercised end-to-end.
 - [x] Enhance WHO-style donor overview with live aggregate risk indicators, referral completion percentage and field activity preview; authenticated desktop/mobile checks passed.
 - [x] Add step-by-step creation/editing of all logframe components; authenticated unchanged-framework save and draft creation verified.
