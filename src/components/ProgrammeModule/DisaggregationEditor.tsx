@@ -23,6 +23,7 @@ interface Props {
   values: Record<string, string>;
   onChange: (next: Record<string, string>) => void;
   idPrefix: string;
+  config?: import("@/lib/programmeModule/logframe").LogframeDisaggregation[];
 }
 
 const LocationPanel = ({ dim, raw, onChange, idPrefix }: { dim: DisaggDimension; raw: string; onChange: (v: string) => void; idPrefix: string }) => {
@@ -172,9 +173,9 @@ const OptionsPanel = ({ dim, raw, onChange, idPrefix }: { dim: DisaggDimension; 
   );
 };
 
-const DisaggregationEditor = ({ labels, values, onChange, idPrefix }: Props) => {
+const DisaggregationEditor = ({ labels, values, onChange, idPrefix, config }: Props) => {
   const [openKey, setOpenKey] = useState<string | null>(null);
-  const dims = useMemo(() => labels.map((l) => dimensionFor(l)), [labels]);
+  const dims = useMemo(() => labels.map((l) => dimensionFor(l, config)), [labels, config]);
 
   return (
     <div>

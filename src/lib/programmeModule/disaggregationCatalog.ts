@@ -57,7 +57,13 @@ const is = (label: string, ...words: string[]) => {
 };
 
 /** Resolve a logframe disaggregation label (e.g. "Gender", "Age band") to a dimension. */
-export function dimensionFor(label: string): DisaggDimension {
+export function dimensionFor(label: string, config?: import("./logframe").LogframeDisaggregation[]): DisaggDimension {
+  const custom = config?.find(d => d.label === label);
+  if (custom) return {
+    key: `custom_${label}`, label, kind: custom.kind, level: custom.level,
+    groups: custom.kind === "options" ? [{ title: label, options: custom.options ?? [] }] : undefined,
+    allowOther: custom.allowOther,
+  };
   if (is(label, "state", "lga", "ward", "community", "location")) {
     const l = label.toLowerCase();
     const level: "state" | "lga" | "ward" = l.includes("ward") || l.includes("community") ? "ward" : l.includes("lga") ? "lga" : "state";
