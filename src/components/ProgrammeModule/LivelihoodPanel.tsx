@@ -293,10 +293,12 @@ const LivelihoodPanel = ({
         quota_disability_pct: Number(form.quota_disability_pct) || 0,
         start_date: String(form.start_date || "") || null,
       } as never);
-      toast({ title: "Opportunity saved" });
+      toast({ title: "Opportunity saved", description: "The Needs Assessment register is now open below." });
       setFormOpen(false);
       setForm({ ...emptyOpportunity });
       await reloadOpportunities();
+      setTimeout(() => document.getElementById("needs-assessment-register")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" }), 400);
     } catch (e) {
       toast({
         title: "Could not save",
