@@ -1,6 +1,6 @@
 // Graduation Approach pathway — tracks each beneficiary household from mapping
 // through verification and selection, then across the delivery stages.
-import { PRIORITY_LIVELIHOOD_SERVICES } from "./componentOutcomes";
+import { componentKind, PRIORITY_LIVELIHOOD_SERVICES } from "./componentOutcomes";
 
 export type SelectionStatus = "mapped" | "verified" | "selected" | "not_selected";
 
@@ -11,6 +11,10 @@ export interface GraduationGate {
   decided_at?: string;
   reason?: string;
   updated_by?: string;
+  vulnerability_score?: number;
+  vulnerability_band?: string;
+  evidence_reasons?: string[];
+  opportunity_id?: string;
 }
 
 export const SELECTION_STEPS: { value: SelectionStatus; label: string; hint: string }[] = [
@@ -35,10 +39,10 @@ export interface StageProgress {
 
 /** Progress per stage, counted from recorded services with matching names. */
 export const stageProgress = (
-  services: { service_name?: string | null; service_date?: string | null }[],
+  services: { service_name?: string | null; service_date?: string | null; component_key?: string | null }[],
 ): StageProgress[] =>
   GRADUATION_STAGES.map((stage) => {
-    const hits = services.filter((s) => (s.service_name || "").toLowerCase() === stage.toLowerCase());
+    const hits = services.filter((s) => (!s.component_key || componentKind(s.component_key) === "livelihood") && (s.service_name || "").trim().toLowerCase() === stage.toLowerCase());
     const lastDate = hits.map((h) => h.service_date || "").filter(Boolean).sort().pop() || null;
     return { stage, count: hits.length, lastDate };
   });
@@ -56,10 +60,13 @@ const PHASE: Record<string, string> = Object.fromEntries(GRADUATION_STAGES.map((
 /** Sequential Graduation funnel: selection gate, then each delivery stage, then full completion. */
 export function graduationOverview(
   beneficiaries: { id: string; full_name: string; lga: string | null; profile?: unknown }[],
-  services: { beneficiary_id: string; service_name?: string | null; service_date?: string | null }[],
+  services: { beneficiary_id: string; service_name?: string | null; service_date?: string | null; component_key?: string | null }[],
 ) {
   const byBen = new Map<string, typeof services>();
-  for (const s of services) byBen.set(s.beneficiary_id, [...(byBen.get(s.beneficiary_id) ?? []), s]);
+  for (const s of services) {
+    if (s.component_key && componentKind(s.component_key) !== "livelihood") continue;
+    byBen.set(s.beneficiary_id, [...(byBen.get(s.beneficiary_id) ?? []), s]);
+  }
   const participants: GraduationParticipant[] = beneficiaries.flatMap(b => {
     const gate = readGate(b.profile as Record<string, unknown>);
     const own = byBen.get(b.id) ?? [];
@@ -75,7 +82,7 @@ export function graduationOverview(
     { key: "mapped", label: "Mapped", phase: "Selection", count: reached(p => rank[p.status] >= 1) },
     { key: "verified", label: "Verified", phase: "Selection", count: reached(p => rank[p.status] >= 2) },
     { key: "selected", label: "Selected", phase: "Selection", count: reached(p => p.status === "selected") },
-    ...GRADUATION_STAGES.map(stage => ({ key: stage, label: stage, phase: PHASE[stage], count: participants.filter(p => p.status === "selected" && stageProgress((byBen.get(p.id) ?? [])).find(x => x.stage === stage)!.count > 0).length })),
+    ...GRADUATION_STAGES.map(stage => ({ key: stage, label: stage, phase: PHASE[stage], count: participants.filter(p => p.status === "selected" && (stageProgress((byBen.get(p.id) ?? [])).find(x => x.stage === stage)?.count ?? 0) > 0).length })),
     { key: "graduated", label: "All stages completed", phase: "Graduation", count: reached(p => p.status === "selected" && p.completed === GRADUATION_STAGES.length) },
   ];
   const funnel: FunnelStep[] = counts.map((c, i) => ({ ...c, conversion: i === 0 ? null : (i <= 3 ? counts[i - 1].count : counts[2].count) ? Math.round(100 * c.count / (i <= 3 ? counts[i - 1].count : counts[2].count)) : null }));
@@ -93,16 +100,19 @@ export function graduationOverview(
 /** Selection decided by the Needs Assessment: completing it maps & verifies the
  * household; extreme/high vulnerability with consent selects it. */
 export function gateFromAssessment(
-  r: { vulnerability: number; band: "extreme" | "high" | "moderate" | "low"; consentGiven: boolean; protectionConcern?: boolean },
+  r: { vulnerability: number; band: "extreme" | "high" | "moderate" | "low"; consentGiven: boolean; protectionConcern?: boolean; assessmentComplete?: boolean; reasons?: string[] },
   prev: GraduationGate | null, now: string, userId?: string,
 ): GraduationGate {
-  const selected = r.consentGiven && (r.band === "extreme" || r.band === "high");
+  const selected = r.consentGiven && !r.protectionConcern && r.assessmentComplete !== false && (r.band === "extreme" || r.band === "high");
   const reason = selected ? undefined
     : !r.consentGiven ? "Did not consent to the livelihood assessment"
+    : r.protectionConcern ? "Safeguarding concern — review before enrolment"
+    : r.assessmentComplete === false ? "Complete all vulnerability domains before confirming selection"
     : `Needs Assessment score ${r.vulnerability}/100 (${r.band}) is below the selection threshold`;
   return {
-    ...(prev || {}), status: selected ? "selected" : "not_selected",
+    ...(prev || {}), status: r.assessmentComplete === false ? "mapped" : selected ? "selected" : "not_selected",
     mapped_at: prev?.mapped_at || now, verified_at: prev?.verified_at || now, decided_at: now,
     reason, updated_by: userId,
+    vulnerability_score: r.vulnerability, vulnerability_band: r.band, evidence_reasons: r.reasons,
   };
 }
