@@ -32,8 +32,9 @@ async function deliver(
   supabase: ReturnType<typeof createClient>,
   endpoint: Endpoint,
   event: { id: string | null; event: string; payload: unknown; project_id: string },
+  retry?: { id: string; attempts: number },
 ) {
-  const deliveryId = crypto.randomUUID()
+  const deliveryId = retry?.id ?? crypto.randomUUID()
   const timestamp = new Date().toISOString()
   const body = JSON.stringify({
     id: deliveryId,
@@ -44,11 +45,13 @@ async function deliver(
   })
   const signature = await hmacSha256(endpoint.secret, body)
 
-  const { data: delivery } = await supabase
+  const attempts = retry ? retry.attempts + 1 : 1
+  const delivery = retry ?? (await supabase
     .from('webhook_deliveries')
-    .insert({ endpoint_id: endpoint.id, event_id: event.id, event: event.event, status: 'pending', attempts: 1 })
+    .insert({ id: deliveryId, endpoint_id: endpoint.id, event_id: event.id, event: event.event, status: 'pending', attempts })
     .select('id')
-    .single()
+    .single()).data
+  if (!delivery?.id) return false
 
   const started = Date.now()
   let httpStatus: number | null = null
@@ -81,11 +84,12 @@ async function deliver(
       .from('webhook_deliveries')
       .update({
         status: ok ? 'success' : 'failed',
+        attempts,
         http_status: httpStatus,
         response_snippet: snippet,
         duration_ms: duration,
         delivered_at: ok ? new Date().toISOString() : null,
-        next_retry_at: ok ? null : new Date(Date.now() + 60_000).toISOString(),
+        next_retry_at: ok || attempts >= MAX_ATTEMPTS ? null : new Date(Date.now() + Math.min(2 ** (attempts - 1), 60) * 60_000).toISOString(),
       })
       .eq('id', delivery.id)
   }
@@ -127,7 +131,7 @@ Deno.serve(async (req) => {
   // 1. Retry due failed deliveries
   const { data: dueRetries } = await supabase
     .from('webhook_deliveries')
-    .select('id, endpoint_id, event, attempts, webhook_endpoints(*)')
+    .select('id, endpoint_id, event_id, event, attempts, webhook_endpoints(*), webhook_events(payload, project_id)')
     .eq('status', 'failed')
     .lt('attempts', MAX_ATTEMPTS)
     .lte('next_retry_at', new Date().toISOString())
@@ -136,14 +140,12 @@ Deno.serve(async (req) => {
   for (const d of dueRetries ?? []) {
     const ep = (d as Record<string, unknown>).webhook_endpoints as Endpoint | null
     if (!ep || !ep.is_active) continue
-    const backoffMs = Math.min(2 ** d.attempts, 60) * 60_000
-    const ok = await deliver(supabase, ep, { id: null, event: d.event, project_id: ep.project_id, payload: { retry_of: d.id } })
-    await supabase.from('webhook_deliveries').update({
-      attempts: d.attempts + 1,
-      status: ok ? 'success' : 'failed',
-      delivered_at: ok ? new Date().toISOString() : null,
-      next_retry_at: ok ? null : new Date(Date.now() + backoffMs).toISOString(),
-    }).eq('id', d.id)
+    const original = (d as Record<string, unknown>).webhook_events as { payload: unknown } | null
+    if (!original && d.event_id) continue
+    await deliver(supabase, ep, {
+      id: d.event_id, event: d.event, project_id: ep.project_id,
+      payload: original?.payload ?? { message: 'Amehnities test webhook' },
+    }, { id: d.id, attempts: d.attempts })
   }
 
   // 2. Deliver new unprocessed events

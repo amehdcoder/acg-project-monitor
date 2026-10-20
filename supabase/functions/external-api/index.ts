@@ -26,6 +26,29 @@ Deno.serve(async (req) => {
   if (req.method !== 'GET') return json({ error: 'Method not allowed' }, 405)
 
   const auth = req.headers.get('Authorization') ?? ''
+  const url = new URL(req.url)
+  const path = url.pathname.replace(/^\/external-api\/?/, '').replace(/\/$/, '')
+  const parts = path.split('/').filter(Boolean)
+  const q = url.searchParams
+  // Donor dashboards use the caller's session and existing donor-only RLS/RPCs.
+  // Integration keys are never required in, or exposed to, the browser.
+  if (parts.join('/') === 'v1/dashboard') {
+    if (!auth.startsWith('Bearer ') || auth.startsWith('Bearer amk_')) return json({ error: 'Donor sign-in required' }, 401)
+    const client = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: auth } } })
+    const { data: { user } } = await client.auth.getUser()
+    if (!user) return json({ error: 'Please sign in again' }, 401)
+    const projectId = q.get('project_id')
+    if (!projectId || !/^[0-9a-f-]{36}$/i.test(projectId)) return json({ error: 'Valid project required' }, 400)
+    const { data: aggregates, error: denied } = await client.rpc('donor_project_aggregates', { _project_id: projectId })
+    if (denied) return json({ error: 'No donor access to this project' }, 403)
+    const [activity, reports, logframe] = await Promise.all([
+      client.rpc('donor_field_activity', { _project_id: projectId, _limit: 30 }),
+      client.from('programme_reports').select('id, period_label, report_year, notes, status, created_at, entries:programme_report_entries(indicator_code, value, disaggregation, risk)').eq('project_id', projectId).order('created_at', { ascending: false }),
+      client.from('programme_logframes').select('data').eq('project_id', projectId).maybeSingle(),
+    ])
+    if (activity.error || reports.error || logframe.error) return json({ error: 'Could not load programme data' }, 500)
+    return json({ data: { aggregates, activity: activity.data ?? [], reports: reports.data ?? [], logframe: logframe.data?.data ?? null } })
+  }
   if (!auth.startsWith('Bearer amk_')) return json({ error: 'Missing or invalid API key. Use Authorization: Bearer amk_...' }, 401)
   const rawKey = auth.replace('Bearer ', '').trim()
 
@@ -36,10 +59,6 @@ Deno.serve(async (req) => {
   if (keyErr || !keyRows || keyRows.length === 0) return json({ error: 'Invalid or revoked API key' }, 401)
   const key = keyRows[0] as ApiKey
 
-  const url = new URL(req.url)
-  const path = url.pathname.replace(/^\/external-api\/?/, '').replace(/\/$/, '')
-  const parts = path.split('/').filter(Boolean) // e.g. ['v1','beneficiaries','ABC-123']
-  const q = url.searchParams
 
   const needScope = (scope: string) => key.scopes.includes(scope) || key.scopes.includes('*')
 
@@ -180,7 +199,7 @@ Deno.serve(async (req) => {
       if (!needScope('reports:read')) return json({ error: 'Key lacks reports:read scope' }, 403)
       const { data, error } = await supabase
         .from('programme_reports')
-        .select('id, period_label, report_year, status, notes, created_at, reviewed_at, resolution_note')
+        .select('id, period_label, report_year, status, notes, created_at, reviewed_at, resolution_note, entries:programme_report_entries(indicator_code, value, disaggregation, risk, over_target_comment)')
         .eq('project_id', key.project_id)
         .order('created_at', { ascending: false })
         .limit(100)
