@@ -305,12 +305,12 @@ const LivelihoodPanel = ({
       toast({ title: "Selection needs review", description: "Complete the assessment, confirm consent and resolve any safeguarding concern before enrolment. Vulnerability score does not prevent selection.", variant: "destructive" }); return;
     }
     try {
-      await setAssessmentDecision(row.id, decision);
+      await setAssessmentDecision(row.id, decision, undefined, projectId);
       const profile = b.profile || {};
       const now = new Date().toISOString();
       const prev = readGate(profile);
       const gate = { ...gateFromAssessment(result, prev, now),
-        status: decision === "selected" ? "selected" : decision === "not_eligible" || decision === "declined" ? "not_selected" : "mapped",
+        status: decision === "selected" ? "selected" : ["not_eligible", "declined", "waitlisted"].includes(decision) ? "not_selected" : "mapped",
         opportunity_id: opportunityId, decision_source: "manual" as const, updated_by: await currentUserId(), decided_at: now,
         reason: decision === "selected" ? undefined : `Opportunity decision: ${decision.replace("_", " ")}` };
       await offlineMutate({ table: "beneficiaries", action: "update", id: b.id, values: { profile: { ...profile, graduation: gate } } });
@@ -498,6 +498,7 @@ const LivelihoodPanel = ({
             canAssess={canAssess || canManage}
             onAssess={setAssessing}
             onOpen={onOpenBeneficiary}
+            onDecide={canManage ? (id, decision) => void decide(id, decision) : undefined}
           />
         </div>
       ) : (

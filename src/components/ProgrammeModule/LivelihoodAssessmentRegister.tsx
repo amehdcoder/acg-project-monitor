@@ -5,6 +5,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DECISIONS } from "@/lib/programmeModule/livelihood";
 import { ClipboardCheck, Search, Users, CheckCircle2, Sprout } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BeneficiaryRow } from "@/lib/programmeModule/types";
@@ -16,11 +18,12 @@ interface Props {
   canAssess: boolean;
   onAssess: (b: BeneficiaryRow) => void;
   onOpen?: (b: BeneficiaryRow) => void;
+  onDecide?: (id: string, decision: string) => void;
 }
 
 const PAGE = 30;
 
-export default function LivelihoodAssessmentRegister({ beneficiaries, assessed, canAssess, onAssess, onOpen }: Props) {
+export default function LivelihoodAssessmentRegister({ beneficiaries, assessed, canAssess, onAssess, onOpen, onDecide }: Props) {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"all" | "todo" | "done">("todo");
   const [limit, setLimit] = useState(PAGE);
@@ -113,6 +116,14 @@ export default function LivelihoodAssessmentRegister({ beneficiaries, assessed, 
                     <Button size="sm" variant={a ? "outline" : "default"} className="gap-1" onClick={() => onAssess(b)}>
                       <ClipboardCheck className="h-3.5 w-3.5" /> {a ? "Update" : "Fill form"}
                     </Button>
+                  )}
+                  {a && onDecide && (
+                    <Select value={String(a.decision || "assessed")} onValueChange={value => onDecide(b.id, value)}>
+                      <SelectTrigger className="w-40" aria-label={`Selection decision for ${b.full_name}`}><SelectValue placeholder="Decision" /></SelectTrigger>
+                      <SelectContent className="z-[10000]">
+                        {DECISIONS.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   )}
                 </div>
               </li>

@@ -9,6 +9,33 @@ const full = Object.fromEntries(ASSESSMENT_SECTIONS.flatMap(s => s.fields.filter
 const score = (profile = {}, answers = full, id = "a") => scoreLivelihood({ beneficiary: beneficiary(profile, id), answers });
 
 describe("livelihood evidence and selection", () => {
+  it("fills spare places with moderate and low vulnerability candidates, highest need first", () => {
+    const base = score({}, { ...full, protection_risk: "no" });
+    const candidates = [
+      { ...base, beneficiaryId: "low", vulnerability: 20, band: "low" as const },
+      { ...base, beneficiaryId: "high", vulnerability: 80, band: "high" as const },
+      { ...base, beneficiaryId: "moderate", vulnerability: 45, band: "moderate" as const },
+    ];
+    expect(buildShortlist(candidates, { target: 3 }).selected.map(e => e.result.beneficiaryId)).toEqual(["high", "moderate", "low"]);
+    expect(buildShortlist(candidates, { target: 2 }).waitlist.map(e => e.result.beneficiaryId)).toEqual(["low"]);
+  });
+  it("lets manual low-score selection supersede ranking and respects manual rejection", () => {
+    const base = score({}, { ...full, protection_risk: "no" });
+    const candidates = [
+      { ...base, beneficiaryId: "high", vulnerability: 90, band: "extreme" as const },
+      { ...base, beneficiaryId: "low", vulnerability: 20, band: "low" as const },
+    ];
+    expect(buildShortlist(candidates, { target: 1, decisions: { low: "selected" } }).selected.map(e => e.result.beneficiaryId)).toEqual(["low"]);
+    expect(buildShortlist(candidates, { target: 2, decisions: { high: "declined" } }).selected.map(e => e.result.beneficiaryId)).toEqual(["low"]);
+  });
+  it("preserves manual selection and rejection across reassessment and in Overview", () => {
+    const low = { vulnerability: 20, band: "low" as const, consentGiven: true, assessmentComplete: true };
+    const selected = gateFromAssessment(low, { status: "selected", decision_source: "manual" }, "t");
+    expect(selected.status).toBe("selected");
+    expect(selected.vulnerability_score).toBe(20);
+    expect(gateFromAssessment({ ...low, vulnerability: 90, band: "extreme" }, { status: "not_selected", decision_source: "manual" }, "t").status).toBe("not_selected");
+    expect(graduationOverview([beneficiary({ graduation: selected })], []).totals.selected).toBe(1);
+  });
   it("uses current registered vulnerability factors alongside assessment answers", () => {
     const poor = score({ vulnerability_factors: ["Extremely poor/vulnerable household", "Person requiring caregiver support"] });
     expect(poor.reasons).toContain("Registered as extremely vulnerable.");
