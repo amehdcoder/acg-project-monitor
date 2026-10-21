@@ -775,7 +775,7 @@ export const scoreLivelihood = (input: TargetingInput): TargetingResult => {
     ? OPPORTUNITY_TYPES.find((o) => o.value === choice)?.label || choice : null;
 
   const pkg = (() => {
-    if (band === "low") return "Not a priority for this round — keep on the register.";
+    if (band === "low") return "Eligible for available places after higher-vulnerability households; the selection committee can confirm enrolment.";
     const wanted = choiceLabel ? ` Build it around their own choice: ${choiceLabel.toLowerCase()}.` : "";
     if (String(answers.work_capacity ?? "") === "none") return "Care and consumption support first; adapt livelihood delivery to functional needs, with a support person where needed." + wanted;
     if (readiness >= 70) {
@@ -1120,10 +1120,14 @@ export const saveAssessment = async (payload: {
   await cacheSet(key, [{ ...row, id: saved.id, created_at: new Date().toISOString() }, ...cached.filter(r => r.id !== saved.id)]);
 };
 
-export const setAssessmentDecision = async (id: string, decision: string, notes?: string) => {
-  const { error } = await db.from("livelihood_assessments")
-    .update({ decision, decision_notes: notes ?? null }).eq("id", id);
-  if (error) throw error;
+export const setAssessmentDecision = async (id: string, decision: string, notes?: string, projectId?: string) => {
+  const values = { decision, ...(notes !== undefined ? { decision_notes: notes } : {}) };
+  await offlineMutate({ table: "livelihood_assessments", action: "update", id, values });
+  if (projectId) {
+    const key = `livelihood-assessments:${await currentUserId()}:${projectId}`;
+    const cached = await cacheGet<LivelihoodAssessmentRow[]>(key) ?? [];
+    await cacheSet(key, cached.map(row => row.id === id ? { ...row, ...values } : row));
+  }
 };
 
 export const saveOpportunity = async (

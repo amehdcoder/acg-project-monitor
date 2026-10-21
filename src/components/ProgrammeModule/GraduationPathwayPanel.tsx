@@ -68,6 +68,7 @@ const GraduationPathwayPanel = ({ projectId, moduleId, beneficiary, componentKey
       const next: GraduationGate = {
         ...(gate || { status }),
         status,
+        decision_source: "manual",
         updated_by: auth.user?.id,
         ...(status === "mapped" ? { mapped_at: now } : {}),
         ...(status === "verified" ? { verified_at: now, mapped_at: gate?.mapped_at || now } : {}),
@@ -106,7 +107,7 @@ const GraduationPathwayPanel = ({ projectId, moduleId, beneficiary, componentKey
           </span>
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-1 text-sm font-semibold text-health-ink">Livelihood Needs Assessment <Sparkles className="h-3.5 w-3.5 text-health-amber" /></span>
-            <span className="block text-xs text-muted-foreground">Every beneficiary is eligible. Completing it maps and verifies the household; the vulnerability score decides selection.</span>
+            <span className="block text-xs text-muted-foreground">Every beneficiary is eligible. Vulnerability guides recommendations; project Admins can confirm selection in the opportunity register regardless of score.</span>
           </span>
           <span className="shrink-0 rounded-full bg-health-teal px-3 py-1 text-xs font-bold text-primary-foreground transition-transform group-hover:scale-105">{gate ? "Update" : "Fill form"}</span>
         </Button>
@@ -184,7 +185,7 @@ const GraduationPathwayPanel = ({ projectId, moduleId, beneficiary, componentKey
             </ul>
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground">Delivery stages unlock after a complete high or extreme vulnerability assessment, with explicit consent and no unresolved protection concern.</p>
+          <p className="text-xs text-muted-foreground">Delivery stages unlock after selection. Admins can select any assessed beneficiary in the opportunity register regardless of vulnerability score, with consent and safeguarding checks.</p>
         )}
       </div>
     </Card>
