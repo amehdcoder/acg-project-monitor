@@ -176,6 +176,27 @@ export function GoogleAccountConnect() {
               </span>
             </div>
           )}
+          {!loading && !status?.connected && (
+            <div className="mt-2 rounded-md bg-muted p-2 text-xs">
+              <p className="text-muted-foreground">
+                If Google shows "redirect_uri_mismatch", add this exact address under
+                Authorized redirect URIs for the Google OAuth client:
+              </p>
+              <div className="mt-1 flex items-center gap-2">
+                <code className="break-all">{`https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co/functions/v1/google-oauth-callback`}</code>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(`https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co/functions/v1/google-oauth-callback`);
+                    toast({ title: "Address copied" });
+                  }}
+                >
+                  Copy
+                </Button>
+              </div>
+            </div>
+          )}
           <div className="mt-3 flex gap-2">
             {status?.connected ? (
               <>
