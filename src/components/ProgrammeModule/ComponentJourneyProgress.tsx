@@ -41,7 +41,7 @@ const fmtDate = (value?: string | null) =>
 const StepNode = ({ step, color }: { step: ComponentJourneyStep; color: string }) => {
   const Icon = STEP_ICON[step.key];
   return (
-    <li className="relative z-10 flex min-w-0 flex-col items-center gap-1 text-center">
+    <li className="relative z-10 flex min-w-0 items-center gap-3 text-left sm:flex-col sm:gap-1 sm:text-center">
       <span
         className={cn(
           "flex h-8 w-8 items-center justify-center rounded-full border-2 bg-card shadow-sm transition-all duration-500 motion-reduce:transition-none",
@@ -54,12 +54,12 @@ const StepNode = ({ step, color }: { step: ComponentJourneyStep; color: string }
         <Icon className="h-3.5 w-3.5" />
       </span>
       <span className={cn(
-        "max-w-16 text-[9px] font-semibold leading-tight",
+        "min-w-0 flex-1 break-normal text-xs font-semibold leading-snug sm:flex-none",
         step.state === "waiting" ? "text-muted-foreground/70" : "text-foreground",
       )}>
         {step.label}
       </span>
-      <span className="text-[9px] tabular-nums text-muted-foreground">{fmtDate(step.at) || "—"}</span>
+      <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{fmtDate(step.at) || "—"}</span>
     </li>
   );
 };
@@ -151,12 +151,12 @@ export default function ComponentJourneyProgress({ beneficiary, components, serv
                   </div>
 
                   <div className="relative">
-                    <div className="absolute left-5 right-5 top-4 h-0.5 rounded-full bg-muted" />
+                    <div className="absolute left-5 right-5 top-4 hidden h-0.5 rounded-full bg-muted sm:block" />
                     <div
-                      className="absolute left-5 top-4 h-0.5 rounded-full transition-all duration-700 motion-reduce:transition-none"
+                      className="absolute left-5 top-4 hidden h-0.5 rounded-full transition-all duration-700 motion-reduce:transition-none sm:block"
                       style={{ width: `calc((100% - 2.5rem) * ${journey.percent / 100})`, background: `hsl(${journey.component.color})` }}
                     />
-                    <ol className="relative grid grid-cols-5 gap-1">
+                    <ol className="relative grid grid-cols-1 gap-3 sm:grid-cols-5 sm:gap-2">
                       {journey.steps.map((step) => <StepNode key={step.key} step={step} color={journey.component.color} />)}
                     </ol>
                   </div>
