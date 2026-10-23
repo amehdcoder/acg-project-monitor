@@ -1,6 +1,6 @@
 # Roadmap
 
-- [ ] Integrate the beneficiary's active-component care journeys beside Overall Progress; run focused tests and verify the authenticated profile display.
+- [x] Integrate the beneficiary's active-component care journeys beside Overall Progress; five focused tests passed and authenticated desktop/mobile profile verified with one active Eye Health component at 60%, readable dates and pending completion/outcome.
 
 - [x] Allow manual livelihood selection regardless of vulnerability band; fill spare opportunity places with lower-scoring recommendations and preserve user decisions across reassessment. Verified 17 tests and live 11/100 manual selection → reassessment retains Selected → Graduation shows 1 mapped/verified/selected; temporary assessment removed and original profile restored.
 
