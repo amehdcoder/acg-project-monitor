@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  Award, CheckCircle2, Circle, HeartHandshake, IdCard, Route, Search, Sparkles,
+  Award, CheckCircle2, HeartHandshake, IdCard, Route, Search, Sparkles,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,10 +41,10 @@ const fmtDate = (value?: string | null) =>
 const StepNode = ({ step, color }: { step: ComponentJourneyStep; color: string }) => {
   const Icon = STEP_ICON[step.key];
   return (
-    <li className="relative z-10 flex min-w-0 flex-col items-center gap-1 text-center">
+    <li className="relative z-10 flex min-w-0 items-center gap-3 text-left sm:flex-col sm:gap-1 sm:text-center">
       <span
         className={cn(
-          "flex h-8 w-8 items-center justify-center rounded-full border-2 bg-card shadow-sm transition-all duration-500",
+          "flex h-8 w-8 items-center justify-center rounded-full border-2 bg-card shadow-sm transition-all duration-500 motion-reduce:transition-none",
           step.state === "done" && "text-primary-foreground",
           step.state === "current" && "scale-110 border-health-amber bg-health-amber/15 text-health-amber shadow-glow",
           step.state === "waiting" && "border-border text-muted-foreground/60",
@@ -54,12 +54,12 @@ const StepNode = ({ step, color }: { step: ComponentJourneyStep; color: string }
         <Icon className="h-3.5 w-3.5" />
       </span>
       <span className={cn(
-        "max-w-16 text-[9px] font-semibold leading-tight",
+        "min-w-0 flex-1 break-normal text-xs font-semibold leading-snug sm:flex-none",
         step.state === "waiting" ? "text-muted-foreground/70" : "text-foreground",
       )}>
         {step.label}
       </span>
-      <span className="text-[9px] tabular-nums text-muted-foreground">{fmtDate(step.at) || "—"}</span>
+      <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{fmtDate(step.at) || "—"}</span>
     </li>
   );
 };
@@ -70,15 +70,20 @@ export default function ComponentJourneyProgress({ beneficiary, components, serv
 
   useEffect(() => {
     let live = true;
+    setLinkedCase(undefined);
     void cachedRead<LinkedCase | null>(`case-search-linked:${beneficiary.id}`, async () => {
       const { data, error } = await db.from("mmdp_potential_cases")
         .select("search_date,created_at,status,confirmed_at,accepted_at")
         .eq("beneficiary_id", beneficiary.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
       if (error) return { data: null, error: null };
       return { data, error: null };
     }).then(({ data }) => {
       if (live) setLinkedCase(data ?? null);
+    }).catch(() => {
+      if (live) setLinkedCase(null);
     });
     return () => { live = false; };
   }, [beneficiary.id]);
@@ -93,14 +98,13 @@ export default function ComponentJourneyProgress({ beneficiary, components, serv
   }
 
   return (
-    <section className="border-t border-border p-4" aria-labelledby="component-journey-title">
+    <section className="min-w-0 border-t border-border py-4" aria-labelledby="component-journey-title">
       <div className="mb-3 flex items-center gap-2">
         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <Route className="h-4 w-4" />
         </span>
         <div className="min-w-0 flex-1">
           <h3 id="component-journey-title" className="text-sm font-semibold text-foreground">Care journey by component</h3>
-          <p className="text-xs text-muted-foreground">From identification to final outcome — active components only.</p>
         </div>
         {journeys.length > 0 && <Badge variant="outline">{journeys.length}</Badge>}
       </div>
@@ -120,11 +124,11 @@ export default function ComponentJourneyProgress({ beneficiary, components, serv
             return (
               <article
                 key={journey.component.key}
-                className="animate-fade-in overflow-hidden rounded-xl border border-border bg-background/70 shadow-sm"
+                className="animate-fade-in overflow-hidden rounded-lg border border-border bg-background/70 shadow-sm motion-reduce:animate-none"
                 style={{ animationDelay: `${index * 90}ms`, animationFillMode: "both" }}
               >
                 <div
-                  className="h-1 transition-all duration-700"
+                  className="h-1 transition-all duration-700 motion-reduce:transition-none"
                   style={{ background: `linear-gradient(90deg, hsl(${journey.component.color}), hsl(${journey.component.color} / 0.35))`, width: `${journey.percent}%` }}
                 />
                 <div className="p-3">
@@ -147,12 +151,12 @@ export default function ComponentJourneyProgress({ beneficiary, components, serv
                   </div>
 
                   <div className="relative">
-                    <div className="absolute left-5 right-5 top-4 h-0.5 rounded-full bg-muted" />
+                    <div className="absolute left-5 right-5 top-4 hidden h-0.5 rounded-full bg-muted sm:block" />
                     <div
-                      className="absolute left-5 top-4 h-0.5 rounded-full transition-all duration-700"
+                      className="absolute left-5 top-4 hidden h-0.5 rounded-full transition-all duration-700 motion-reduce:transition-none sm:block"
                       style={{ width: `calc((100% - 2.5rem) * ${journey.percent / 100})`, background: `hsl(${journey.component.color})` }}
                     />
-                    <ol className="relative grid grid-cols-5 gap-1">
+                    <ol className="relative grid grid-cols-1 gap-3 sm:grid-cols-5 sm:gap-2">
                       {journey.steps.map((step) => <StepNode key={step.key} step={step} color={journey.component.color} />)}
                     </ol>
                   </div>

@@ -32,6 +32,7 @@ import { resolveIcon } from "./icons";
 import { useBeneficiaryRecord } from "./useProgrammeModule";
 import ServiceEntryDialog from "./ServiceEntryDialog";
 import GraduationPathwayPanel from "./GraduationPathwayPanel";
+import ComponentJourneyProgress from "./ComponentJourneyProgress";
 import WashingtonGroupDialog from "./WashingtonGroupDialog";
 import { componentKind } from "@/lib/programmeModule/componentOutcomes";
 import { buildWgRecord, WG_DOMAINS } from "@/lib/programmeModule/washingtonGroup";
@@ -369,6 +370,16 @@ const BeneficiaryRecord = ({
               </Card>
             )}
           </div>
+
+          {config.layout.showProgressRing && components.length > 0 && (
+            <ComponentJourneyProgress
+              key={beneficiary.id}
+              beneficiary={beneficiary}
+              components={components}
+              services={services}
+              referrals={referrals}
+            />
+          )}
 
           {config.layout.showDataQuality && flags.length > 0 && (
             <Card className="flex flex-wrap items-center gap-2 border-amber-500/30 bg-amber-500/5 p-3">
