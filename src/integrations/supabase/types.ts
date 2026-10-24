@@ -5497,6 +5497,60 @@ export type Database = {
           },
         ]
       }
+      facility_visits: {
+        Row: {
+          created_at: string
+          duration_minutes: number | null
+          facility_id: string
+          id: string
+          notes: string | null
+          outcome: string
+          project_id: string
+          recorded_by: string | null
+          updated_at: string
+          visit_date: string
+        }
+        Insert: {
+          created_at?: string
+          duration_minutes?: number | null
+          facility_id: string
+          id?: string
+          notes?: string | null
+          outcome?: string
+          project_id: string
+          recorded_by?: string | null
+          updated_at?: string
+          visit_date: string
+        }
+        Update: {
+          created_at?: string
+          duration_minutes?: number | null
+          facility_id?: string
+          id?: string
+          notes?: string | null
+          outcome?: string
+          project_id?: string
+          recorded_by?: string | null
+          updated_at?: string
+          visit_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facility_visits_facility_id_fkey"
+            columns: ["facility_id"]
+            isOneToOne: false
+            referencedRelation: "health_facilities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facility_visits_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       feedback: {
         Row: {
           admin_response: string | null
