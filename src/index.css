@@ -1574,3 +1574,4 @@ html[data-lbr-fit="on"] .lbr-type img, html[data-lbr-fit="on"] .lbr-type table {
 html[data-lbr-fit="on"] .lbr-type * { min-width: 0; overflow-wrap: anywhere; }
 html[data-lbr-fit="on"][data-lbr-device="android"] .lbr-type button,
 html[data-lbr-fit="on"][data-lbr-device="ios"] .lbr-type button { min-height: 44px; }
+.records-scroll [role="tablist"] > * { flex-shrink: 0; }
