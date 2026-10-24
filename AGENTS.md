@@ -29,3 +29,4 @@
 - Assessments reuse QuizBuilder/server scoring; keys append to unpublished quizzes; pair by quiz/source/person. Exact activity links feed reporting-only aggregates by post-test month; dedup activity/person; user-scoped caches — why: no wrong-training totals.
 - The app's landing tab is the records workspace and that workspace's landing view is its Overview hub; people without records access keep Forms as home — why: one homepage that opens on project results without dead ends.
 
+- Access studio: per-project category access in `project_access_profiles` (Super Admin write); members follow a category via `permissions.access_category`, `hidden_views`/`hidden_sections` hide pages and profile tabs; "View as" uses the same profiles and never changes real access — why: one source of truth for what each kind of user sees.
