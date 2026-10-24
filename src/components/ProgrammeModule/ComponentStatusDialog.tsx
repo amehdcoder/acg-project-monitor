@@ -20,7 +20,8 @@ import {
   EXIT_REASONS, finalOutcomesFor, LIFECYCLE_MODAL_TITLE, SUSPENSION_REASONS,
   type ServiceLifecycleAction,
 } from "@/lib/programmeModule/componentOutcomes";
-import { offlineMutate, newUuid } from "@/lib/programmeModule/offlineWrite";
+import { offlineMutate } from "@/lib/programmeModule/offlineWrite";
+import { newUuid } from "@/lib/programmeModule/offlineQueue";
 import { recordAudit } from "./useProgrammeModule";
 import type { BeneficiaryRow, ProgrammeComponent } from "@/lib/programmeModule/types";
 
