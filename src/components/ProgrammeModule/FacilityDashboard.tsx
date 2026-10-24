@@ -18,6 +18,7 @@ import {
   CLOSED_OUTCOMES, REFERRAL_OUTCOME_LABEL, acceptReferral, setReferralStatus, useFacilityDashboard,
 } from "@/lib/programmeModule/facilityOps";
 import ReferralOutcomeDialog from "./ReferralOutcomeDialog";
+import FacilityVisitsPanel from "./FacilityVisitsPanel";
 
 interface Props {
   projectId?: string;
