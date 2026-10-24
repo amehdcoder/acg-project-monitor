@@ -37,7 +37,7 @@ import RecordQualityBar from "./RecordQualityBar";
 import BeneficiaryFormDialog from "./BeneficiaryFormDialog";
 import ProjectTeamPanel from "./ProjectTeamPanel";
 import DonorAccessPanel from "./DonorAccessPanel";
-import { useMyTeamPermissions, isHealthWorkerComponent, componentInAreas } from "@/lib/programmeModule/projectTeam";
+import { useMyTeamPermissions, isHealthWorkerComponent, componentInAreas, memberComponentFilter, memberDashboardAllowed } from "@/lib/programmeModule/projectTeam";
 import ModuleConfigurator from "./ModuleConfigurator";
 import ModuleProjectsDialog from "./ModuleProjectsDialog";
 import FacilityFocalPersons from "./FacilityFocalPersons";
@@ -126,7 +126,7 @@ const ProgrammeModuleWorkspace = ({
 
   // What this person is allowed to see and do, from the project team register.
   // People who are not listed keep the access they already had.
-  const { can: teamCan, listed: onTeamRegister, loading: permissionsLoading, healthWorkerCadre, programmeStaffCadre, programmeAreas } = useMyTeamPermissions(projectId, canConfigure);
+  const { can: teamCan, listed: onTeamRegister, loading: permissionsLoading, healthWorkerCadre, programmeStaffCadre, programmeAreas, member: teamMember } = useMyTeamPermissions(projectId, canConfigure);
   // Designated health workers only work on MMDP/NTD and mental health: case
   // search, records, households/MDA/WASH, services, follow-ups and referrals.
   const isHealthWorker = Boolean(healthWorkerCadre);
