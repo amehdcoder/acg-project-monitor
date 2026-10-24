@@ -149,13 +149,25 @@ const ProgrammeModuleWorkspace = ({
     if (isHealthWorker && ["view_safeguarding", "assess_livelihood", "verify_livelihood", "manage_livelihood", "export_data", "manage_team", "configure_module", "manage_facilities"].includes(key)) return false;
     return teamCan(key);
   }, [teamCan, isHealthWorker, isProgrammeStaff, safeguardingOnly, isFocalPerson, focalCanWrite, facilityLevels]);
+  // Per-member setup from the Project team register: component access and
+  // Overview dashboard grants only narrow listed, non-administrator members.
+  const memberPerms = !canConfigure && onTeamRegister ? teamMember?.permissions : undefined;
+  const memberComponentsKey = (memberPerms?.components || []).join(",");
   const componentFilter = useMemo(() => {
-    if (isFocalPerson) return isFacilityClinicalComponent;
-    if (isHealthWorker) return isHealthWorkerComponent;
-    if (staffAreas) return componentInAreas(staffAreas);
-    return undefined;
+    const base = isFocalPerson ? isFacilityClinicalComponent
+      : isHealthWorker ? isHealthWorkerComponent
+      : staffAreas ? componentInAreas(staffAreas)
+      : undefined;
+    const mine = memberComponentFilter(memberPerms);
+    if (base && mine) return (c: { key: string; label?: string }) => base(c) && mine(c);
+    return base || mine;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isHealthWorker, areaKey, isProgrammeStaff, isFocalPerson]);
+  }, [isHealthWorker, areaKey, isProgrammeStaff, isFocalPerson, memberComponentsKey]);
+  const dashAllowed = (key: string) => memberDashboardAllowed(memberPerms, key);
+  // Listed members granted feedback sharing see the QR code and public link —
+  // never the confidential reports.
+  const canShareFeedback = canConfigure || Boolean(memberPerms?.feedback_share);
+  const feedbackShareOnly = !canConfigure && !isOwner && !isSuperAdmin && Boolean(memberPerms?.feedback_share);
   // Health workers and programme staff always see the General dashboard and the
   // dashboards of their own components (scoped via componentFilter below).
   const canDash = can("view_dashboards") || ((isHealthWorker || isProgrammeStaff) && can("view_records"));
