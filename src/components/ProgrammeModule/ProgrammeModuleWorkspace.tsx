@@ -302,6 +302,9 @@ const ProgrammeModuleWorkspace = ({
       return;
     }
     if ((view === "brain" && canBrain) || (view === "guide" && canGuide)) return;
+    // Manage-menu pages are not navigation items; keep them open for people allowed to manage.
+    const canManageTeam = canConfigure || can("manage_team");
+    if ((view === "team" && (canManageTeam || onTeamRegister)) || (view === "donors" && canManageTeam)) return;
     if (!visibleViews.includes(view)) setView(visibleViews.includes("records") ? "records" : visibleViews[0] || "records");
   }, [accessLoading, view, canConfigure, canReport, canAssessments, canBrain, canGuide, isFocalPerson, isOfficer, onTeamRegister, isProgrammeStaff, areaKey]);
 
