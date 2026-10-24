@@ -187,7 +187,7 @@ const FacilityDashboard = ({ projectId, canSeeAllFacilities = false, onOpenBenef
       </Card>
 
       <Tabs defaultValue="incoming">
-        <TabsList>
+        <TabsList className="flex h-auto w-full max-w-full justify-start overflow-x-auto">
           <TabsTrigger value="incoming" className="gap-1">
             <ArrowDownLeft className="h-4 w-4" /> Referrals in
             {pendingIn.length > 0 && <Badge className="ml-1">{pendingIn.length}</Badge>}

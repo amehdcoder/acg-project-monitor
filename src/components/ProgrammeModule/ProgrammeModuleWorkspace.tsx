@@ -74,6 +74,8 @@ import WorkspaceNavigation, { type WorkspaceNavGroup, type WorkspaceView } from 
 import { useIsSafeguardingOfficer } from "@/lib/programmeModule/safeguarding";
 import { useMyFacilityAccess } from "@/lib/programmeModule/facilities";
 import { FACILITY_WORKSPACE_VIEWS, facilityCanWrite, isFacilityClinicalComponent } from "@/lib/programmeModule/facilityScope";
+import DevicePreviewDialog from "./DevicePreviewDialog";
+import { applyDeviceFit } from "@/lib/deviceFit";
 
 
 interface Props {
@@ -103,6 +105,8 @@ const ProgrammeModuleWorkspace = ({
   const [configOpen, setConfigOpen] = useState(false);
   const [focalOpen, setFocalOpen] = useState(false);
   const [registryOpen, setRegistryOpen] = useState(false);
+  const [devicePreviewOpen, setDevicePreviewOpen] = useState(false);
+  useEffect(() => { applyDeviceFit(); }, []);
   const [drugsOpen, setDrugsOpen] = useState(false);
   const [whatsappOpen, setWhatsappOpen] = useState(false);
   const [smsOpen, setSmsOpen] = useState(false);
@@ -404,6 +408,7 @@ const ProgrammeModuleWorkspace = ({
 
   return (
     <div className="lbr-type space-y-3 font-report">
+      {canConfigure && <DevicePreviewDialog open={devicePreviewOpen} onOpenChange={setDevicePreviewOpen} projectId={projectId} />}
       <div className="flex flex-col gap-3 rounded-lg border border-health-blue/15 bg-card p-3 shadow-soft lg:flex-row lg:items-center">
         <div className="flex min-w-0 items-center gap-3">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-health-blue text-primary-foreground"><Layers className="h-5 w-5" /></span>
@@ -462,6 +467,7 @@ const ProgrammeModuleWorkspace = ({
             <DropdownMenuLabel>Administration</DropdownMenuLabel><DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => openWorkflowTour()}><Compass className="mr-2 h-4 w-4" /> Guided tour</DropdownMenuItem>
             <DropdownMenuItem onSelect={() => setRegistryOpen(true)}><Building2 className="mr-2 h-4 w-4" /> Health facilities</DropdownMenuItem>
+            {canConfigure && <DropdownMenuItem onSelect={() => setDevicePreviewOpen(true)}><Layers className="mr-2 h-4 w-4" /> Device preview</DropdownMenuItem>}
             {canConfigure && <DropdownMenuItem onSelect={() => { setFocalFacilityId(undefined); setFocalOpen(true); }}><Users className="mr-2 h-4 w-4" /> Facility teams</DropdownMenuItem>}
             {(canConfigure || can("manage_team") || onTeamRegister) && <DropdownMenuItem onSelect={() => setView("team")}><Users className="mr-2 h-4 w-4" /> Project team</DropdownMenuItem>}
             {canConfigure && <DropdownMenuItem onSelect={() => setDrugsOpen(true)}><Settings2 className="mr-2 h-4 w-4" /> mhGAP medicines</DropdownMenuItem>}
