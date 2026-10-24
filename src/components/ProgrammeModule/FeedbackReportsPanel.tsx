@@ -201,15 +201,19 @@ const FeedbackReportsPanel = ({ projectId, projectName, canManage, shareOnly = f
     else loadViewers();
   };
 
-  if (denied && !loading) {
+  if (shareOnly || (denied && !loading)) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-        <ShieldCheck className="mx-auto h-10 w-10 text-slate-300" />
-        <h3 className="mt-3 font-semibold text-slate-900">Restricted area</h3>
-        <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500">
-          Community feedback reports are confidential. Only Super Admins and
-          approved viewers can see them.
-        </p>
+      <div className="space-y-5">
+        <FeedbackQrCard projectId={projectId} projectName={projectName} />
+        <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <ShieldCheck className="mx-auto h-10 w-10 text-slate-300" />
+          <h3 className="mt-3 font-semibold text-slate-900">Reports are restricted</h3>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500">
+            Community feedback reports are confidential. Only Super Admins and
+            approved viewers can see them — share the QR code or public link above
+            so communities can reach the project at any time.
+          </p>
+        </div>
       </div>
     );
   }
@@ -217,6 +221,7 @@ const FeedbackReportsPanel = ({ projectId, projectName, canManage, shareOnly = f
   return (
     <div className="space-y-5">
       <FeedbackQrCard projectId={projectId} projectName={projectName} />
+
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
