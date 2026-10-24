@@ -72,9 +72,11 @@ interface Props {
   projectId: string;
   projectName: string;
   canManage: boolean; // owner / super admin — can grant viewer access
+  /** Team members granted feedback sharing see only the QR code and public link. */
+  shareOnly?: boolean;
 }
 
-const FeedbackReportsPanel = ({ projectId, projectName, canManage }: Props) => {
+const FeedbackReportsPanel = ({ projectId, projectName, canManage, shareOnly = false }: Props) => {
   const { toast } = useToast();
   const [rows, setRows] = useState<FeedbackRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -91,6 +93,7 @@ const FeedbackReportsPanel = ({ projectId, projectName, canManage }: Props) => {
   const [addingViewer, setAddingViewer] = useState(false);
 
   const load = useCallback(async () => {
+    if (shareOnly) { setLoading(false); return; }
     setLoading(true);
     const { data, error } = await db
       .from("project_feedback")
