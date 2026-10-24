@@ -5,6 +5,8 @@
 - Dispatch CCFF paths to a standalone form-only shell before mounting workspace providers; use anonymous public-function requests and published QR origins — why: community visitors cannot enter records through form navigation, shared overlays, error states or editor-only links.
 - Filter tours by visible destinations, effective permissions and configured components — why: guidance matches access.
 - Hand Cards: protected standalone route rendering the same live record-backed document as exports; exports capture the naturally flowing front/back layouts with independent page aspect ratios; camera start/stop serialized with stale sessions cancelled, torch only when the running track supports it — why: consistent viewing/downloads, no public beneficiary data, no cropping or leaked cameras.
+- Facility branding: logos upload to the private `facility-logos` bucket (`<project>/<facility>.<ext>`), path stored in `health_facilities.logo_url`, resolved via signed URL; the hand card swaps the default partner logo/name for the beneficiary's facility when set — why: per-facility cards without exposing media publicly.
+- DHIS2 indicator labels follow the national standard "Number of …" wording in `nationalIndicators.ts` (mirrored in `_shared/`); mappings key off stable `key`, never the label — why: renames never break existing DHIS2 mappings.
 - Route all DHIS2 reporting/dashboard imports through `health-exchange`; maps use bundled Nigeria LGA/State/National boundaries — why: secrets server-side, exact geography.
 - Revoke browser EXECUTE on SECURITY DEFINER trigger/internal functions; keep it only for RLS helpers and app-called RPCs — why: smaller attack surface.
 - Self-hosting: Dockerfile + nginx.conf, backend on Lovable Cloud — why: no badge.
