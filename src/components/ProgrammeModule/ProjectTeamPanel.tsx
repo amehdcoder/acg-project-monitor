@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/table";
 import { Pencil, Search, ShieldCheck, Trash2, UserPlus, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { toneClasses } from "@/lib/programmeModule/defaults";
 import { useFacilities } from "@/lib/programmeModule/facilities";
