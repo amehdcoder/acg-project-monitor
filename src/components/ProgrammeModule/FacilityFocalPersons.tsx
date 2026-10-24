@@ -22,6 +22,7 @@ import {
   useFacilities, FACILITY_TYPE_LABEL, ACCESS_LEVELS, ACCESS_LEVEL_LABEL,
   type FacilityAccessLevel,
 } from "@/lib/programmeModule/facilities";
+import { useProjectUsers } from "@/lib/programmeModule/projectUsers";
 
 interface Props {
   open: boolean;
@@ -47,6 +48,7 @@ const ROLES = [
 const FacilityFocalPersons = ({ open, onOpenChange, projectId, initialFacilityId }: Props) => {
   const { toast } = useToast();
   const { facilities } = useFacilities(projectId);
+  const { users: projectUsers } = useProjectUsers(projectId);
   const [people, setPeople] = useState<PersonRow[]>([]);
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [facilityIds, setFacilityIds] = useState<string[]>(initialFacilityId ? [initialFacilityId] : []);
