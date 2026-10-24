@@ -566,6 +566,7 @@ const ProgrammeModuleWorkspace = ({
             projectId={projectId}
             moduleId={active?.id}
             canManage={canConfigure || can("manage_team")}
+            components={(normalizeConfig(active?.config).components || []).filter((c) => !c.hidden).map((c) => ({ key: c.key, label: c.label }))}
           />
           <DonorAccessPanel projectId={projectId} canManage={canConfigure || can("manage_team")} />
         </div>
@@ -687,6 +688,7 @@ const ProgrammeModuleWorkspace = ({
           projectId={projectId}
           projectName={active?.name || "this project"}
           canManage={isOwner || isSuperAdmin}
+          shareOnly={feedbackShareOnly}
         />
       )}
 
