@@ -22,6 +22,7 @@ import {
   useFacilities, FACILITY_TYPE_LABEL, ACCESS_LEVELS, ACCESS_LEVEL_LABEL,
   type FacilityAccessLevel,
 } from "@/lib/programmeModule/facilities";
+import { useProjectUsers } from "@/lib/programmeModule/projectUsers";
 
 interface Props {
   open: boolean;
@@ -47,6 +48,7 @@ const ROLES = [
 const FacilityFocalPersons = ({ open, onOpenChange, projectId, initialFacilityId }: Props) => {
   const { toast } = useToast();
   const { facilities } = useFacilities(projectId);
+  const { users: projectUsers } = useProjectUsers(projectId);
   const [people, setPeople] = useState<PersonRow[]>([]);
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [facilityIds, setFacilityIds] = useState<string[]>(initialFacilityId ? [initialFacilityId] : []);
@@ -86,6 +88,22 @@ const FacilityFocalPersons = ({ open, onOpenChange, projectId, initialFacilityId
       .filter((p) => `${p.first_name} ${p.last_name} ${p.email}`.toLowerCase().includes(q))
       .slice(0, 50);
   }, [profiles, search]);
+
+  // People with an account on this project come first — each assignment is tied
+  // to their real name. The full account search remains as a fallback.
+  const pickerOptions = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (projectUsers.length) {
+      const list = projectUsers.map((u) => ({ id: u.user_id, label: u.full_name, sub: u.email || "" }));
+      if (!q) return list.slice(0, 50);
+      return list.filter((o) => `${o.label} ${o.sub}`.toLowerCase().includes(q)).slice(0, 50);
+    }
+    return filteredProfiles.map((p) => ({
+      id: p.user_id,
+      label: `${p.first_name} ${p.last_name}`.trim() || p.email,
+      sub: p.email,
+    }));
+  }, [projectUsers, filteredProfiles, search]);
 
   const visibleFacilities = useMemo(() => {
     const q = facilitySearch.trim().toLowerCase();
@@ -142,7 +160,7 @@ const FacilityFocalPersons = ({ open, onOpenChange, projectId, initialFacilityId
       <DialogContent className="max-h-[92dvh] max-w-3xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" /> Facility focal persons
+            <Users className="h-5 w-5" /> Facility teams
           </DialogTitle>
         </DialogHeader>
 

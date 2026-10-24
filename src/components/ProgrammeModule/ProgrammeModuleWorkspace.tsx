@@ -37,7 +37,7 @@ import RecordQualityBar from "./RecordQualityBar";
 import BeneficiaryFormDialog from "./BeneficiaryFormDialog";
 import ProjectTeamPanel from "./ProjectTeamPanel";
 import DonorAccessPanel from "./DonorAccessPanel";
-import { useMyTeamPermissions, isHealthWorkerComponent, componentInAreas } from "@/lib/programmeModule/projectTeam";
+import { useMyTeamPermissions, isHealthWorkerComponent, componentInAreas, memberComponentFilter, memberDashboardAllowed } from "@/lib/programmeModule/projectTeam";
 import ModuleConfigurator from "./ModuleConfigurator";
 import ModuleProjectsDialog from "./ModuleProjectsDialog";
 import FacilityFocalPersons from "./FacilityFocalPersons";
@@ -126,7 +126,7 @@ const ProgrammeModuleWorkspace = ({
 
   // What this person is allowed to see and do, from the project team register.
   // People who are not listed keep the access they already had.
-  const { can: teamCan, listed: onTeamRegister, loading: permissionsLoading, healthWorkerCadre, programmeStaffCadre, programmeAreas } = useMyTeamPermissions(projectId, canConfigure);
+  const { can: teamCan, listed: onTeamRegister, loading: permissionsLoading, healthWorkerCadre, programmeStaffCadre, programmeAreas, member: teamMember } = useMyTeamPermissions(projectId, canConfigure);
   // Designated health workers only work on MMDP/NTD and mental health: case
   // search, records, households/MDA/WASH, services, follow-ups and referrals.
   const isHealthWorker = Boolean(healthWorkerCadre);
@@ -149,13 +149,25 @@ const ProgrammeModuleWorkspace = ({
     if (isHealthWorker && ["view_safeguarding", "assess_livelihood", "verify_livelihood", "manage_livelihood", "export_data", "manage_team", "configure_module", "manage_facilities"].includes(key)) return false;
     return teamCan(key);
   }, [teamCan, isHealthWorker, isProgrammeStaff, safeguardingOnly, isFocalPerson, focalCanWrite, facilityLevels]);
+  // Per-member setup from the Project team register: component access and
+  // Overview dashboard grants only narrow listed, non-administrator members.
+  const memberPerms = !canConfigure && onTeamRegister ? teamMember?.permissions : undefined;
+  const memberComponentsKey = (memberPerms?.components || []).join(",");
   const componentFilter = useMemo(() => {
-    if (isFocalPerson) return isFacilityClinicalComponent;
-    if (isHealthWorker) return isHealthWorkerComponent;
-    if (staffAreas) return componentInAreas(staffAreas);
-    return undefined;
+    const base = isFocalPerson ? isFacilityClinicalComponent
+      : isHealthWorker ? isHealthWorkerComponent
+      : staffAreas ? componentInAreas(staffAreas)
+      : undefined;
+    const mine = memberComponentFilter(memberPerms);
+    if (base && mine) return (c: { key: string; label?: string }) => base(c) && mine(c);
+    return base || mine;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isHealthWorker, areaKey, isProgrammeStaff, isFocalPerson]);
+  }, [isHealthWorker, areaKey, isProgrammeStaff, isFocalPerson, memberComponentsKey]);
+  const dashAllowed = (key: string) => memberDashboardAllowed(memberPerms, key);
+  // Listed members granted feedback sharing see the QR code and public link —
+  // never the confidential reports.
+  const canShareFeedback = canConfigure || Boolean(memberPerms?.feedback_share);
+  const feedbackShareOnly = !canConfigure && !isOwner && !isSuperAdmin && Boolean(memberPerms?.feedback_share);
   // Health workers and programme staff always see the General dashboard and the
   // dashboards of their own components (scoped via componentFilter below).
   const canDash = can("view_dashboards") || ((isHealthWorker || isProgrammeStaff) && can("view_records"));
@@ -212,11 +224,11 @@ const ProgrammeModuleWorkspace = ({
       label: "Overview",
       hub: { key: "overview", label: "Overview", description: "Executive view of people, services and outcomes", icon: BarChart3 },
       items: [
-        { key: "dashboard", label: "General dashboard", description: "Project-wide outcomes, alerts and service performance", icon: BarChart3, show: canDash },
-        { key: "journey", label: "Beneficiary journey", description: "Change, feedback and service reach", icon: Route, show: canDash },
-        { key: "facility", label: "Facility dashboard", description: "Facility caseloads and referral performance", icon: Hospital, show: canDash },
-        { key: "clusters", label: "Community clusters", description: "Geographic concentrations and community patterns", icon: Layers, show: canDash },
-        { key: "graduation", label: "Graduation pathway", description: "Livelihood mapping, selection, delivery stages and graduation", icon: Briefcase, show: canDash && hasArea("livelihood") },
+        { key: "dashboard", label: "General dashboard", description: "Project-wide outcomes, alerts and service performance", icon: BarChart3, show: canDash && dashAllowed("dashboard") },
+        { key: "journey", label: "Beneficiary journey", description: "Change, feedback and service reach", icon: Route, show: canDash && dashAllowed("journey") },
+        { key: "facility", label: "Facility dashboard", description: "Facility caseloads and referral performance", icon: Hospital, show: canDash && dashAllowed("facility") },
+        { key: "clusters", label: "Community clusters", description: "Geographic concentrations and community patterns", icon: Layers, show: canDash && dashAllowed("clusters") },
+        { key: "graduation", label: "Graduation pathway", description: "Livelihood mapping, selection, delivery stages and graduation", icon: Briefcase, show: canDash && hasArea("livelihood") && dashAllowed("graduation") },
       ],
     },
     {
@@ -245,7 +257,7 @@ const ProgrammeModuleWorkspace = ({
       items: [
         { key: "safeguarding_dashboard", label: "Safeguarding dashboard", description: "Restricted caseload oversight and outcomes", icon: ShieldAlert, show: isOfficer && can("view_safeguarding") },
         { key: "safeguarding", label: "Safeguarding cases", description: "Restricted concerns, actions and secure notes", icon: ShieldCheck, show: isOfficer && can("view_safeguarding") },
-        { key: "feedback", label: "Community feedback", description: "Public complaints & feedback form, QR code and reports", icon: MessageSquareHeart, show: canConfigure || can("view_records") || canDash },
+        { key: "feedback", label: "Community feedback", description: "Public complaints & feedback form, QR code and reports", icon: MessageSquareHeart, show: canConfigure || can("view_records") || canDash || canShareFeedback },
       ],
     },
   ];
@@ -554,6 +566,7 @@ const ProgrammeModuleWorkspace = ({
             projectId={projectId}
             moduleId={active?.id}
             canManage={canConfigure || can("manage_team")}
+            components={(normalizeConfig(active?.config).components || []).filter((c) => !c.hidden).map((c) => ({ key: c.key, label: c.label }))}
           />
           <DonorAccessPanel projectId={projectId} canManage={canConfigure || can("manage_team")} />
         </div>
@@ -675,6 +688,7 @@ const ProgrammeModuleWorkspace = ({
           projectId={projectId}
           projectName={active?.name || "this project"}
           canManage={isOwner || isSuperAdmin}
+          shareOnly={feedbackShareOnly}
         />
       )}
 

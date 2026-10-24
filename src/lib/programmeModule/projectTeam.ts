@@ -90,6 +90,12 @@ export interface TeamPermissions {
   programme_staff?: string;
   /** Programme areas a programme staff member works on. */
   programme_areas?: ProgrammeArea[];
+  /** Component keys the member can see and report for (empty = every component). */
+  components?: string[];
+  /** Overview dashboard keys the member may open (empty = every dashboard). */
+  dashboards?: string[];
+  /** May see and share the Community feedback QR code and public link — never the reports. */
+  feedback_share?: boolean;
 }
 
 export type ProgrammeArea = "ntd" | "mental" | "wash" | "livelihood" | "eye";
@@ -159,6 +165,30 @@ export const HEALTH_WORKER_CADRES = [
 /** Components a health worker may open: every health component (not livelihood/economic). */
 export const isHealthWorkerComponent = (c: { key: string; label?: string }) =>
   !AREA_PATTERNS.livelihood.test(`${c.key} ${c.label || ""}`);
+
+/** Overview dashboards a team member can be granted, one by one. */
+export const OVERVIEW_DASHBOARDS: { key: string; label: string; hint: string }[] = [
+  { key: "dashboard", label: "General dashboard", hint: "Project-wide outcomes, alerts and service performance" },
+  { key: "journey", label: "Beneficiary journey", hint: "Change, feedback and service reach" },
+  { key: "facility", label: "Facility dashboard", hint: "Facility caseloads and referral performance" },
+  { key: "clusters", label: "Community clusters", hint: "Geographic concentrations and community patterns" },
+  { key: "graduation", label: "Graduation pathway", hint: "Livelihood mapping, selection and graduation" },
+];
+
+/** Whether a listed team member may open an Overview dashboard — empty list means all. */
+export const memberDashboardAllowed = (perms: TeamPermissions | null | undefined, key: string) => {
+  const list = perms?.dashboards;
+  if (!list || !list.length) return true;
+  return list.includes(key);
+};
+
+/** Component filter for a listed team member — empty list means every component. */
+export const memberComponentFilter = (perms: TeamPermissions | null | undefined) => {
+  const list = perms?.components;
+  if (!list || !list.length) return undefined;
+  const allowed = new Set(list);
+  return (c: { key: string; label?: string }) => allowed.has(c.key);
+};
 
 export type PermissionKey = keyof TeamPermissions;
 
