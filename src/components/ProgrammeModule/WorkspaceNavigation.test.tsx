@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { BarChart3, Users } from "lucide-react";
+import { Activity, BarChart3, Users } from "lucide-react";
 import { describe, expect, it, vi } from "vitest";
 import WorkspaceNavigation, { type WorkspaceNavGroup } from "./WorkspaceNavigation";
 
@@ -17,6 +17,13 @@ const groups: WorkspaceNavGroup[] = [
     items: [
       { key: "records", label: "Beneficiary records", description: "Find records", icon: Users, show: true },
       { key: "households", label: "Households & MDA", description: "Restricted section", icon: Users, show: false },
+    ],
+  },
+  {
+    label: "Intelligence",
+    hub: { key: "intelligence", label: "Intelligence", description: "Predictive analytics", icon: Activity },
+    items: [
+      { key: "risk", label: "Follow-up risk & CHEW visits", description: "Prioritised risk", icon: Activity, show: true },
     ],
   },
 ];
@@ -48,6 +55,15 @@ describe("WorkspaceNavigation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Overview" }));
     expect(onViewChange).toHaveBeenCalledTimes(1);
     expect(onViewChange).toHaveBeenCalledWith("overview");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("opens Intelligence cards directly instead of a dropdown", () => {
+    const onViewChange = vi.fn();
+    render(<WorkspaceNavigation groups={groups} view="risk" onViewChange={onViewChange} />);
+    fireEvent.click(screen.getByRole("button", { name: "Intelligence" }));
+    expect(onViewChange).toHaveBeenCalledTimes(1);
+    expect(onViewChange).toHaveBeenCalledWith("intelligence");
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 });
