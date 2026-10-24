@@ -1,5 +1,5 @@
 import WorkflowTour, { openWorkflowTour } from "./WorkflowTour";
-import { Compass } from "lucide-react";
+import { Compass, Eye } from "lucide-react";
 import BeneficiaryBrainPanel from "./BeneficiaryBrainPanel";
 import { Brain, BookOpenCheck } from "lucide-react";
 import FieldGuidePanel from "./FieldGuidePanel";
@@ -72,7 +72,7 @@ import IntelligenceHub from "./IntelligenceHub";
 import ProtectionHub from "./ProtectionHub";
 import WorkspaceNavigation, { type WorkspaceNavGroup, type WorkspaceView } from "./WorkspaceNavigation";
 import { useIsSafeguardingOfficer } from "@/lib/programmeModule/safeguarding";
-import { useMyFacilityAccess } from "@/lib/programmeModule/facilities";
+import { useMyFacilityAccess, useFacilities, type FacilityAccessLevel } from "@/lib/programmeModule/facilities";
 import { FACILITY_WORKSPACE_VIEWS, facilityCanWrite, isFacilityClinicalComponent } from "@/lib/programmeModule/facilityScope";
 import DevicePreviewDialog from "./DevicePreviewDialog";
 import ViewAsDialog, { ViewAsBanner } from "./ViewAsDialog";
