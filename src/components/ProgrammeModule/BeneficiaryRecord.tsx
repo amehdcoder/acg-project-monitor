@@ -74,6 +74,8 @@ interface Props {
   componentsVisible?: boolean;
   /** Limits which programme components this person may see (health workers). */
   componentFilter?: (c: { key: string; label?: string }) => boolean;
+  /** Profile sections switched off in the Access studio. */
+  hiddenSections?: string[];
 }
 
 const fmtDate = (d?: string | null) =>
@@ -406,11 +408,11 @@ const BeneficiaryRecord = ({
                 {components.map((c) => (
                   <TabsTrigger key={c.key} value={c.key}>{c.label}</TabsTrigger>
                 ))}
-                {componentsVisible && <TabsTrigger value="lesions">Lesion staging</TabsTrigger>}
-                <TabsTrigger value="outcomes">Outcomes</TabsTrigger>
-                <TabsTrigger value="care">Care network</TabsTrigger>
-                <TabsTrigger value="mda">MDA rounds</TabsTrigger>
-                <TabsTrigger value="history">History</TabsTrigger>
+                {componentsVisible && !hiddenSections?.includes("lesions") && <TabsTrigger value="lesions">Lesion staging</TabsTrigger>}
+                {!hiddenSections?.includes("outcomes") && <TabsTrigger value="outcomes">Outcomes</TabsTrigger>}
+                {!hiddenSections?.includes("care") && <TabsTrigger value="care">Care network</TabsTrigger>}
+                {!hiddenSections?.includes("mda") && <TabsTrigger value="mda">MDA rounds</TabsTrigger>}
+                {!hiddenSections?.includes("history") && <TabsTrigger value="history">History</TabsTrigger>}
               </TabsList>
             </div>
 
