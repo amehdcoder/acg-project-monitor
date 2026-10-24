@@ -209,7 +209,7 @@ const ProgrammeModuleWorkspace = ({
     },
     {
       label: "People & care",
-      hub: { key: "people", label: "People & care overview", description: "All people and care sections with live totals", icon: Users },
+      hub: { key: "people", label: "People & care", description: "Manage beneficiaries, households, follow-ups and support services for integrated NTD care and inclusion", icon: Users },
       items: [
         { key: "records", label: "Beneficiary records", description: "Find, register and open individual records", icon: LayoutGrid, show: can("view_records") },
         { key: "followups", label: "Follow-ups & referrals", description: "Upcoming visits and referral traffic", icon: CalendarClock, show: can("view_records") },

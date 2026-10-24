@@ -1,6 +1,7 @@
 # Architecture rules
 
 - Keep major longitudinal tabs separate from grouped navigation and project-gated — why: direct reporting without duplicate entries or permission bypass.
+- Workspace groups with a hub open their permission-filtered card page directly rather than a dropdown — why: one entry point without duplicate navigation.
 - Dispatch CCFF paths to a standalone form-only shell before mounting workspace providers; use anonymous public-function requests and published QR origins — why: community visitors cannot enter records through form navigation, shared overlays, error states or editor-only links.
 - Filter tours by visible destinations, effective permissions and configured components — why: guidance matches access.
 - Hand Cards: protected standalone route rendering the same live record-backed document as exports; exports capture the naturally flowing front/back layouts with independent page aspect ratios; camera start/stop serialized with stale sessions cancelled, torch only when the running track supports it — why: consistent viewing/downloads, no public beneficiary data, no cropping or leaked cameras.
