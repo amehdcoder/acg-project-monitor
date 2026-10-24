@@ -121,6 +121,7 @@ const BeneficiaryRecord = ({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteReason, setDeleteReason] = useState("");
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [lifecycle, setLifecycle] = useState<{ action: ServiceLifecycleAction; componentKey: string } | null>(null);
 
   const submitDeleteRequest = async () => {
     setDeleteBusy(true);
