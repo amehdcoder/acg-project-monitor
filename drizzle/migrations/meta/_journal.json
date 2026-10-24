@@ -239,6 +239,13 @@
       "when": 1792860182158,
       "tag": "0033_project_access_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1792860725737,
+      "tag": "0034_focal_guard_remaining_tables",
+      "breakpoints": true
     }
   ]
 }

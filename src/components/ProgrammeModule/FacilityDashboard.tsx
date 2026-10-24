@@ -25,6 +25,8 @@ interface Props {
   /** Administrators can look at any facility, focal persons only at their own. */
   canSeeAllFacilities?: boolean;
   onOpenBeneficiary?: (b: BeneficiaryRow) => void;
+  /** Overrides the signed-in person's facility access (used by "View as"). */
+  levelsOverride?: Record<string, string>;
 }
 
 const urgencyTone: Record<string, string> = {
@@ -44,10 +46,11 @@ const statusTone: Record<string, string> = {
  * Facility dashboard — one registered health facility's own beneficiaries and
  * the referrals sent to and from it, so focal persons can track cases locally.
  */
-const FacilityDashboard = ({ projectId, canSeeAllFacilities = false, onOpenBeneficiary }: Props) => {
+const FacilityDashboard = ({ projectId, canSeeAllFacilities = false, onOpenBeneficiary, levelsOverride }: Props) => {
   const { toast } = useToast();
   const { facilities } = useFacilities(projectId);
-  const { levels } = useMyFacilityAccess();
+  const { levels: myLevels } = useMyFacilityAccess();
+  const levels = (levelsOverride || myLevels) as typeof myLevels;
   const [facilityId, setFacilityId] = useState("");
 
   const visible = useMemo(
