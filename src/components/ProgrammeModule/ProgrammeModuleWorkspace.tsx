@@ -1,4 +1,3 @@
-import WorkflowTour, { openWorkflowTour } from "./WorkflowTour";
 import { Compass, Eye, KeyRound } from "lucide-react";
 import AccessStudio from "./AccessStudio";
 import { useAccessProfiles, pageAllowed } from "@/lib/programmeModule/accessStudio";
