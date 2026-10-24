@@ -1,6 +1,7 @@
 # Roadmap
 
-- [ ] Restrict facility focal persons to assigned-facility records and clinical workflows; enforce navigation, profile components and database scope and verify.
+- [x] Restrict facility focal persons to assigned-facility navigation, clinical components and care tools; enforce restrictive record/child/document policies, protect user-scoped offline caches, and preserve admin access. Seventeen regression tests passed; live admin workspace verified.
+- [ ] Verify the facility-focal workflow with a real assigned account — no active facility focal-person assignments exist yet.
 
 - [x] Apply the supplied Overview card design with direct navigation to five permission-visible dashboards; verified hosted illustrations, desktop/mobile fit, General dashboard navigation and three tests.
 
