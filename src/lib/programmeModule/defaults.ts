@@ -63,6 +63,11 @@ export const DEFAULT_SERVICE_STATUSES: StatusOption[] = [
   { value: "on_track", label: "On track", tone: "success" },
   { value: "due", label: "Due", tone: "warning" },
   { value: "overdue", label: "Overdue", tone: "danger" },
+  { value: "at_risk", label: "At risk", tone: "warning" },
+  { value: "needs_follow_up", label: "Needs follow-up", tone: "warning" },
+  { value: "completed", label: "Completed", tone: "success" },
+  { value: "suspended", label: "Suspended", tone: "warning" },
+  { value: "exited", label: "Exited", tone: "neutral" },
   { value: "not_applicable", label: "Not applicable", tone: "neutral" },
 ];
 
