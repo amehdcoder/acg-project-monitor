@@ -28,6 +28,9 @@ import {
   FACILITY_TYPE_LABEL, useFacilities, type FacilityRow,
 } from "@/lib/programmeModule/facilities";
 import {
+  fileToDataUrl, resolveFacilityLogoUrl, uploadFacilityLogo,
+} from "@/lib/programmeModule/media";
+import {
   getAllStates, getLGAsForState, getWardsForLGA,
 } from "@/lib/nigeriaAdminData";
 
@@ -54,6 +57,7 @@ const emptyDraft = {
   address: "",
   contact_person: "",
   contact_phone: "",
+  logo_url: "",
 };
 
 const FacilityRegistry = ({
