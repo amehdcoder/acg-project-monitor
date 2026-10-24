@@ -412,8 +412,15 @@ export const toneClasses: Record<StatusOption["tone"], string> = {
 export const toneFor = (options: StatusOption[], value?: string | null) =>
   options.find((o) => o.value === value)?.tone ?? "neutral";
 
+/** "at_risk" -> "At risk": never show raw snake_case status values to users. */
+export const humanizeStatus = (value: string) =>
+  value
+    .replace(/[_-]+/g, " ")
+    .trim()
+    .replace(/^\w/, (c) => c.toUpperCase());
+
 export const labelFor = (options: StatusOption[], value?: string | null) =>
-  options.find((o) => o.value === value)?.label ?? (value || "—");
+  options.find((o) => o.value === value)?.label ?? (value ? humanizeStatus(value) : "—");
 
 export const ageFromDob = (dob?: unknown): string => {
   if (!dob) return "—";
