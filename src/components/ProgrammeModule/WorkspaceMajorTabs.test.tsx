@@ -4,6 +4,15 @@ import WorkspaceMajorTabs from "./WorkspaceMajorTabs";
 
 afterEach(cleanup);
 describe("major workspace destinations", () => {
+  it("limits facility focal persons to records and Field guide", () => {
+    const onSelect = vi.fn();
+    render(<WorkspaceMajorTabs selected="records" canReport={false} canBrain={false} canRecords canGuide onSelect={onSelect} />);
+    expect(screen.getAllByRole("tab")).toHaveLength(2);
+    fireEvent.click(screen.getByRole("tab", { name: "Field guide" }));
+    expect(onSelect).toHaveBeenCalledWith("guide");
+    fireEvent.click(screen.getByRole("tab", { name: "Beneficiary records" }));
+    expect(onSelect).toHaveBeenLastCalledWith("records");
+  });
   it("opens the Programme Report directly without selecting an Overview destination", () => {
     const onSelect = vi.fn();
     render(<WorkspaceMajorTabs selected="records" canReport canBrain onSelect={onSelect} />);

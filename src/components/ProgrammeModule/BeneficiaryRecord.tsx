@@ -664,6 +664,7 @@ const BeneficiaryRecord = ({
                         <Button
                           size="sm" variant="outline"
                           className="border-status-warning/40 text-status-warning hover:bg-status-warning/10"
+                          disabled={!canRecord}
                           onClick={() => setLifecycle({ action: "suspended", componentKey: c.key })}
                         >
                           Suspend Service
@@ -671,6 +672,7 @@ const BeneficiaryRecord = ({
                         <Button
                           size="sm" variant="outline"
                           className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                          disabled={!canRecord}
                           onClick={() => setLifecycle({ action: "exited", componentKey: c.key })}
                         >
                           Exit Service
@@ -883,7 +885,7 @@ const BeneficiaryRecord = ({
         ) : null;
       })()}
       <WashingtonGroupDialog
-        open={wgOpen}
+        open={canManage && wgOpen}
         beneficiaryName={beneficiary.full_name}
         initial={readWgResult(beneficiary.profile as Record<string, unknown>)?.answers}
         onSkip={() => setWgOpen(false)}
