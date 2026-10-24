@@ -69,3 +69,5 @@
 - [x] Overview page is the default landing/homepage; brand write-up removed above the heading.
 
 - [x] Protection section opens as illustrated hub cards (Safeguarding dashboard, Safeguarding cases, Community feedback) with live figures, matching the uploaded design.
+
+- [ ] Admin device preview (Desktop/Android/iOS/Tablet) for Longitudinal Beneficiary Records with one-click scale-to-fit and device-native font sizing
