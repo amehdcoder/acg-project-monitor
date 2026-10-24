@@ -6,6 +6,7 @@ import {
 } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 import ProgrammeModuleWorkspace from "./ProgrammeModuleWorkspace";
+import ScrollRail from "./ScrollRail";
 import type { RecordsOnlyProject } from "@/lib/programmeModule/recordsOnly";
 
 interface Props {
@@ -41,7 +42,8 @@ const RecordsOnlyShell = ({ projects, initialProjectId, onExit, onSwitchToFullAp
   );
 
   return (
-    <div className="min-h-[100dvh] bg-health-surface">
+    <div className="records-scroll min-h-[100dvh] bg-health-surface">
+      <ScrollRail />
       <header className="sticky top-0 z-40 border-b border-primary/20 bg-primary text-primary-foreground shadow-lg">
         <div className="mx-auto flex max-w-[1500px] flex-col gap-3 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3">
