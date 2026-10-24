@@ -31,6 +31,7 @@ import { toneClasses } from "@/lib/programmeModule/defaults";
 import { useFacilities } from "@/lib/programmeModule/facilities";
 import {
   DUTY_PRESETS, HEALTH_WORKER_CADRES, PROGRAMME_STAFF_CADRES, PROGRAMME_AREAS, type ProgrammeArea,
+  OVERVIEW_DASHBOARDS,
   PERMISSION_LIST, PRESETS, STATE_UNITS, TEAM_DESIGNATIONS, TEAM_TYPES,
   TEAM_TYPE_LABEL, deleteTeamMember, grantedCount, memberContext, saveTeamMember,
   useTeamMembers, type PermissionKey, type TeamMemberRow, type TeamPermissions,
@@ -45,6 +46,8 @@ interface Props {
   moduleId?: string;
   /** Only people who may change the register see the add / edit controls. */
   canManage?: boolean;
+  /** Programme components of the active module — for per-member component access. */
+  components?: { key: string; label: string }[];
 }
 
 const blank = {
