@@ -6473,6 +6473,7 @@ export type Database = {
           is_active: boolean
           latitude: number | null
           lga: string | null
+          logo_url: string | null
           longitude: number | null
           name: string
           project_id: string | null
@@ -6492,6 +6493,7 @@ export type Database = {
           is_active?: boolean
           latitude?: number | null
           lga?: string | null
+          logo_url?: string | null
           longitude?: number | null
           name: string
           project_id?: string | null
@@ -6511,6 +6513,7 @@ export type Database = {
           is_active?: boolean
           latitude?: number | null
           lga?: string | null
+          logo_url?: string | null
           longitude?: number | null
           name?: string
           project_id?: string | null

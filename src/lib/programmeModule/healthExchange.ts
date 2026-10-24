@@ -86,19 +86,19 @@ export const KIND_LABEL: Record<ExchangeKind, string> = {
 
 /** Indicators this programme can report upward. */
 export const REPORTABLE_INDICATORS: { key: string; label: string; area?: IndicatorArea; definition?: string }[] = [
-  { key: "beneficiaries_registered", label: "Beneficiaries registered" },
-  { key: "beneficiaries_active", label: "Active beneficiaries" },
-  { key: "cases_confirmed", label: "Cases clinically confirmed" },
-  { key: "referrals_made", label: "Referrals made" },
-  { key: "home_visits", label: "Home visits conducted" },
-  { key: "mda_treatments", label: "MDA treatments recorded" },
-  { key: "morbidity_records", label: "Morbidity management records" },
-  { key: "beneficiaries_registered:female", label: "Beneficiaries registered — female" },
-  { key: "beneficiaries_registered:male", label: "Beneficiaries registered — male" },
-  { key: "beneficiaries_active:female", label: "Active beneficiaries — female" },
-  { key: "beneficiaries_active:male", label: "Active beneficiaries — male" },
-  { key: "services_delivered", label: "Services delivered (this server's programme area)" },
-  { key: "beneficiaries_served", label: "Beneficiaries served (this server's programme area)" },
+  { key: "beneficiaries_registered", label: "Number of beneficiaries registered" },
+  { key: "beneficiaries_active", label: "Number of active beneficiaries" },
+  { key: "cases_confirmed", label: "Number of cases clinically confirmed" },
+  { key: "referrals_made", label: "Number of referrals made" },
+  { key: "home_visits", label: "Number of home visits conducted" },
+  { key: "mda_treatments", label: "Number of MDA treatments recorded" },
+  { key: "morbidity_records", label: "Number of morbidity management records" },
+  { key: "beneficiaries_registered:female", label: "Number of beneficiaries registered — female" },
+  { key: "beneficiaries_registered:male", label: "Number of beneficiaries registered — male" },
+  { key: "beneficiaries_active:female", label: "Number of active beneficiaries — female" },
+  { key: "beneficiaries_active:male", label: "Number of active beneficiaries — male" },
+  { key: "services_delivered", label: "Number of services delivered (this server's programme area)" },
+  { key: "beneficiaries_served", label: "Number of beneficiaries served (this server's programme area)" },
   ...NATIONAL_INDICATORS.map((i) => ({ key: i.key, label: i.label, area: i.area, definition: i.definition })),
 ];
 

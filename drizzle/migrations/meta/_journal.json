@@ -183,6 +183,13 @@
       "when": 1792483650108,
       "tag": "0025_quiz_participant_display_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1792829124896,
+      "tag": "0026_facility_logo_url",
+      "breakpoints": true
     }
   ]
 }

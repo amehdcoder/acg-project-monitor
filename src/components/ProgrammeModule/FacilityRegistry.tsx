@@ -28,6 +28,9 @@ import {
   FACILITY_TYPE_LABEL, useFacilities, type FacilityRow,
 } from "@/lib/programmeModule/facilities";
 import {
+  fileToDataUrl, resolveFacilityLogoUrl, uploadFacilityLogo,
+} from "@/lib/programmeModule/media";
+import {
   getAllStates, getLGAsForState, getWardsForLGA,
 } from "@/lib/nigeriaAdminData";
 
@@ -54,6 +57,7 @@ const emptyDraft = {
   address: "",
   contact_person: "",
   contact_phone: "",
+  logo_url: "",
 };
 
 const FacilityRegistry = ({
@@ -69,6 +73,8 @@ const FacilityRegistry = ({
   const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<FacilityRow | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState("");
 
   const loadCounts = useCallback(async () => {
     const [b, t] = await Promise.all([
@@ -100,7 +106,7 @@ const FacilityRegistry = ({
       `${f.name} ${f.state || ""} ${f.lga || ""} ${f.ward || ""}`.toLowerCase().includes(q));
   }, [facilities, search]);
 
-  const openNew = () => { setDraft(emptyDraft); setFormOpen(true); };
+  const openNew = () => { setDraft(emptyDraft); setLogoFile(null); setLogoPreview(""); setFormOpen(true); };
   const openEdit = (f: FacilityRow) => {
     setDraft({
       id: f.id,
@@ -113,8 +119,18 @@ const FacilityRegistry = ({
       address: "",
       contact_person: f.contact_person || "",
       contact_phone: f.contact_phone || "",
+      logo_url: f.logo_url || "",
     });
+    setLogoFile(null);
+    setLogoPreview("");
+    if (f.logo_url) void resolveFacilityLogoUrl(f.logo_url).then(setLogoPreview);
     setFormOpen(true);
+  };
+
+  const pickLogo = async (file: File | null) => {
+    setLogoFile(file);
+    if (!file) { setLogoPreview(draft.logo_url ? await resolveFacilityLogoUrl(draft.logo_url) : ""); return; }
+    setLogoPreview(await fileToDataUrl(file));
   };
 
   const save = async () => {
@@ -138,16 +154,25 @@ const FacilityRegistry = ({
         contact_phone: draft.contact_phone || null,
         is_active: true,
       };
+      let facilityId = draft.id;
       if (draft.id) {
         const { error } = await supabase.from("health_facilities")
           .update(payload as never).eq("id", draft.id);
         if (error) throw error;
         toast({ title: "Facility updated" });
       } else {
-        const { error } = await supabase.from("health_facilities")
-          .insert({ ...payload, created_by: auth.user?.id } as never);
+        const { data: inserted, error } = await supabase.from("health_facilities")
+          .insert({ ...payload, created_by: auth.user?.id } as never)
+          .select("id").single();
         if (error) throw error;
+        facilityId = (inserted as { id: string } | null)?.id || "";
         toast({ title: "Facility registered", description: draft.name });
+      }
+      if (logoFile && facilityId) {
+        const path = await uploadFacilityLogo(logoFile, projectId, facilityId);
+        const { error: logoError } = await supabase.from("health_facilities")
+          .update({ logo_url: path } as never).eq("id", facilityId);
+        if (logoError) throw logoError;
       }
       setFormOpen(false);
       await reload();
@@ -356,6 +381,26 @@ const FacilityRegistry = ({
                       {wards.map((w) => <SelectItem key={w} value={w}>{w}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Facility logo (optional)</Label>
+                <div className="flex items-center gap-3 rounded-lg border border-dashed p-3">
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
+                    {logoPreview
+                      ? <img src={logoPreview} alt="Facility logo" className="h-full w-full object-contain" />
+                      : <Building2 className="h-6 w-6 text-muted-foreground" />}
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => void pickLogo(e.target.files?.[0] || null)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Shown on beneficiary hand cards in place of the default partner logo.
+                    </p>
+                  </div>
                 </div>
               </div>
               <div className="space-y-1.5">

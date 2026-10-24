@@ -8,7 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { Download, FileDown, Printer, QrCode, Loader2, IdCard, ExternalLink } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
-import { resolveMediaUrl } from "@/lib/programmeModule/media";
+import { resolveMediaUrl, resolveFacilityLogoUrl } from "@/lib/programmeModule/media";
 import { toast } from "@/hooks/use-toast";
 import type { BeneficiaryRow } from "@/lib/programmeModule/types";
 import handsEmblem from "@/assets/hands-emblem.png";
@@ -77,6 +77,7 @@ export const HandCardDocument = ({ beneficiary: b }: { beneficiary: BeneficiaryR
   }, []);
   const [photo, setPhoto] = useState("");
   const [facility, setFacility] = useState("");
+  const [facilityLogo, setFacilityLogo] = useState("");
   const [busy, setBusy] = useState<"" | "png" | "pdf">("");
   const frontRef = useRef<HTMLDivElement>(null);
   const backRef = useRef<HTMLDivElement>(null);
@@ -91,8 +92,14 @@ export const HandCardDocument = ({ beneficiary: b }: { beneficiary: BeneficiaryR
       if (!off) setPhoto(d);
       const fid = b.facility_id || b.referring_facility_id;
       if (fid) {
-        const { data } = await supabase.from("health_facilities").select("name").eq("id", fid).maybeSingle();
-        if (!off) setFacility((data as { name?: string } | null)?.name || "");
+        const { data } = await supabase.from("health_facilities").select("name,logo_url").eq("id", fid).maybeSingle();
+        const row = data as { name?: string; logo_url?: string | null } | null;
+        if (!off) setFacility(row?.name || "");
+        if (row?.logo_url) {
+          const logoUrl = await resolveFacilityLogoUrl(row.logo_url);
+          const logoData = await toDataUrl(logoUrl);
+          if (!off && logoData) setFacilityLogo(logoData);
+        }
       }
     })();
     return () => { off = true; };
@@ -181,7 +188,7 @@ export const HandCardDocument = ({ beneficiary: b }: { beneficiary: BeneficiaryR
                     <div><div style={{ fontWeight: 800, fontSize: 26, color: NAVY, lineHeight: 1.3 }}>HANDS</div><div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 0, color: NAVY }}>TRANSFORMING LIVES</div></div>
                   </div>
                   <div style={{ width: 1, height: 70, background: "#c9d4e6" }} />
-                  <img src={ecwaLogo} style={{ height: 66, width: "100%", objectFit: "contain" }} />
+                  <img src={facilityLogo || ecwaLogo} style={{ height: 66, width: "100%", objectFit: "contain" }} />
                   <div style={{ width: 1, height: 70, background: "#c9d4e6" }} />
                   <img src={cbmLogo} style={{ height: 80, width: "100%", objectFit: "contain" }} />
                   <div style={{ width: 1, height: 70, background: "#c9d4e6" }} />
