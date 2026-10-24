@@ -135,7 +135,24 @@ const ProjectTeamPanel = ({ projectId, moduleId, canManage = false, components =
         is_active: form.is_active,
         notes: form.notes.trim() || null,
       });
-      toast({ title: editing ? "Team member updated" : "Team member added" });
+      // Facility staff with an account are linked to their own facility automatically,
+      // so their facility-scoped access works without a separate Facility teams step.
+      const linkedUser = form.user_id.trim();
+      let linked = false;
+      if (form.team_type === "facility" && form.facility_id && linkedUser) {
+        const { data: auth } = await supabase.auth.getUser();
+        const { error: linkError } = await supabase.from("facility_focal_persons").upsert({
+          facility_id: form.facility_id, user_id: linkedUser, role: "focal_person",
+          access_level: perms.edit_records || perms.record_services ? "record" : "view",
+          is_active: form.is_active, created_by: auth.user?.id,
+        } as never, { onConflict: "facility_id,user_id" });
+        if (linkError) toast({ title: "Saved, but facility link failed", description: linkError.message, variant: "destructive" });
+        else linked = true;
+      }
+      toast({
+        title: editing ? "Team member updated" : "Team member added",
+        description: linked ? `Linked to ${facilityName(form.facility_id)} as facility focal person.` : undefined,
+      });
       setOpen(false);
       await reload();
     } catch (e) {
