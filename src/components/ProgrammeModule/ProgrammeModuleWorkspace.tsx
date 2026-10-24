@@ -251,6 +251,9 @@ const ProgrammeModuleWorkspace = ({
     return rows.filter((b) =>
       Boolean(facilityLevels[(b as unknown as { facility_id?: string }).facility_id || ""]));
   }, [beneficiaries, facilityLevels, isFocalPerson, viewAs]);
+  // Facilities every screen must stay inside (focal persons, or a "View as" facility).
+  const scopeFacilityIds = useMemo(() => (isFocalPerson ? Object.keys(facilityLevels)
+    : viewAs?.facilityId ? [viewAs.facilityId] : null), [isFocalPerson, facilityLevels, viewAs]);
   const { facilities: viewAsFacilities } = useFacilities(canViewAs ? projectId : undefined);
   const viewAsStates = useMemo(() => Array.from(new Set([
     ...viewAsFacilities.map((f) => f.state || ""),
@@ -604,7 +607,7 @@ const ProgrammeModuleWorkspace = ({
           moduleId={active.id}
           config={dashConfig || normalizeConfig(active.config)}
           beneficiaries={scopedBeneficiaries}
-          allowedFacilityIds={isFocalPerson ? Object.keys(facilityLevels) : []}
+          allowedFacilityIds={scopeFacilityIds || []}
           isSafeguardingOfficer={isOfficer}
           canRegister={can("edit_records")}
           canExchange={canConfigure}
@@ -633,7 +636,7 @@ const ProgrammeModuleWorkspace = ({
           projectId={projectId}
           moduleId={active?.id}
           config={dashConfig}
-          allowedFacilityIds={isFocalPerson ? Object.keys(facilityLevels) : []}
+          allowedFacilityIds={scopeFacilityIds || []}
           onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }}
         />
       )}
@@ -642,6 +645,7 @@ const ProgrammeModuleWorkspace = ({
         <FacilityDashboard
           projectId={projectId}
           canSeeAllFacilities={canConfigure}
+          levelsOverride={viewAs ? (viewAs.facilityId ? { [viewAs.facilityId]: "record" } : canConfigure ? undefined : {}) : undefined}
           onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }}
         />
       )}
@@ -649,7 +653,7 @@ const ProgrammeModuleWorkspace = ({
       {view === "followups" && (
         <FollowUpsPanel
           projectId={projectId}
-          allowedFacilityIds={isFocalPerson ? Object.keys(facilityLevels) : null}
+          allowedFacilityIds={scopeFacilityIds}
           onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }}
         />
       )}
@@ -671,7 +675,7 @@ const ProgrammeModuleWorkspace = ({
           projectId={projectId}
           moduleId={active?.id}
           beneficiaries={scopedBeneficiaries}
-          allowedFacilityIds={isFocalPerson ? Object.keys(facilityLevels) : null}
+          allowedFacilityIds={scopeFacilityIds}
         />
       )}
 
@@ -715,7 +719,7 @@ const ProgrammeModuleWorkspace = ({
           canRecord={canConfigure || can("manage_cdds")
             || (!onTeamRegister && Object.values(facilityLevels).some((l) => l !== "view"))}
           canConfirm={canConfigure || can("confirm_cases")}
-          allowedFacilityIds={isFocalPerson ? Object.keys(facilityLevels) : null}
+          allowedFacilityIds={scopeFacilityIds}
           onBeneficiaryRegistered={() => void reloadBeneficiaries()}
           onCompleteRecord={(row) => setCompleting(row)}
         />
@@ -761,7 +765,7 @@ const ProgrammeModuleWorkspace = ({
         <SafeguardingDashboard
           projectId={projectId}
           isOfficer={isOfficer}
-          allowedFacilityIds={isFocalPerson ? Object.keys(facilityLevels) : []}
+          allowedFacilityIds={scopeFacilityIds || []}
         />
       )}
 
