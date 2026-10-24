@@ -21,6 +21,7 @@ import {
   type ServiceLifecycleAction,
 } from "@/lib/programmeModule/componentOutcomes";
 import { offlineMutate } from "@/lib/programmeModule/offlineWrite";
+import OutcomePicker from "./OutcomePicker";
 import { newUuid } from "@/lib/programmeModule/offlineQueue";
 import { recordAudit } from "./useProgrammeModule";
 import type { BeneficiaryRow, ProgrammeComponent } from "@/lib/programmeModule/types";
@@ -188,16 +189,14 @@ const ComponentStatusDialog = ({
               {action === "completed" ? "Final outcome" : "Final outcome / status at exit"}{" "}
               <span className="text-destructive">*</span>
             </Label>
-            <Select value={outcome} onValueChange={setOutcome}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select the outcome" />
-              </SelectTrigger>
-              <SelectContent>
-                {outcomes.map((o) => (
-                  <SelectItem key={o} value={o}>{o}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <OutcomePicker
+              componentKey={component.key}
+              projectId={projectId}
+              action={action}
+              options={outcomes}
+              value={outcome}
+              onChange={setOutcome}
+            />
           </div>
 
           <div className="space-y-1.5">

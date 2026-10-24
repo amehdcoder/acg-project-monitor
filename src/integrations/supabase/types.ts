@@ -10377,6 +10377,44 @@ export type Database = {
           },
         ]
       }
+      project_custom_outcomes: {
+        Row: {
+          action: string
+          component_key: string
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          project_id: string
+        }
+        Insert: {
+          action: string
+          component_key: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          project_id: string
+        }
+        Update: {
+          action?: string
+          component_key?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_custom_outcomes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_custom_services: {
         Row: {
           component_key: string
