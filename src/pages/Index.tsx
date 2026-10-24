@@ -536,7 +536,7 @@ const Index = () => {
 
           <main data-app-scroll-root className={`flex-1 overflow-y-auto overflow-x-hidden pb-20 lg:pb-0 max-w-full overscroll-contain ${
             activeTab === "dashboard" ? "p-0" : "px-1 sm:px-2 md:px-4"
-          }`} style={{ WebkitOverflowScrolling: 'touch' }}>
+          } ${activeTab === "records" ? "records-scroll" : ""}`} style={{ WebkitOverflowScrolling: 'touch' }}>
             <ErrorBoundary name="Main Content">
               {/*
                * Tab switch — no opacity/transform animation at all.
