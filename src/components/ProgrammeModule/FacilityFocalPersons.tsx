@@ -89,6 +89,22 @@ const FacilityFocalPersons = ({ open, onOpenChange, projectId, initialFacilityId
       .slice(0, 50);
   }, [profiles, search]);
 
+  // People with an account on this project come first — each assignment is tied
+  // to their real name. The full account search remains as a fallback.
+  const pickerOptions = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (projectUsers.length) {
+      const list = projectUsers.map((u) => ({ id: u.user_id, label: u.full_name, sub: u.email || "" }));
+      if (!q) return list.slice(0, 50);
+      return list.filter((o) => `${o.label} ${o.sub}`.toLowerCase().includes(q)).slice(0, 50);
+    }
+    return filteredProfiles.map((p) => ({
+      id: p.user_id,
+      label: `${p.first_name} ${p.last_name}`.trim() || p.email,
+      sub: p.email,
+    }));
+  }, [projectUsers, filteredProfiles, search]);
+
   const visibleFacilities = useMemo(() => {
     const q = facilitySearch.trim().toLowerCase();
     if (!q) return facilities;
@@ -144,7 +160,7 @@ const FacilityFocalPersons = ({ open, onOpenChange, projectId, initialFacilityId
       <DialogContent className="max-h-[92dvh] max-w-3xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" /> Facility focal persons
+            <Users className="h-5 w-5" /> Facility teams
           </DialogTitle>
         </DialogHeader>
 
