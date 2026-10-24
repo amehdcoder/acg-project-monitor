@@ -1,0 +1,29 @@
+CREATE OR REPLACE FUNCTION public.facility_restricted_user(_uid uuid) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public AS $$ SELECT NOT public.is_admin(_uid) AND EXISTS (SELECT 1 FROM public.facility_focal_persons WHERE user_id=_uid AND is_active); $$;
+CREATE OR REPLACE FUNCTION public.focal_beneficiary_scope(_uid uuid,_bid uuid,_write boolean DEFAULT false,_manage boolean DEFAULT false) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public AS $$ SELECT EXISTS(SELECT 1 FROM public.beneficiaries b JOIN public.facility_focal_persons f ON f.facility_id=b.facility_id WHERE b.id=_bid AND f.user_id=_uid AND f.is_active AND (NOT _write OR f.access_level IN ('record','manage')) AND (NOT _manage OR f.access_level='manage')); $$;
+CREATE OR REPLACE FUNCTION public.focal_household_scope(_uid uuid,_hid uuid,_write boolean DEFAULT false) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public AS $$ SELECT EXISTS(SELECT 1 FROM public.beneficiaries b WHERE b.household_id=_hid AND public.focal_beneficiary_scope(_uid,b.id,_write)) AND NOT EXISTS(SELECT 1 FROM public.beneficiaries b WHERE b.household_id=_hid AND NOT public.focal_beneficiary_scope(_uid,b.id)); $$;
+CREATE OR REPLACE FUNCTION public.focal_component_allowed(_key text) RETURNS boolean LANGUAGE sql IMMUTABLE SET search_path=public AS $$ SELECT _key='documents' OR public.programme_area_matches(_key, ARRAY['eye','ntd','mental']); $$;
+REVOKE ALL ON FUNCTION public.facility_restricted_user(uuid), public.focal_beneficiary_scope(uuid,uuid,boolean,boolean),public.focal_household_scope(uuid,uuid,boolean),public.focal_component_allowed(text) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.facility_restricted_user(uuid), public.focal_beneficiary_scope(uuid,uuid,boolean,boolean),public.focal_household_scope(uuid,uuid,boolean),public.focal_component_allowed(text) TO authenticated,service_role;
+CREATE POLICY focal_beneficiary_read_guard ON public.beneficiaries AS RESTRICTIVE FOR SELECT TO authenticated USING (NOT public.facility_restricted_user(auth.uid()) OR public.focal_beneficiary_scope(auth.uid(),id));
+CREATE POLICY focal_beneficiary_insert_guard ON public.beneficiaries AS RESTRICTIVE FOR INSERT TO authenticated WITH CHECK (NOT public.facility_restricted_user(auth.uid()) OR public.can_manage_at_facility(auth.uid(),facility_id));
+CREATE POLICY focal_beneficiary_update_guard ON public.beneficiaries AS RESTRICTIVE FOR UPDATE TO authenticated USING (NOT public.facility_restricted_user(auth.uid()) OR public.focal_beneficiary_scope(auth.uid(),id,true,true)) WITH CHECK (NOT public.facility_restricted_user(auth.uid()) OR public.can_manage_at_facility(auth.uid(),facility_id));
+CREATE POLICY focal_beneficiary_delete_guard ON public.beneficiaries AS RESTRICTIVE FOR DELETE TO authenticated USING (NOT public.facility_restricted_user(auth.uid()) OR public.focal_beneficiary_scope(auth.uid(),id,true,true));
+DO $$ DECLARE t text; parent_expr text; read_expr text; write_expr text; BEGIN
+FOREACH t IN ARRAY ARRAY['beneficiary_services','beneficiary_referrals','beneficiary_audit','beneficiary_lesion_assessments','beneficiary_home_visits','household_members','ntd_morbidity_records','household_mda_treatments','beneficiary_households','household_mda_rounds'] LOOP
+IF t='beneficiary_households' THEN parent_expr='public.focal_household_scope(auth.uid(),id,%s)';
+ELSIF t IN ('household_mda_rounds','household_members') THEN parent_expr='public.focal_household_scope(auth.uid(),household_id,%s)';
+ELSIF t IN ('household_mda_treatments','ntd_morbidity_records') THEN parent_expr='(CASE WHEN beneficiary_id IS NOT NULL THEN public.focal_beneficiary_scope(auth.uid(),beneficiary_id,%s) ELSE public.focal_household_scope(auth.uid(),household_id,%s) END)';
+ELSE parent_expr='public.focal_beneficiary_scope(auth.uid(),beneficiary_id,%s)'; END IF;
+read_expr=format(parent_expr,'false','false'); write_expr=format(parent_expr,'true','true');
+IF t IN ('beneficiary_services','beneficiary_referrals') THEN read_expr=read_expr||' AND public.focal_component_allowed(component_key)'; write_expr=write_expr||' AND public.focal_component_allowed(component_key)'; END IF;
+read_expr='NOT public.facility_restricted_user(auth.uid()) OR ('||read_expr||')'; write_expr='NOT public.facility_restricted_user(auth.uid()) OR ('||write_expr||')';
+EXECUTE format('CREATE POLICY focal_read_guard ON public.%I AS RESTRICTIVE FOR SELECT TO authenticated USING (%s)',t,read_expr);
+EXECUTE format('CREATE POLICY focal_insert_guard ON public.%I AS RESTRICTIVE FOR INSERT TO authenticated WITH CHECK (%s)',t,write_expr);
+EXECUTE format('CREATE POLICY focal_update_guard ON public.%I AS RESTRICTIVE FOR UPDATE TO authenticated USING (%s) WITH CHECK (%s)',t,write_expr,write_expr);
+EXECUTE format('CREATE POLICY focal_delete_guard ON public.%I AS RESTRICTIVE FOR DELETE TO authenticated USING (%s)',t,write_expr);
+IF t NOT IN ('beneficiary_services','beneficiary_referrals','beneficiary_audit') THEN
+EXECUTE format('CREATE POLICY focal_read_grant ON public.%I FOR SELECT TO authenticated USING (public.facility_restricted_user(auth.uid()) AND (%s))',t,read_expr);
+EXECUTE format('CREATE POLICY focal_insert_grant ON public.%I FOR INSERT TO authenticated WITH CHECK (public.facility_restricted_user(auth.uid()) AND (%s))',t,write_expr);
+EXECUTE format('CREATE POLICY focal_update_grant ON public.%I FOR UPDATE TO authenticated USING (public.facility_restricted_user(auth.uid()) AND (%s)) WITH CHECK (public.facility_restricted_user(auth.uid()) AND (%s))',t,write_expr,write_expr);
+END IF;
+END LOOP; END $$;

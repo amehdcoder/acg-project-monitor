@@ -1,5 +1,8 @@
 # Roadmap
 
+- [x] Restrict facility focal persons to assigned-facility navigation, clinical components and care tools; enforce restrictive record/child/document policies, protect user-scoped offline caches, and preserve admin access. Seventeen regression tests passed; live admin workspace verified.
+- [ ] Verify the facility-focal workflow with a real assigned account — no active facility focal-person assignments exist yet.
+
 - [x] Apply the supplied Overview card design with direct navigation to five permission-visible dashboards; verified hosted illustrations, desktop/mobile fit, General dashboard navigation and three tests.
 
 - [x] Integrate the beneficiary's active-component care journeys beside Overall Progress; five focused tests passed and authenticated desktop/mobile profile verified with one active Eye Health component at 60%, readable dates and pending completion/outcome.

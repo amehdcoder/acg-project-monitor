@@ -73,6 +73,7 @@ import ProtectionHub from "./ProtectionHub";
 import WorkspaceNavigation, { type WorkspaceNavGroup, type WorkspaceView } from "./WorkspaceNavigation";
 import { useIsSafeguardingOfficer } from "@/lib/programmeModule/safeguarding";
 import { useMyFacilityAccess } from "@/lib/programmeModule/facilities";
+import { FACILITY_WORKSPACE_VIEWS, facilityCanWrite, isFacilityClinicalComponent } from "@/lib/programmeModule/facilityScope";
 
 
 interface Props {
@@ -105,7 +106,9 @@ const ProgrammeModuleWorkspace = ({
   const [drugsOpen, setDrugsOpen] = useState(false);
   const [whatsappOpen, setWhatsappOpen] = useState(false);
   const [smsOpen, setSmsOpen] = useState(false);
-  const { levels: facilityLevels } = useMyFacilityAccess();
+  const { levels: facilityLevels, loading: facilityAccessLoading } = useMyFacilityAccess();
+  const isFocalPerson = !canConfigure && Object.keys(facilityLevels).length > 0;
+  const focalCanWrite = facilityCanWrite(facilityLevels);
   const [focalFacilityId, setFocalFacilityId] = useState<string | undefined>(undefined);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [selected, setSelected] = useState<BeneficiaryRow | null>(null);
@@ -135,17 +138,24 @@ const ProgrammeModuleWorkspace = ({
   // Safeguarding Officers (who are not administrators) only see safeguarding.
   const safeguardingOnly = isOfficer && !canConfigure;
   const can = useMemo(() => (key: Parameters<typeof teamCan>[0]) => {
+    if (isFocalPerson) {
+      if (key === "view_records" || key === "view_dashboards") return true;
+      if (["record_services", "manage_cdds", "confirm_cases", "manage_households", "home_visits", "dispatch_visits", "accept_referrals"].includes(key)) return focalCanWrite;
+      if (key === "edit_records") return Object.values(facilityLevels).includes("manage");
+      return false;
+    }
     if (safeguardingOnly) return key === "view_safeguarding";
     if (isProgrammeStaff && ["view_safeguarding", "manage_team", "configure_module", "manage_facilities"].includes(key)) return false;
     if (isHealthWorker && ["view_safeguarding", "assess_livelihood", "verify_livelihood", "manage_livelihood", "export_data", "manage_team", "configure_module", "manage_facilities"].includes(key)) return false;
     return teamCan(key);
-  }, [teamCan, isHealthWorker, isProgrammeStaff, safeguardingOnly]);
+  }, [teamCan, isHealthWorker, isProgrammeStaff, safeguardingOnly, isFocalPerson, focalCanWrite, facilityLevels]);
   const componentFilter = useMemo(() => {
+    if (isFocalPerson) return isFacilityClinicalComponent;
     if (isHealthWorker) return isHealthWorkerComponent;
     if (staffAreas) return componentInAreas(staffAreas);
     return undefined;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isHealthWorker, areaKey, isProgrammeStaff]);
+  }, [isHealthWorker, areaKey, isProgrammeStaff, isFocalPerson]);
   // Health workers and programme staff always see the General dashboard and the
   // dashboards of their own components (scoped via componentFilter below).
   const canDash = can("view_dashboards") || ((isHealthWorker || isProgrammeStaff) && can("view_records"));
@@ -161,7 +171,7 @@ const ProgrammeModuleWorkspace = ({
       .then(({ data }) => setIsProgrammeOfficer(Boolean(data)))
       .catch(() => setIsProgrammeOfficer(false));
   }, [projectId]);
-  const canReport = canConfigure || isProgrammeOfficer;
+  const canReport = !isFocalPerson && (canConfigure || isProgrammeOfficer);
 
   // A scanned Hand Card link (?case=...) must land on the records list so the
   // record can open straight away, even for people who default to the dashboard.
@@ -191,15 +201,13 @@ const ProgrammeModuleWorkspace = ({
    * records — and programme components — of those facilities. Everyone else
    * keeps the full view.
    */
-  const isFocalPerson = !canConfigure && Object.keys(facilityLevels).length > 0;
-
   const scopedBeneficiaries = useMemo(() => {
     if (!isFocalPerson) return beneficiaries;
     return beneficiaries.filter((b) =>
       Boolean(facilityLevels[(b as unknown as { facility_id?: string }).facility_id || ""]));
   }, [beneficiaries, facilityLevels, isFocalPerson]);
 
-  const navGroups: WorkspaceNavGroup[] = [
+  const allNavGroups: WorkspaceNavGroup[] = [
     {
       label: "Overview",
       hub: { key: "overview", label: "Overview", description: "Executive view of people, services and outcomes", icon: BarChart3 },
@@ -217,8 +225,8 @@ const ProgrammeModuleWorkspace = ({
       items: [
         { key: "records", label: "Beneficiary records", description: "Find, register and open individual records", icon: LayoutGrid, show: can("view_records") },
         { key: "followups", label: "Follow-ups & referrals", description: "Upcoming visits and referral traffic", icon: CalendarClock, show: can("view_records") },
-        { key: "households", label: "Households & MDA", description: "Household members, treatment rounds and water points", icon: Home, show: (hasArea("ntd") || hasArea("wash")) && (can("manage_households") || canDash) },
-        { key: "casesearch", label: "CDD case search", description: "MMDP case finding, review and registration", icon: Search, show: (hasArea("ntd") || hasArea("eye")) && (can("manage_cdds") || can("confirm_cases") || can("view_records")) },
+        { key: "households", label: "Households & MDA", description: "Household members, treatment rounds and water points", icon: Home, show: (isFocalPerson || hasArea("ntd") || hasArea("wash")) && (can("manage_households") || canDash) },
+        { key: "casesearch", label: "CDD case search", description: "MMDP case finding, review and registration", icon: Search, show: (isFocalPerson || hasArea("ntd") || hasArea("eye")) && (can("manage_cdds") || can("confirm_cases") || can("view_records")) },
         { key: "livelihood", label: "Livelihood & empowerment", description: "Assessments, shortlists and verification", icon: Briefcase, show: !isHealthWorker && hasArea("livelihood") && (can("view_records") || can("view_dashboards")) },
       ],
     },
@@ -242,8 +250,14 @@ const ProgrammeModuleWorkspace = ({
     },
   ];
 
-  const canAssessments = Boolean(projectId) && !safeguardingOnly && (canConfigure || can("view_records") || canDash);
-  const canBrain = can("view_dashboards") || can("view_records");
+  const navGroups = allNavGroups.map((group) => ({ ...group,
+    items: group.items.map((item) => ({ ...item, show: item.show && (!isFocalPerson || FACILITY_WORKSPACE_VIEWS.has(item.key)) })),
+  }));
+  const accessLoading = permissionsLoading || facilityAccessLoading;
+  const canRecords = can("view_records") || can("view_dashboards");
+  const canGuide = canRecords;
+  const canAssessments = !isFocalPerson && Boolean(projectId) && !safeguardingOnly && (canConfigure || can("view_records") || canDash);
+  const canBrain = !isFocalPerson && canRecords;
   const [brainMounted, setBrainMounted] = useState(false);
   const [lastRecordsView, setLastRecordsView] = useState<WorkspaceView>("records");
   const isSide = (v: WorkspaceView) => v === "brain" || v === "guide" || v === "report" || v === "assessments";
@@ -258,7 +272,7 @@ const ProgrammeModuleWorkspace = ({
   // there. A scanned Case ID link still goes straight to the record.
   const landedRef = useRef(false);
   useEffect(() => {
-    if (permissionsLoading) return;
+    if (accessLoading) return;
     const hubViews = navGroups.flatMap((group) => group.hub && group.items.some((item) => item.show) ? [group.hub.key] : []);
     const visibleViews: WorkspaceView[] = [...hubViews, ...navGroups.flatMap((group) => group.items).filter((item) => item.show).map((item) => item.key), ...(canReport ? ["report" as const] : []), ...(canAssessments ? ["assessments" as const] : [])];
     if (!landedRef.current) {
@@ -271,9 +285,9 @@ const ProgrammeModuleWorkspace = ({
       setView(landing);
       return;
     }
-    if (view === "brain" || view === "guide") return;
+    if ((view === "brain" && canBrain) || (view === "guide" && canGuide)) return;
     if (!visibleViews.includes(view)) setView(visibleViews.includes("records") ? "records" : visibleViews[0] || "records");
-  }, [permissionsLoading, view, canConfigure, canReport, canAssessments, isOfficer, onTeamRegister, isProgrammeStaff, areaKey]);
+  }, [accessLoading, view, canConfigure, canReport, canAssessments, canBrain, canGuide, isFocalPerson, isOfficer, onTeamRegister, isProgrammeStaff, areaKey]);
 
 
   useEffect(() => {
@@ -354,16 +368,21 @@ const ProgrammeModuleWorkspace = ({
     );
   }
 
-  if (selected && active) {
+  if (accessLoading) return <div role="status" className="p-8 text-center text-muted-foreground">Checking facility access…</div>;
+
+  if (isFocalPerson && !FACILITY_WORKSPACE_VIEWS.has(view)) return <div role="status" className="p-8 text-center text-muted-foreground">Opening your facility workspace…</div>;
+
+  if (!accessLoading && selected && active && (!isFocalPerson || facilityLevels[selected.facility_id || ""])) {
     const selectedFacility = (selected as unknown as { facility_id?: string }).facility_id || "";
     return (
       <div className="lbr-type"><BeneficiaryRecord
         beneficiary={selected}
-        config={normalizeConfig(active.config)}
+        config={dashConfig || normalizeConfig(active.config)}
         moduleId={active.id}
         projectId={projectId}
         onBack={() => setSelected(null)}
         canManage={canConfigure || facilityLevels[selectedFacility] === "manage"}
+        canRecord={!isFocalPerson || ["record", "manage"].includes(facilityLevels[selectedFacility])}
         componentsVisible={!isFocalPerson || Boolean(facilityLevels[selectedFacility])}
         componentFilter={componentFilter}
         onChanged={() => void reloadBeneficiaries()}
@@ -418,13 +437,13 @@ const ProgrammeModuleWorkspace = ({
         </div>
       </div>
 
-      <WorkflowTour can={(k) => (k === "view_dashboards" ? canDash : can(k as Parameters<typeof teamCan>[0]))} canConfigure={canConfigure} isOfficer={isOfficer} ready={!permissionsLoading && Boolean(active)} visibleViews={[...navGroups.flatMap((g) => g.items).filter((i) => i.show).map((i) => i.key), ...(canBrain ? ["brain", "guide"] : [])]} components={(dashConfig?.components || []).filter((c) => !c.hidden)} onNavigate={(v) => { if (v === "brain" || v === "guide") openTab(v); else setView(v as WorkspaceView); }} />
+      <WorkflowTour can={(k) => (k === "view_dashboards" ? canDash : can(k as Parameters<typeof teamCan>[0]))} canConfigure={canConfigure} isOfficer={isOfficer} ready={!accessLoading && Boolean(active)} visibleViews={[...navGroups.flatMap((g) => g.items).filter((i) => i.show).map((i) => i.key), ...(canBrain ? ["brain"] : []), ...(canGuide ? ["guide"] : [])]} components={(dashConfig?.components || []).filter((c) => !c.hidden)} onNavigate={(v) => { if (v === "brain" || v === "guide") openTab(v); else setView(v as WorkspaceView); }} />
 
-      {!permissionsLoading && (canBrain || canReport) && active && (
-        <WorkspaceMajorTabs selected={isSide(view) ? view as MajorTab : "records"} canReport={canReport} canBrain={canBrain} canAssessments={canAssessments} onSelect={openTab} />
+      {!accessLoading && (canRecords || canReport) && active && (
+        <WorkspaceMajorTabs selected={isSide(view) ? view as MajorTab : "records"} canReport={canReport} canBrain={canBrain} canRecords={canRecords} canGuide={canGuide} canAssessments={canAssessments} onSelect={openTab} />
       )}
 
-      {!permissionsLoading && !isSide(view) && <WorkspaceNavigation groups={navGroups} view={view} onViewChange={setView} administration={
+      {!accessLoading && !isSide(view) && <WorkspaceNavigation groups={navGroups} view={view} onViewChange={setView} administration={isFocalPerson ? <Button variant="outline" size="sm" onClick={() => openWorkflowTour()}><Compass className="mr-2 h-4 w-4" /> Guided tour</Button> :
         <DropdownMenu>
           <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="gap-2"><SlidersHorizontal className="h-4 w-4" /> Manage<ChevronDown className="h-3.5 w-3.5" /></Button></DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64">
@@ -461,7 +480,7 @@ const ProgrammeModuleWorkspace = ({
         </Card>
       )}
 
-      {!permissionsLoading && active && view === "records" && (
+      {!accessLoading && active && view === "records" && (
         <RecordQualityBar
           beneficiaries={scopedBeneficiaries}
           canMerge={canConfigure}
@@ -469,7 +488,7 @@ const ProgrammeModuleWorkspace = ({
           onMerged={() => void reloadBeneficiaries()}
         />
       )}
-      {!permissionsLoading && active && view === "records" && (
+      {!accessLoading && active && view === "records" && (
         <BeneficiaryList
           beneficiaries={scopedBeneficiaries}
           config={normalizeConfig(active.config)}
@@ -483,41 +502,41 @@ const ProgrammeModuleWorkspace = ({
         />
       )}
 
-      {!permissionsLoading && active && view === "people" && projectId && (
+      {!accessLoading && active && view === "people" && projectId && (
         <PeopleCareHub projectId={projectId} beneficiaries={scopedBeneficiaries}
           items={navGroups.find((g) => g.hub?.key === "people")?.items.filter((i) => i.show) || []}
           onOpen={setView} />
       )}
 
-      {!permissionsLoading && active && view === "overview" && (
+      {!accessLoading && active && view === "overview" && (
         <OverviewHub beneficiaries={scopedBeneficiaries} pending={pending}
           items={navGroups.find((g) => g.hub?.key === "overview")?.items.filter((i) => i.show) || []}
           onOpen={setView} />
       )}
 
-      {!permissionsLoading && active && view === "intelligence" && (
+      {!accessLoading && active && view === "intelligence" && (
         <IntelligenceHub beneficiaries={scopedBeneficiaries} pending={pending}
           components={dashConfig?.components.length || 0}
           items={navGroups.find((g) => g.hub?.key === "intelligence")?.items.filter((i) => i.show) || []}
           onOpen={setView} />
       )}
 
-      {!permissionsLoading && active && view === "protection" && projectId && (
+      {!accessLoading && active && view === "protection" && projectId && (
         <ProtectionHub projectId={projectId}
           items={navGroups.find((g) => g.hub?.key === "protection")?.items.filter((i) => i.show) || []}
           onOpen={setView} />
       )}
 
-      {!permissionsLoading && active && view === "assessments" && projectId && canAssessments && <QuizBuilder key={projectId} projectId={projectId} />}
+      {!accessLoading && active && view === "assessments" && projectId && canAssessments && <QuizBuilder key={projectId} projectId={projectId} />}
 
-      {!permissionsLoading && active && view === "report" && projectId && canReport && (
+      {!accessLoading && active && view === "report" && projectId && canReport && (
         <ProgrammeReportForm projectId={projectId} canManage={canConfigure || isSuperAdmin} />
       )}
-      {!permissionsLoading && active && view === "dashboard" && (
+      {!accessLoading && active && view === "dashboard" && (
         <GeneralDashboard
           projectId={projectId}
           moduleId={active.id}
-          config={dashConfig!}
+          config={dashConfig || normalizeConfig(active.config)}
           beneficiaries={scopedBeneficiaries}
           allowedFacilityIds={isFocalPerson ? Object.keys(facilityLevels) : []}
           isSafeguardingOfficer={isOfficer}
@@ -561,6 +580,7 @@ const ProgrammeModuleWorkspace = ({
       {view === "followups" && (
         <FollowUpsPanel
           projectId={projectId}
+          allowedFacilityIds={isFocalPerson ? Object.keys(facilityLevels) : null}
           onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }}
         />
       )}
@@ -570,6 +590,7 @@ const ProgrammeModuleWorkspace = ({
           projectId={projectId}
           moduleId={active?.id}
           beneficiaries={scopedBeneficiaries}
+          facilityScoped={isFocalPerson}
           canManage={canConfigure || Object.values(facilityLevels).includes("manage") || Object.values(facilityLevels).includes("record")}
           onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }}
           onChanged={() => void reloadBeneficiaries()}
@@ -589,7 +610,7 @@ const ProgrammeModuleWorkspace = ({
         <GraduationDashboard projectId={projectId} beneficiaries={scopedBeneficiaries} onOpenBeneficiary={(b) => { setSelected(b); setView("records"); }} />
       )}
 
-      {view === "guide" && canBrain && <FieldGuidePanel moduleId={active?.id} />}
+      {view === "guide" && canGuide && <FieldGuidePanel moduleId={active?.id} />}
       {brainMounted && canBrain && (
         <div className={view === "brain" ? "" : "hidden"}>
           <BeneficiaryBrainPanel moduleId={active?.id} projectId={projectId} visible={view === "brain"}

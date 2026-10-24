@@ -26,7 +26,7 @@ interface Props {
   beneficiary: BeneficiaryRow & { facility_id?: string | null };
   projectId: string;
   referrals: BeneficiaryReferralRow[];
-  onRefer: () => void;
+  onRefer?: () => void;
   onChanged: () => void;
 }
 
@@ -180,7 +180,7 @@ const CareNetworkPanel = ({ beneficiary, projectId, referrals, onRefer, onChange
 
       <TabsContent value="referrals" className="space-y-3">
         <div className="flex justify-end">
-          <Button size="sm" className="gap-1" onClick={onRefer}>
+          <Button size="sm" disabled={!onRefer} className="gap-1" onClick={onRefer}>
             <Share2 className="h-4 w-4" /> New referral
           </Button>
         </div>
@@ -224,7 +224,7 @@ const CareNetworkPanel = ({ beneficiary, projectId, referrals, onRefer, onChange
               {!r.__pending && (
                 <div className="flex flex-wrap gap-2 pt-1">
                   {REFERRAL_STATUSES.filter((s) => s.value !== r.status).map((s) => (
-                    <Button key={s.value} size="sm" variant="outline" onClick={() => void setReferralStatus(r.id, s.value)}>
+                    <Button key={s.value} disabled={!onRefer} size="sm" variant="outline" onClick={() => void setReferralStatus(r.id, s.value)}>
                       Mark {s.label.toLowerCase()}
                     </Button>
                   ))}

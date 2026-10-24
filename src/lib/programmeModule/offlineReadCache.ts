@@ -3,10 +3,16 @@
 // record still open with no internet. Reads fall back to the cache whenever the
 // device is offline or the server request fails.
 
+import { supabase } from "@/integrations/supabase/client";
+
 const DB_NAME = "amehnities-records-cache";
 const STORE = "reads";
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;
+const scopedKey = async (key: string): Promise<string> => {
+  const { data } = await supabase.auth.getSession();
+  return `user:${data.session?.user.id || "signed-out"}:${key}`;
+};
 const openDb = (): Promise<IDBDatabase | null> => {
   if (typeof indexedDB === "undefined") return Promise.resolve(null);
   if (!dbPromise) {
@@ -21,21 +27,23 @@ const openDb = (): Promise<IDBDatabase | null> => {
 };
 
 export async function cacheSet(key: string, value: unknown): Promise<void> {
+  const userKey = await scopedKey(key);
   const db = await openDb();
   if (!db) return;
   await new Promise<void>((resolve) => {
     const tx = db.transaction(STORE, "readwrite");
-    tx.objectStore(STORE).put({ value, saved_at: Date.now() }, key);
+    tx.objectStore(STORE).put({ value, saved_at: Date.now() }, userKey);
     tx.oncomplete = () => resolve();
     tx.onerror = () => resolve();
   });
 }
 
 export async function cacheGet<T>(key: string): Promise<T | null> {
+  const userKey = await scopedKey(key);
   const db = await openDb();
   if (!db) return null;
   return new Promise((resolve) => {
-    const req = db.transaction(STORE, "readonly").objectStore(STORE).get(key);
+    const req = db.transaction(STORE, "readonly").objectStore(STORE).get(userKey);
     req.onsuccess = () => resolve((req.result?.value as T) ?? null);
     req.onerror = () => resolve(null);
   });
@@ -69,6 +77,7 @@ export async function cachedRead<T>(
 
 /** Applies a change to a row inside every cached list whose key starts with `prefix`. */
 export async function cachePatchRows(prefix: string, id: string, patch: Record<string, unknown> | null): Promise<void> {
+  const userPrefix = await scopedKey(prefix);
   const db = await openDb();
   if (!db) return;
   await new Promise<void>((resolve) => {
@@ -80,7 +89,7 @@ export async function cachePatchRows(prefix: string, id: string, patch: Record<s
       if (!cur) return;
       const key = String(cur.key);
       const entry = cur.value as { value: unknown; saved_at: number };
-      if (key.startsWith(prefix) && Array.isArray(entry.value)) {
+      if (key.startsWith(userPrefix) && Array.isArray(entry.value)) {
         const rows = (entry.value as Record<string, unknown>[])
           .map((r) => (r.id === id ? (patch ? { ...r, ...patch } : null) : r))
           .filter(Boolean);

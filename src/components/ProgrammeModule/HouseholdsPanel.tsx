@@ -60,6 +60,7 @@ interface Props {
   moduleId?: string;
   beneficiaries: BeneficiaryRow[];
   canManage?: boolean;
+  facilityScoped?: boolean;
   onOpenBeneficiary?: (b: BeneficiaryRow) => void;
   onChanged?: () => void;
 }
@@ -75,10 +76,15 @@ const blankWash: Record<string, string | boolean> = {
 };
 
 const HouseholdsPanel = ({
-  projectId, moduleId, beneficiaries, canManage = true, onOpenBeneficiary, onChanged,
+  projectId, moduleId, beneficiaries, canManage = true, facilityScoped = false, onOpenBeneficiary, onChanged,
 }: Props) => {
   const { toast } = useToast();
-  const { households, washSources, rounds, treatments, loading, reload } = useHouseholds(projectId, moduleId);
+  const householdData = useHouseholds(projectId, moduleId);
+  const allowedHouseholds = new Set(beneficiaries.map(householdOf).filter(Boolean));
+  const { washSources, loading, reload } = householdData;
+  const households = facilityScoped ? householdData.households.filter((h) => allowedHouseholds.has(h.id)) : householdData.households;
+  const rounds = facilityScoped ? householdData.rounds.filter((r) => allowedHouseholds.has(r.household_id)) : householdData.rounds;
+  const treatments = facilityScoped ? householdData.treatments.filter((t) => allowedHouseholds.has(t.household_id)) : householdData.treatments;
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string>("");
   const [busy, setBusy] = useState(false);

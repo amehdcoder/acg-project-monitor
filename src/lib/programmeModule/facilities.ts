@@ -3,6 +3,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { cachedRead } from "./offlineReadCache";
 
 export interface FacilityRow {
   id: string;
@@ -108,20 +110,24 @@ export const useMyFacilities = () => {
 
 /** Access level the signed-in user holds at each facility. */
 export const useMyFacilityAccess = () => {
+  const { user } = useAuth();
   const [levels, setLevels] = useState<Record<string, FacilityAccessLevel>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setLevels({});
     void (async () => {
-      const { data: auth } = await supabase.auth.getUser();
-      if (!auth.user) { if (!cancelled) { setLevels({}); setLoading(false); } return; }
-      const { data } = await supabase
+      if (!user) { if (!cancelled) { setLevels({}); setLoading(false); } return; }
+      const { data, fromCache } = await cachedRead(`facility-access:${user.id}`, () => supabase
         .from("facility_focal_persons")
         .select("facility_id,access_level")
-        .eq("user_id", auth.user.id)
-        .eq("is_active", true);
+        .eq("user_id", user.id)
+        .eq("is_active", true));
       if (cancelled) return;
+      // No successful read or offline copy: do not interpret failure as unrestricted access.
+      if (fromCache && data === null) return;
       const map: Record<string, FacilityAccessLevel> = {};
       for (const r of (data as { facility_id: string; access_level: FacilityAccessLevel }[]) || []) {
         map[r.facility_id] = r.access_level;
@@ -130,7 +136,7 @@ export const useMyFacilityAccess = () => {
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [user?.id]);
 
   return { levels, loading };
 };
