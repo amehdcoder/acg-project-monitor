@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
-import { Monitor, Smartphone, Tablet, Sparkles, Check } from "lucide-react";
+import { Monitor, Smartphone, Tablet, Sparkles, Check, X, RefreshCw, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { applyDeviceFit, fitEnabled } from "@/lib/deviceFit";
 
@@ -11,13 +11,51 @@ const DEVICES = [
   { key: "android", label: "Android", w: 412, h: 915, icon: Smartphone },
   { key: "ios", label: "iOS", w: 390, h: 844, icon: Smartphone },
 ] as const;
+type Device = (typeof DEVICES)[number];
 
+/**
+ * Live device preview of the whole records workspace. The preview frame is
+ * loaded in the background as soon as the workspace opens and stays mounted,
+ * so opening the preview or switching devices is instant (only its size changes).
+ */
 export default function DevicePreviewDialog({ open, onOpenChange, projectId }: { open: boolean; onOpenChange: (o: boolean) => void; projectId?: string }) {
-  const [device, setDevice] = useState<(typeof DEVICES)[number]>(DEVICES[2]);
+  const [device, setDevice] = useState<Device>(DEVICES[2]);
   const [fit, setFit] = useState(fitEnabled());
   const [scale, setScale] = useState(1);
-  const [nonce, setNonce] = useState(0);
+  const [preload, setPreload] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const box = useRef<HTMLDivElement>(null);
+  const frame = useRef<HTMLIFrameElement>(null);
+
+  // Warm the frame shortly after the workspace loads (or immediately when opened).
+  useEffect(() => {
+    if (open) { setPreload(true); return; }
+    const t = setTimeout(() => setPreload(true), 1500);
+    return () => clearTimeout(t);
+  }, [open]);
+
+  // Mirror device + fit into the framed app (same origin) without reloading it.
+  const sync = useCallback(() => {
+    const root = frame.current?.contentDocument?.documentElement;
+    if (!root) return;
+    root.dataset.lbrDevice = device.key;
+    root.dataset.lbrFit = fit ? "on" : "off";
+  }, [device, fit]);
+  useEffect(sync, [sync, ready]);
+
+  // Consider the frame ready once the records workspace has actually rendered.
+  useEffect(() => {
+    if (!preload) return;
+    setReady(false);
+    const t = setInterval(() => {
+      const doc = frame.current?.contentDocument;
+      if (doc?.querySelector(".lbr-type, form, [data-auth-page]") || doc?.body?.innerText?.trim().length) {
+        if (doc?.querySelector(".lbr-type")) { setReady(true); clearInterval(t); }
+      }
+    }, 200);
+    return () => clearInterval(t);
+  }, [preload, reloadKey]);
 
   useEffect(() => {
     if (!open) return;
@@ -27,19 +65,26 @@ export default function DevicePreviewDialog({ open, onOpenChange, projectId }: {
     };
     measure();
     const ro = new ResizeObserver(measure); if (box.current) ro.observe(box.current);
-    return () => ro.disconnect();
-  }, [open, device]);
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") onOpenChange(false); };
+    window.addEventListener("keydown", esc);
+    return () => { ro.disconnect(); window.removeEventListener("keydown", esc); };
+  }, [open, device, onOpenChange]);
 
-  const toggleFit = () => { const next = !fit; setFit(next); applyDeviceFit(next); setNonce((n) => n + 1); };
-  const src = `/?tab=records${projectId ? `&project=${projectId}` : ""}`;
+  const toggleFit = () => { const next = !fit; setFit(next); applyDeviceFit(next); };
+  const src = `/?tab=records${projectId ? `&project=${projectId}` : ""}&lbrEmbed=1`;
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[94dvh] max-w-[96vw] flex-col gap-3 p-4">
-        <DialogHeader>
-          <DialogTitle>Device preview</DialogTitle>
-          <DialogDescription>See the records workspace as it appears on each device, then fit it to every screen in one click.</DialogDescription>
-        </DialogHeader>
+  if (!preload) return null;
+  return createPortal(
+    <div role="dialog" aria-modal="true" aria-label="Device preview" aria-hidden={!open}
+      className={cn("fixed inset-0 z-[1300] flex items-center justify-center bg-foreground/60 p-2 sm:p-4", !open && "pointer-events-none invisible")}>
+      <div className="flex h-[94dvh] w-[96vw] flex-col gap-3 rounded-xl bg-background p-4 shadow-card">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">Device preview</h2>
+            <p className="text-sm text-muted-foreground">The full Longitudinal Beneficiary Records workspace, live, on each device. Fit it to every screen in one click.</p>
+          </div>
+          <Button variant="ghost" size="icon" aria-label="Close preview" onClick={() => onOpenChange(false)}><X className="h-5 w-5" /></Button>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           {DEVICES.map((d) => (
             <Button key={d.key} size="sm" variant={device.key === d.key ? "default" : "outline"} className="gap-1.5" onClick={() => setDevice(d)}>
@@ -47,18 +92,26 @@ export default function DevicePreviewDialog({ open, onOpenChange, projectId }: {
             </Button>
           ))}
           <span className="text-xs text-muted-foreground">{device.w}×{device.h} · {Math.round(scale * 100)}%</span>
+          <Button size="icon" variant="ghost" aria-label="Reload preview" onClick={() => setReloadKey((k) => k + 1)}><RefreshCw className="h-4 w-4" /></Button>
           <Button size="sm" onClick={toggleFit} className={cn("ml-auto gap-1.5", fit && "bg-health-teal text-primary-foreground hover:bg-health-teal/90")}>
             {fit ? <Check className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />} {fit ? "Fitted to all devices" : "Fit to all devices"}
           </Button>
         </div>
         <div ref={box} className="relative min-h-0 flex-1 overflow-hidden rounded-xl bg-muted">
-          <div className="absolute left-1/2 top-3 origin-top overflow-hidden rounded-[28px] border-[10px] border-foreground/80 bg-background shadow-card"
+          <div className="absolute left-1/2 top-3 origin-top overflow-hidden border-[10px] border-foreground/80 bg-background shadow-card transition-[width,height] duration-200"
             style={{ width: device.w, height: device.h, transform: `translateX(-50%) scale(${scale})`, borderRadius: device.key === "desktop" ? 12 : 28 }}>
-            <iframe key={`${device.key}-${nonce}`} title={`${device.label} preview`} src={src} className="h-full w-full border-0" />
+            <iframe ref={frame} key={reloadKey} title="Records device preview" src={src} onLoad={sync} className="h-full w-full border-0" />
+            {!ready && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background text-muted-foreground">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-sm">Preparing the records workspace…</p>
+              </div>
+            )}
           </div>
         </div>
         <p className="text-xs text-muted-foreground">Fit to all devices makes text follow each phone's own font size setting, keeps buttons easy to tap and stops anything spilling off the screen.</p>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>,
+    document.body,
   );
 }

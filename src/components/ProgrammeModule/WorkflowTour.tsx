@@ -258,6 +258,7 @@ const WorkflowTour = ({ can, canConfigure, isOfficer, ready, visibleViews, compo
   // Show once per sign-in session unless the user chose "never".
   useEffect(() => {
     if (!uid || !ready || stages.length === 0) return;
+    if (new URLSearchParams(window.location.search).has("lbrEmbed")) return; // device preview frames stay clean
     const p = (localStorage.getItem(prefKey(uid)) as TourPrefs) || "every_sign_in";
     setPref(p);
     if (p === "never" || sessionStorage.getItem(sessionKey(uid))) return;
