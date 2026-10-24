@@ -384,6 +384,26 @@ const FacilityRegistry = ({
                 </div>
               </div>
               <div className="space-y-1.5">
+                <Label>Facility logo (optional)</Label>
+                <div className="flex items-center gap-3 rounded-lg border border-dashed p-3">
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
+                    {logoPreview
+                      ? <img src={logoPreview} alt="Facility logo" className="h-full w-full object-contain" />
+                      : <Building2 className="h-6 w-6 text-muted-foreground" />}
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => void pickLogo(e.target.files?.[0] || null)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Shown on beneficiary hand cards in place of the default partner logo.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-1.5">
                 <Label>Address / landmark</Label>
                 <Textarea
                   rows={2}
