@@ -54,7 +54,7 @@ export default function OverviewHub({ beneficiaries, items, pending, onOpen }: P
               <div className="overview-art" aria-hidden="true"><img src={card.art} alt="" loading="lazy" /></div>
               <div className="relative flex items-start gap-4 pr-8 sm:gap-5">
                 <span className="overview-card-icon flex shrink-0 items-center justify-center rounded-2xl"><item.icon className="h-10 w-10 sm:h-12 sm:w-12" /></span>
-                <div className="overview-card-copy min-w-0 py-1"><h3 className="font-report-display text-xl font-extrabold sm:text-2xl">{item.label}</h3><p className="mt-2 text-base font-normal text-muted-foreground sm:text-lg">{item.description}.</p></div>
+                <div className="overview-card-copy min-w-0 py-1"><h3 className="whitespace-normal break-words font-report-display text-xl font-extrabold sm:text-2xl">{item.label}</h3><p className="mt-2 whitespace-normal break-words text-base font-normal text-muted-foreground sm:text-lg">{item.description}.</p></div>
               </div>
               <span className="overview-arrow absolute right-4 top-5 flex h-10 w-10 items-center justify-center rounded-full"><ChevronRight className="h-7 w-7" /></span>
               <div className="relative mt-4 flex flex-wrap gap-2">

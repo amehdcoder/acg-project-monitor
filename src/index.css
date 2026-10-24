@@ -11,6 +11,7 @@
 .overview-violet { --overview-tone: var(--pc-violet); --overview-soft: var(--pc-violet-soft); }
 .overview-gold { --overview-tone: var(--records-amber); --overview-soft: var(--pc-red-soft); }
 .overview-card-icon { width: 80px; height: 80px; color: hsl(var(--primary-foreground)); background: linear-gradient(140deg, hsl(var(--overview-tone)), hsl(var(--overview-tone) / .8)); }
+.overview-card .overview-card-icon svg { width: 44px; height: 44px; }
 .overview-card-copy { width: 47%; }
 .overview-art { position: absolute; right: 0; top: 10px; width: 43%; height: 150px; pointer-events: none; }
 .overview-art img { width: 100%; height: 100%; object-fit: contain; mix-blend-mode: multiply; }
@@ -22,7 +23,8 @@
 .overview-chip-4 { background: hsl(var(--pc-teal-soft)); color: hsl(var(--pc-teal)); }
 @media (max-width: 640px) {
   .overview-card-icon { width: 58px; height: 58px; border-radius: 14px; }
-  .overview-card-copy { width: 100%; }
+  .overview-card-copy { width: auto; flex: 1; }
+  .overview-card .overview-card-icon svg { width: 34px; height: 34px; }
   .overview-art { position: relative; align-self: flex-end; width: 75%; height: 115px; margin-bottom: -8px; order: 1; }
 }
 
