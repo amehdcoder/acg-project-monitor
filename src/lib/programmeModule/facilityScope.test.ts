@@ -5,8 +5,8 @@ describe("facility focal-person boundaries", () => {
   it("allows only the specified facility workflows and Field guide", () => {
     expect([...FACILITY_WORKSPACE_VIEWS].sort()).toEqual(["casesearch", "facility", "followups", "guide", "households", "overview", "people", "records"]);
   });
-  it("includes only eye, NTD and mental health components", () => {
-    expect(["eye_health", "mmdp_ntd", "mental_health", "livelihood", "wash"].filter((key) => isFacilityClinicalComponent({ key }))).toEqual(["eye_health", "mmdp_ntd", "mental_health"]);
+  it("includes eye, NTD, mental health and Documents only", () => {
+    expect(["eye_health", "mmdp_ntd", "mental_health", "documents", "livelihood", "wash"].filter((key) => isFacilityClinicalComponent({ key }))).toEqual(["eye_health", "mmdp_ntd", "mental_health", "documents"]);
   });
   it("excludes unassigned facilities and unplaced beneficiaries", () => {
     const levels = { assigned: "record" as const };

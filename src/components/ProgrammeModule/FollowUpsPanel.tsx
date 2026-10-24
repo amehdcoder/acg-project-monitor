@@ -10,6 +10,7 @@ import { useFacilities } from "@/lib/programmeModule/facilities";
 
 interface Props {
   projectId?: string;
+  allowedFacilityIds?: string[] | null;
   onOpenBeneficiary?: (b: BeneficiaryRow) => void;
 }
 
@@ -17,26 +18,37 @@ const dayDiff = (iso: string) =>
   Math.round((new Date(iso).getTime() - new Date().setHours(0, 0, 0, 0)) / 86400000);
 
 /** Upcoming visits and referral traffic across the whole project. */
-const FollowUpsPanel = ({ projectId, onOpenBeneficiary }: Props) => {
+const FollowUpsPanel = ({ projectId, allowedFacilityIds = null, onOpenBeneficiary }: Props) => {
   const [beneficiaries, setBeneficiaries] = useState<BeneficiaryRow[]>([]);
   const [referrals, setReferrals] = useState<BeneficiaryReferralRow[]>([]);
   const [loading, setLoading] = useState(false);
   const { facilities } = useFacilities(projectId);
+  const facilityKey = allowedFacilityIds?.slice().sort().join(",") ?? null;
 
   const load = useCallback(async () => {
     if (!projectId) { setBeneficiaries([]); setReferrals([]); return; }
     setLoading(true);
+    let beneficiaryQuery = supabase.from("beneficiaries").select("*").eq("project_id", projectId);
+    if (facilityKey !== null) beneficiaryQuery = beneficiaryQuery.in("facility_id", facilityKey.split(",").filter(Boolean));
     const [b, r] = await Promise.all([
-      supabase.from("beneficiaries").select("*").eq("project_id", projectId)
+      beneficiaryQuery
         .not("next_follow_up_date", "is", null)
         .order("next_follow_up_date", { ascending: true }).limit(300),
       supabase.from("beneficiary_referrals").select("*").eq("project_id", projectId)
         .order("referral_date", { ascending: false }).limit(200),
     ]);
     setBeneficiaries((b.data as unknown as BeneficiaryRow[]) || []);
-    setReferrals((r.data as unknown as BeneficiaryReferralRow[]) || []);
+    let visibleReferrals = (r.data as unknown as BeneficiaryReferralRow[]) || [];
+    if (facilityKey !== null && visibleReferrals.length) {
+      const { data } = await supabase.from("beneficiaries").select("id,full_name")
+        .in("id", visibleReferrals.map((referral) => referral.beneficiary_id))
+        .in("facility_id", facilityKey.split(",").filter(Boolean));
+      const ids = new Set((data || []).map((row) => row.id));
+      visibleReferrals = visibleReferrals.filter((referral) => ids.has(referral.beneficiary_id));
+    }
+    setReferrals(visibleReferrals);
     setLoading(false);
-  }, [projectId]);
+  }, [projectId, facilityKey]);
 
   useEffect(() => { void load(); }, [load]);
 

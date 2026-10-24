@@ -65,6 +65,7 @@ interface Props {
   onChanged: () => void;
   /** Administrators can change the beneficiary's status from the record. */
   canManage?: boolean;
+  canRecord?: boolean;
   /**
    * Programme components (MMDP/NTD, Eye Health, Mental Health & Psychosocial
    * Support ...) are only shown to facility focal persons for beneficiaries in
@@ -104,10 +105,11 @@ const FieldRow = ({ label, value }: { label: string; value: string }) => (
 );
 
 const BeneficiaryRecord = ({
-  beneficiary, config, moduleId, projectId, onBack, onChanged, canManage = false,
+  beneficiary, config, moduleId, projectId, onBack, onChanged, canManage = false, canRecord = true,
   componentsVisible = true, componentFilter,
 }: Props) => {
-  const { services, referrals, audit, reload } = useBeneficiaryRecord(beneficiary.id);
+  const { services: allServices, referrals, audit, reload } = useBeneficiaryRecord(beneficiary.id);
+  const services = componentFilter ? allServices.filter((s) => componentFilter({ key: s.component_key })) : allServices;
   const { toast } = useToast();
   const portrait = useMediaUrl(beneficiary.photo_url);
   const [statusSaving, setStatusSaving] = useState(false);
@@ -609,7 +611,7 @@ const BeneficiaryRecord = ({
 
                 <Card className="space-y-2 p-4">
                   <h3 className="font-semibold text-foreground">Quick Actions</h3>
-                  {config.layout.quickActions.map((a) => {
+                  {config.layout.quickActions.filter((a) => a.key === "print" || (a.key === "schedule_follow_up" ? canManage : canRecord)).map((a) => {
                     const Icon = resolveIcon(a.icon);
                     const run = () => {
                       if (a.key === "add_service") { setServiceComponent(undefined); setServiceOpen(true); }
@@ -649,11 +651,11 @@ const BeneficiaryRecord = ({
                             <a href="/mhgap-guide" target="_blank" rel="noopener noreferrer">mhGAP guide</a>
                           </Button>
                         )}
-                        <Button size="sm" onClick={() => { setServiceComponent(c.key); setServiceOpen(true); }}>
+                        <Button size="sm" disabled={!canRecord} onClick={() => { setServiceComponent(c.key); setServiceOpen(true); }}>
                           Record service
                         </Button>
                         <Button
-                          size="sm" variant="outline"
+                          size="sm" variant="outline" disabled={!canRecord}
                           className="border-status-success/40 text-status-success hover:bg-status-success/10"
                           onClick={() => setLifecycle({ action: "completed", componentKey: c.key })}
                         >
@@ -718,7 +720,7 @@ const BeneficiaryRecord = ({
                   beneficiaryId={beneficiary.id}
                   projectId={projectId}
                   moduleId={moduleId}
-                  canRecord
+                  canRecord={canRecord}
                 />
               </TabsContent>
             )}
@@ -733,7 +735,7 @@ const BeneficiaryRecord = ({
                 beneficiary={beneficiary}
                 projectId={projectId}
                 referrals={referrals}
-                onRefer={() => setReferralOpen(true)}
+                onRefer={canRecord ? () => setReferralOpen(true) : undefined}
                 onChanged={() => { void reload(); onChanged(); }}
               />
             </TabsContent>
@@ -837,7 +839,7 @@ const BeneficiaryRecord = ({
               ) : (
                 <p className="text-sm text-muted-foreground">No referrals yet.</p>
               )}
-              <Button variant="outline" size="sm" className="mt-3 w-full" onClick={() => setReferralOpen(true)}>
+              <Button variant="outline" size="sm" disabled={!canRecord} className="mt-3 w-full" onClick={() => setReferralOpen(true)}>
                 Create referral
               </Button>
             </Card>
@@ -864,12 +866,12 @@ const BeneficiaryRecord = ({
       </div>
 
       <ServiceEntryDialog
-        open={serviceOpen} onOpenChange={(v) => { setServiceOpen(v); if (!v) setServiceDefault(undefined); }} config={config}
+        open={canRecord && serviceOpen} onOpenChange={(v) => { setServiceOpen(v); if (!v) setServiceDefault(undefined); }} config={config}
         beneficiary={beneficiary} moduleId={moduleId} projectId={projectId}
         defaultComponent={serviceComponent} defaultService={serviceDefault} priorServices={services} componentFilter={componentFilter}
         onSaved={() => { void reload(); onChanged(); }}
       />
-      {lifecycle && (() => {
+      {canRecord && lifecycle && (() => {
         const lc = components.find((c) => c.key === lifecycle.componentKey);
         return lc ? (
           <ComponentStatusDialog
@@ -895,7 +897,7 @@ const BeneficiaryRecord = ({
         }}
       />
       <ReferralDialog
-        open={referralOpen} onOpenChange={setReferralOpen} config={config}
+        open={canRecord && referralOpen} onOpenChange={setReferralOpen} config={config}
         beneficiaryId={beneficiary.id} projectId={projectId}
         fromFacilityId={(beneficiary as unknown as { facility_id?: string | null }).facility_id || null}
         onSaved={() => { void reload(); onChanged(); }}

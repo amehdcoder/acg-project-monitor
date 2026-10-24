@@ -1,7 +1,9 @@
 import { componentInAreas } from "./projectTeam";
 import type { FacilityAccessLevel } from "./facilities";
 
-export const isFacilityClinicalComponent = componentInAreas(["eye", "ntd", "mental"]);
+const clinicalComponent = componentInAreas(["eye", "ntd", "mental"]);
+export const isFacilityClinicalComponent = (component: { key: string; label?: string }) =>
+  component.key === "documents" || clinicalComponent(component);
 export const FACILITY_WORKSPACE_VIEWS = new Set([
   "overview", "facility", "people", "records", "followups", "households", "casesearch", "guide",
 ]);
