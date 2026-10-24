@@ -154,16 +154,25 @@ const FacilityRegistry = ({
         contact_phone: draft.contact_phone || null,
         is_active: true,
       };
+      let facilityId = draft.id;
       if (draft.id) {
         const { error } = await supabase.from("health_facilities")
           .update(payload as never).eq("id", draft.id);
         if (error) throw error;
         toast({ title: "Facility updated" });
       } else {
-        const { error } = await supabase.from("health_facilities")
-          .insert({ ...payload, created_by: auth.user?.id } as never);
+        const { data: inserted, error } = await supabase.from("health_facilities")
+          .insert({ ...payload, created_by: auth.user?.id } as never)
+          .select("id").single();
         if (error) throw error;
+        facilityId = (inserted as { id: string } | null)?.id || "";
         toast({ title: "Facility registered", description: draft.name });
+      }
+      if (logoFile && facilityId) {
+        const path = await uploadFacilityLogo(logoFile, projectId, facilityId);
+        const { error: logoError } = await supabase.from("health_facilities")
+          .update({ logo_url: path } as never).eq("id", facilityId);
+        if (logoError) throw logoError;
       }
       setFormOpen(false);
       await reload();
