@@ -74,6 +74,8 @@ import WorkspaceNavigation, { type WorkspaceNavGroup, type WorkspaceView } from 
 import { useIsSafeguardingOfficer } from "@/lib/programmeModule/safeguarding";
 import { useMyFacilityAccess } from "@/lib/programmeModule/facilities";
 import { FACILITY_WORKSPACE_VIEWS, facilityCanWrite, isFacilityClinicalComponent } from "@/lib/programmeModule/facilityScope";
+import DevicePreviewDialog from "./DevicePreviewDialog";
+import { applyDeviceFit } from "@/lib/deviceFit";
 
 
 interface Props {
@@ -462,6 +464,7 @@ const ProgrammeModuleWorkspace = ({
             <DropdownMenuLabel>Administration</DropdownMenuLabel><DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => openWorkflowTour()}><Compass className="mr-2 h-4 w-4" /> Guided tour</DropdownMenuItem>
             <DropdownMenuItem onSelect={() => setRegistryOpen(true)}><Building2 className="mr-2 h-4 w-4" /> Health facilities</DropdownMenuItem>
+            {canConfigure && <DropdownMenuItem onSelect={() => setDevicePreviewOpen(true)}><Layers className="mr-2 h-4 w-4" /> Device preview</DropdownMenuItem>}
             {canConfigure && <DropdownMenuItem onSelect={() => { setFocalFacilityId(undefined); setFocalOpen(true); }}><Users className="mr-2 h-4 w-4" /> Facility teams</DropdownMenuItem>}
             {(canConfigure || can("manage_team") || onTeamRegister) && <DropdownMenuItem onSelect={() => setView("team")}><Users className="mr-2 h-4 w-4" /> Project team</DropdownMenuItem>}
             {canConfigure && <DropdownMenuItem onSelect={() => setDrugsOpen(true)}><Settings2 className="mr-2 h-4 w-4" /> mhGAP medicines</DropdownMenuItem>}
