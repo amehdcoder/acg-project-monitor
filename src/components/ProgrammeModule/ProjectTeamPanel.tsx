@@ -56,7 +56,7 @@ const blank = {
   facility_id: "", notes: "", is_active: true, user_id: "",
 };
 
-const ProjectTeamPanel = ({ projectId, moduleId, canManage = false }: Props) => {
+const ProjectTeamPanel = ({ projectId, moduleId, canManage = false, components = [] }: Props) => {
   const { toast } = useToast();
   const { members, reload } = useTeamMembers(projectId);
   const { facilities } = useFacilities(projectId);
@@ -497,6 +497,78 @@ const ProjectTeamPanel = ({ projectId, moduleId, canManage = false }: Props) => 
                     {!(perms.programme_areas || []).length && <p className="mt-1 text-[11px] text-muted-foreground">No area chosen — they will see every component.</p>}
                   </div>
                 )}
+              </div>
+
+              {components.length > 0 && (
+                <div className="rounded-lg border border-border p-3">
+                  <p className="text-sm font-medium text-foreground">Components they can see and report for</p>
+                  <p className="text-xs text-muted-foreground">
+                    Tick one or more programme components. Leave all unticked to give access to every component.
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {components.map((c) => {
+                      const on = (perms.components || []).includes(c.key);
+                      return (
+                        <button key={c.key} type="button"
+                          onClick={() => {
+                            const cur = perms.components || [];
+                            setPerms({ ...perms, components: on ? cur.filter((x) => x !== c.key) : [...cur, c.key] });
+                          }}
+                          className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${on ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground"}`}>
+                          {c.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {!(perms.components || []).length && (
+                    <p className="mt-1 text-[11px] text-muted-foreground">No component chosen — they will see every component.</p>
+                  )}
+                </div>
+              )}
+
+              <div className="rounded-lg border border-border p-3">
+                <p className="text-sm font-medium text-foreground">Overview dashboards they can open</p>
+                <p className="text-xs text-muted-foreground">
+                  Tick one or more dashboards in the Overview section. Leave all unticked to allow every dashboard.
+                </p>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  {OVERVIEW_DASHBOARDS.map((d) => {
+                    const on = (perms.dashboards || []).includes(d.key);
+                    return (
+                      <label key={d.key} className="flex cursor-pointer items-start gap-2 rounded-md border border-border p-2">
+                        <Checkbox
+                          checked={on}
+                          onCheckedChange={() => {
+                            const cur = perms.dashboards || [];
+                            setPerms({ ...perms, dashboards: on ? cur.filter((x) => x !== d.key) : [...cur, d.key] });
+                          }}
+                        />
+                        <span>
+                          <span className="block text-sm text-foreground">{d.label}</span>
+                          <span className="block text-xs text-muted-foreground">{d.hint}</span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+                {!(perms.dashboards || []).length && (
+                  <p className="mt-1 text-[11px] text-muted-foreground">No dashboard chosen — they will see every dashboard.</p>
+                )}
+              </div>
+
+              <div className="flex items-start justify-between gap-3 rounded-lg border border-border p-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Community feedback sharing</p>
+                  <p className="text-xs text-muted-foreground">
+                    Shows the public Community feedback QR code and form link so they can share them with
+                    communities. The reports themselves stay restricted to Super Admins and approved viewers.
+                  </p>
+                </div>
+                <Switch
+                  checked={!!perms.feedback_share}
+                  onCheckedChange={(v) => setPerms({ ...perms, feedback_share: v })}
+                  aria-label="Community feedback sharing"
+                />
               </div>
 
               <div className="rounded-lg border border-border p-3">
