@@ -12,7 +12,7 @@ export type WorkspaceView =
   | "guide"
   | "assessments" | "report" | "dashboard" | "records" | "journey" | "facility" | "followups" | "households"
   | "clusters" | "graduation" | "network" | "risk" | "casesearch" | "livelihood" | "safeguarding"
-  | "safeguarding_dashboard" | "team" | "exchange" | "feedback";
+  | "safeguarding_dashboard" | "team" | "exchange" | "feedback" | "people";
 
 export interface WorkspaceNavItem {
   key: WorkspaceView;
@@ -25,6 +25,8 @@ export interface WorkspaceNavItem {
 export interface WorkspaceNavGroup {
   label: string;
   items: WorkspaceNavItem[];
+  /** Optional overview page for the whole group, listed first in its menu. */
+  hub?: { key: WorkspaceView; label: string; description: string; icon: LucideIcon };
 }
 
 interface Props {
@@ -38,7 +40,7 @@ const WorkspaceNavigation = ({ groups, view, onViewChange, administration }: Pro
   const visibleGroups = groups
     .map((group) => ({ ...group, items: group.items.filter((item) => item.show) }))
     .filter((group) => group.items.length > 0);
-  const active = visibleGroups.flatMap((group) => group.items).find((item) => item.key === view);
+  const active = visibleGroups.flatMap((group) => [...(group.hub ? [group.hub] : []), ...group.items]).find((item) => item.key === view);
 
   return (
     <div className="overflow-hidden rounded-lg border border-health-blue/20 bg-card shadow-soft">
@@ -55,7 +57,7 @@ const WorkspaceNavigation = ({ groups, view, onViewChange, administration }: Pro
 
         <nav className="flex flex-1 flex-wrap gap-1.5" aria-label="Beneficiary records sections">
           {visibleGroups.map((group) => {
-            const selected = group.items.some((item) => item.key === view);
+            const selected = group.hub?.key === view || group.items.some((item) => item.key === view);
             const first = group.items[0];
             return (
               <DropdownMenu key={group.label}>
@@ -71,6 +73,18 @@ const WorkspaceNavigation = ({ groups, view, onViewChange, administration }: Pro
                 <DropdownMenuContent align="start" className="w-72 p-2">
                   <DropdownMenuLabel className="px-2 text-[10px] uppercase text-muted-foreground">{group.label}</DropdownMenuLabel>
                   <DropdownMenuSeparator />
+                  {group.hub && (
+                    <DropdownMenuItem onSelect={() => onViewChange(group.hub!.key)}
+                      className={cn("gap-3 rounded-md p-2.5", group.hub.key === view && "bg-health-blue/10 text-health-blue")}>
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-health-blue text-primary-foreground">
+                        <group.hub.icon className="h-4 w-4" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold">{group.hub.label}</span>
+                        <span className="block text-xs font-normal text-muted-foreground">{group.hub.description}</span>
+                      </span>
+                    </DropdownMenuItem>
+                  )}
                   {group.items.map((item) => (
                     <DropdownMenuItem
                       key={item.key}
