@@ -31,6 +31,8 @@ import { isMmdpVisit } from "@/lib/programmeModule/mmdp";
 import { resolveIcon } from "./icons";
 import { useBeneficiaryRecord } from "./useProgrammeModule";
 import ServiceEntryDialog from "./ServiceEntryDialog";
+import ComponentStatusDialog from "./ComponentStatusDialog";
+import type { ServiceLifecycleAction } from "@/lib/programmeModule/componentOutcomes";
 import GraduationPathwayPanel from "./GraduationPathwayPanel";
 import ComponentJourneyProgress from "./ComponentJourneyProgress";
 import WashingtonGroupDialog from "./WashingtonGroupDialog";
@@ -119,6 +121,7 @@ const BeneficiaryRecord = ({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteReason, setDeleteReason] = useState("");
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [lifecycle, setLifecycle] = useState<{ action: ServiceLifecycleAction; componentKey: string } | null>(null);
 
   const submitDeleteRequest = async () => {
     setDeleteBusy(true);
@@ -649,6 +652,27 @@ const BeneficiaryRecord = ({
                         <Button size="sm" onClick={() => { setServiceComponent(c.key); setServiceOpen(true); }}>
                           Record service
                         </Button>
+                        <Button
+                          size="sm" variant="outline"
+                          className="border-status-success/40 text-status-success hover:bg-status-success/10"
+                          onClick={() => setLifecycle({ action: "completed", componentKey: c.key })}
+                        >
+                          Mark as Completed
+                        </Button>
+                        <Button
+                          size="sm" variant="outline"
+                          className="border-status-warning/40 text-status-warning hover:bg-status-warning/10"
+                          onClick={() => setLifecycle({ action: "suspended", componentKey: c.key })}
+                        >
+                          Suspend Service
+                        </Button>
+                        <Button
+                          size="sm" variant="outline"
+                          className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                          onClick={() => setLifecycle({ action: "exited", componentKey: c.key })}
+                        >
+                          Exit Service
+                        </Button>
                       </div>
                     </div>
                     <div className="overflow-x-auto">
@@ -845,6 +869,17 @@ const BeneficiaryRecord = ({
         defaultComponent={serviceComponent} defaultService={serviceDefault} priorServices={services} componentFilter={componentFilter}
         onSaved={() => { void reload(); onChanged(); }}
       />
+      {lifecycle && (() => {
+        const lc = components.find((c) => c.key === lifecycle.componentKey);
+        return lc ? (
+          <ComponentStatusDialog
+            open onOpenChange={(v) => { if (!v) setLifecycle(null); }}
+            action={lifecycle.action} component={lc}
+            beneficiary={beneficiary} moduleId={moduleId} projectId={projectId}
+            onChanged={() => { void reload(); onChanged(); }}
+          />
+        ) : null;
+      })()}
       <WashingtonGroupDialog
         open={wgOpen}
         beneficiaryName={beneficiary.full_name}

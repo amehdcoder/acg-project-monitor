@@ -63,6 +63,11 @@ export const DEFAULT_SERVICE_STATUSES: StatusOption[] = [
   { value: "on_track", label: "On track", tone: "success" },
   { value: "due", label: "Due", tone: "warning" },
   { value: "overdue", label: "Overdue", tone: "danger" },
+  { value: "at_risk", label: "At risk", tone: "warning" },
+  { value: "needs_follow_up", label: "Needs follow-up", tone: "warning" },
+  { value: "completed", label: "Completed", tone: "success" },
+  { value: "suspended", label: "Suspended", tone: "warning" },
+  { value: "exited", label: "Exited", tone: "neutral" },
   { value: "not_applicable", label: "Not applicable", tone: "neutral" },
 ];
 
@@ -407,8 +412,15 @@ export const toneClasses: Record<StatusOption["tone"], string> = {
 export const toneFor = (options: StatusOption[], value?: string | null) =>
   options.find((o) => o.value === value)?.tone ?? "neutral";
 
+/** "at_risk" -> "At risk": never show raw snake_case status values to users. */
+export const humanizeStatus = (value: string) =>
+  value
+    .replace(/[_-]+/g, " ")
+    .trim()
+    .replace(/^\w/, (c) => c.toUpperCase());
+
 export const labelFor = (options: StatusOption[], value?: string | null) =>
-  options.find((o) => o.value === value)?.label ?? (value || "—");
+  options.find((o) => o.value === value)?.label ?? (value ? humanizeStatus(value) : "—");
 
 export const ageFromDob = (dob?: unknown): string => {
   if (!dob) return "—";

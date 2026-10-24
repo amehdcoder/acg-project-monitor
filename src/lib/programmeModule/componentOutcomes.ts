@@ -125,3 +125,161 @@ export const servicesForComponent = (c: { key: string; label?: string; services?
 
 export const outcomesForComponent = (c: { key: string; label?: string }) =>
   KIND_OUTCOMES[componentKind(c.key, c.label)];
+
+// ============= Component service lifecycle (Complete / Suspend / Exit) =============
+
+export type ServiceLifecycleAction = "completed" | "suspended" | "exited";
+
+export const LIFECYCLE_ACTION_LABEL: Record<ServiceLifecycleAction, string> = {
+  completed: "Mark as Completed",
+  suspended: "Suspend Service",
+  exited: "Exit Service",
+};
+
+export const LIFECYCLE_MODAL_TITLE: Record<ServiceLifecycleAction, string> = {
+  completed: "Complete Service",
+  suspended: "Suspend Service",
+  exited: "Exit Service",
+};
+
+/** Final outcome choices when a component's service is marked Completed. */
+const COMPLETED_OUTCOMES: Record<Kind, string[]> = {
+  eye: [
+    "Treatment completed — vision restored or improved",
+    "Surgery completed successfully",
+    "Spectacles dispensed — correction achieved",
+    "Specialist care completed after referral",
+    "Condition stable — no further treatment needed",
+  ],
+  mmdp: [
+    "Self-care established — condition well managed",
+    "Surgery completed successfully",
+    "Lymphoedema improved to manageable stage",
+    "Treatment course completed",
+    "Condition stable — no further intervention needed",
+  ],
+  mental: [
+    "Symptoms resolved or minimal",
+    "Treatment completed — stable on medication",
+    "Recovered — discharged from follow-up",
+    "Specialist care completed after referral",
+    "Condition stable — self-management plan in place",
+  ],
+  wash: [
+    "Household adaptation completed",
+    "Safe water and sanitation access achieved",
+    "Hygiene practices adopted — follow-up complete",
+  ],
+  livelihood: [
+    "Graduated — all pathway stages completed",
+    "Business active and generating income",
+    "Support package fully delivered",
+    "Household self-reliant — exited Graduation pathway",
+  ],
+  health_system: [
+    "Care plan completed",
+    "Referral completed — care received",
+    "Follow-up complete — no further action needed",
+  ],
+  generic: [
+    "Service completed successfully",
+    "Care plan completed",
+    "Goal achieved — no further support needed",
+  ],
+};
+
+/** Final status-at-exit choices when a component's service is Suspended. */
+const SUSPENDED_OUTCOMES: Record<Kind, string[]> = {
+  eye: [
+    "Stable — treatment paused, resumption planned",
+    "Awaiting surgery or appointment date",
+    "Partial improvement at pause",
+    "No improvement at pause",
+  ],
+  mmdp: [
+    "Condition stable at pause",
+    "Partial improvement at pause",
+    "Condition worsening — urgent resumption needed",
+    "Awaiting surgery scheduling",
+  ],
+  mental: [
+    "Stable on current treatment at pause",
+    "Partial improvement at pause",
+    "Symptoms worsening — urgent resumption needed",
+    "Awaiting specialist appointment",
+  ],
+  wash: ["Adaptation partially completed", "Awaiting materials or construction", "Follow-up still required"],
+  livelihood: [
+    "Progress on track at pause",
+    "Partial progress — support interrupted",
+    "Business paused — resumption planned",
+  ],
+  health_system: ["Care paused — resumption planned", "Awaiting referral outcome", "Partial progress at pause"],
+  generic: ["Stable at pause", "Partial progress at pause", "Resumption planned"],
+};
+
+/** Final status-at-exit choices when a component's service is Exited/Discontinued. */
+const EXITED_OUTCOMES: Record<Kind, string[]> = {
+  eye: [
+    "Lost to follow-up",
+    "Refused further eye care",
+    "Referred out — continuing care elsewhere",
+    "Condition resolved outside the programme",
+    "Deceased",
+  ],
+  mmdp: [
+    "Lost to follow-up",
+    "Refused further care",
+    "Referred out — continuing care elsewhere",
+    "Condition resolved outside the programme",
+    "Deceased",
+  ],
+  mental: [
+    "Lost to follow-up",
+    "Refused further support",
+    "Referred out — continuing care elsewhere",
+    "Recovered outside the programme",
+    "Deceased",
+  ],
+  wash: ["Household relocated", "Support no longer needed", "Covered by another programme"],
+  livelihood: [
+    "Lost to follow-up",
+    "Withdrew from the programme",
+    "Relocated out of project area",
+    "No longer eligible",
+    "Deceased",
+  ],
+  health_system: ["Lost to follow-up", "Referred out — continuing care elsewhere", "Relocated out of project area", "Deceased"],
+  generic: ["Lost to follow-up", "Refused further services", "Referred out", "Relocated out of project area", "Deceased"],
+};
+
+export const finalOutcomesFor = (
+  c: { key: string; label?: string },
+  action: ServiceLifecycleAction,
+): string[] => {
+  const kind = componentKind(c.key, c.label);
+  if (action === "completed") return COMPLETED_OUTCOMES[kind];
+  if (action === "suspended") return SUSPENDED_OUTCOMES[kind];
+  return EXITED_OUTCOMES[kind];
+};
+
+/** Reasons offered when suspending a component's service. */
+export const SUSPENSION_REASONS = [
+  "Beneficiary temporarily unavailable / travelled",
+  "Medical reason — treatment paused",
+  "Awaiting referral or surgery scheduling",
+  "Supply or commodity stock-out",
+  "Family or caregiver decision",
+  "Other (explain in notes)",
+];
+
+/** Reasons offered when exiting/discontinuing a component's service. */
+export const EXIT_REASONS = [
+  "Lost to follow-up",
+  "Refused further services",
+  "Referred to another programme or facility",
+  "Relocated out of project area",
+  "No longer eligible",
+  "Deceased",
+  "Other (explain in notes)",
+];
