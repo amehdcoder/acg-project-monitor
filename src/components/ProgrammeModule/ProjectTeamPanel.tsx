@@ -243,6 +243,15 @@ const ProjectTeamPanel = ({ projectId, moduleId, canManage = false, components =
                         <ShieldCheck className="h-3 w-3" />
                         {grantedCount(m.permissions)} permission{grantedCount(m.permissions) === 1 ? "" : "s"}
                       </Badge>
+                      {(m.permissions?.components?.length || m.permissions?.dashboards?.length || m.permissions?.feedback_share) && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {[
+                            m.permissions?.components?.length ? `${m.permissions.components.length} component${m.permissions.components.length === 1 ? "" : "s"}` : "",
+                            m.permissions?.dashboards?.length ? `${m.permissions.dashboards.length} dashboard${m.permissions.dashboards.length === 1 ? "" : "s"}` : "",
+                            m.permissions?.feedback_share ? "feedback QR/link" : "",
+                          ].filter(Boolean).join(" · ")}
+                        </p>
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       {canManage && (
