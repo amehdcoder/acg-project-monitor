@@ -66,6 +66,7 @@ import WhatsAppRemindersDialog from "./WhatsAppRemindersDialog";
 import SmsRemindersDialog from "./SmsRemindersDialog";
 import { MessageCircle } from "lucide-react";
 import WorkspaceMajorTabs, { type MajorTab } from "./WorkspaceMajorTabs";
+import PeopleCareHub from "./PeopleCareHub";
 import WorkspaceNavigation, { type WorkspaceNavGroup, type WorkspaceView } from "./WorkspaceNavigation";
 import { useIsSafeguardingOfficer } from "@/lib/programmeModule/safeguarding";
 import { useMyFacilityAccess } from "@/lib/programmeModule/facilities";
@@ -208,6 +209,7 @@ const ProgrammeModuleWorkspace = ({
     },
     {
       label: "People & care",
+      hub: { key: "people", label: "People & care overview", description: "All people and care sections with live totals", icon: Users },
       items: [
         { key: "records", label: "Beneficiary records", description: "Find, register and open individual records", icon: LayoutGrid, show: can("view_records") },
         { key: "followups", label: "Follow-ups & referrals", description: "Upcoming visits and referral traffic", icon: CalendarClock, show: can("view_records") },
@@ -248,7 +250,8 @@ const ProgrammeModuleWorkspace = ({
 
   useEffect(() => {
     if (permissionsLoading) return;
-    const visibleViews: WorkspaceView[] = [...navGroups.flatMap((group) => group.items).filter((item) => item.show).map((item) => item.key), ...(canReport ? ["report" as const] : []), ...(canAssessments ? ["assessments" as const] : [])];
+    const peopleItems = navGroups.find((g) => g.hub?.key === "people")?.items.filter((i) => i.show) || [];
+    const visibleViews: WorkspaceView[] = [...(peopleItems.length ? ["people" as const] : []), ...navGroups.flatMap((group) => group.items).filter((item) => item.show).map((item) => item.key), ...(canReport ? ["report" as const] : []), ...(canAssessments ? ["assessments" as const] : [])];
     if (view === "brain" || view === "guide") return;
     if (!visibleViews.includes(view)) setView(visibleViews.includes("records") ? "records" : visibleViews[0] || "records");
   }, [permissionsLoading, view, canConfigure, canReport, canAssessments, isOfficer, onTeamRegister, isProgrammeStaff, areaKey]);
@@ -458,6 +461,12 @@ const ProgrammeModuleWorkspace = ({
           canRegister={can("edit_records")}
           onRefresh={() => void reloadBeneficiaries()}
         />
+      )}
+
+      {!permissionsLoading && active && view === "people" && projectId && (
+        <PeopleCareHub projectId={projectId} beneficiaries={scopedBeneficiaries}
+          items={navGroups.find((g) => g.hub?.key === "people")?.items.filter((i) => i.show) || []}
+          onOpen={setView} />
       )}
 
       {!permissionsLoading && active && view === "assessments" && projectId && canAssessments && <QuizBuilder key={projectId} projectId={projectId} />}
