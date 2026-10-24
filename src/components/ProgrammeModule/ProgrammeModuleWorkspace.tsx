@@ -105,6 +105,8 @@ const ProgrammeModuleWorkspace = ({
   const [configOpen, setConfigOpen] = useState(false);
   const [focalOpen, setFocalOpen] = useState(false);
   const [registryOpen, setRegistryOpen] = useState(false);
+  const [devicePreviewOpen, setDevicePreviewOpen] = useState(false);
+  useEffect(() => { applyDeviceFit(); }, []);
   const [drugsOpen, setDrugsOpen] = useState(false);
   const [whatsappOpen, setWhatsappOpen] = useState(false);
   const [smsOpen, setSmsOpen] = useState(false);
@@ -406,6 +408,7 @@ const ProgrammeModuleWorkspace = ({
 
   return (
     <div className="lbr-type space-y-3 font-report">
+      {canConfigure && <DevicePreviewDialog open={devicePreviewOpen} onOpenChange={setDevicePreviewOpen} projectId={projectId} />}
       <div className="flex flex-col gap-3 rounded-lg border border-health-blue/15 bg-card p-3 shadow-soft lg:flex-row lg:items-center">
         <div className="flex min-w-0 items-center gap-3">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-health-blue text-primary-foreground"><Layers className="h-5 w-5" /></span>
