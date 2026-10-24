@@ -86,7 +86,9 @@ const AppUpdateButton = () => {
         ]);
         setUpdateState(next);
         if (!next.updateAvailable) {
-          await forceLatestReload("No pending update found — refreshing latest version…");
+          toast.success("You're on the latest version — no update available", { id: optimisticId });
+          setStatusText(null);
+          setInstalling(false);
           return;
         }
         toast.loading("New version found — updating…", { id: optimisticId });
