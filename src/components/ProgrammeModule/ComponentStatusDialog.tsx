@@ -21,6 +21,7 @@ import {
   type ServiceLifecycleAction,
 } from "@/lib/programmeModule/componentOutcomes";
 import { offlineMutate } from "@/lib/programmeModule/offlineWrite";
+import OutcomePicker from "./OutcomePicker";
 import { newUuid } from "@/lib/programmeModule/offlineQueue";
 import { recordAudit } from "./useProgrammeModule";
 import type { BeneficiaryRow, ProgrammeComponent } from "@/lib/programmeModule/types";
