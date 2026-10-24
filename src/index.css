@@ -1,5 +1,33 @@
 /* Fonts loaded via index.html <link> tags */
 
+.overview-hub { --overview-tone: var(--pc-blue); --overview-soft: var(--pc-blue-soft); }
+.overview-heading { background: linear-gradient(115deg, hsl(var(--health-ink)), hsl(var(--health-blue))); color: hsl(var(--primary-foreground)); border-radius: 16px; }
+.overview-brand-icon { display: grid; place-items: center; width: 52px; height: 52px; border: 2px solid hsl(var(--primary-foreground) / .5); border-radius: 50%; }
+.overview-status { border-radius: 12px; }
+.overview-card { border-radius: 16px; white-space: normal; background: linear-gradient(110deg, hsl(var(--card)), hsl(var(--overview-soft) / .65)); border-color: hsl(var(--overview-tone) / .14); color: hsl(var(--foreground)); }
+.overview-card:hover { background: linear-gradient(110deg, hsl(var(--card)), hsl(var(--overview-soft))); }
+.overview-green { --overview-tone: var(--pc-green); --overview-soft: var(--pc-teal-soft); }
+.overview-orange { --overview-tone: var(--records-amber); --overview-soft: var(--pc-red-soft); }
+.overview-violet { --overview-tone: var(--pc-violet); --overview-soft: var(--pc-violet-soft); }
+.overview-gold { --overview-tone: var(--records-amber); --overview-soft: var(--pc-red-soft); }
+.overview-card-icon { width: 80px; height: 80px; color: hsl(var(--primary-foreground)); background: linear-gradient(140deg, hsl(var(--overview-tone)), hsl(var(--overview-tone) / .8)); }
+.overview-card .overview-card-icon svg { width: 44px; height: 44px; }
+.overview-card-copy { width: 47%; }
+.overview-art { position: absolute; right: 0; top: 10px; width: 43%; height: 150px; pointer-events: none; }
+.overview-art img { width: 100%; height: 100%; object-fit: contain; mix-blend-mode: multiply; }
+.overview-arrow { color: hsl(var(--health-ink)); background: hsl(var(--overview-tone) / .1); }
+.overview-chip-0 { background: hsl(var(--pc-blue-soft)); color: hsl(var(--pc-blue)); }
+.overview-chip-1 { background: hsl(var(--pc-green-soft)); color: hsl(var(--pc-green)); }
+.overview-chip-2 { background: hsl(var(--pc-red-soft)); color: hsl(var(--pc-red)); }
+.overview-chip-3 { background: hsl(var(--pc-violet-soft)); color: hsl(var(--pc-violet)); }
+.overview-chip-4 { background: hsl(var(--pc-teal-soft)); color: hsl(var(--pc-teal)); }
+@media (max-width: 640px) {
+  .overview-card-icon { width: 58px; height: 58px; border-radius: 14px; }
+  .overview-card-copy { width: auto; flex: 1; }
+  .overview-card .overview-card-icon svg { width: 34px; height: 34px; }
+  .overview-art { position: relative; align-self: flex-end; width: 75%; height: 115px; margin-bottom: -8px; order: 1; }
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

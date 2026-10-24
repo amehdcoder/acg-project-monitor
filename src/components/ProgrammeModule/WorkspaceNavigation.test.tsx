@@ -6,6 +6,7 @@ import WorkspaceNavigation, { type WorkspaceNavGroup } from "./WorkspaceNavigati
 const groups: WorkspaceNavGroup[] = [
   {
     label: "Overview",
+    hub: { key: "overview", label: "Overview", description: "Project dashboards", icon: BarChart3 },
     items: [
       { key: "dashboard", label: "General dashboard", description: "Project outcomes", icon: BarChart3, show: true },
     ],
@@ -38,6 +39,15 @@ describe("WorkspaceNavigation", () => {
     fireEvent.click(screen.getByRole("button", { name: "People & care" }));
     expect(onViewChange).toHaveBeenCalledTimes(1);
     expect(onViewChange).toHaveBeenCalledWith("people");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("opens Overview cards directly instead of a dropdown", () => {
+    const onViewChange = vi.fn();
+    render(<WorkspaceNavigation groups={groups} view="dashboard" onViewChange={onViewChange} />);
+    fireEvent.click(screen.getByRole("button", { name: "Overview" }));
+    expect(onViewChange).toHaveBeenCalledTimes(1);
+    expect(onViewChange).toHaveBeenCalledWith("overview");
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 });

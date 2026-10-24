@@ -67,6 +67,7 @@ import SmsRemindersDialog from "./SmsRemindersDialog";
 import { MessageCircle } from "lucide-react";
 import WorkspaceMajorTabs, { type MajorTab } from "./WorkspaceMajorTabs";
 import PeopleCareHub from "./PeopleCareHub";
+import OverviewHub from "./OverviewHub";
 import WorkspaceNavigation, { type WorkspaceNavGroup, type WorkspaceView } from "./WorkspaceNavigation";
 import { useIsSafeguardingOfficer } from "@/lib/programmeModule/safeguarding";
 import { useMyFacilityAccess } from "@/lib/programmeModule/facilities";
@@ -199,6 +200,7 @@ const ProgrammeModuleWorkspace = ({
   const navGroups: WorkspaceNavGroup[] = [
     {
       label: "Overview",
+      hub: { key: "overview", label: "Overview", description: "Executive view of people, services and outcomes", icon: BarChart3 },
       items: [
         { key: "dashboard", label: "General dashboard", description: "Project-wide outcomes, alerts and service performance", icon: BarChart3, show: canDash },
         { key: "journey", label: "Beneficiary journey", description: "Change, feedback and service reach", icon: Route, show: canDash },
@@ -250,8 +252,8 @@ const ProgrammeModuleWorkspace = ({
 
   useEffect(() => {
     if (permissionsLoading) return;
-    const peopleItems = navGroups.find((g) => g.hub?.key === "people")?.items.filter((i) => i.show) || [];
-    const visibleViews: WorkspaceView[] = [...(peopleItems.length ? ["people" as const] : []), ...navGroups.flatMap((group) => group.items).filter((item) => item.show).map((item) => item.key), ...(canReport ? ["report" as const] : []), ...(canAssessments ? ["assessments" as const] : [])];
+    const hubViews = navGroups.flatMap((group) => group.hub && group.items.some((item) => item.show) ? [group.hub.key] : []);
+    const visibleViews: WorkspaceView[] = [...hubViews, ...navGroups.flatMap((group) => group.items).filter((item) => item.show).map((item) => item.key), ...(canReport ? ["report" as const] : []), ...(canAssessments ? ["assessments" as const] : [])];
     if (view === "brain" || view === "guide") return;
     if (!visibleViews.includes(view)) setView(visibleViews.includes("records") ? "records" : visibleViews[0] || "records");
   }, [permissionsLoading, view, canConfigure, canReport, canAssessments, isOfficer, onTeamRegister, isProgrammeStaff, areaKey]);
@@ -466,6 +468,12 @@ const ProgrammeModuleWorkspace = ({
       {!permissionsLoading && active && view === "people" && projectId && (
         <PeopleCareHub projectId={projectId} beneficiaries={scopedBeneficiaries}
           items={navGroups.find((g) => g.hub?.key === "people")?.items.filter((i) => i.show) || []}
+          onOpen={setView} />
+      )}
+
+      {!permissionsLoading && active && view === "overview" && (
+        <OverviewHub beneficiaries={scopedBeneficiaries} pending={pending}
+          items={navGroups.find((g) => g.hub?.key === "overview")?.items.filter((i) => i.show) || []}
           onOpen={setView} />
       )}
 
