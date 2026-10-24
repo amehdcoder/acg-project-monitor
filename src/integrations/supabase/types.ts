@@ -14415,6 +14415,10 @@ export type Database = {
         Args: { _hid: string; _uid: string; _write?: boolean }
         Returns: boolean
       }
+      focal_media_scope: {
+        Args: { _path: string; _uid: string; _write?: boolean }
+        Returns: boolean
+      }
       get_direct_unread_by_user: {
         Args: never
         Returns: {

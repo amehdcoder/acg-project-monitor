@@ -225,6 +225,13 @@
       "when": 1792831681823,
       "tag": "0031_enforce_exclusive_facility_clinical_scope",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1792831835017,
+      "tag": "0032_protect_facility_documents_and_referral_grants",
+      "breakpoints": true
     }
   ]
 }
