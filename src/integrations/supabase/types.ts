@@ -10431,6 +10431,38 @@ export type Database = {
           },
         ]
       }
+      project_access_profiles: {
+        Row: {
+          permissions: Json
+          project_id: string
+          role_key: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          permissions?: Json
+          project_id: string
+          role_key: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          permissions?: Json
+          project_id?: string
+          role_key?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_access_profiles_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_custom_outcomes: {
         Row: {
           action: string
