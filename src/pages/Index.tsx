@@ -104,11 +104,18 @@ const Index = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
   // Initialize state from URL params — Forms is the default landing page.
+  // The records Overview is the homepage: a fresh session opens there. "forms"
+  // was the legacy default, so a stored "forms" is not read as a deliberate
+  // choice — an explicit ?tab= link or any other stored tab still wins.
   const [activeTab, setActiveTab] = useState(() => {
     const fromUrl = searchParams.get("tab");
     if (fromUrl) return fromUrl;
-    try { return sessionStorage.getItem("amehnities:active-tab") || "forms"; } catch { return "forms"; }
+    try {
+      const stored = sessionStorage.getItem("amehnities:active-tab");
+      return stored && stored !== "forms" ? stored : "records";
+    } catch { return "records"; }
   });
+
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(searchParams.get("project"));
   
   const [showSubmissionHistory, setShowSubmissionHistory] = useState(false);
@@ -149,6 +156,25 @@ const Index = () => {
       setSelectedProjectId((current) => (current === urlProject ? current : urlProject));
     }
   }, [searchParams]);
+
+  // Land on the records Overview: open the first project that has beneficiary
+  // records. People who cannot use the records workspace keep Forms as home.
+  const [landingResolved, setLandingResolved] = useState(false);
+  useEffect(() => {
+    if (landingResolved || loading || !user || recordsLock.loading) return;
+    setLandingResolved(true);
+    if (searchParams.get("tab") || activeTab !== "records") return;
+    if (recordsLockActive) return;
+    if (isAdmin || isOwner || isSuperAdmin || isCoOwner) {
+      if (selectedProjectId) return;
+      const first = recordsLock.locked[0];
+      if (first) setSelectedProjectId(first.id);
+      else setActiveTab("forms");
+      return;
+    }
+    setActiveTab("forms");
+  }, [landingResolved, loading, user, recordsLock.loading, recordsLock.locked, activeTab, selectedProjectId, recordsLockActive, isAdmin, isOwner, isSuperAdmin, isCoOwner, searchParams]);
+
 
   useEffect(() => {
     if (user?.id && activeTab) trackPageVisit(activeTab);
