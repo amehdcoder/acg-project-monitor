@@ -15,6 +15,8 @@ export default function DonorAccessPanel({ projectId, canManage }: { projectId: 
   const [email, setEmail] = useState("");
   const [organization, setOrganization] = useState("");
   const [busy, setBusy] = useState(false);
+  const host = window.location.hostname;
+  const portalUrl = `${/^(www\.)?amehnities\.org$|^handscollect\.lovable\.app$/.test(host) ? window.location.origin : "https://handscollect.lovable.app"}/donor`;
 
   const reload = () => {
     listProjectDonors(projectId).then(setDonors).catch((e) => toast.error(e.message));
@@ -46,9 +48,14 @@ export default function DonorAccessPanel({ projectId, canManage }: { projectId: 
         <h3 className="font-semibold">Donor portal access</h3>
       </div>
       <p className="mb-4 text-sm text-muted-foreground">
-        Donors sign in at <code className="rounded bg-muted px-1">/donor</code> to see this project's Programme Report,
-        Logframe and aggregate insights — never individual beneficiary records. The donor must already have a user account.
+        Donors sign in with their own account at the link below to see this project's Programme Report,
+        Logframe, maps, risk indicators and field activity — never individual beneficiary records.
       </p>
+      <div className="mb-4 flex flex-col gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3 sm:flex-row sm:items-center">
+        <code className="min-w-0 flex-1 truncate text-sm">{portalUrl}</code>
+        <Button size="sm" variant="outline" onClick={() => { void navigator.clipboard?.writeText(portalUrl); toast.success("Donor sign-in link copied"); }}>Copy link</Button>
+        <Button size="sm" onClick={() => window.open("/donor", "_blank", "noopener")}>Open donor dashboard</Button>
+      </div>
 
       <div className="mb-4 flex flex-col gap-2 sm:flex-row">
         <Input type="email" placeholder="Donor's account email" value={email} onChange={(e) => setEmail(e.target.value)} />
