@@ -3,7 +3,7 @@ import { Compass } from "lucide-react";
 import BeneficiaryBrainPanel from "./BeneficiaryBrainPanel";
 import { Brain, BookOpenCheck } from "lucide-react";
 import FieldGuidePanel from "./FieldGuidePanel";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -147,7 +147,7 @@ const ProgrammeModuleWorkspace = ({
   // Health workers and programme staff always see the General dashboard and the
   // dashboards of their own components (scoped via componentFilter below).
   const canDash = can("view_dashboards") || ((isHealthWorker || isProgrammeStaff) && can("view_records"));
-  const [view, setView] = useState<WorkspaceView>(() => canDash ? "dashboard" : "records");
+  const [view, setView] = useState<WorkspaceView>(() => canDash ? "overview" : "records");
 
   // Designated Programme Officers (plus Super Admins) see and fill the
   // Programme Report Form built on the project logframe.
@@ -250,13 +250,27 @@ const ProgrammeModuleWorkspace = ({
     setView(t);
   };
 
+  // The Overview card page is the workspace homepage: whoever can see it opens
+  // there. A scanned Case ID link still goes straight to the record.
+  const landedRef = useRef(false);
   useEffect(() => {
     if (permissionsLoading) return;
     const hubViews = navGroups.flatMap((group) => group.hub && group.items.some((item) => item.show) ? [group.hub.key] : []);
     const visibleViews: WorkspaceView[] = [...hubViews, ...navGroups.flatMap((group) => group.items).filter((item) => item.show).map((item) => item.key), ...(canReport ? ["report" as const] : []), ...(canAssessments ? ["assessments" as const] : [])];
+    if (!landedRef.current) {
+      landedRef.current = true;
+      if (new URLSearchParams(window.location.search).has("case")) return;
+      const landing: WorkspaceView = visibleViews.includes("overview") ? "overview"
+        : visibleViews.includes("dashboard") ? "dashboard"
+        : visibleViews.includes("records") ? "records"
+        : visibleViews[0] || "records";
+      setView(landing);
+      return;
+    }
     if (view === "brain" || view === "guide") return;
     if (!visibleViews.includes(view)) setView(visibleViews.includes("records") ? "records" : visibleViews[0] || "records");
   }, [permissionsLoading, view, canConfigure, canReport, canAssessments, isOfficer, onTeamRegister, isProgrammeStaff, areaKey]);
+
 
   useEffect(() => {
     bindQueueAutoFlush();

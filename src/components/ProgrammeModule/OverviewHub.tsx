@@ -36,7 +36,6 @@ export default function OverviewHub({ beneficiaries, items, pending, onOpen }: P
   return (
     <section className="overview-hub space-y-4">
       <header className="overview-heading px-5 py-6 sm:px-7">
-        <div className="mb-4 flex items-center gap-3"><span className="overview-brand-icon"><Users className="h-7 w-7" /></span><div><p className="text-2xl font-extrabold">Amehnities</p><p className="text-sm">People · Data · Action · Healthier Communities</p></div></div>
         <h2 className="font-report-display text-4xl font-extrabold">Overview</h2>
         <p className="mt-2 max-w-xl text-base sm:text-lg">Executive view of people, services and outcomes across this project and its locations.</p>
       </header>
