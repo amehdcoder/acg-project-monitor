@@ -14443,6 +14443,10 @@ export type Database = {
         Returns: boolean
       }
       focal_component_allowed: { Args: { _key: string }; Returns: boolean }
+      focal_has_facility: {
+        Args: { _fid: string; _uid: string }
+        Returns: boolean
+      }
       focal_household_scope: {
         Args: { _hid: string; _uid: string; _write?: boolean }
         Returns: boolean
