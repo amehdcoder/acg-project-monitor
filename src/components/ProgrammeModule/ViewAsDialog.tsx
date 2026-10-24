@@ -2,14 +2,14 @@ import { useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Eye, Hospital, Stethoscope, Pill, FileText, ClipboardList, Users, Check, MapPin, Layers, Sparkles, X } from "lucide-react";
+import { Eye, Hospital, Stethoscope, Pill, FileText, ClipboardList, Users, Check, MapPin, Layers, Sparkles, X, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VIEW_AS_ROLES, viewAsLabel, type ViewAsConfig, type ViewAsRole } from "@/lib/programmeModule/viewAs";
 import type { FacilityRow } from "@/lib/programmeModule/facilities";
 
 const ICONS: Record<ViewAsRole, typeof Eye> = {
   facility_focal: Hospital, clinician: Stethoscope, pharmacist: Pill,
-  records_officer: FileText, programme_officer: ClipboardList, team_member: Users,
+  records_officer: FileText, programme_officer: ClipboardList, team_member: Users, safeguarding_officer: ShieldCheck,
 };
 const TONES: Record<ViewAsRole, string> = {
   facility_focal: "bg-health-teal/15 text-health-teal",
@@ -18,6 +18,7 @@ const TONES: Record<ViewAsRole, string> = {
   records_officer: "bg-secondary text-secondary-foreground",
   programme_officer: "bg-primary/10 text-primary",
   team_member: "bg-muted text-foreground",
+  safeguarding_officer: "bg-destructive/10 text-destructive",
 };
 const ALL = "__all";
 

@@ -1,5 +1,7 @@
 import WorkflowTour, { openWorkflowTour } from "./WorkflowTour";
-import { Compass, Eye } from "lucide-react";
+import { Compass, Eye, KeyRound } from "lucide-react";
+import AccessStudio from "./AccessStudio";
+import { useAccessProfiles, pageAllowed } from "@/lib/programmeModule/accessStudio";
 import BeneficiaryBrainPanel from "./BeneficiaryBrainPanel";
 import { Brain, BookOpenCheck } from "lucide-react";
 import FieldGuidePanel from "./FieldGuidePanel";
@@ -144,8 +146,11 @@ const ProgrammeModuleWorkspace = ({
   // What this person is allowed to see and do, from the project team register.
   // People who are not listed keep the access they already had.
   const realTeam = useMyTeamPermissions(projectId, realCanConfigure);
-  const isOfficer = viewAs ? false : realIsOfficer;
-  const simPerms = useMemo(() => (viewAs ? viewAsPermissions(viewAs) : null), [viewAs]);
+  const isOfficer = viewAs ? viewAs.role === "safeguarding_officer" : realIsOfficer;
+  const { profiles: accessProfiles } = useAccessProfiles(projectId);
+  const [accessStudioOpen, setAccessStudioOpen] = useState(false);
+  const [viewAsSeed, setViewAsSeed] = useState<ViewAsConfig | null>(null);
+  const simPerms = useMemo(() => (viewAs ? viewAsPermissions(viewAs, accessProfiles[viewAs.role]) : null), [viewAs, accessProfiles]);
   const teamCan = useMemo(() => (simPerms ? (k: keyof typeof simPerms) => Boolean(simPerms[k]) : realTeam.can), [simPerms, realTeam.can]);
   const onTeamRegister = simPerms ? true : realTeam.listed;
   const permissionsLoading = realTeam.loading;
@@ -209,7 +214,7 @@ const ProgrammeModuleWorkspace = ({
       .then(({ data }) => setIsProgrammeOfficer(Boolean(data)))
       .catch(() => setIsProgrammeOfficer(false));
   }, [projectId]);
-  const canReport = !isFocalPerson && (canConfigure || (viewAs ? viewAs.role === "programme_officer" : isProgrammeOfficer));
+  const canReport = pageAllowed(memberPerms, "report") && !isFocalPerson && (canConfigure || (viewAs ? viewAs.role === "programme_officer" : isProgrammeOfficer));
 
   // A scanned Hand Card link (?case=...) must land on the records list so the
   // record can open straight away, even for people who default to the dashboard.
@@ -297,13 +302,13 @@ const ProgrammeModuleWorkspace = ({
   ];
 
   const navGroups = allNavGroups.map((group) => ({ ...group,
-    items: group.items.map((item) => ({ ...item, show: item.show && (!isFocalPerson || FACILITY_WORKSPACE_VIEWS.has(item.key)) })),
+    items: group.items.map((item) => ({ ...item, show: item.show && (!isFocalPerson || FACILITY_WORKSPACE_VIEWS.has(item.key)) && pageAllowed(memberPerms, item.key) })),
   }));
   const accessLoading = permissionsLoading || facilityAccessLoading;
   const canRecords = can("view_records") || can("view_dashboards");
-  const canGuide = canRecords;
-  const canAssessments = !isFocalPerson && Boolean(projectId) && !safeguardingOnly && (canConfigure || can("view_records") || canDash);
-  const canBrain = !isFocalPerson && canRecords;
+  const canGuide = canRecords && pageAllowed(memberPerms, "guide");
+  const canAssessments = pageAllowed(memberPerms, "assessments") && !isFocalPerson && Boolean(projectId) && !safeguardingOnly && (canConfigure || can("view_records") || canDash);
+  const canBrain = !isFocalPerson && canRecords && pageAllowed(memberPerms, "brain");
   const [brainMounted, setBrainMounted] = useState(false);
   const [lastRecordsView, setLastRecordsView] = useState<WorkspaceView>("records");
   const isSide = (v: WorkspaceView) => v === "brain" || v === "guide" || v === "report" || v === "assessments";
@@ -434,6 +439,7 @@ const ProgrammeModuleWorkspace = ({
         canRecord={!isFocalPerson || ["record", "manage"].includes(facilityLevels[selectedFacility])}
         componentsVisible={!isFocalPerson || Boolean(facilityLevels[selectedFacility])}
         componentFilter={componentFilter}
+        hiddenSections={memberPerms?.hidden_sections}
         onChanged={() => void reloadBeneficiaries()}
       /></div>
     );
@@ -487,9 +493,11 @@ const ProgrammeModuleWorkspace = ({
         </div>
       </div>
 
-      {canViewAs && <ViewAsDialog key={viewAsOpen ? "o" : "c"} open={viewAsOpen} onOpenChange={setViewAsOpen} initial={viewAs}
+      {canViewAs && <ViewAsDialog key={viewAsOpen ? "o" : "c"} open={viewAsOpen} onOpenChange={(o) => { setViewAsOpen(o); if (!o) setViewAsSeed(null); }} initial={viewAsSeed || viewAs}
         components={normalizeConfig(active?.config || {}).components.filter((c) => !c.hidden).map((c) => ({ key: c.key, label: c.label }))}
         facilities={viewAsFacilities} states={viewAsStates} onApply={setViewAs} />}
+      {canViewAs && <AccessStudio open={accessStudioOpen} onOpenChange={setAccessStudioOpen} projectId={projectId}
+        onPreview={(role) => { setAccessStudioOpen(false); setViewAsSeed({ role, components: [] }); setViewAsOpen(true); }} />}
       {viewAs && <ViewAsBanner config={viewAs} facilityName={viewAsFacilities.find((f) => f.id === viewAs.facilityId)?.name} onChange={() => setViewAsOpen(true)} onExit={() => setViewAs(null)} />}
       {!viewAs && <WorkflowTour can={(k) => (k === "view_dashboards" ? canDash : can(k as Parameters<typeof teamCan>[0]))} canConfigure={canConfigure} isOfficer={isOfficer} ready={!accessLoading && Boolean(active)} visibleViews={[...navGroups.flatMap((g) => g.items).filter((i) => i.show).map((i) => i.key), ...(canBrain ? ["brain"] : []), ...(canGuide ? ["guide"] : [])]} components={(dashConfig?.components || []).filter((c) => !c.hidden)} onNavigate={(v) => { if (v === "brain" || v === "guide") openTab(v); else setView(v as WorkspaceView); }} />}
 
@@ -503,6 +511,7 @@ const ProgrammeModuleWorkspace = ({
           <DropdownMenuContent align="end" className="w-64">
             <DropdownMenuLabel>Administration</DropdownMenuLabel><DropdownMenuSeparator />
             {canViewAs && <DropdownMenuItem onSelect={() => setViewAsOpen(true)}><Eye className="mr-2 h-4 w-4" /> View as another user</DropdownMenuItem>}
+            {canViewAs && <DropdownMenuItem onSelect={() => setAccessStudioOpen(true)}><KeyRound className="mr-2 h-4 w-4" /> Access studio</DropdownMenuItem>}
             <DropdownMenuItem onSelect={() => openWorkflowTour()}><Compass className="mr-2 h-4 w-4" /> Guided tour</DropdownMenuItem>
             <DropdownMenuItem onSelect={() => setRegistryOpen(true)}><Building2 className="mr-2 h-4 w-4" /> Health facilities</DropdownMenuItem>
             {canConfigure && <DropdownMenuItem onSelect={() => setDevicePreviewOpen(true)}><Layers className="mr-2 h-4 w-4" /> Device preview</DropdownMenuItem>}
