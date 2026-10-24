@@ -6,7 +6,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, ArrowDownLeft, ArrowUpRight, Users, RefreshCw, CalendarClock, ClipboardCheck, Archive } from "lucide-react";
+import { Building2, ArrowDownLeft, ArrowUpRight, Users, RefreshCw, CalendarClock, ClipboardCheck, ClipboardList, Archive } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,7 @@ import {
   CLOSED_OUTCOMES, REFERRAL_OUTCOME_LABEL, acceptReferral, setReferralStatus, useFacilityDashboard,
 } from "@/lib/programmeModule/facilityOps";
 import ReferralOutcomeDialog from "./ReferralOutcomeDialog";
+import FacilityVisitsPanel from "./FacilityVisitsPanel";
 
 interface Props {
   projectId?: string;
@@ -201,6 +202,9 @@ const FacilityDashboard = ({ projectId, canSeeAllFacilities = false, onOpenBenef
             <Archive className="h-4 w-4" /> Transferred archive
             {archived.length > 0 && <Badge variant="secondary" className="ml-1">{archived.length}</Badge>}
           </TabsTrigger>
+          <TabsTrigger value="visits" className="gap-1">
+            <ClipboardList className="h-4 w-4" /> Visits
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="incoming" className="mt-3 space-y-2">
@@ -329,6 +333,20 @@ const FacilityDashboard = ({ projectId, canSeeAllFacilities = false, onOpenBenef
               <Badge variant="outline">{REFERRAL_OUTCOME_LABEL[r.outcome || "pending"]}</Badge>
             </Card>
           ))}
+        </TabsContent>
+
+        <TabsContent value="visits" className="mt-3">
+          {facility && (
+            <FacilityVisitsPanel
+              facilityId={facility.id}
+              projectId={projectId}
+              canRecord={
+                canSeeAllFacilities ||
+                levels[facility.id] === "record" ||
+                levels[facility.id] === "manage"
+              }
+            />
+          )}
         </TabsContent>
       </Tabs>
 

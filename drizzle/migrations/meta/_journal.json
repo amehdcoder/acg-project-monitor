@@ -204,6 +204,20 @@
       "when": 1792830194922,
       "tag": "0028_bind_facility_logo_storage_policies",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1792830508450,
+      "tag": "0029_create_facility_visits",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1792830821974,
+      "tag": "0030_grant_facility_access_helpers_execute",
+      "breakpoints": true
     }
   ]
 }
