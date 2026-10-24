@@ -61,6 +61,41 @@ export const resolveMediaUrl = async (value?: string | null): Promise<string> =>
   return url;
 };
 
+// Facility logos live in the private `facility-logos` bucket under
+// `<project_id>/<facility_id>.<ext>`; the hand card resolves a short-lived
+// signed URL at render time, exactly like beneficiary photos.
+export const FACILITY_LOGO_BUCKET = "facility-logos";
+
+/** Uploads (or replaces) a facility logo and returns its storage path. */
+export const uploadFacilityLogo = async (
+  file: File,
+  projectId: string,
+  facilityId: string,
+): Promise<string> => {
+  const path = `${projectId}/${facilityId}.${ext(file)}`;
+  const { error } = await supabase.storage.from(FACILITY_LOGO_BUCKET).upload(path, file, {
+    upsert: true,
+    contentType: file.type || "image/png",
+  });
+  if (error) throw error;
+  logoCache.delete(path);
+  return path;
+};
+
+const logoCache = new Map<string, { url: string; expires: number }>();
+
+/** Resolves a viewable URL for a stored facility logo path or external link. */
+export const resolveFacilityLogoUrl = async (value?: string | null): Promise<string> => {
+  if (!value) return "";
+  if (value.startsWith("data:") || value.startsWith("http")) return value;
+  const hit = logoCache.get(value);
+  if (hit && hit.expires > Date.now()) return hit.url;
+  const { data } = await supabase.storage.from(FACILITY_LOGO_BUCKET).createSignedUrl(value, 3600);
+  const url = data?.signedUrl || "";
+  if (url) logoCache.set(value, { url, expires: Date.now() + 50 * 60 * 1000 });
+  return url;
+};
+
 /** React helper: viewable URL for a stored picture reference. */
 export const useMediaUrl = (value?: string | null) => {
   const [url, setUrl] = useState("");
