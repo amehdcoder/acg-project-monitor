@@ -25,15 +25,17 @@ export default function DevicePreviewDialog({ open, onOpenChange, projectId }: {
   const [preload, setPreload] = useState(false);
   const [ready, setReady] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const embedded = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("lbrEmbed");
   const box = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLIFrameElement>(null);
 
   // Warm the frame shortly after the workspace loads (or immediately when opened).
   useEffect(() => {
+    if (embedded) return;
     if (open) { setPreload(true); return; }
     const t = setTimeout(() => setPreload(true), 1500);
     return () => clearTimeout(t);
-  }, [open]);
+  }, [open, embedded]);
 
   // Mirror device + fit into the framed app (same origin) without reloading it.
   const sync = useCallback(() => {
@@ -50,10 +52,8 @@ export default function DevicePreviewDialog({ open, onOpenChange, projectId }: {
     setReady(false);
     const t = setInterval(() => {
       const doc = frame.current?.contentDocument;
-      if (doc?.querySelector(".lbr-type, form, [data-auth-page]") || doc?.body?.innerText?.trim().length) {
-        if (doc?.querySelector(".lbr-type")) { setReady(true); clearInterval(t); }
-      }
-    }, 200);
+      if ((doc?.body?.innerText?.trim().length ?? 0) > 120) { setReady(true); clearInterval(t); }
+    }, 150);
     return () => clearInterval(t);
   }, [preload, reloadKey]);
 
@@ -73,7 +73,7 @@ export default function DevicePreviewDialog({ open, onOpenChange, projectId }: {
   const toggleFit = () => { const next = !fit; setFit(next); applyDeviceFit(next); };
   const src = `/?tab=records${projectId ? `&project=${projectId}` : ""}&lbrEmbed=1`;
 
-  if (!preload) return null;
+  if (!preload || embedded) return null;
   return createPortal(
     <div role="dialog" aria-modal="true" aria-label="Device preview" aria-hidden={!open}
       className={cn("fixed inset-0 z-[1300] flex items-center justify-center bg-foreground/60 p-2 sm:p-4", !open && "pointer-events-none invisible")}>
