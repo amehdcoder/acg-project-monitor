@@ -3,6 +3,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import ProgrammeReportForm from "./ProgrammeReportForm";
 
 vi.mock("@/lib/programmeModule/programmeReport", () => ({ aggregateIndicators: vi.fn(async () => ({})) }));
+// Non-starter projects load a blank framework, so give this test a populated one.
+vi.mock("@/lib/programmeModule/logframeStore", async () => {
+  const { defaultLogframe } = await import("@/lib/programmeModule/logframe");
+  return { loadProjectLogframe: vi.fn(async () => defaultLogframe()), saveProjectLogframe: vi.fn(async () => {}) };
+});
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: vi.fn() }) }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {
   auth: { getUser: async () => ({ data: { user: null } }) },
