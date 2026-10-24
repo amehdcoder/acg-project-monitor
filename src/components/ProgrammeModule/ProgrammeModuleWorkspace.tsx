@@ -68,6 +68,8 @@ import { MessageCircle } from "lucide-react";
 import WorkspaceMajorTabs, { type MajorTab } from "./WorkspaceMajorTabs";
 import PeopleCareHub from "./PeopleCareHub";
 import OverviewHub from "./OverviewHub";
+import IntelligenceHub from "./IntelligenceHub";
+import ProtectionHub from "./ProtectionHub";
 import WorkspaceNavigation, { type WorkspaceNavGroup, type WorkspaceView } from "./WorkspaceNavigation";
 import { useIsSafeguardingOfficer } from "@/lib/programmeModule/safeguarding";
 import { useMyFacilityAccess } from "@/lib/programmeModule/facilities";
@@ -222,6 +224,7 @@ const ProgrammeModuleWorkspace = ({
     },
     {
       label: "Intelligence",
+      hub: { key: "intelligence", label: "Intelligence", description: "Predictive analytics for targeted action and greater impact", icon: Activity },
       items: [
         { key: "network", label: "Transmission network", description: "Household, kinship and WASH relationships", icon: Network, show: (hasArea("ntd") || hasArea("wash")) && canDash },
         { key: "risk", label: "Follow-up risk & CHEW visits", description: "Prioritised risk and dispatched visits", icon: Activity, show: canDash },
@@ -230,6 +233,7 @@ const ProgrammeModuleWorkspace = ({
     },
     {
       label: "Protection",
+      hub: { key: "protection", label: "Protection", description: "Safeguarding, secure feedback and confidential case management", icon: ShieldCheck },
       items: [
         { key: "safeguarding_dashboard", label: "Safeguarding dashboard", description: "Restricted caseload oversight and outcomes", icon: ShieldAlert, show: isOfficer && can("view_safeguarding") },
         { key: "safeguarding", label: "Safeguarding cases", description: "Restricted concerns, actions and secure notes", icon: ShieldCheck, show: isOfficer && can("view_safeguarding") },
@@ -488,6 +492,19 @@ const ProgrammeModuleWorkspace = ({
       {!permissionsLoading && active && view === "overview" && (
         <OverviewHub beneficiaries={scopedBeneficiaries} pending={pending}
           items={navGroups.find((g) => g.hub?.key === "overview")?.items.filter((i) => i.show) || []}
+          onOpen={setView} />
+      )}
+
+      {!permissionsLoading && active && view === "intelligence" && (
+        <IntelligenceHub beneficiaries={scopedBeneficiaries} pending={pending}
+          components={dashConfig?.components.length || 0}
+          items={navGroups.find((g) => g.hub?.key === "intelligence")?.items.filter((i) => i.show) || []}
+          onOpen={setView} />
+      )}
+
+      {!permissionsLoading && active && view === "protection" && projectId && (
+        <ProtectionHub projectId={projectId}
+          items={navGroups.find((g) => g.hub?.key === "protection")?.items.filter((i) => i.show) || []}
           onOpen={setView} />
       )}
 
