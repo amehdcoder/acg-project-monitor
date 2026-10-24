@@ -652,6 +652,27 @@ const BeneficiaryRecord = ({
                         <Button size="sm" onClick={() => { setServiceComponent(c.key); setServiceOpen(true); }}>
                           Record service
                         </Button>
+                        <Button
+                          size="sm" variant="outline"
+                          className="border-status-success/40 text-status-success hover:bg-status-success/10"
+                          onClick={() => setLifecycle({ action: "completed", componentKey: c.key })}
+                        >
+                          Mark as Completed
+                        </Button>
+                        <Button
+                          size="sm" variant="outline"
+                          className="border-status-warning/40 text-status-warning hover:bg-status-warning/10"
+                          onClick={() => setLifecycle({ action: "suspended", componentKey: c.key })}
+                        >
+                          Suspend Service
+                        </Button>
+                        <Button
+                          size="sm" variant="outline"
+                          className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                          onClick={() => setLifecycle({ action: "exited", componentKey: c.key })}
+                        >
+                          Exit Service
+                        </Button>
                       </div>
                     </div>
                     <div className="overflow-x-auto">
