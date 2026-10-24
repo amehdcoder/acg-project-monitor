@@ -81,7 +81,7 @@
     "dompurify": "^3.4.17",
     "embla-carousel-react": "^8.6.0",
     "exceljs": "^4.4.0",
-    "expr-eval": "^2.0.2",
+    "expr-eval-fork": "^3.0.3",
     "file-saver": "^2.0.5",
     "framer-motion": "^12.35.2",
     "html2canvas": "^1.4.1",

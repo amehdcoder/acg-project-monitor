@@ -3,7 +3,7 @@
  * such as `approved / total * 100` or `sum_a + sum_b` against numeric fields.
  */
 import { useMemo, useState } from "react";
-import { Parser } from "expr-eval";
+import { Parser } from "expr-eval-fork";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
