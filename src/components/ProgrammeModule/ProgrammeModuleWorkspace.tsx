@@ -20,7 +20,7 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Plus, Settings2, CloudOff, RefreshCw, Layers, Users, Building2, ShieldAlert,
+  Plus, Settings2, CloudOff, RefreshCw, Layers, Users, Building2, Globe, ShieldAlert,
   LayoutGrid, CalendarClock, Hospital, Route, ShieldCheck, Home, Network, Activity,
   Search, Briefcase, Share2, ChevronDown, SlidersHorizontal, BarChart3,
   Trash2, MessageSquareHeart,
@@ -470,6 +470,7 @@ const ProgrammeModuleWorkspace = ({
             {canConfigure && <DropdownMenuItem onSelect={() => setDevicePreviewOpen(true)}><Layers className="mr-2 h-4 w-4" /> Device preview</DropdownMenuItem>}
             {canConfigure && <DropdownMenuItem onSelect={() => { setFocalFacilityId(undefined); setFocalOpen(true); }}><Users className="mr-2 h-4 w-4" /> Facility teams</DropdownMenuItem>}
             {(canConfigure || can("manage_team") || onTeamRegister) && <DropdownMenuItem onSelect={() => setView("team")}><Users className="mr-2 h-4 w-4" /> Project team</DropdownMenuItem>}
+            {(canConfigure || can("manage_team")) && <DropdownMenuItem onSelect={() => setView("donors")}><Globe className="mr-2 h-4 w-4" /> Donor portal</DropdownMenuItem>}
             {canConfigure && <DropdownMenuItem onSelect={() => setDrugsOpen(true)}><Settings2 className="mr-2 h-4 w-4" /> mhGAP medicines</DropdownMenuItem>}
             {canConfigure && <DropdownMenuItem onSelect={() => setWhatsappOpen(true)}><MessageCircle className="mr-2 h-4 w-4" /> WhatsApp reminders</DropdownMenuItem>}
             {canConfigure && <DropdownMenuItem onSelect={() => setSmsOpen(true)}><MessageCircle className="mr-2 h-4 w-4" /> SMS reminders</DropdownMenuItem>}
@@ -574,8 +575,10 @@ const ProgrammeModuleWorkspace = ({
             canManage={canConfigure || can("manage_team")}
             components={(normalizeConfig(active?.config).components || []).filter((c) => !c.hidden).map((c) => ({ key: c.key, label: c.label }))}
           />
-          <DonorAccessPanel projectId={projectId} canManage={canConfigure || can("manage_team")} />
         </div>
+      )}
+      {view === "donors" && projectId && (canConfigure || can("manage_team")) && (
+        <DonorAccessPanel projectId={projectId} canManage />
       )}
 
       {view === "journey" && (
