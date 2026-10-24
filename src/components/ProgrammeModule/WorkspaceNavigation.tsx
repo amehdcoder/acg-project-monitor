@@ -25,7 +25,7 @@ export interface WorkspaceNavItem {
 export interface WorkspaceNavGroup {
   label: string;
   items: WorkspaceNavItem[];
-  /** Optional overview page for the whole group, listed first in its menu. */
+  /** Optional card page opened directly instead of a dropdown. */
   hub?: { key: WorkspaceView; label: string; description: string; icon: LucideIcon };
 }
 
@@ -59,6 +59,16 @@ const WorkspaceNavigation = ({ groups, view, onViewChange, administration }: Pro
           {visibleGroups.map((group) => {
             const selected = group.hub?.key === view || group.items.some((item) => item.key === view);
             const first = group.items[0];
+            const hub = group.hub;
+            if (hub) {
+              return (
+                <Button key={group.label} variant={selected ? "default" : "ghost"} size="sm"
+                  className={cn("gap-2", !selected && "text-health-ink")}
+                  onClick={() => onViewChange(hub.key)}>
+                  {group.label}
+                </Button>
+              );
+            }
             return (
               <DropdownMenu key={group.label}>
                 <DropdownMenuTrigger asChild>
@@ -73,18 +83,6 @@ const WorkspaceNavigation = ({ groups, view, onViewChange, administration }: Pro
                 <DropdownMenuContent align="start" className="w-72 p-2">
                   <DropdownMenuLabel className="px-2 text-[10px] uppercase text-muted-foreground">{group.label}</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  {group.hub && (
-                    <DropdownMenuItem onSelect={() => onViewChange(group.hub!.key)}
-                      className={cn("gap-3 rounded-md p-2.5", group.hub.key === view && "bg-health-blue/10 text-health-blue")}>
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-health-blue text-primary-foreground">
-                        <group.hub.icon className="h-4 w-4" />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-sm font-semibold">{group.hub.label}</span>
-                        <span className="block text-xs font-normal text-muted-foreground">{group.hub.description}</span>
-                      </span>
-                    </DropdownMenuItem>
-                  )}
                   {group.items.map((item) => (
                     <DropdownMenuItem
                       key={item.key}
