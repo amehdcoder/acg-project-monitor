@@ -477,21 +477,30 @@ const ProgrammeModuleWorkspace = ({
         <Button variant="outline" size="sm" onClick={() => void reload()} aria-label="Reload modules">
           <RefreshCw className="h-4 w-4" />
         </Button>
-        {canConfigure && (
-          <Button size="sm" className="gap-1" onClick={() => setGalleryOpen(true)} aria-label="Add programme module">
-            <Plus className="h-4 w-4" /> Add module
-          </Button>
-        )}
-        {isSuperAdmin && active && (
-          <Button
-            variant="destructive"
-            size="sm"
-            className="gap-1"
-            onClick={() => { setRemoveConfirm(""); setRemoveOpen(true); }}
-            aria-label={`Delete ${active.name}`}
-          >
-            <Trash2 className="h-4 w-4" /> Delete module
-          </Button>
+        {isSuperAdmin && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1" aria-label="Manage modules">
+                <Settings2 className="h-4 w-4" /> Manage
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="z-[1200] w-48 bg-popover">
+              <DropdownMenuItem onClick={() => setGalleryOpen(true)} className="gap-2">
+                <Plus className="h-4 w-4" /> Add module
+              </DropdownMenuItem>
+              {active && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => { setRemoveConfirm(""); setRemoveOpen(true); }}
+                    className="gap-2 text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" /> Delete {active.name}
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
         </div>
       </div>
