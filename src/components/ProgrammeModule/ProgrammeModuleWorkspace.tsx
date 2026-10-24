@@ -68,6 +68,7 @@ import { MessageCircle } from "lucide-react";
 import WorkspaceMajorTabs, { type MajorTab } from "./WorkspaceMajorTabs";
 import PeopleCareHub from "./PeopleCareHub";
 import OverviewHub from "./OverviewHub";
+import IntelligenceHub from "./IntelligenceHub";
 import WorkspaceNavigation, { type WorkspaceNavGroup, type WorkspaceView } from "./WorkspaceNavigation";
 import { useIsSafeguardingOfficer } from "@/lib/programmeModule/safeguarding";
 import { useMyFacilityAccess } from "@/lib/programmeModule/facilities";
@@ -489,6 +490,13 @@ const ProgrammeModuleWorkspace = ({
       {!permissionsLoading && active && view === "overview" && (
         <OverviewHub beneficiaries={scopedBeneficiaries} pending={pending}
           items={navGroups.find((g) => g.hub?.key === "overview")?.items.filter((i) => i.show) || []}
+          onOpen={setView} />
+      )}
+
+      {!permissionsLoading && active && view === "intelligence" && (
+        <IntelligenceHub beneficiaries={scopedBeneficiaries} pending={pending}
+          components={dashConfig?.components.length || 0}
+          items={navGroups.find((g) => g.hub?.key === "intelligence")?.items.filter((i) => i.show) || []}
           onOpen={setView} />
       )}
 
