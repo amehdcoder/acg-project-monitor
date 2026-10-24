@@ -73,6 +73,8 @@ const FacilityRegistry = ({
   const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<FacilityRow | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState("");
 
   const loadCounts = useCallback(async () => {
     const [b, t] = await Promise.all([
@@ -104,7 +106,7 @@ const FacilityRegistry = ({
       `${f.name} ${f.state || ""} ${f.lga || ""} ${f.ward || ""}`.toLowerCase().includes(q));
   }, [facilities, search]);
 
-  const openNew = () => { setDraft(emptyDraft); setFormOpen(true); };
+  const openNew = () => { setDraft(emptyDraft); setLogoFile(null); setLogoPreview(""); setFormOpen(true); };
   const openEdit = (f: FacilityRow) => {
     setDraft({
       id: f.id,
@@ -117,8 +119,18 @@ const FacilityRegistry = ({
       address: "",
       contact_person: f.contact_person || "",
       contact_phone: f.contact_phone || "",
+      logo_url: f.logo_url || "",
     });
+    setLogoFile(null);
+    setLogoPreview("");
+    if (f.logo_url) void resolveFacilityLogoUrl(f.logo_url).then(setLogoPreview);
     setFormOpen(true);
+  };
+
+  const pickLogo = async (file: File | null) => {
+    setLogoFile(file);
+    if (!file) { setLogoPreview(draft.logo_url ? await resolveFacilityLogoUrl(draft.logo_url) : ""); return; }
+    setLogoPreview(await fileToDataUrl(file));
   };
 
   const save = async () => {
