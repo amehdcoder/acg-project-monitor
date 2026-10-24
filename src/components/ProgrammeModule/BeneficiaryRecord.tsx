@@ -108,7 +108,7 @@ const FieldRow = ({ label, value }: { label: string; value: string }) => (
 
 const BeneficiaryRecord = ({
   beneficiary, config, moduleId, projectId, onBack, onChanged, canManage = false, canRecord = true,
-  componentsVisible = true, componentFilter,
+  componentsVisible = true, componentFilter, hiddenSections,
 }: Props) => {
   const { services: allServices, referrals, audit, reload } = useBeneficiaryRecord(beneficiary.id);
   const services = componentFilter ? allServices.filter((s) => componentFilter({ key: s.component_key })) : allServices;
