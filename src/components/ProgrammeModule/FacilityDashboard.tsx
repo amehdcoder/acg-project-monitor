@@ -334,6 +334,20 @@ const FacilityDashboard = ({ projectId, canSeeAllFacilities = false, onOpenBenef
             </Card>
           ))}
         </TabsContent>
+
+        <TabsContent value="visits" className="mt-3">
+          {facility && (
+            <FacilityVisitsPanel
+              facilityId={facility.id}
+              projectId={projectId}
+              canRecord={
+                canSeeAllFacilities ||
+                levels[facility.id] === "record" ||
+                levels[facility.id] === "manage"
+              }
+            />
+          )}
+        </TabsContent>
       </Tabs>
 
       <ReferralOutcomeDialog
