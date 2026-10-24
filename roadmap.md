@@ -65,4 +65,4 @@
 - [x] Quiz participant identifier fields, external link auto-detect/import, minute-level external sync with live dashboard.
 - [x] Overview page is the default landing/homepage; brand write-up removed above the heading.
 
-- [ ] Protection section opens as illustrated hub cards (Safeguarding dashboard, Safeguarding cases, Community feedback) with live figures, matching the uploaded design.
+- [x] Protection section opens as illustrated hub cards (Safeguarding dashboard, Safeguarding cases, Community feedback) with live figures, matching the uploaded design.
