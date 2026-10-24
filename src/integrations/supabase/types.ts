@@ -14400,6 +14400,21 @@ export type Database = {
         Args: { _facility_id: string; _user_id: string }
         Returns: string
       }
+      facility_restricted_user: { Args: { _uid: string }; Returns: boolean }
+      focal_beneficiary_scope: {
+        Args: {
+          _bid: string
+          _manage?: boolean
+          _uid: string
+          _write?: boolean
+        }
+        Returns: boolean
+      }
+      focal_component_allowed: { Args: { _key: string }; Returns: boolean }
+      focal_household_scope: {
+        Args: { _hid: string; _uid: string; _write?: boolean }
+        Returns: boolean
+      }
       get_direct_unread_by_user: {
         Args: never
         Returns: {
