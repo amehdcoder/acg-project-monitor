@@ -36,7 +36,8 @@ describe("WorkspaceNavigation", () => {
     const onViewChange = vi.fn();
     render(<WorkspaceNavigation groups={groups} view="records" onViewChange={onViewChange} />);
     fireEvent.click(screen.getByRole("button", { name: "People & care" }));
-    expect(onViewChange).toHaveBeenCalledExactlyOnceWith("people");
+    expect(onViewChange).toHaveBeenCalledTimes(1);
+    expect(onViewChange).toHaveBeenCalledWith("people");
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 });
