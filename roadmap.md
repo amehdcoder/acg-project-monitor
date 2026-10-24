@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Restrict facility focal persons to assigned-facility records and clinical workflows; enforce navigation, profile components and database scope and verify.
+
 - [x] Apply the supplied Overview card design with direct navigation to five permission-visible dashboards; verified hosted illustrations, desktop/mobile fit, General dashboard navigation and three tests.
 
 - [x] Integrate the beneficiary's active-component care journeys beside Overall Progress; five focused tests passed and authenticated desktop/mobile profile verified with one active Eye Health component at 60%, readable dates and pending completion/outcome.
