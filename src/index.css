@@ -90,6 +90,17 @@
 
     /* Global-health evidence report palette */
     --health-blue: 209 100% 36%;
+    --pc-blue: 214 85% 44%;
+    --pc-blue-soft: 212 90% 90%;
+    --pc-red: 6 82% 52%;
+    --pc-red-soft: 18 90% 94%;
+    --pc-green: 152 60% 32%;
+    --pc-green-soft: 145 55% 90%;
+    --pc-violet: 262 48% 56%;
+    --pc-violet-soft: 255 60% 93%;
+    --pc-teal: 160 55% 34%;
+    --pc-teal-soft: 165 50% 92%;
+    --pc-ink: 222 60% 12%;
     --health-teal: 176 100% 31%;
     --health-amber: 45 87% 61%;
     --health-red: 356 63% 56%;
