@@ -45,7 +45,7 @@ describe("WorkspaceNavigation", () => {
   it("opens Overview cards directly instead of a dropdown", () => {
     const onViewChange = vi.fn();
     render(<WorkspaceNavigation groups={groups} view="dashboard" onViewChange={onViewChange} />);
-    fireEvent.click(screen.getByRole("button", { name: "Overview", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "Overview" }));
     expect(onViewChange).toHaveBeenCalledTimes(1);
     expect(onViewChange).toHaveBeenCalledWith("overview");
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
