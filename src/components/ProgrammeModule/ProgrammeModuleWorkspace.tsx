@@ -225,8 +225,8 @@ const ProgrammeModuleWorkspace = ({
       items: [
         { key: "records", label: "Beneficiary records", description: "Find, register and open individual records", icon: LayoutGrid, show: can("view_records") },
         { key: "followups", label: "Follow-ups & referrals", description: "Upcoming visits and referral traffic", icon: CalendarClock, show: can("view_records") },
-        { key: "households", label: "Households & MDA", description: "Household members, treatment rounds and water points", icon: Home, show: (hasArea("ntd") || hasArea("wash")) && (can("manage_households") || canDash) },
-        { key: "casesearch", label: "CDD case search", description: "MMDP case finding, review and registration", icon: Search, show: (hasArea("ntd") || hasArea("eye")) && (can("manage_cdds") || can("confirm_cases") || can("view_records")) },
+        { key: "households", label: "Households & MDA", description: "Household members, treatment rounds and water points", icon: Home, show: (isFocalPerson || hasArea("ntd") || hasArea("wash")) && (can("manage_households") || canDash) },
+        { key: "casesearch", label: "CDD case search", description: "MMDP case finding, review and registration", icon: Search, show: (isFocalPerson || hasArea("ntd") || hasArea("eye")) && (can("manage_cdds") || can("confirm_cases") || can("view_records")) },
         { key: "livelihood", label: "Livelihood & empowerment", description: "Assessments, shortlists and verification", icon: Briefcase, show: !isHealthWorker && hasArea("livelihood") && (can("view_records") || can("view_dashboards")) },
       ],
     },
@@ -367,6 +367,10 @@ const ProgrammeModuleWorkspace = ({
       </Card>
     );
   }
+
+  if (accessLoading) return <div role="status" className="p-8 text-center text-muted-foreground">Checking facility access…</div>;
+
+  if (isFocalPerson && !FACILITY_WORKSPACE_VIEWS.has(view)) return <div role="status" className="p-8 text-center text-muted-foreground">Opening your facility workspace…</div>;
 
   if (!accessLoading && selected && active && (!isFocalPerson || facilityLevels[selected.facility_id || ""])) {
     const selectedFacility = (selected as unknown as { facility_id?: string }).facility_id || "";
@@ -532,7 +536,7 @@ const ProgrammeModuleWorkspace = ({
         <GeneralDashboard
           projectId={projectId}
           moduleId={active.id}
-          config={dashConfig!}
+          config={dashConfig || normalizeConfig(active.config)}
           beneficiaries={scopedBeneficiaries}
           allowedFacilityIds={isFocalPerson ? Object.keys(facilityLevels) : []}
           isSafeguardingOfficer={isOfficer}
