@@ -31,6 +31,8 @@ import { isMmdpVisit } from "@/lib/programmeModule/mmdp";
 import { resolveIcon } from "./icons";
 import { useBeneficiaryRecord } from "./useProgrammeModule";
 import ServiceEntryDialog from "./ServiceEntryDialog";
+import ComponentStatusDialog from "./ComponentStatusDialog";
+import type { ServiceLifecycleAction } from "@/lib/programmeModule/componentOutcomes";
 import GraduationPathwayPanel from "./GraduationPathwayPanel";
 import ComponentJourneyProgress from "./ComponentJourneyProgress";
 import WashingtonGroupDialog from "./WashingtonGroupDialog";
