@@ -869,6 +869,17 @@ const BeneficiaryRecord = ({
         defaultComponent={serviceComponent} defaultService={serviceDefault} priorServices={services} componentFilter={componentFilter}
         onSaved={() => { void reload(); onChanged(); }}
       />
+      {lifecycle && (() => {
+        const lc = components.find((c) => c.key === lifecycle.componentKey);
+        return lc ? (
+          <ComponentStatusDialog
+            open onOpenChange={(v) => { if (!v) setLifecycle(null); }}
+            action={lifecycle.action} component={lc}
+            beneficiary={beneficiary} moduleId={moduleId} projectId={projectId}
+            onChanged={() => { void reload(); onChanged(); }}
+          />
+        ) : null;
+      })()}
       <WashingtonGroupDialog
         open={wgOpen}
         beneficiaryName={beneficiary.full_name}
