@@ -75,6 +75,8 @@ import { useIsSafeguardingOfficer } from "@/lib/programmeModule/safeguarding";
 import { useMyFacilityAccess } from "@/lib/programmeModule/facilities";
 import { FACILITY_WORKSPACE_VIEWS, facilityCanWrite, isFacilityClinicalComponent } from "@/lib/programmeModule/facilityScope";
 import DevicePreviewDialog from "./DevicePreviewDialog";
+import ViewAsDialog, { ViewAsBanner } from "./ViewAsDialog";
+import { viewAsPermissions, viewAsRecordVisible, type ViewAsConfig } from "@/lib/programmeModule/viewAs";
 import { applyDeviceFit } from "@/lib/deviceFit";
 
 
@@ -96,8 +98,15 @@ interface Props {
  * Case ID format — comes from `programme_modules.config`, never from this code.
  */
 const ProgrammeModuleWorkspace = ({
-  projectId, canConfigure = false, isOwner = false, isSuperAdmin = false,
+  projectId, canConfigure: realCanConfigure = false, isOwner: realIsOwner = false, isSuperAdmin: realIsSuperAdmin = false,
 }: Props) => {
+  // Super Admins can preview the workspace as another kind of user.
+  const canViewAs = realIsSuperAdmin || realIsOwner;
+  const [viewAs, setViewAs] = useState<ViewAsConfig | null>(null);
+  const [viewAsOpen, setViewAsOpen] = useState(false);
+  const canConfigure = viewAs ? false : realCanConfigure;
+  const isOwner = viewAs ? false : realIsOwner;
+  const isSuperAdmin = viewAs ? false : realIsSuperAdmin;
   const { toast } = useToast();
   const { modules, loading, reload } = useProgrammeModules(projectId);
   const [activeId, setActiveId] = useState<string>("");
@@ -110,7 +119,11 @@ const ProgrammeModuleWorkspace = ({
   const [drugsOpen, setDrugsOpen] = useState(false);
   const [whatsappOpen, setWhatsappOpen] = useState(false);
   const [smsOpen, setSmsOpen] = useState(false);
-  const { levels: facilityLevels, loading: facilityAccessLoading } = useMyFacilityAccess();
+  const { levels: realFacilityLevels, loading: facilityAccessLoading } = useMyFacilityAccess();
+  const facilityLevels = useMemo<Record<string, FacilityAccessLevel>>(() => {
+    if (!viewAs) return realFacilityLevels;
+    return viewAs.role === "facility_focal" && viewAs.facilityId ? { [viewAs.facilityId]: "record" } : {};
+  }, [viewAs, realFacilityLevels]);
   const isFocalPerson = !canConfigure && Object.keys(facilityLevels).length > 0;
   const focalCanWrite = facilityCanWrite(facilityLevels);
   const [focalFacilityId, setFocalFacilityId] = useState<string | undefined>(undefined);
@@ -126,11 +139,20 @@ const ProgrammeModuleWorkspace = ({
   const [removeOpen, setRemoveOpen] = useState(false);
   const [removeConfirm, setRemoveConfirm] = useState("");
   const [removing, setRemoving] = useState(false);
-  const { isOfficer, reload: reloadOfficerAccess } = useIsSafeguardingOfficer(projectId);
+  const { isOfficer: realIsOfficer, reload: reloadOfficerAccess } = useIsSafeguardingOfficer(projectId);
 
   // What this person is allowed to see and do, from the project team register.
   // People who are not listed keep the access they already had.
-  const { can: teamCan, listed: onTeamRegister, loading: permissionsLoading, healthWorkerCadre, programmeStaffCadre, programmeAreas, member: teamMember } = useMyTeamPermissions(projectId, canConfigure);
+  const realTeam = useMyTeamPermissions(projectId, realCanConfigure);
+  const isOfficer = viewAs ? false : realIsOfficer;
+  const simPerms = useMemo(() => (viewAs ? viewAsPermissions(viewAs) : null), [viewAs]);
+  const teamCan = useMemo(() => (simPerms ? (k: keyof typeof simPerms) => Boolean(simPerms[k]) : realTeam.can), [simPerms, realTeam.can]);
+  const onTeamRegister = simPerms ? true : realTeam.listed;
+  const permissionsLoading = realTeam.loading;
+  const healthWorkerCadre = simPerms ? simPerms.health_worker || null : realTeam.healthWorkerCadre;
+  const programmeStaffCadre = simPerms ? simPerms.programme_staff || null : realTeam.programmeStaffCadre;
+  const programmeAreas = simPerms ? [] : realTeam.programmeAreas;
+  const teamMember = simPerms ? ({ permissions: simPerms } as typeof realTeam.member) : realTeam.member;
   // Designated health workers only work on MMDP/NTD and mental health: case
   // search, records, households/MDA/WASH, services, follow-ups and referrals.
   const isHealthWorker = Boolean(healthWorkerCadre);
@@ -187,7 +209,7 @@ const ProgrammeModuleWorkspace = ({
       .then(({ data }) => setIsProgrammeOfficer(Boolean(data)))
       .catch(() => setIsProgrammeOfficer(false));
   }, [projectId]);
-  const canReport = !isFocalPerson && (canConfigure || isProgrammeOfficer);
+  const canReport = !isFocalPerson && (canConfigure || (viewAs ? viewAs.role === "programme_officer" : isProgrammeOfficer));
 
   // A scanned Hand Card link (?case=...) must land on the records list so the
   // record can open straight away, even for people who default to the dashboard.
@@ -218,10 +240,18 @@ const ProgrammeModuleWorkspace = ({
    * keeps the full view.
    */
   const scopedBeneficiaries = useMemo(() => {
-    if (!isFocalPerson) return beneficiaries;
-    return beneficiaries.filter((b) =>
+    let rows = beneficiaries;
+    if (viewAs) rows = rows.filter((b) => viewAsRecordVisible(viewAs, b as unknown as { state?: string; facility_id?: string }));
+    if (!isFocalPerson) return rows;
+    return rows.filter((b) =>
       Boolean(facilityLevels[(b as unknown as { facility_id?: string }).facility_id || ""]));
-  }, [beneficiaries, facilityLevels, isFocalPerson]);
+  }, [beneficiaries, facilityLevels, isFocalPerson, viewAs]);
+  const { facilities: viewAsFacilities } = useFacilities(canViewAs ? projectId : undefined);
+  const viewAsStates = useMemo(() => Array.from(new Set([
+    ...viewAsFacilities.map((f) => f.state || ""),
+    ...beneficiaries.map((b) => (b as unknown as { state?: string }).state || ""),
+  ].map((x) => x.trim()).filter(Boolean))).sort(), [viewAsFacilities, beneficiaries]);
+  useEffect(() => { setSelected(null); setView(viewAs ? (viewAs.role === "facility_focal" ? "records" : "overview") : "overview"); }, [viewAs]);
 
   const allNavGroups: WorkspaceNavGroup[] = [
     {
@@ -457,7 +487,11 @@ const ProgrammeModuleWorkspace = ({
         </div>
       </div>
 
-      <WorkflowTour can={(k) => (k === "view_dashboards" ? canDash : can(k as Parameters<typeof teamCan>[0]))} canConfigure={canConfigure} isOfficer={isOfficer} ready={!accessLoading && Boolean(active)} visibleViews={[...navGroups.flatMap((g) => g.items).filter((i) => i.show).map((i) => i.key), ...(canBrain ? ["brain"] : []), ...(canGuide ? ["guide"] : [])]} components={(dashConfig?.components || []).filter((c) => !c.hidden)} onNavigate={(v) => { if (v === "brain" || v === "guide") openTab(v); else setView(v as WorkspaceView); }} />
+      {canViewAs && <ViewAsDialog key={viewAsOpen ? "o" : "c"} open={viewAsOpen} onOpenChange={setViewAsOpen} initial={viewAs}
+        components={normalizeConfig(active?.config || {}).components.filter((c) => !c.hidden).map((c) => ({ key: c.key, label: c.label }))}
+        facilities={viewAsFacilities} states={viewAsStates} onApply={setViewAs} />}
+      {viewAs && <ViewAsBanner config={viewAs} facilityName={viewAsFacilities.find((f) => f.id === viewAs.facilityId)?.name} onChange={() => setViewAsOpen(true)} onExit={() => setViewAs(null)} />}
+      {!viewAs && <WorkflowTour can={(k) => (k === "view_dashboards" ? canDash : can(k as Parameters<typeof teamCan>[0]))} canConfigure={canConfigure} isOfficer={isOfficer} ready={!accessLoading && Boolean(active)} visibleViews={[...navGroups.flatMap((g) => g.items).filter((i) => i.show).map((i) => i.key), ...(canBrain ? ["brain"] : []), ...(canGuide ? ["guide"] : [])]} components={(dashConfig?.components || []).filter((c) => !c.hidden)} onNavigate={(v) => { if (v === "brain" || v === "guide") openTab(v); else setView(v as WorkspaceView); }} />}
 
       {!accessLoading && (canRecords || canReport) && active && (
         <WorkspaceMajorTabs selected={isSide(view) ? view as MajorTab : "records"} canReport={canReport} canBrain={canBrain} canRecords={canRecords} canGuide={canGuide} canAssessments={canAssessments} onSelect={openTab} />
@@ -468,6 +502,7 @@ const ProgrammeModuleWorkspace = ({
           <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="gap-2"><SlidersHorizontal className="h-4 w-4" /> Manage<ChevronDown className="h-3.5 w-3.5" /></Button></DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64">
             <DropdownMenuLabel>Administration</DropdownMenuLabel><DropdownMenuSeparator />
+            {canViewAs && <DropdownMenuItem onSelect={() => setViewAsOpen(true)}><Eye className="mr-2 h-4 w-4" /> View as another user</DropdownMenuItem>}
             <DropdownMenuItem onSelect={() => openWorkflowTour()}><Compass className="mr-2 h-4 w-4" /> Guided tour</DropdownMenuItem>
             <DropdownMenuItem onSelect={() => setRegistryOpen(true)}><Building2 className="mr-2 h-4 w-4" /> Health facilities</DropdownMenuItem>
             {canConfigure && <DropdownMenuItem onSelect={() => setDevicePreviewOpen(true)}><Layers className="mr-2 h-4 w-4" /> Device preview</DropdownMenuItem>}
