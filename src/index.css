@@ -1565,3 +1565,12 @@ select option {
 .records-scroll::-webkit-scrollbar-track { background: hsl(var(--muted) / 0.4); }
 .records-scroll::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.5); border-radius: 9999px; border: 2px solid transparent; background-clip: padding-box; }
 .records-scroll .overview-hub, .records-scroll section { touch-action: pan-y pinch-zoom; }
+.records-scroll [role="tablist"] { max-width: 100%; overflow-x: auto; justify-content: flex-start; }
+
+/* One-click device fit: follow the device's own text size (iOS Dynamic Type, Android font scale). */
+html[data-lbr-fit="on"] .lbr-type { font-size: 1rem; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+html[data-lbr-fit="on"][data-lbr-device="ios"] .lbr-type { font: -apple-system-body; font-family: inherit; }
+html[data-lbr-fit="on"] .lbr-type img, html[data-lbr-fit="on"] .lbr-type table { max-width: 100%; }
+html[data-lbr-fit="on"] .lbr-type * { min-width: 0; overflow-wrap: anywhere; }
+html[data-lbr-fit="on"][data-lbr-device="android"] .lbr-type button,
+html[data-lbr-fit="on"][data-lbr-device="ios"] .lbr-type button { min-height: 44px; }
