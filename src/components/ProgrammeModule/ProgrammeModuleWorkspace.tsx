@@ -222,6 +222,7 @@ const ProgrammeModuleWorkspace = ({
     },
     {
       label: "Intelligence",
+      hub: { key: "intelligence", label: "Intelligence", description: "Predictive analytics for targeted action and greater impact", icon: Activity },
       items: [
         { key: "network", label: "Transmission network", description: "Household, kinship and WASH relationships", icon: Network, show: (hasArea("ntd") || hasArea("wash")) && canDash },
         { key: "risk", label: "Follow-up risk & CHEW visits", description: "Prioritised risk and dispatched visits", icon: Activity, show: canDash },
