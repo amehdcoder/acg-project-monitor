@@ -23,3 +23,5 @@
 - Donors: own Auth accounts, standalone login/signup/recovery; dashboard API uses donor RPCs/RLS + protected donor_viewers associations, never project assignments; local selection is not authorization; server risk totals — why: private aggregate-only dashboards. Report events follow entries; retries retain payloads.
 
 - Assessments reuse QuizBuilder/server scoring; keys append to unpublished quizzes; pair by quiz/source/person. Exact activity links feed reporting-only aggregates by post-test month; dedup activity/person; user-scoped caches — why: no wrong-training totals.
+- The app's landing tab is the records workspace and that workspace's landing view is its Overview hub; people without records access keep Forms as home — why: one homepage that opens on project results without dead ends.
+
