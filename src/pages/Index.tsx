@@ -97,6 +97,7 @@ import RecordsOnlyShell from "@/components/ProgrammeModule/RecordsOnlyShell";
 import GeoWorkspaceShell from "@/components/Microplanning/GeoWorkspaceShell";
 import { useGeoWorkspaceLock } from "@/lib/microplanning/geoWorkspaceLock";
 import ProgrammeModuleWorkspace from "@/components/ProgrammeModule/ProgrammeModuleWorkspace";
+import ScrollRail from "@/components/ProgrammeModule/ScrollRail";
 
 const Index = () => {
   const [searchParams, setSearchParams] = useSearchParams();
