@@ -311,7 +311,7 @@ const ProgrammeModuleWorkspace = ({
   const canRecords = can("view_records") || can("view_dashboards");
   const canGuide = canRecords && pageAllowed(memberPerms, "guide");
   const canAssessments = pageAllowed(memberPerms, "assessments") && !isFocalPerson && Boolean(projectId) && !safeguardingOnly && (canConfigure || can("view_records") || canDash);
-  const canBrain = !isFocalPerson && canRecords && pageAllowed(memberPerms, "brain");
+  const canBrain = isSuperAdmin && canRecords && pageAllowed(memberPerms, "brain");
   const [brainMounted, setBrainMounted] = useState(false);
   const [lastRecordsView, setLastRecordsView] = useState<WorkspaceView>("records");
   const isSide = (v: WorkspaceView) => v === "brain" || v === "guide" || v === "report" || v === "assessments";
