@@ -90,6 +90,12 @@ export interface TeamPermissions {
   programme_staff?: string;
   /** Programme areas a programme staff member works on. */
   programme_areas?: ProgrammeArea[];
+  /** Component keys the member can see and report for (empty = every component). */
+  components?: string[];
+  /** Overview dashboard keys the member may open (empty = every dashboard). */
+  dashboards?: string[];
+  /** May see and share the Community feedback QR code and public link — never the reports. */
+  feedback_share?: boolean;
 }
 
 export type ProgrammeArea = "ntd" | "mental" | "wash" | "livelihood" | "eye";
