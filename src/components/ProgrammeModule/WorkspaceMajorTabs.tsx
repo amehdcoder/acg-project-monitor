@@ -4,19 +4,21 @@ import { cn } from "@/lib/utils";
 
 export type MajorTab = "records" | "report" | "assessments" | "brain" | "guide";
 
-export default function WorkspaceMajorTabs({ selected, canReport, canBrain, canAssessments = false, onSelect }: {
+export default function WorkspaceMajorTabs({ selected, canReport, canBrain, canRecords = canBrain, canGuide = canBrain, canAssessments = false, onSelect }: {
   selected: MajorTab;
   canReport: boolean;
   canBrain: boolean;
+  canRecords?: boolean;
+  canGuide?: boolean;
   canAssessments?: boolean;
   onSelect: (tab: MajorTab) => void;
 }) {
   const tabs = [
-    { key: "records", label: "Beneficiary records", icon: Layers, show: canBrain },
+    { key: "records", label: "Beneficiary records", icon: Layers, show: canRecords },
     { key: "report", label: "Programme report", icon: ClipboardList, show: canReport },
     { key: "assessments", label: "Quizzes & assessments", icon: GraduationCap, show: canAssessments },
     { key: "brain", label: "Record quality brain", icon: Brain, show: canBrain },
-    { key: "guide", label: "Field guide", icon: BookOpenCheck, show: canBrain },
+    { key: "guide", label: "Field guide", icon: BookOpenCheck, show: canGuide },
   ] as const;
   return (
     <div role="tablist" aria-label="Cases workspace" className="flex flex-wrap gap-x-5 gap-y-1 border-b border-border">
