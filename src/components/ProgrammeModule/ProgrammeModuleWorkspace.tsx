@@ -224,11 +224,11 @@ const ProgrammeModuleWorkspace = ({
       label: "Overview",
       hub: { key: "overview", label: "Overview", description: "Executive view of people, services and outcomes", icon: BarChart3 },
       items: [
-        { key: "dashboard", label: "General dashboard", description: "Project-wide outcomes, alerts and service performance", icon: BarChart3, show: canDash },
-        { key: "journey", label: "Beneficiary journey", description: "Change, feedback and service reach", icon: Route, show: canDash },
-        { key: "facility", label: "Facility dashboard", description: "Facility caseloads and referral performance", icon: Hospital, show: canDash },
-        { key: "clusters", label: "Community clusters", description: "Geographic concentrations and community patterns", icon: Layers, show: canDash },
-        { key: "graduation", label: "Graduation pathway", description: "Livelihood mapping, selection, delivery stages and graduation", icon: Briefcase, show: canDash && hasArea("livelihood") },
+        { key: "dashboard", label: "General dashboard", description: "Project-wide outcomes, alerts and service performance", icon: BarChart3, show: canDash && dashAllowed("dashboard") },
+        { key: "journey", label: "Beneficiary journey", description: "Change, feedback and service reach", icon: Route, show: canDash && dashAllowed("journey") },
+        { key: "facility", label: "Facility dashboard", description: "Facility caseloads and referral performance", icon: Hospital, show: canDash && dashAllowed("facility") },
+        { key: "clusters", label: "Community clusters", description: "Geographic concentrations and community patterns", icon: Layers, show: canDash && dashAllowed("clusters") },
+        { key: "graduation", label: "Graduation pathway", description: "Livelihood mapping, selection, delivery stages and graduation", icon: Briefcase, show: canDash && hasArea("livelihood") && dashAllowed("graduation") },
       ],
     },
     {
@@ -257,7 +257,7 @@ const ProgrammeModuleWorkspace = ({
       items: [
         { key: "safeguarding_dashboard", label: "Safeguarding dashboard", description: "Restricted caseload oversight and outcomes", icon: ShieldAlert, show: isOfficer && can("view_safeguarding") },
         { key: "safeguarding", label: "Safeguarding cases", description: "Restricted concerns, actions and secure notes", icon: ShieldCheck, show: isOfficer && can("view_safeguarding") },
-        { key: "feedback", label: "Community feedback", description: "Public complaints & feedback form, QR code and reports", icon: MessageSquareHeart, show: canConfigure || can("view_records") || canDash },
+        { key: "feedback", label: "Community feedback", description: "Public complaints & feedback form, QR code and reports", icon: MessageSquareHeart, show: canConfigure || can("view_records") || canDash || canShareFeedback },
       ],
     },
   ];
