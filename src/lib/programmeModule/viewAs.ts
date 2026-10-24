@@ -5,7 +5,7 @@
 import type { TeamPermissions } from "./projectTeam";
 
 export type ViewAsRole =
-  | "facility_focal" | "clinician" | "pharmacist" | "records_officer" | "programme_officer" | "team_member";
+  | "facility_focal" | "clinician" | "pharmacist" | "records_officer" | "programme_officer" | "team_member" | "safeguarding_officer";
 
 export interface ViewAsConfig {
   role: ViewAsRole;
@@ -22,6 +22,7 @@ export const VIEW_AS_ROLES: { key: ViewAsRole; label: string; hint: string; need
   { key: "records_officer", label: "Records Officer", hint: "Registers and updates records, services and home visits" },
   { key: "programme_officer", label: "Programme Officer", hint: "Dashboards, records and the Programme Report" },
   { key: "team_member", label: "Project team member", hint: "Read-only records and dashboards for chosen components" },
+  { key: "safeguarding_officer", label: "Safeguarding Officer", hint: "Safeguarding dashboard and restricted cases only" },
 ];
 
 const BASE: Record<ViewAsRole, TeamPermissions> = {
@@ -31,11 +32,15 @@ const BASE: Record<ViewAsRole, TeamPermissions> = {
   records_officer: { view_records: true, edit_records: true, record_services: true, home_visits: true, export_data: true, view_dashboards: true },
   programme_officer: { view_records: true, view_dashboards: true, export_data: true },
   team_member: { view_records: true, view_dashboards: true },
+  safeguarding_officer: { view_safeguarding: true },
 };
 
+/** Built-in starting access for a category, before any Access studio changes. */
+export const defaultRolePermissions = (role: ViewAsRole): TeamPermissions => ({ ...BASE[role] });
+
 /** The team-register permissions the simulated person would have. */
-export const viewAsPermissions = (v: ViewAsConfig): TeamPermissions => ({
-  ...BASE[v.role],
+export const viewAsPermissions = (v: ViewAsConfig, profile?: TeamPermissions | null): TeamPermissions => ({
+  ...(profile || BASE[v.role]),
   ...(v.components.length ? { components: [...v.components] } : {}),
 });
 

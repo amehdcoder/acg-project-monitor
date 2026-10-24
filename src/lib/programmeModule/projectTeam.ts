@@ -96,6 +96,12 @@ export interface TeamPermissions {
   dashboards?: string[];
   /** May see and share the Community feedback QR code and public link — never the reports. */
   feedback_share?: boolean;
+  /** Workspace pages and tabs hidden for this person (Access studio). */
+  hidden_views?: string[];
+  /** Beneficiary profile sections hidden for this person (Access studio). */
+  hidden_sections?: string[];
+  /** Access studio category this member follows. */
+  access_category?: string;
 }
 
 export type ProgrammeArea = "ntd" | "mental" | "wash" | "livelihood" | "eye";
