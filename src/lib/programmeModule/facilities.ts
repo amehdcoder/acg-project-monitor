@@ -17,6 +17,8 @@ export interface FacilityRow {
   contact_phone: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  /** Storage path (or URL) of the facility logo shown on beneficiary hand cards. */
+  logo_url?: string | null;
 }
 
 export type FacilityAccessLevel = "view" | "record" | "manage";
@@ -65,7 +67,7 @@ export const useFacilities = (projectId?: string) => {
     setLoading(true);
     let q = supabase
       .from("health_facilities")
-      .select("id,name,code,facility_type,state,lga,ward,contact_person,contact_phone,latitude,longitude")
+      .select("id,name,code,facility_type,state,lga,ward,contact_person,contact_phone,latitude,longitude,logo_url")
       .order("name")
       .limit(2000);
     if (projectId) q = q.or(`project_id.eq.${projectId},project_id.is.null`);
