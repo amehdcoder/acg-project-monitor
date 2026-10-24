@@ -18,7 +18,7 @@
     "android:splash": "bash scripts/apply-android-splash.sh"
   },
   "dependencies": {
-    "@capacitor/cli": "^8.5.2",
+    "@capacitor/cli": "^8.5.3",
     "@capacitor/core": "^8.3.0",
     "@capacitor/geolocation": "^7.0.0",
     "@diffusionstudio/vits-web": "^1.0.3",
@@ -78,7 +78,7 @@
     "cmdk": "^1.1.1",
     "date-fns": "^3.6.0",
     "docx": "^9.7.1",
-    "dompurify": "^3.4.11",
+    "dompurify": "^3.4.17",
     "embla-carousel-react": "^8.6.0",
     "exceljs": "^4.4.0",
     "expr-eval": "^2.0.2",
@@ -88,7 +88,7 @@
     "html5-qrcode": "^2.3.8",
     "input-otp": "^1.4.2",
     "jsbarcode": "^3.12.3",
-    "jspdf": "^4.0.0",
+    "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "jszip": "^3.10.1",
     "leaflet": "^1.9.4",
