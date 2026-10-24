@@ -2401,7 +2401,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     <TabsTrigger value="followup">Follow-up</TabsTrigger>
                   </TabsList>
                   <TabsContent value="records" className="mt-4">
-                    <ProgrammeModuleWorkspace projectId={currentProjectId} canConfigure={isAdmin} />
+                    <ProgrammeModuleWorkspace projectId={currentProjectId} canConfigure={isAdmin} isOwner={isOwner} isSuperAdmin={isSuperAdmin || isOwner} />
                   </TabsContent>
                   <TabsContent value="followup" className="mt-4">
                     <FollowUpsPanel projectId={currentProjectId} />
