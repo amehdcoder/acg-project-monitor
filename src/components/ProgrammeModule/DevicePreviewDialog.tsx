@@ -76,7 +76,7 @@ export default function DevicePreviewDialog({ open, onOpenChange, projectId }: {
   if (!preload || embedded) return null;
   return createPortal(
     <div role="dialog" aria-modal="true" aria-label="Device preview" aria-hidden={!open}
-      className={cn("fixed inset-0 z-[1300] flex items-center justify-center bg-foreground/60 p-2 sm:p-4", !open && "pointer-events-none invisible")}>
+      className={cn("fixed inset-0 z-[2147483000] flex items-center justify-center bg-foreground/60 p-2 sm:p-4", !open && "pointer-events-none invisible")}>
       <div className="flex h-[94dvh] w-[96vw] flex-col gap-3 rounded-xl bg-background p-4 shadow-card">
         <div className="flex items-start justify-between gap-3">
           <div>
