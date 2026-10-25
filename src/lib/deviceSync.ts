@@ -45,7 +45,7 @@ const toRecord = (entry: SavedFormEntry): DeviceSyncRecord => ({
   clientSubmittedAt: entry.finalizedAt || entry.createdAt || entry.updatedAt,
   // See Clear visits and cases are routed to their own intake server-side.
   kind:
-    entry.settings?.kind === "microplan" ? "microplan" : entry.settings?.kind === "seeclear"
+    entry.settings?.kind === "eye_daily" ? "eye_daily" : entry.settings?.kind === "microplan" ? "microplan" : entry.settings?.kind === "seeclear"
       ? "seeclear"
       : entry.settings?.kind === "case"
         ? "case"
