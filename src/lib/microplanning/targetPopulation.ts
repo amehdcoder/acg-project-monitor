@@ -1,4 +1,4 @@
-export const TARGET_POP_DISAGGREGATION_FIELDS = [
+export const TARGET_POP_DISAGGREGATION_FIELDS: { key: string; label: string; field: string; mode: PopulationMode }[] = [
   { key: "total_population", label: "Whole community", field: "estimated_total_population", mode: "total" },
   { key: "children_0_4", label: "Children 0–4 years", field: "estimated_children_0_4", mode: "standard" },
   { key: "children_5_14", label: "Children 5–14 years", field: "estimated_children_5_14", mode: "standard" },
@@ -7,7 +7,7 @@ export const TARGET_POP_DISAGGREGATION_FIELDS = [
   { key: "trachoma_6m_6y", label: "6 months–6 years", field: "trachoma_6m_6y", mode: "trachoma" },
   { key: "trachoma_7_14y", label: "7–14 years", field: "trachoma_7_14y", mode: "trachoma" },
   { key: "trachoma_15_plus", label: "15+ years", field: "trachoma_15_plus", mode: "trachoma" },
-] as const;
+];
 
 export type PopulationMode = "standard" | "trachoma" | "total";
 export function validTargetSelection(value: unknown): value is string[] {
