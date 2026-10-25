@@ -401,7 +401,7 @@ const BeneficiaryRecord = ({
           )}
 
           {/* Component tabs */}
-          <Tabs value={tab} onValueChange={setTab}>
+          <Tabs value={hiddenSections?.includes(tab) ? "overview" : tab} onValueChange={value => { if (!hiddenSections?.includes(value)) setTab(value); }}>
             <div className="overflow-x-auto">
               <TabsList className="w-max">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -718,7 +718,7 @@ const BeneficiaryRecord = ({
               );
             })}
 
-            {componentsVisible && (
+            {componentsVisible && !hiddenSections?.includes("lesions") && (
               <TabsContent value="lesions" className="mt-4">
                 <LesionStagingPanel
                   beneficiaryId={beneficiary.id}
@@ -729,12 +729,12 @@ const BeneficiaryRecord = ({
               </TabsContent>
             )}
 
-            <TabsContent value="outcomes" className="mt-4 space-y-4">
+            {!hiddenSections?.includes("outcomes") && <TabsContent value="outcomes" className="mt-4 space-y-4">
               <LongitudinalOutcome services={services} />
               {services.some(isMmdpVisit) && <LimbProgressPanel services={services} />}
-            </TabsContent>
+            </TabsContent>}
 
-            <TabsContent value="care" className="mt-4">
+            {!hiddenSections?.includes("care") && <TabsContent value="care" className="mt-4">
               <CareNetworkPanel
                 beneficiary={beneficiary}
                 projectId={projectId}
@@ -742,16 +742,16 @@ const BeneficiaryRecord = ({
                 onRefer={canRecord ? () => setReferralOpen(true) : undefined}
                 onChanged={() => { void reload(); onChanged(); }}
               />
-            </TabsContent>
+            </TabsContent>}
 
-            <TabsContent value="mda" className="mt-4">
+            {!hiddenSections?.includes("mda") && <TabsContent value="mda" className="mt-4">
               <BeneficiaryMdaPanel
                 beneficiaryId={beneficiary.id}
                 householdId={beneficiary.household_id}
               />
-            </TabsContent>
+            </TabsContent>}
 
-            <TabsContent value="history" className="mt-4">
+            {!hiddenSections?.includes("history") && <TabsContent value="history" className="mt-4">
               <Card className="p-4">
                 <h3 className="mb-3 flex items-center gap-2 font-semibold text-foreground">
                   <History className="h-4 w-4" /> Audit trail
@@ -768,7 +768,7 @@ const BeneficiaryRecord = ({
                   {audit.length === 0 && <p className="text-sm text-muted-foreground">No changes recorded yet.</p>}
                 </div>
               </Card>
-            </TabsContent>
+            </TabsContent>}
           </Tabs>
         </div>
 

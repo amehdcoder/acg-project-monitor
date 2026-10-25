@@ -70,10 +70,13 @@ export const useAccessProfiles = (projectId?: string) => {
     });
     if (error) throw error;
     setProfiles((p) => ({ ...p, [role]: permissions }));
+    window.dispatchEvent(new Event("programme-access-changed"));
   };
   const reset = async (role: ViewAsRole) => {
-    await db.from("project_access_profiles").delete().eq("project_id", projectId).eq("role_key", role);
+    const { error } = await db.from("project_access_profiles").delete().eq("project_id", projectId).eq("role_key", role);
+    if (error) throw error;
     setProfiles((p) => { const n = { ...p }; delete n[role]; return n; });
+    window.dispatchEvent(new Event("programme-access-changed"));
   };
   return { profiles, save, reset, reload: load };
 };

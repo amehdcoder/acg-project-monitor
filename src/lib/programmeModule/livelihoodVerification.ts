@@ -24,6 +24,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { TargetingResult } from "./livelihood";
+import { cachedRead } from "./offlineReadCache";
+import { offlineMutate, currentUserId } from "./offlineWrite";
+import { listQueued } from "./offlineQueue";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as unknown as { from: (t: string) => any };
@@ -436,10 +439,19 @@ export const useLivelihoodVerifications = (projectId?: string) => {
   const load = useCallback(async () => {
     if (!projectId) { setRows([]); setLoading(false); return; }
     setLoading(true);
-    const { data } = await db.from("livelihood_verifications")
+    const { data } = await cachedRead<LivelihoodVerificationRow[]>(`livelihood-verifications:${projectId}`, () => db.from("livelihood_verifications")
       .select("*").eq("project_id", projectId)
-      .order("created_at", { ascending: false }).limit(2000);
-    setRows((data as LivelihoodVerificationRow[]) || []);
+      .order("created_at", { ascending: false }).limit(2000));
+    if (data) {
+      const next = new Map(data.map(r => [r.id, r]));
+      for (const item of listQueued()) {
+        const op = item.payload as { table?: string; action?: string; id?: string; values?: LivelihoodVerificationRow };
+        if (item.kind !== "op" || op.table !== "livelihood_verifications" || !op.values) continue;
+        const id = op.id || op.values.id;
+        if (op.values.project_id === projectId || next.has(id)) next.set(id, { ...next.get(id), ...op.values, id } as LivelihoodVerificationRow);
+      }
+      setRows([...next.values()]);
+    }
     setLoading(false);
   }, [projectId]);
 
@@ -466,12 +478,7 @@ export const saveVerification = async (payload: {
   recommendation?: string | null;
   notes?: string | null;
 }) => {
-  const { data: auth } = await supabase.auth.getUser();
   const { id, ...rest } = payload;
-  const row = { ...rest, verifier_id: auth.user?.id || null };
-  const q = id
-    ? db.from("livelihood_verifications").update(row).eq("id", id)
-    : db.from("livelihood_verifications").insert(row);
-  const { error } = await q;
-  if (error) throw error;
+  const row = { ...rest, verifier_id: await currentUserId() || null, ...(!id ? { created_at: new Date().toISOString() } : {}) };
+  return offlineMutate({ table: "livelihood_verifications", action: id ? "update" : "insert", id, values: row });
 };

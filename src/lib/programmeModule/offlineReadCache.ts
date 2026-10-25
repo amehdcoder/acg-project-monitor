@@ -76,7 +76,7 @@ export async function cachedRead<T>(
 }
 
 /** Applies a change to a row inside every cached list whose key starts with `prefix`. */
-export async function cachePatchRows(prefix: string, id: string, patch: Record<string, unknown> | null): Promise<void> {
+export async function cachePatchRows(prefix: string, id: string, patch: Record<string, unknown> | null, insert = false): Promise<void> {
   const userPrefix = await scopedKey(prefix);
   const db = await openDb();
   if (!db) return;
@@ -90,9 +90,11 @@ export async function cachePatchRows(prefix: string, id: string, patch: Record<s
       const key = String(cur.key);
       const entry = cur.value as { value: unknown; saved_at: number };
       if (key.startsWith(userPrefix) && Array.isArray(entry.value)) {
-        const rows = (entry.value as Record<string, unknown>[])
+        const existing = entry.value as Record<string, unknown>[];
+        const rows = existing
           .map((r) => (r.id === id ? (patch ? { ...r, ...patch } : null) : r))
           .filter(Boolean);
+        if (insert && patch && !existing.some(r => r.id === id)) rows.unshift({ ...patch, id });
         cur.update({ ...entry, value: rows });
       }
       cur.continue();
