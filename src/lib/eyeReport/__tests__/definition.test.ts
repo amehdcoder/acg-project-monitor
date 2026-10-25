@@ -24,6 +24,36 @@ describe("eye daily report rules", () => {
     expect(validateReport({ ...r, csom: c }).some((i) => i.field === "csom.discharge.pinhole" && i.level === "error")).toBe(true);
   });
   it("computes percentages to one decimal", () => { expect(pct(2, 3)).toBe(66.7); expect(pct(1, 0)).toBe(0); });
+  it("requires state, LGA, sign-off names and a labelled source document", () => {
+    const r = { ...base(), state: "", lga: "", preparedBy: "", confirmedBy: "", attachments: [] as any[] };
+    const fields = validateReport(r).filter((i) => i.level === "error").map((i) => i.field);
+    expect(fields).toContain("state"); expect(fields).toContain("lga");
+    expect(fields).toContain("prepared"); expect(fields).toContain("confirmed"); expect(fields).toContain("attachments");
+    const ok = validateReport({ ...r, state: "Jigawa", lga: "Dutse", preparedBy: "A. Clerk", confirmedBy: "B. Matron", attachments: [{ ref: "x", label: "Register p.1" }] as any });
+    expect(ok.some((i) => ["state", "lga", "prepared", "confirmed", "attachments"].includes(i.field))).toBe(false);
+  });
+  it("flags unlabelled source documents", () => {
+    const r = { ...base(), attachments: [{ ref: "x", label: " " }] as any[] };
+    expect(validateReport(r).some((i) => i.field === "attachments" && i.level === "error")).toBe(true);
+  });
+  it("warns when WG-SS screenings do not match the summary", () => {
+    const s = emptySummary(); s.consult.a15 = { m: 3, f: 2 }; s.pwd = { m: 1, f: 0 };
+    const issues = wgVsSummaryIssues(4, 0, s);
+    expect(issues.some((i) => i.message.includes("4 patients"))).toBe(true);
+    expect(issues.some((i) => i.message.includes("classified 0"))).toBe(true);
+    expect(wgVsSummaryIssues(5, 1, s)).toEqual([]);
+  });
+  it("aggregates WG-SS patients by domain and sex", () => {
+    const p = (id: string, sex: string, domains: string[]) => ({
+      id, project_id: "p", report_id: null, facility_id: null, facility_name: "A", state: null, lga: null,
+      report_date: "2026-10-20", patient_label: id, sex, age_band: "a15", wg_ss: {},
+      has_disability: domains.length > 0, disability_domains: domains, created_by: null, device_id: null, collector_label: null,
+    });
+    const agg = aggregatePatients([p("1", "m", ["Seeing"]), p("2", "f", ["Seeing", "Walking"]), p("3", "f", [])]);
+    expect(agg.screened).toBe(3); expect(agg.withDisability).toBe(2);
+    expect(agg.domains[0]).toEqual({ label: "Seeing", count: 2 });
+    expect(agg.bySex).toEqual({ m: 1, f: 2, other: 0 });
+  });
   it("aggregates daily rows into months", () => {
     const row = (d: string, m: number) => ({ id: d, project_id: "p", facility_id: null, facility_name: "A", state: null, lga: null, report_date: d, summary: { consult: { a15: { m, f: 0 } } }, csom: null, notes: null, prepared_by: null, confirmed_by: null, created_by: null, device_id: null, collector_label: null });
     const months = byMonth([row("2026-01-02", 4), row("2026-01-03", 6), row("2026-02-01", 1)]);
