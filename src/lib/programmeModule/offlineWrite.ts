@@ -41,7 +41,7 @@ export async function runOp(op: OpPayload): Promise<void> {
   if (res.error && res.error.code !== "23505") throw new Error(res.error.message);
 }
 
-const CACHE_PREFIX: Record<string, string> = { beneficiaries: "beneficiaries:", livelihood_verifications: "livelihood-verifications:" };
+const CACHE_PREFIX: Record<string, string> = { microplan_entries: "microplan-entries:", beneficiaries: "beneficiaries:", livelihood_verifications: "livelihood-verifications:" };
 
 /** Current user id from the local session — works offline. */
 export async function currentUserId(): Promise<string | undefined> {

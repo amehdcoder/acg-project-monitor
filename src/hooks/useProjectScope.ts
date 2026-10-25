@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { cachedRead } from "@/lib/programmeModule/offlineReadCache";
 import { fetchProjectScope, EMPTY_SCOPE, type ProjectScope } from "@/lib/projectScope";
 
 /** Loads a project's geographic scope (States/LGAs/Wards). */
@@ -13,8 +14,8 @@ export const useProjectScope = (projectId?: string | null) => {
     }
     let cancelled = false;
     setLoading(true);
-    fetchProjectScope(projectId)
-      .then((s) => { if (!cancelled) setScope(s); })
+    cachedRead<ProjectScope>(`project-scope:${projectId}`, async () => ({data: await fetchProjectScope(projectId), error: null}))
+      .then(({data}) => { if (!cancelled && data) setScope(data); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [projectId]);

@@ -1,5 +1,11 @@
 # Roadmap
 
+- [x] Match New Microplan Entry to the supplied illustrated form while retaining all fields and validation; desktop and Android-size fit verified.
+- [x] Add project-wide Geo-only workspace settings including administrators; project isolation and lock rules tested.
+- [x] Enable durable offline Microplan entry and automatic reconnect sync; live account-free offline capture returned 1 synced / 0 pending and server row confirmed.
+- [x] Extend account-free QR/code collection to the Geo entry form with mandatory collector/device name; live project-code enrollment and collection verified, temporary settings restored.
+- [ ] Verify published offline cold-start and physical Android QR scanning — latest app has not been published; preview intentionally never installs an offline worker.
+
 - [x] Add separate beneficiary account portal with verified record links, personal Graduation progress submissions and staff review; real unlinked account privacy/sign-out and mobile fit verified.
 - [ ] Verify linked beneficiary submission → staff approval → Graduation service end-to-end — needs a confirmed beneficiary/account link.
 - [ ] Assign and verify real focal/person programme categories — user supplied one account only; project, facility and second account not identified.

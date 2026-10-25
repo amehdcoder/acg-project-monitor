@@ -20,15 +20,19 @@ const GeoLockDialog = ({ project, onClose }: Props) => {
   const [lockedUsers, setLockedUsers] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const db = supabase as any;
 
   useEffect(() => {
     if (!project) return;
+    setSettingsLoaded(false);
     void (async () => {
-      const { data } = await db.from("microplan_workspace_locks").select("user_id").eq("project_id", project.id);
+      const { data, error } = await db.from("microplan_workspace_locks").select("user_id").eq("project_id", project.id);
+      if (error) { toast({title:"Could not load workspace settings", description:error.message,variant:"destructive"}); return; }
       const rows = (data as { user_id: string | null }[]) || [];
       setWholeProject(rows.some((r) => r.user_id === null));
       setLockedUsers(new Set(rows.filter((r) => r.user_id).map((r) => r.user_id as string)));
+      setSettingsLoaded(true);
     })();
   }, [project?.id]);
 
@@ -45,6 +49,7 @@ const GeoLockDialog = ({ project, onClose }: Props) => {
     if (error) { toast({ title: "Could not update", description: error.message, variant: "destructive" }); return; }
     if (userId === null) setWholeProject(on);
     else setLockedUsers((s) => { const n = new Set(s); on ? n.add(userId) : n.delete(userId); return n; });
+    window.dispatchEvent(new Event("geo-lock-changed"));
     toast({ title: on ? "Locked to Geo Microplanning" : "Lock removed" });
   };
 
@@ -56,7 +61,7 @@ const GeoLockDialog = ({ project, onClose }: Props) => {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><MapPinned className="h-5 w-5 text-primary" /> Geo Microplanning workspace</DialogTitle>
           <DialogDescription>
-            Locked people see only the Geo Microplanning workspace for "{project?.name}" — no side menu, not even the Geo Microplanning item. Owners and Super Admins are never locked.
+            Locked people see only the Geo Microplanning workspace for "{project?.name}" — no side menu, not even the Geo Microplanning item. This also applies to assigned administrators, Owners and Super Admins.
           </DialogDescription>
         </DialogHeader>
         <div className="flex items-center justify-between rounded-lg border border-primary/25 bg-primary/5 p-3">
@@ -64,7 +69,7 @@ const GeoLockDialog = ({ project, onClose }: Props) => {
             <Label className="text-sm font-semibold">Lock the whole project</Label>
             <p className="text-xs text-muted-foreground">Everyone assigned to this project.</p>
           </div>
-          <Switch checked={wholeProject} disabled={busy} onCheckedChange={(v) => void toggle(null, v)} />
+          <Switch checked={wholeProject} disabled={busy || !settingsLoaded} onCheckedChange={(v) => void toggle(null, v)} />
         </div>
         <div className="space-y-2">
           <Label className="text-sm font-semibold">Or lock chosen users</Label>
@@ -80,7 +85,7 @@ const GeoLockDialog = ({ project, onClose }: Props) => {
                 </div>
                 <Switch
                   checked={wholeProject || lockedUsers.has(u.user_id)}
-                  disabled={busy || wholeProject}
+                  disabled={busy || wholeProject || !settingsLoaded}
                   onCheckedChange={(v) => void toggle(u.user_id, v)}
                 />
               </div>

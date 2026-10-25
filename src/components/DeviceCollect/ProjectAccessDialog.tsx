@@ -19,6 +19,7 @@ interface AccessConfig {
   allow_forms: boolean;
   allow_cases: boolean;
   allow_seeclear?: boolean;
+  allow_microplanning?: boolean;
   expires_at: string | null;
   pin_hash: string | null;
 }
@@ -49,6 +50,7 @@ const ProjectAccessDialog = ({ projectId, projectName, open, onOpenChange }: Pro
   const [enabled, setEnabled] = useState(false);
   const [allowForms, setAllowForms] = useState(true);
   const [allowCases, setAllowCases] = useState(false);
+  const [allowMicroplanning, setAllowMicroplanning] = useState(false);
   const [allowSeeclear, setAllowSeeclear] = useState(false);
   const [expiresAt, setExpiresAt] = useState("");
   const [pin, setPin] = useState("");
@@ -83,6 +85,7 @@ const ProjectAccessDialog = ({ projectId, projectName, open, onOpenChange }: Pro
     setAllowForms(cfg ? !!(cfg as any).allow_forms : true);
     setAllowCases(!!(cfg as any)?.allow_cases);
     setAllowSeeclear(!!(cfg as any)?.allow_seeclear);
+    setAllowMicroplanning(!!cfg?.allow_microplanning);
     setExpiresAt(cfg?.expires_at ? String(cfg.expires_at).slice(0, 10) : "");
   }, []);
 
@@ -110,6 +113,7 @@ const ProjectAccessDialog = ({ projectId, projectName, open, onOpenChange }: Pro
         allowForms,
         allowCases,
         allowSeeclear,
+        allowMicroplanning,
         expiresAt: expiresAt || null,
         pin: pin.trim() ? pin.trim() : undefined,
         ...extra,
@@ -140,7 +144,7 @@ const ProjectAccessDialog = ({ projectId, projectName, open, onOpenChange }: Pro
   };
 
   const joinUrl = config?.join_code
-    ? `${window.location.origin}/join?code=${encodeURIComponent(config.join_code)}`
+    ? `https://handscollect.lovable.app/join?code=${encodeURIComponent(config.join_code)}`
     : "";
 
   const revokeDevice = async (deviceRowId: string, revoked: boolean) => {
@@ -193,6 +197,10 @@ const ProjectAccessDialog = ({ projectId, projectName, open, onOpenChange }: Pro
               <Switch checked={allowSeeclear} onCheckedChange={setAllowSeeclear} />
             </div>
 
+            <div className="flex items-center justify-between gap-3">
+              <div><Label className="text-sm">Geo Microplanning entry</Label><p className="text-xs text-muted-foreground">Open the Microplan entry form immediately after joining.</p></div>
+              <Switch checked={allowMicroplanning} onCheckedChange={setAllowMicroplanning} />
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="pin" className="text-sm">PIN (optional)</Label>

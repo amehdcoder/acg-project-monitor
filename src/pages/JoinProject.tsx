@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { QrCode, Camera, Keyboard, Loader2, ArrowLeft, WifiOff, ShieldCheck, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { collectorNameValid } from "@/lib/microplanning/collectionRules";
 import { useDeviceSession } from "@/hooks/useDeviceSession";
 
 const ERRORS: Record<string, string> = {
@@ -86,7 +87,7 @@ const JoinProject = () => {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!code.trim() || !label.trim()) {
+    if (!code.trim() || !collectorNameValid(label)) {
       toast.error("Enter the project code and a name for this device.");
       return;
     }
@@ -175,7 +176,7 @@ const JoinProject = () => {
               <div className="space-y-2">
                 <Label htmlFor="label" className="font-semibold">Collector or device name</Label>
                 <Input id="label" value={label} onChange={(e) => setLabel(e.target.value)}
-                  placeholder="e.g. Aisha — Kaugama 3" className="h-12 border-primary/20" />
+                  required maxLength={120} placeholder="e.g. Aisha — Kaugama 3" className="h-12 border-primary/20" />
               </div>
               <Button type="submit" size="lg" className="w-full" disabled={busy}>
                 {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}

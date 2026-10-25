@@ -18,6 +18,7 @@ export interface QueuedItem {
   payload: Record<string, unknown>;
   queued_at: string;
   attempts: number;
+  user_id?: string;
   last_error?: string;
   next_try_at?: number;
 }
@@ -60,6 +61,7 @@ export const enqueue = (kind: QueueKind, payload: Record<string, unknown>): Queu
     payload,
     queued_at: new Date().toISOString(),
     attempts: 0,
+    user_id: kind === "op" && payload.table === "microplan_entries" ? String((payload.values as Record<string, unknown>)?.updated_by || (payload.values as Record<string, unknown>)?.created_by || "") : undefined,
   };
   item.payload.submission_uuid = item.submission_uuid;
   // Pending beneficiaries keep the same id on the server, so services or visits
@@ -103,9 +105,12 @@ const flushInner = async (): Promise<{ sent: number; failed: number }> => {
   let sent = 0;
   let failed = 0;
   try {
+    const {data: sessionData} = await supabase.auth.getSession();
+    const userId = sessionData.session?.user.id;
     const items = [...read()].sort((a, b) => ORDER[a.kind] - ORDER[b.kind] || a.queued_at.localeCompare(b.queued_at));
     const remaining: QueuedItem[] = [];
     for (const item of items) {
+      if (item.user_id && item.user_id !== userId) { remaining.push(item); continue; }
       if (!readyToRetry(item)) { remaining.push(item); continue; }
       try {
         if (item.kind === "op") {

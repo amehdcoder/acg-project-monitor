@@ -18,6 +18,9 @@ import { toast } from "@/hooks/use-toast";
 import { Plus, Map as MapIcon, List, Download, Upload, Search, Trash2, Edit, MapPin, Users, Building2, FileSpreadsheet, Maximize2, Minimize2, UserPlus, X, Pill, Activity, Navigation, Home, Target, Globe, Heart, Copy, AlertTriangle, ChevronUp, Layers } from "lucide-react";
 import { useTablePagination } from "@/hooks/useTablePagination";
 import TablePagination from "@/components/ui/table-pagination";
+import { offlineMutate } from "@/lib/programmeModule/offlineWrite";
+import { bindQueueAutoFlush, listQueued } from "@/lib/programmeModule/offlineQueue";
+import { cacheGet, cacheSet, cachedRead } from "@/lib/programmeModule/offlineReadCache";
 import MicroplanEntryForm, { MicroplanFormData } from "./MicroplanEntryForm";
 import MicroplanMap from "./MicroplanMap";
 import CoverageView from "./CoverageView";
@@ -851,12 +854,13 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
 
 interface MicroplanningViewProps {
   entryOnly?: boolean;
+  allowedProjectIds?: string[];
 }
 
 // Session cache of loaded entries per project (instant re-open of a project).
 const microplanEntriesCache = new Map<string, any[]>();
 
-const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
+const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: MicroplanningViewProps) => {
   const { user, isOwner, isSuperAdmin, isAdmin } = useAuth();
   const [entries, setEntries] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
@@ -979,7 +983,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     let data: { id: string; name: string }[] | null = null;
     if (isAdmin) {
       // Admins/owner see every project.
-      const res = await supabase.from("projects").select("id, name").order("name");
+      const res = await cachedRead<{id:string; name:string}[]>("microplan-projects", () => supabase.from("projects").select("id, name").order("name"));
       data = res.data;
     } else {
       // Tier 1: non-admins only see projects they are assigned to, so data is
@@ -1000,6 +1004,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         data = [];
       }
     }
+    data = (data || []).filter(p => !allowedProjectIds || allowedProjectIds.includes(p.id));
     const visibleProjects = lens ? (data || []).filter((project) => projectInLensScope(lens, project.id)) : (data || []);
     setProjects(visibleProjects);
     if (visibleProjects.length > 0 && (!selectedProjectId || !visibleProjects.some((project) => project.id === selectedProjectId))) {
@@ -1009,12 +1014,12 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         setShowForm(true);
       }
     }
-  }, [selectedProjectId, entryOnly, isAdmin, user?.id, lens]);
+  }, [selectedProjectId, entryOnly, isAdmin, user?.id, lens, allowedProjectIds]);
 
   // Per-project cache + request guard so switching projects shows data instantly
   // and a slower, older request can never overwrite the newly selected project.
   const entriesReqRef = useRef(0);
-  const entriesKey = selectedProjectId ? `${selectedProjectId}|${entryOnly && user?.id ? user.id : "all"}` : "";
+  const entriesKey = selectedProjectId ? `${user?.id}|${selectedProjectId}|${entryOnly ? "own" : "all"}` : "";
   useEffect(() => {
     if (!entriesKey) return;
     const cached = microplanEntriesCache.get(entriesKey);
@@ -1025,8 +1030,17 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const fetchEntries = useCallback(async () => {
     if (!selectedProjectId) return;
     const reqId = ++entriesReqRef.current;
-    const key = `${selectedProjectId}|${entryOnly && user?.id ? user.id : "all"}`;
+    const key = `${user?.id}|${selectedProjectId}|${entryOnly ? "own" : "all"}`;
     if (!microplanEntriesCache.has(key)) setLoading(true);
+    const pending = listQueued().filter(q => q.kind === "op" && q.payload.table === "microplan_entries").flatMap(q => {
+      const values = q.payload.values as any;
+      return values?.project_id === selectedProjectId && values?.created_by === user?.id ? [{ ...values, id: values.id || q.payload.id }] : [];
+    });
+    if (!navigator.onLine) {
+      const cached = await cacheGet<any[]>(`microplan-entries:${key}`) || [];
+      const merged = new Map(cached.map(r => [r.id,r])); pending.forEach(r => merged.set(r.id, {...merged.get(r.id), ...r}));
+      setEntries([...merged.values()]); setLoading(false); return;
+    }
     try {
       // Keyset-paginate ALL rows so KPIs/coverage are never silently truncated.
       // The first page renders immediately; later pages stream in.
@@ -1049,8 +1063,11 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         }
       });
       if (reqId !== entriesReqRef.current) return;
-      microplanEntriesCache.set(key, data || []);
-      setEntries(data || []);
+      const merged = new Map((data || []).map(r => [r.id,r])); pending.forEach(r => merged.set(r.id, {...merged.get(r.id), ...r}));
+      const rows = [...merged.values()];
+      microplanEntriesCache.set(key, rows);
+      await cacheSet(`microplan-entries:${key}`, rows);
+      setEntries(rows);
     } catch (error: any) {
       if (reqId !== entriesReqRef.current) return;
       toast({ title: "Error loading entries", description: error.message, variant: "destructive" });
@@ -1091,7 +1108,11 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   }, []);
 
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
-  useEffect(() => { fetchEntries(); }, [fetchEntries]);
+  useEffect(() => {
+    bindQueueAutoFlush(); void fetchEntries();
+    const refresh = () => void fetchEntries(); window.addEventListener("online", refresh);
+    return () => window.removeEventListener("online", refresh);
+  }, [fetchEntries]);
   // Real-time: refresh entries whenever the Kobo webhook (or any other client)
   // inserts / updates / deletes a row on the active project.
   useRealtimeMicroplanEntries(selectedProjectId || null, fetchEntries);
@@ -1167,6 +1188,8 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       };
 
       if (editingEntry) {
+        payload.id = editingEntry.id;
+        payload.created_by = editingEntry.created_by;
         // ── GPS override write-back ─────────────────────────────────
         // If the original GRID3 lat/lng already exists and the user has
         // changed it, persist the new value into the *_override columns
@@ -1199,8 +1222,8 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
           payload.gps_overridden_at = new Date().toISOString();
         }
 
-        const { error } = await supabase.from("microplan_entries").update(payload).eq("id", editingEntry.id);
-        if (error) throw error;
+        const result = await offlineMutate({table: "microplan_entries", action: "update", id: editingEntry.id, values: payload});
+        if (result.queued) toast({title: "Saved on this device", description: "Pending automatic sync."});
         toast({ title: didOverride ? "✅ Entry updated (GPS saved as override)" : "✅ Entry updated" });
       } else {
         // Flag duplicate community rows (same State · LGA · Ward · FLHF · Community).
@@ -1211,24 +1234,27 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
             `A matching entry already exists for "${payload.community_name}" (${payload.lga}).\n\nClick OK to UPDATE the existing entry with these values, or Cancel to add it as a separate new row.`,
           );
           if (overwrite) {
-            const { error } = await supabase.from("microplan_entries").update(payload).eq("id", existingMatch.id);
-            if (error) throw error;
+            const result = await offlineMutate({table: "microplan_entries", action: "update", id: existingMatch.id, values: payload});
+            if (result.queued) toast({title: "Saved on this device", description: "Pending automatic sync."});
             toast({ title: "🔄 Existing entry updated", description: "Duplicate detected — the matching entry was updated." });
             setShowForm(false);
             setEditingEntry(null);
+            await cacheSet(`microplan-entries:${user?.id}|${selectedProjectId}|${entryOnly ? "own" : "all"}`, [{...existingMatch,...payload,id:existingMatch.id}, ...entries.filter(r => r.id !== existingMatch.id)]);
             fetchEntries();
             return;
           }
         }
-        const { error } = await supabase.from("microplan_entries").insert(payload);
-        if (error) throw error;
-        toast({ title: existingMatch ? "✅ Entry added (duplicate kept separate)" : "✅ Entry added" });
+        const result = await offlineMutate({table: "microplan_entries", action: "insert", values: payload});
+        payload.id = result.id;
+        toast({ title: result.queued ? "Saved on this device · pending sync" : existingMatch ? "Entry added (duplicate kept separate)" : "Entry added" });
       }
+      await cacheSet(`microplan-entries:${user?.id}|${selectedProjectId}|${entryOnly ? "own" : "all"}`, [payload, ...entries.filter(r => r.id !== payload.id)]);
       setShowForm(false);
       setEditingEntry(null);
       fetchEntries();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
+      throw err;
     } finally {
       setSubmitting(false);
     }
@@ -3719,7 +3745,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
       {/* Entry Form Dialog */}
       <Dialog open={showForm} onOpenChange={(v) => { if (!v) { setShowForm(false); setEditingEntry(null); setDialogFullscreen(false); } }}>
-        <DialogContent className={`overflow-hidden z-[9999] flex flex-col ${dialogFullscreen ? 'max-w-[100vw] w-[100vw] h-[100vh] max-h-[100vh] rounded-none m-0' : 'max-w-4xl max-h-[90vh] w-[95vw] sm:w-auto'}`}>
+        <DialogContent className={`overflow-hidden z-[9999] flex flex-col ${dialogFullscreen ? 'max-w-[100vw] w-[100vw] h-[100vh] max-h-[100vh] rounded-none m-0' : 'max-w-6xl h-[92dvh] max-h-[92dvh] w-[96vw] p-3 sm:p-4'}`}>
           <DialogHeader className="flex-shrink-0">
             <div className="flex items-center justify-between">
               <DialogTitle className="flex items-center gap-2">

@@ -65,6 +65,7 @@ export default defineConfig(({ mode }) => {
       // App updates are coordinated by appUpdateManager so active form sessions
       // can be draft-snapshotted/restored instead of being interrupted by the SW.
       registerType: "prompt",
+      injectRegister: null,
       devOptions: { enabled: false },
       includeAssets: ["favicon.ico", "favicon.png", "pwa-icon-192.png", "pwa-icon-512.png", "pwa-maskable-512.png", "apple-touch-icon.png"],
       manifest: {
@@ -108,7 +109,7 @@ export default defineConfig(({ mode }) => {
         // navigation handler below (it always wins for navigations when the
         // network is reachable), plus skipWaiting + cleanupOutdatedCaches and the
         // in-app update manager — so users never get stuck on a stale shell.
-        globPatterns: ["**/*.{js,css,ico,png,svg,woff2,html}"],
+        globPatterns: ["**/*.{js,css,ico,png,jpg,jpeg,svg,woff2,html}"],
         maximumFileSizeToCacheInBytes: 16 * 1024 * 1024, // 16 MiB
         navigateFallbackDenylist: [/^\/~oauth/],
         // Do NOT let a freshly published service worker take over on its own.
@@ -197,7 +198,7 @@ export default defineConfig(({ mode }) => {
             // offline right after install — precacheFallback serves the
             // precached index.html shell so the REAL app loads instead of the
             // browser's generic "You're offline" page.
-            urlPattern: ({ request }: any) => request.mode === "navigate",
+            urlPattern: ({ request, url }: any) => request.mode === "navigate" && !url.pathname.startsWith('/~oauth'),
             handler: "NetworkFirst",
             options: {
               cacheName: "html-cache",

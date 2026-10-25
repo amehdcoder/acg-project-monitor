@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { appliesGeoLock } from "./collectionRules";
+import { cachedRead } from "@/lib/programmeModule/offlineReadCache";
 import { useAuth } from "@/hooks/useAuth";
 
 export interface GeoLockRow {
@@ -27,14 +29,22 @@ export function useGeoWorkspaceLock() {
   const load = useCallback(async () => {
     if (!user?.id) return;
     const [{ data }, { data: assigns }] = await Promise.all([
-      (supabase as any).from("microplan_workspace_locks").select("id, project_id, user_id").limit(5000),
-      supabase.from("user_project_assignments").select("project_id").eq("user_id", user.id),
+      cachedRead<GeoLockRow[]>("geo-workspace-locks", () => (supabase as any).from("microplan_workspace_locks").select("id, project_id, user_id").limit(5000)),
+      cachedRead<{project_id: string}[]>("geo-workspace-membership", () => supabase.from("user_project_assignments").select("project_id").eq("user_id", user.id)),
     ]);
     setRows((data as GeoLockRow[]) || []);
     setMyProjects(new Set(((assigns as any[]) || []).map((a) => a.project_id)));
   }, [user?.id]);
 
-  useEffect(() => { if (!authLoading) void load(); }, [authLoading, load]);
+  useEffect(() => {
+    if (authLoading) return;
+    void load();
+    const refresh = () => void load();
+    window.addEventListener("geo-lock-changed", refresh); window.addEventListener("focus", refresh); window.addEventListener("online", refresh);
+    const channel = supabase.channel(`geo-lock:${user?.id}`).on("postgres_changes", {event:"*",schema:"public",table:"microplan_workspace_locks"}, refresh).subscribe();
+    const timer = window.setInterval(refresh, 60000);
+    return () => { window.removeEventListener("geo-lock-changed", refresh); window.removeEventListener("focus", refresh); window.removeEventListener("online", refresh); window.clearInterval(timer); void supabase.removeChannel(channel); };
+  }, [authLoading, load, user?.id]);
 
   const setOwnerMode = (on: boolean) => {
     setOwnerModeState(on);
@@ -42,11 +52,10 @@ export function useGeoWorkspaceLock() {
   };
 
   // A user is locked when targeted directly, or when a whole project they belong to is locked.
-  const lockedForMe =
-    !canManage &&
-    rows.some((r) => r.user_id === user?.id || (r.user_id === null && myProjects.has(r.project_id)));
+  const applicable = appliesGeoLock(rows, user?.id, myProjects);
+  const lockedForMe = applicable.length > 0;
   const anyLocks = rows.length > 0;
   const active = lockedForMe || (canManage && anyLocks && ownerMode);
-
-  return { rows, canManage, active, lockedForMe, anyLocks, ownerMode, setOwnerMode, reload: load };
+  const projectIds = [...new Set((lockedForMe ? applicable : rows).map(r => r.project_id))];
+  return { rows, canManage, active, lockedForMe, projectIds, anyLocks, ownerMode, setOwnerMode, reload: load };
 }
