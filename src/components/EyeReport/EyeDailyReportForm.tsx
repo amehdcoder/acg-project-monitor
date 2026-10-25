@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  ArrowLeft, ArrowRight, Building2, CalendarDays, Check, CloudOff, Eye, Glasses, Loader2, ScanEye, Scissors,
-  Sparkles, Stethoscope, AlertTriangle, ShieldCheck, Accessibility, X, ClipboardSignature,
+  ArrowLeft, ArrowRight, Building2, CalendarDays, Check, CloudOff, Eye, Glasses, ImagePlus, Loader2, Paperclip,
+  Pencil, ScanEye, Scissors, Sparkles, Stethoscope, AlertTriangle, ShieldCheck, Accessibility, Trash2, Users, X,
+  ClipboardSignature,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,16 +12,25 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import hero from "@/assets/eye-report/hero.jpg";
 import {
-  AGE_BANDS, LENS_TYPES, SURGERY_ITEMS, emptyCsom, emptySummary, normCsom, normSummary, pct, t, totals, validateReport, vaTotal,
-  type EyeCsom, type EyeReportRow, type EyeSummary, type MF, type VaBand,
+  AGE_BANDS, LENS_TYPES, SURGERY_ITEMS, emptyCsom, emptySummary, normAttachments, normCsom, normSummary, pct, t, totals,
+  validateReport, vaTotal, wgVsSummaryIssues,
+  type EyeAttachment, type EyeCsom, type EyePatientRow, type EyeReportRow, type EyeSummary, type MF, type VaBand,
 } from "@/lib/eyeReport/definition";
-import { saveDeviceReport, saveReport } from "@/lib/eyeReport/store";
+import { saveDevicePatients, saveDeviceReport, savePatients, saveReport } from "@/lib/eyeReport/store";
+import { GeoCombobox } from "@/components/ProgrammeModule/GeoCascadeFields";
+import { getAllStates, getLGAsForState } from "@/lib/nigeriaAdminData";
+import { fileToDataUrl, uploadBeneficiaryMedia } from "@/lib/programmeModule/media";
+import { buildWgRecord, readWgResult, type WgResult } from "@/lib/programmeModule/washingtonGroup";
+import WgPatientWizard, { emptyWgPatient, type WgPatientDraft } from "./WgPatientWizard";
 
 export interface EyeFacility { id: string; name: string; state?: string | null; lga?: string | null }
 type Mode = { kind: "user"; userId: string } | { kind: "device"; deviceId: string; label: string };
 interface Props {
   projectId: string; projectName?: string; facilities: EyeFacility[]; mode: Mode;
-  existing?: EyeReportRow | null; otherReports?: EyeReportRow[]; onClose: () => void; onSaved?: () => void;
+  existing?: EyeReportRow | null; existingPatients?: EyePatientRow[];
+  /** WG-SS-only mode: screen patients without the daily summary / CSOM. */
+  wgOnly?: boolean;
+  otherReports?: EyeReportRow[]; onClose: () => void; onSaved?: () => void;
 }
 
 const today = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -30,8 +40,11 @@ const STEPS = [
   { key: "surgery", label: "Surgeries", icon: Scissors, tone: "bg-eye-teal" },
   { key: "refraction", label: "Refraction & glasses", icon: Glasses, tone: "bg-eye-violet" },
   { key: "csom", label: "CSOM episode", icon: ScanEye, tone: "bg-eye-teal" },
+  { key: "patients", label: "Patients · WG-SS", icon: Accessibility, tone: "bg-eye-violet" },
+  { key: "docs", label: "Source documents", icon: Paperclip, tone: "bg-eye-orange" },
   { key: "review", label: "Review & sign-off", icon: ClipboardSignature, tone: "bg-eye-orange" },
 ] as const;
+const WG_ONLY_STEPS = ["who", "patients", "review"] as const;
 
 function NumberCell({ value, onChange, label, invalid }: { value: number; onChange: (v: number) => void; label: string; invalid?: boolean }) {
   return (
@@ -86,22 +99,32 @@ function VaTable({ title, colA, colB, a, b, onA, onB, ceiling }: { title: string
   );
 }
 
-export default function EyeDailyReportForm({ projectId, projectName, facilities, mode, existing, otherReports = [], onClose, onSaved }: Props) {
-  const draftKey = `eye-report-draft:${projectId}:${mode.kind === "user" ? mode.userId : mode.deviceId}`;
+interface PatientEntry { draft: WgPatientDraft; record: WgResult }
+
+export default function EyeDailyReportForm({ projectId, projectName, facilities, mode, existing, existingPatients = [], wgOnly = false, otherReports = [], onClose, onSaved }: Props) {
+  const draftKey = `eye-report-draft:${projectId}:${mode.kind === "user" ? mode.userId : mode.deviceId}${wgOnly ? ":wg" : ""}`;
   const initial = useMemo(() => {
-    if (existing) return { facilityId: existing.facility_id ?? "", facility: existing.facility_name, state: existing.state ?? "", lga: existing.lga ?? "", date: existing.report_date, summary: normSummary(existing.summary), csom: normCsom(existing.csom), notes: existing.notes ?? "", prepared: existing.prepared_by ?? "", confirmed: existing.confirmed_by ?? "" };
-    try { const d = JSON.parse(localStorage.getItem(draftKey) || "null"); if (d) return { ...d, summary: normSummary(d.summary), csom: normCsom(d.csom) }; } catch { /* ignore */ }
+    if (existing) return { facilityId: existing.facility_id ?? "", facility: existing.facility_name, state: existing.state ?? "", lga: existing.lga ?? "", date: existing.report_date, summary: normSummary(existing.summary), csom: normCsom(existing.csom), notes: existing.notes ?? "", prepared: existing.prepared_by ?? "", confirmed: existing.confirmed_by ?? "", attachments: normAttachments(existing.attachments) };
+    try { const d = JSON.parse(localStorage.getItem(draftKey) || "null"); if (d) return { ...d, summary: normSummary(d.summary), csom: normCsom(d.csom), attachments: normAttachments(d.attachments) }; } catch { /* ignore */ }
     const only = facilities.length === 1 ? facilities[0] : null;
-    return { facilityId: only?.id ?? "", facility: only?.name ?? "", state: only?.state ?? "", lga: only?.lga ?? "", date: today(), summary: emptySummary(), csom: null as EyeCsom | null, notes: "", prepared: mode.kind === "device" ? mode.label : "", confirmed: "" };
+    return { facilityId: only?.id ?? "", facility: only?.name ?? "", state: only?.state ?? "", lga: only?.lga ?? "", date: today(), summary: emptySummary(), csom: null as EyeCsom | null, notes: "", prepared: mode.kind === "device" ? mode.label : "", confirmed: "", attachments: [] as EyeAttachment[] };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [f, setF] = useState(initial);
+  const [patients, setPatients] = useState<PatientEntry[]>(() =>
+    existingPatients.map((p) => {
+      const record = readWgResult(p.wg_ss) ?? buildWgRecord({});
+      return { draft: { patient_label: p.patient_label, sex: (p.sex as "m" | "f") ?? "", age_band: p.age_band ?? "", answers: record.answers }, record };
+    }));
+  const [wizard, setWizard] = useState<{ open: boolean; index: number | null }>({ open: false, index: null });
   const [step, setStep] = useState(0);
   const [ack, setAck] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [online, setOnline] = useState(navigator.onLine);
   useEffect(() => { const a = () => setOnline(true), b = () => setOnline(false); addEventListener("online", a); addEventListener("offline", b); return () => { removeEventListener("online", a); removeEventListener("offline", b); }; }, []);
-  useEffect(() => { if (!existing) localStorage.setItem(draftKey, JSON.stringify(f)); }, [f, existing, draftKey]);
+  useEffect(() => { if (!existing) localStorage.setItem(draftKey, JSON.stringify({ ...f, patients })); }, [f, patients, existing, draftKey]);
 
   const S = f.summary; const T = totals(S);
   const cataract = t(S.surgery.cataract);
@@ -117,37 +140,105 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
   const setS = (fn: (s: EyeSummary) => void) => setF((p: any) => { const s = structuredClone(p.summary); fn(s); return { ...p, summary: s }; });
   const setC = (fn: (c: EyeCsom) => void) => setF((p: any) => { const c = structuredClone(p.csom ?? emptyCsom()); fn(c); return { ...p, csom: c }; });
 
+  const disabledCount = patients.filter((p) => p.record.hasDisability).length;
   const csomForValidation = cataract > 0 ? f.csom : null;
-  const issues = validateReport({ facility: f.facility, date: f.date, summary: S, csom: csomForValidation, today: today() });
-  const dup = otherReports.find((r) => r.id !== existing?.id && r.report_date === f.date && r.facility_name.toLowerCase() === f.facility.trim().toLowerCase());
+  const issues = validateReport({
+    facility: f.facility, date: f.date, summary: S, csom: csomForValidation, today: today(),
+    state: f.state, lga: f.lga, preparedBy: f.prepared, confirmedBy: f.confirmed,
+    attachments: wgOnly ? [/* not required in WG-SS-only mode */ { ref: "x", name: "", label: "x", mime: "", size: 0, kind: "document", captured_at: "" }] : f.attachments,
+  });
+  if (wgOnly) {
+    // WG-SS-only entries carry no summary — drop summary-driven rules, keep identity rules.
+    for (let i = issues.length - 1; i >= 0; i--) {
+      const k = issues[i].field;
+      if (k.startsWith("pwd") || k.startsWith("glasses") || k.startsWith("surgery") || k.startsWith("consult") || k.startsWith("csom") || k.startsWith("lenses")) issues.splice(i, 1);
+    }
+    if (patients.length === 0) issues.push({ field: "patients", message: "Screen at least one patient with the WG-SS before saving.", level: "error" });
+  } else {
+    issues.push(...wgVsSummaryIssues(patients.length, disabledCount, S));
+  }
+  const dup = !wgOnly && otherReports.find((r) => r.id !== existing?.id && r.report_date === f.date && r.facility_name.toLowerCase() === f.facility.trim().toLowerCase());
   if (dup) issues.unshift({ field: "date", message: `A report for ${f.facility} on ${f.date} already exists. Edit that report instead.`, level: "error" });
   const errors = issues.filter((i) => i.level === "error");
   const warnings = issues.filter((i) => i.level === "warning");
   const has = (prefix: string) => errors.some((e) => e.field.startsWith(prefix));
-  const steps = STEPS.filter((s) => s.key !== "csom" || cataract > 0);
+  const steps = STEPS.filter((s) => (wgOnly ? (WG_ONLY_STEPS as readonly string[]).includes(s.key) : s.key !== "csom" || cataract > 0));
   const cur = steps[Math.min(step, steps.length - 1)];
-  const stepErrors = (key: string) => errors.filter((e) => (key === "who" ? ["facility", "date"].includes(e.field) : key === "consult" ? e.field.startsWith("pwd") || e.field.startsWith("consult") : key === "surgery" ? e.field.startsWith("surgery") : key === "refraction" ? e.field.startsWith("lenses") || e.field.startsWith("glasses") : key === "csom" ? e.field.startsWith("csom.") : false));
+  const stepErrors = (key: string) => errors.filter((e) => (key === "who" ? ["facility", "date", "state", "lga"].includes(e.field) : key === "consult" ? e.field.startsWith("pwd") || e.field.startsWith("consult") : key === "surgery" ? e.field.startsWith("surgery") : key === "refraction" ? e.field.startsWith("lenses") || e.field.startsWith("glasses") : key === "csom" ? e.field.startsWith("csom.") : key === "patients" ? e.field.startsWith("patients") : key === "docs" ? e.field.startsWith("attachments") : key === "review" ? ["prepared", "confirmed"].includes(e.field) : false));
+
+  const addFiles = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setUploading(true);
+    const added: EyeAttachment[] = [];
+    for (const file of Array.from(files)) {
+      try {
+        const mime = file.type || "image/jpeg";
+        const base = { name: file.name || "source document", mime, size: file.size, kind: "image" as const, label: "", captured_at: new Date().toISOString() };
+        if (navigator.onLine) {
+          try {
+            const ref = await uploadBeneficiaryMedia(file, projectId, `eye-reports/${existing?.id ?? "new"}`);
+            added.push({ ...base, ref });
+            continue;
+          } catch { /* fall through to on-device storage */ }
+        }
+        added.push({ ...base, ref: await fileToDataUrl(file), pending: true });
+      } catch { toast.error(`Could not attach ${file.name}`); }
+    }
+    if (added.length) setF((p: any) => ({ ...p, attachments: [...p.attachments, ...added] }));
+    if (added.some((a) => a.pending)) toast.info("Kept on this device — attachments upload with the report.");
+    setUploading(false);
+  };
+
+  const patientPayloads = (reportId: string | null) => patients.map((p) => ({
+    project_id: projectId, report_id: reportId, facility_id: f.facilityId || null, facility_name: f.facility.trim(),
+    state: f.state || null, lga: f.lga || null, report_date: f.date, patient_label: p.draft.patient_label.trim(),
+    sex: p.draft.sex || null, age_band: p.draft.age_band || null, wg_ss: p.record,
+    has_disability: p.record.hasDisability, disability_domains: p.record.disabilityDomains,
+  }));
 
   const submit = async () => {
     if (errors.length) { toast.error(errors[0].message); return; }
     if (warnings.length && !ack) { toast.warning("Please confirm the highlighted checks before saving."); return; }
     setSaving(true);
     try {
-      const payload = { id: existing?.id, project_id: projectId, facility_id: f.facilityId || null, facility_name: f.facility.trim(), state: f.state || null, lga: f.lga || null, report_date: f.date, summary: S, csom: cataract > 0 ? f.csom : null, notes: f.notes.trim() || null, prepared_by: f.prepared.trim() || null, confirmed_by: f.confirmed.trim() || null };
-      if (mode.kind === "device") { await saveDeviceReport(payload as any, { deviceId: mode.deviceId, projectId, label: mode.label }); toast.success(navigator.onLine ? "Report saved and sending" : "Saved on this device — it will send when you are back online"); }
-      else { const r = await saveReport(payload as any, mode.userId, !!existing); toast.success(r.queued ? "Saved offline — it will sync automatically" : "Daily report submitted"); }
+      if (mode.kind === "device") {
+        if (!wgOnly) {
+          const payload = { id: existing?.id, project_id: projectId, facility_id: f.facilityId || null, facility_name: f.facility.trim(), state: f.state || null, lga: f.lga || null, report_date: f.date, summary: S, csom: cataract > 0 ? f.csom : null, notes: f.notes.trim() || null, prepared_by: f.prepared.trim() || null, confirmed_by: f.confirmed.trim() || null, attachments: f.attachments };
+          await saveDeviceReport(payload as any, { deviceId: mode.deviceId, projectId, label: mode.label });
+        }
+        if (patients.length) await saveDevicePatients(patientPayloads(existing?.id ?? null) as any, { deviceId: mode.deviceId, projectId, label: mode.label });
+        toast.success(navigator.onLine ? "Saved and sending" : "Saved on this device — it will send when you are back online");
+      } else {
+        let reportId = existing?.id ?? null;
+        if (!wgOnly) {
+          const payload = { id: existing?.id, project_id: projectId, facility_id: f.facilityId || null, facility_name: f.facility.trim(), state: f.state || null, lga: f.lga || null, report_date: f.date, summary: S, csom: cataract > 0 ? f.csom : null, notes: f.notes.trim() || null, prepared_by: f.prepared.trim() || null, confirmed_by: f.confirmed.trim() || null, attachments: f.attachments };
+          const r = await saveReport(payload as any, mode.userId, !!existing);
+          reportId = r.id;
+          if (patients.length || existing) await savePatients(patientPayloads(reportId) as any, mode.userId, existing?.id ?? null);
+          toast.success(r.queued ? "Saved offline — it will sync automatically" : "Daily report submitted");
+        } else {
+          const r = await savePatients(patientPayloads(null) as any, mode.userId);
+          toast.success(r.queued ? "Saved offline — it will sync automatically" : `${patients.length} screening${patients.length === 1 ? "" : "s"} submitted`);
+        }
+      }
       localStorage.removeItem(draftKey);
       onSaved?.(); onClose();
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not save the report"); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not save"); }
     finally { setSaving(false); }
   };
 
-  const kpis = [
+  const kpis = wgOnly ? [
+    { label: "Screened", value: patients.length, icon: Users, cls: "bg-eye-blue" },
+    { label: "With disability", value: disabledCount, icon: Accessibility, cls: "bg-eye-violet" },
+  ] : [
     { label: "Consulted", value: t(T.consulted), icon: Stethoscope, cls: "bg-eye-blue" },
     { label: "Surgeries", value: t(T.surgeries), icon: Scissors, cls: "bg-eye-teal" },
     { label: "Lenses", value: t(T.lenses), icon: Eye, cls: "bg-eye-violet" },
     { label: "Glasses", value: t(T.glasses), icon: Glasses, cls: "bg-eye-orange" },
   ];
+
+  const states = getAllStates();
+  const lgas = f.state ? getLGAsForState(f.state) : [];
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-eye-sky">
@@ -157,7 +248,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
         <div className="relative mx-auto flex max-w-5xl items-start justify-between gap-3 px-4 py-4 sm:py-5">
           <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-eye-gold">State Ministry of Health · Primary Eye Care</p>
-            <h1 className="mt-1 text-xl font-extrabold leading-tight sm:text-2xl">Eye Health Daily Facility Report</h1>
+            <h1 className="mt-1 text-xl font-extrabold leading-tight sm:text-2xl">{wgOnly ? "Patient Disability Screening (WG-SS)" : "Eye Health Daily Facility Report"}</h1>
             <p className="mt-0.5 truncate text-xs opacity-80">{projectName}{!online && <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-eye-gold px-2 py-0.5 font-semibold text-eye-ink"><CloudOff className="h-3 w-3" /> Offline — saving on device</span>}</p>
           </div>
           <Button size="icon" variant="ghost" onClick={onClose} aria-label="Close" className="shrink-0 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"><X className="h-5 w-5" /></Button>
@@ -176,7 +267,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
       </header>
 
       <div className="shrink-0 border-b bg-card">
-        <div className="mx-auto grid max-w-5xl grid-cols-4 gap-2 px-4 py-2">
+        <div className={`mx-auto grid max-w-5xl gap-2 px-4 py-2 ${wgOnly ? "grid-cols-2" : "grid-cols-4"}`}>
           {kpis.map((k) => (
             <div key={k.label} className="flex items-center gap-2 rounded-xl border bg-background px-2 py-1.5">
               <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${k.cls} text-primary-foreground`}><k.icon className="h-3.5 w-3.5" /></span>
@@ -193,7 +284,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
               {cur.key === "who" && (
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="space-y-1.5 rounded-2xl border bg-card p-4 shadow-sm md:col-span-2">
-                    <span className="flex items-center gap-2 text-sm font-bold"><Building2 className="h-4 w-4 text-eye-blue" /> Reporting facility</span>
+                    <span className="flex items-center gap-2 text-sm font-bold"><Building2 className="h-4 w-4 text-eye-blue" /> Reporting facility <span className="text-destructive">*</span></span>
                     {facilities.length > 0 ? (
                       <select value={f.facilityId} onChange={(e) => { const x = facilities.find((y) => y.id === e.target.value); setF({ ...f, facilityId: x?.id ?? "", facility: x?.name ?? "", state: x?.state ?? "", lga: x?.lga ?? "" }); }} className={`h-12 w-full rounded-md border bg-background px-3 text-base ${has("facility") ? "border-destructive" : ""}`}>
                         <option value="">Select facility…</option>
@@ -204,13 +295,20 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
                     )}
                   </label>
                   <label className="space-y-1.5 rounded-2xl border bg-card p-4 shadow-sm">
-                    <span className="flex items-center gap-2 text-sm font-bold"><CalendarDays className="h-4 w-4 text-eye-blue" /> Report date</span>
+                    <span className="flex items-center gap-2 text-sm font-bold"><CalendarDays className="h-4 w-4 text-eye-blue" /> Report date <span className="text-destructive">*</span></span>
                     <Input type="date" max={today()} value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} className={`h-12 text-base ${has("date") ? "border-destructive" : ""}`} />
                   </label>
-                  <label className="space-y-1.5 rounded-2xl border bg-card p-4 shadow-sm">
-                    <span className="text-sm font-bold">LGA</span>
-                    <Input value={f.lga} onChange={(e) => setF({ ...f, lga: e.target.value.slice(0, 80) })} placeholder="LGA" className="h-12 text-base" disabled={!!f.facilityId && !!facilities.find((x) => x.id === f.facilityId)?.lga} />
-                  </label>
+                  <div className="rounded-2xl border bg-card p-4 shadow-sm">
+                    <span className="text-sm font-bold">Location <span className="text-destructive">*</span></span>
+                    <div className="mt-1.5 grid gap-3 sm:grid-cols-2">
+                      <GeoCombobox label="State" value={f.state} options={states} placeholder="Select state"
+                        onSelect={(v) => setF({ ...f, state: v, lga: "" })} />
+                      <GeoCombobox label="LGA" value={f.lga} options={lgas} disabled={!f.state}
+                        placeholder={f.state ? "Select LGA" : "Pick a state first"}
+                        onSelect={(v) => setF({ ...f, lga: v })} />
+                    </div>
+                    {(has("state") || has("lga")) && <p className="mt-2 text-xs font-medium text-destructive">State and LGA are required.</p>}
+                  </div>
                 </div>
               )}
 
@@ -278,11 +376,107 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
                 </motion.div>
               )}
 
+              {cur.key === "patients" && (
+                <div className="space-y-4">
+                  <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-eye-violet via-eye-blue to-eye-deep p-5 text-primary-foreground shadow-lg">
+                    <Accessibility className="absolute -right-3 -top-3 h-24 w-24 opacity-15" />
+                    <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-eye-gold"><Sparkles className="h-4 w-4" /> Washington Group Short Set</p>
+                    <p className="mt-1 text-xl font-extrabold">Screen every patient individually</p>
+                    <p className="mt-0.5 max-w-lg text-xs opacity-85">Six short questions per patient identify functional difficulties. The dashboard aggregates patients seen and their disability domains.</p>
+                    {!wgOnly && t(T.consulted) > 0 && (
+                      <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-primary-foreground/15 px-3 py-1.5 text-xs font-semibold">
+                        <Users className="h-3.5 w-3.5" /> {patients.length} of {t(T.consulted)} consulted patients screened
+                        {patients.length !== t(T.consulted) && <span className="rounded-full bg-eye-gold px-2 py-0.5 text-eye-ink">incomplete</span>}
+                      </div>
+                    )}
+                  </div>
+
+                  {wizard.open ? (
+                    <WgPatientWizard
+                      initial={wizard.index !== null ? patients[wizard.index].draft : undefined}
+                      suggestedLabel={`Patient ${patients.length + 1}`}
+                      onCancel={() => setWizard({ open: false, index: null })}
+                      onSave={(draft, record) => {
+                        setPatients((p) => wizard.index !== null ? p.map((x, i) => (i === wizard.index ? { draft, record } : x)) : [...p, { draft, record }]);
+                        setWizard({ open: false, index: null });
+                      }}
+                    />
+                  ) : (
+                    <>
+                      <Button type="button" onClick={() => setWizard({ open: true, index: null })} className="h-12 w-full bg-eye-violet text-base font-bold hover:bg-eye-violet/90 sm:w-auto">
+                        <Accessibility className="mr-2 h-5 w-5" /> Screen a patient
+                      </Button>
+                      {patients.length === 0 && (
+                        <div className="rounded-2xl border border-dashed bg-card p-6 text-center text-sm text-muted-foreground">
+                          No patients screened yet. Tap <span className="font-semibold text-foreground">Screen a patient</span> to begin — you can also do this later, even before the daily summary is entered.
+                        </div>
+                      )}
+                      <ul className="space-y-2">
+                        {patients.map((p, i) => (
+                          <motion.li key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                            className="flex items-center gap-3 rounded-2xl border bg-card p-3 shadow-sm">
+                            <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-primary-foreground ${p.record.hasDisability ? "bg-eye-violet" : "bg-status-success"}`}>
+                              <Accessibility className="h-5 w-5" />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-bold">{p.draft.patient_label}</span>
+                              <span className="block truncate text-xs text-muted-foreground">
+                                {p.draft.sex === "m" ? "Male" : p.draft.sex === "f" ? "Female" : "—"} · {AGE_BANDS.find((b) => b.key === p.draft.age_band)?.label ?? "—"} ·{" "}
+                                {p.record.hasDisability ? <span className="font-semibold text-eye-violet">{p.record.disabilityDomains.join(", ")}</span> : "No disability identified"}
+                              </span>
+                            </span>
+                            <Button size="icon" variant="ghost" aria-label="Edit screening" onClick={() => setWizard({ open: true, index: i })}><Pencil className="h-4 w-4" /></Button>
+                            <Button size="icon" variant="ghost" aria-label="Remove screening" onClick={() => setPatients((x) => x.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                          </motion.li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {cur.key === "docs" && (
+                <div className="space-y-4">
+                  <div className="rounded-3xl bg-gradient-to-br from-eye-orange to-eye-rose p-5 text-primary-foreground shadow-lg">
+                    <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-eye-gold"><Paperclip className="h-4 w-4" /> Source documents <span className="text-primary-foreground">*</span></p>
+                    <p className="mt-1 text-xl font-extrabold">Photograph the records behind these figures</p>
+                    <p className="mt-0.5 max-w-lg text-xs opacity-90">Attach clear photos of the register pages, tally sheets or theatre log these numbers came from. Label each one so reviewers can verify the report.</p>
+                  </div>
+                  <input ref={fileRef} type="file" accept="image/*" multiple capture="environment" className="hidden"
+                    onChange={(e) => { void addFiles(e.target.files); e.target.value = ""; }} />
+                  <Button type="button" variant="outline" className="h-12 w-full sm:w-auto" disabled={uploading} onClick={() => fileRef.current?.click()}>
+                    {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImagePlus className="mr-2 h-4 w-4" />} Add source document photos
+                  </Button>
+                  {f.attachments.length === 0 && (
+                    <div className={`rounded-2xl border border-dashed p-6 text-center text-sm ${has("attachments") ? "border-destructive text-destructive" : "text-muted-foreground"}`}>
+                      At least one source document photo is required before this report can be submitted.
+                    </div>
+                  )}
+                  <ul className="grid gap-3 sm:grid-cols-2">
+                    {f.attachments.map((a, i) => (
+                      <li key={i} className="space-y-2 rounded-2xl border bg-card p-3 shadow-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-eye-orange/15 text-eye-orange"><ImagePlus className="h-4 w-4" /></span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-xs font-semibold">{a.name}</span>
+                            <span className="block text-[11px] text-muted-foreground">{a.pending ? "On this device — uploads with the report" : "Uploaded"}</span>
+                          </span>
+                          <Button size="icon" variant="ghost" aria-label="Remove attachment" onClick={() => setF((p: any) => ({ ...p, attachments: p.attachments.filter((_: any, j: number) => j !== i) }))}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        </div>
+                        <Input value={a.label} placeholder="Label, e.g. Outpatient register p.4 *"
+                          onChange={(e) => setF((p: any) => ({ ...p, attachments: p.attachments.map((x: EyeAttachment, j: number) => (j === i ? { ...x, label: e.target.value.slice(0, 120) } : x)) }))}
+                          className={`h-10 text-sm ${!a.label.trim() && has("attachments") ? "border-destructive" : ""}`} />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {cur.key === "review" && (
                 <div className="space-y-4">
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="space-y-1.5 rounded-2xl border bg-card p-4 shadow-sm"><span className="text-sm font-bold">Prepared by</span><Input value={f.prepared} onChange={(e) => setF({ ...f, prepared: e.target.value.slice(0, 120) })} placeholder="Data clerk name" className="h-12" /></label>
-                    <label className="space-y-1.5 rounded-2xl border bg-card p-4 shadow-sm"><span className="text-sm font-bold">Confirmed by</span><Input value={f.confirmed} onChange={(e) => setF({ ...f, confirmed: e.target.value.slice(0, 120) })} placeholder="Facility in-charge" className="h-12" /></label>
+                    <label className="space-y-1.5 rounded-2xl border bg-card p-4 shadow-sm"><span className="text-sm font-bold">Prepared by <span className="text-destructive">*</span></span><Input value={f.prepared} onChange={(e) => setF({ ...f, prepared: e.target.value.slice(0, 120) })} placeholder="Data clerk name" className={`h-12 ${has("prepared") ? "border-destructive" : ""}`} /></label>
+                    <label className="space-y-1.5 rounded-2xl border bg-card p-4 shadow-sm"><span className="text-sm font-bold">Confirmed by <span className="text-destructive">*</span></span><Input value={f.confirmed} onChange={(e) => setF({ ...f, confirmed: e.target.value.slice(0, 120) })} placeholder="Facility in-charge" className={`h-12 ${has("confirmed") ? "border-destructive" : ""}`} /></label>
                   </div>
                   <label className="block space-y-1.5 rounded-2xl border bg-card p-4 shadow-sm"><span className="text-sm font-bold">Notes (optional)</span><Textarea value={f.notes} maxLength={2000} onChange={(e) => setF({ ...f, notes: e.target.value })} rows={3} /></label>
                   <div className="rounded-2xl border bg-card p-4 shadow-sm">
@@ -298,22 +492,24 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
                 </div>
               )}
 
-              {cur.key !== "review" && stepErrors(cur.key).map((e, i) => (
+              {cur.key !== "review" && cur.key !== "patients" && stepErrors(cur.key).map((e, i) => (
                 <p key={i} className="flex gap-2 rounded-xl bg-destructive/10 p-2.5 text-sm text-destructive"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />{e.message}</p>
               ))}
             </motion.section>
           </AnimatePresence>
 
-          <div className="mt-6 flex items-center justify-between gap-3 border-t pt-4">
-            <Button variant="outline" className="h-12" onClick={() => (step === 0 ? onClose() : setStep(step - 1))}><ArrowLeft className="mr-1 h-4 w-4" />{step === 0 ? "Cancel" : "Back"}</Button>
-            {cur.key !== "review" ? (
-              <Button className="h-12 bg-eye-blue hover:bg-eye-blue/90" onClick={() => setStep(Math.min(step + 1, steps.length - 1))}>Next<ArrowRight className="ml-1 h-4 w-4" /></Button>
-            ) : (
-              <Button className="h-12 bg-eye-teal hover:bg-eye-teal/90" onClick={submit} disabled={saving || errors.length > 0 || (warnings.length > 0 && !ack)}>
-                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}{existing ? "Save changes" : "Submit daily report"}
-              </Button>
-            )}
-          </div>
+          {!wizard.open && (
+            <div className="mt-6 flex items-center justify-between gap-3 border-t pt-4">
+              <Button variant="outline" className="h-12" onClick={() => (step === 0 ? onClose() : setStep(step - 1))}><ArrowLeft className="mr-1 h-4 w-4" />{step === 0 ? "Cancel" : "Back"}</Button>
+              {cur.key !== "review" ? (
+                <Button className="h-12 bg-eye-blue hover:bg-eye-blue/90" onClick={() => setStep(Math.min(step + 1, steps.length - 1))}>Next<ArrowRight className="ml-1 h-4 w-4" /></Button>
+              ) : (
+                <Button className="h-12 bg-eye-teal hover:bg-eye-teal/90" onClick={submit} disabled={saving || errors.length > 0 || (warnings.length > 0 && !ack)}>
+                  {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}{wgOnly ? "Submit screenings" : existing ? "Save changes" : "Submit daily report"}
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </main>
     </div>

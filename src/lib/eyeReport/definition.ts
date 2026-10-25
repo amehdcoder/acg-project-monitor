@@ -92,13 +92,44 @@ export function totals(s: EyeSummary) {
 export interface Issue { field: string; message: string; level: "error" | "warning" }
 export const MAX_CELL = 5000;
 
+/** Source-document evidence attached to a daily report. */
+export interface EyeAttachment {
+  ref: string; name: string; label: string; mime: string; size: number;
+  kind: "image" | "video" | "audio" | "document"; pending?: boolean; captured_at: string;
+}
+export const normAttachments = (raw: any): EyeAttachment[] =>
+  (Array.isArray(raw) ? raw : []).filter((a) => a && typeof a.ref === "string").map((a) => ({
+    ref: a.ref, name: String(a.name ?? "attachment"), label: String(a.label ?? ""), mime: String(a.mime ?? ""),
+    size: n(a.size), kind: (["image", "video", "audio", "document"].includes(a.kind) ? a.kind : "document") as EyeAttachment["kind"],
+    pending: !!a.pending, captured_at: String(a.captured_at ?? ""),
+  }));
+
+/** One patient's Washington Group Short Set screening for a facility day. */
+export interface EyePatientRow {
+  id: string; project_id: string; report_id: string | null; facility_id: string | null; facility_name: string;
+  state: string | null; lga: string | null; report_date: string; patient_label: string;
+  sex: string | null; age_band: string | null; wg_ss: any; has_disability: boolean; disability_domains: string[];
+  created_by: string | null; device_id: string | null; collector_label: string | null; created_at?: string;
+}
+
 /** Validation rules for a single daily report. Errors block saving; warnings require confirmation. */
-export function validateReport(input: { facility: string; date: string; summary: EyeSummary; csom: EyeCsom | null; today?: string }): Issue[] {
+export function validateReport(input: {
+  facility: string; date: string; summary: EyeSummary; csom: EyeCsom | null; today?: string;
+  state?: string; lga?: string; preparedBy?: string; confirmedBy?: string; attachments?: EyeAttachment[];
+}): Issue[] {
   const out: Issue[] = [];
   const today = input.today ?? new Date().toISOString().slice(0, 10);
   if (!input.facility.trim()) out.push({ field: "facility", message: "Select the reporting facility.", level: "error" });
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) out.push({ field: "date", message: "Enter the report date.", level: "error" });
   else if (input.date > today) out.push({ field: "date", message: "The report date cannot be in the future.", level: "error" });
+  if (input.state !== undefined && !input.state.trim()) out.push({ field: "state", message: "Select the State.", level: "error" });
+  if (input.lga !== undefined && !input.lga.trim()) out.push({ field: "lga", message: "Select the LGA.", level: "error" });
+  if (input.preparedBy !== undefined && !input.preparedBy.trim()) out.push({ field: "prepared", message: "Enter who prepared this report.", level: "error" });
+  if (input.confirmedBy !== undefined && !input.confirmedBy.trim()) out.push({ field: "confirmed", message: "Enter who confirmed this report (facility in-charge).", level: "error" });
+  if (input.attachments !== undefined && input.attachments.length === 0)
+    out.push({ field: "attachments", message: "Attach at least one photo of the source documents (register/tally sheets) these figures came from.", level: "error" });
+  if (input.attachments?.some((a) => !a.label.trim()))
+    out.push({ field: "attachments", message: "Give every attached source document a label (e.g. “Outpatient register p.4”).", level: "error" });
 
   const s = input.summary;
   const all: [string, number][] = [];
@@ -136,7 +167,49 @@ export interface EyeReportRow {
   id: string; project_id: string; facility_id: string | null; facility_name: string;
   state: string | null; lga: string | null; report_date: string;
   summary: any; csom: any; notes: string | null; prepared_by: string | null; confirmed_by: string | null;
+  attachments?: EyeAttachment[] | null;
   created_by: string | null; device_id: string | null; collector_label: string | null; created_at?: string;
+}
+
+/** WG-SS disability aggregation across screened patients (for the dashboard). */
+export interface PatientAggregate {
+  screened: number; withDisability: number; days: number; facilities: number;
+  /** Disability count per WG-SS domain label (Seeing, Hearing, …). */
+  domains: { label: string; count: number }[];
+  bySex: { m: number; f: number; other: number };
+}
+export function aggregatePatients(rows: EyePatientRow[]): PatientAggregate {
+  const domains = new Map<string, number>();
+  const bySex = { m: 0, f: 0, other: 0 };
+  let withDisability = 0;
+  for (const r of rows) {
+    if (r.has_disability) withDisability += 1;
+    for (const d of r.disability_domains ?? []) domains.set(d, (domains.get(d) ?? 0) + 1);
+    if (r.sex === "m") bySex.m += 1; else if (r.sex === "f") bySex.f += 1; else bySex.other += 1;
+  }
+  return {
+    screened: rows.length, withDisability,
+    days: new Set(rows.map((r) => r.report_date)).size,
+    facilities: new Set(rows.map((r) => r.facility_name.toLowerCase())).size,
+    domains: [...domains.entries()].map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count),
+    bySex,
+  };
+}
+
+/**
+ * Cross-checks WG-SS patient screenings against a daily summary. Mismatches are
+ * warnings (the clerk confirms) — screenings may legitimately be entered before
+ * the summary, or cover only part of the day.
+ */
+export function wgVsSummaryIssues(patientCount: number, disabledCount: number, summary: EyeSummary): Issue[] {
+  const out: Issue[] = [];
+  const T = totals(summary);
+  const consulted = t(T.consulted);
+  if (consulted > 0 && patientCount !== consulted)
+    out.push({ field: "patients", message: `${patientCount} patient${patientCount === 1 ? "" : "s"} screened with the WG-SS, but ${consulted} persons were consulted. Screen every patient or confirm the difference.`, level: "warning" });
+  if (disabledCount !== t(summary.pwd))
+    out.push({ field: "patients", message: `WG-SS classified ${disabledCount} patient${disabledCount === 1 ? "" : "s"} with a disability, but the summary records ${t(summary.pwd)} persons with disability. Please reconcile.`, level: "warning" });
+  return out;
 }
 
 export interface Aggregate { summary: EyeSummary; csom: EyeCsom; reports: number; facilities: number; days: number }

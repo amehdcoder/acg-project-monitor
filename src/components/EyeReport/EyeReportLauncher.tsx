@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { BarChart3, ChevronRight, ClipboardPlus, Settings2 } from "lucide-react";
+import { Accessibility, BarChart3, ChevronRight, ClipboardPlus, Settings2 } from "lucide-react";
 import hero from "@/assets/eye-report/hero.jpg";
 import { cachedRead } from "@/lib/programmeModule/offlineReadCache";
 import { loadReports } from "@/lib/eyeReport/store";
@@ -26,7 +26,7 @@ export default function EyeReportLauncher({ projectId: selected, projects, userI
   const projectId = selected ?? fallback;
   const [perm, setPerm] = useState({ enabled: false, report: false, view: false });
   const [facilities, setFacilities] = useState<EyeFacility[]>([]);
-  const [open, setOpen] = useState<"form" | "dash" | null>(null);
+  const [open, setOpen] = useState<"form" | "dash" | "wg" | null>(null);
   const [manage, setManage] = useState(false);
   const [rows, setRows] = useState<EyeReportRow[]>([]);
 
@@ -69,6 +69,13 @@ export default function EyeReportLauncher({ projectId: selected, projects, userI
               <ChevronRight className="mt-1 h-5 w-5 text-muted-foreground/60" />
             </button>
           )}
+          {perm.report && (
+            <button type="button" onClick={() => setOpen("wg")} className="group flex items-start gap-3 rounded-2xl border bg-card p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-eye-violet text-primary-foreground"><Accessibility className="h-6 w-6" /></span>
+              <span className="min-w-0 flex-1"><span className="block text-[15px] font-extrabold text-eye-deep">Patient Disability Screening (WG-SS)</span><span className="mt-1 block text-xs text-muted-foreground">Screen individual patients with the six Washington Group questions — even before the daily summary. Works offline.</span></span>
+              <ChevronRight className="mt-1 h-5 w-5 text-muted-foreground/60" />
+            </button>
+          )}
           {perm.view && (
             <button type="button" onClick={() => setOpen("dash")} className="group flex items-start gap-3 rounded-2xl border bg-card p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
               <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-eye-teal text-primary-foreground"><BarChart3 className="h-6 w-6" /></span>
@@ -79,6 +86,7 @@ export default function EyeReportLauncher({ projectId: selected, projects, userI
         </div>
       ) : <p className="text-xs text-muted-foreground">Not added to this project yet. Use Access → Projects to add it.</p>}
       {open === "form" && <EyeDailyReportForm projectId={projectId} projectName={projectName} facilities={facilities} mode={{ kind: "user", userId }} otherReports={rows} onClose={() => setOpen(null)} />}
+      {open === "wg" && <EyeDailyReportForm projectId={projectId} projectName={projectName} facilities={facilities} mode={{ kind: "user", userId }} wgOnly onClose={() => setOpen(null)} />}
       {open === "dash" && <EyeReportDashboard projectId={projectId} projectName={projectName} facilities={facilities} userId={userId} canReport={perm.report} canManage={isAdmin} onClose={() => setOpen(null)} />}
       <EyeReportAccessDialog open={manage} onOpenChange={setManage} projects={projects} projectId={projectId} userId={userId} onChanged={() => void check()} />
     </div>

@@ -12,9 +12,10 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import hero from "@/assets/eye-report/hero.jpg";
 import {
-  AGE_BANDS, MONTHS, aggregate, byMonth, normCsom, normSummary, pct, t, totals, vaTotal, type EyeReportRow,
+  AGE_BANDS, MONTHS, aggregate, aggregatePatients, byMonth, normCsom, normSummary, pct, t, totals, vaTotal,
+  type EyePatientRow, type EyeReportRow,
 } from "@/lib/eyeReport/definition";
-import { deleteReport, loadReports } from "@/lib/eyeReport/store";
+import { deleteReport, loadPatients, loadReports } from "@/lib/eyeReport/store";
 import { exportAggregated, exportDailyReport } from "@/lib/eyeReport/exportExcel";
 import EyeDailyReportForm, { type EyeFacility } from "./EyeDailyReportForm";
 
@@ -36,13 +37,14 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
   const [facility, setFacility] = useState("all");
   const [sex, setSex] = useState<"all" | "m" | "f">("all");
   const [csomOnly, setCsomOnly] = useState(false);
-  const [form, setForm] = useState<{ open: boolean; existing?: EyeReportRow | null }>({ open: false });
+  const [form, setForm] = useState<{ open: boolean; existing?: EyeReportRow | null; wgOnly?: boolean }>({ open: false });
   const [exporting, setExporting] = useState(false);
+  const [patients, setPatients] = useState<EyePatientRow[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const r = await loadReports(projectId);
-    setRows(r.rows); setFromCache(r.fromCache); setLoading(false);
+    const [r, p] = await Promise.all([loadReports(projectId), loadPatients(projectId)]);
+    setRows(r.rows); setPatients(p.rows); setFromCache(r.fromCache || p.fromCache); setLoading(false);
   }, [projectId]);
   useEffect(() => { void load(); }, [load]);
 
@@ -52,6 +54,17 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
 
   const yearRows = useMemo(() => rows.filter((r) => (year === "all" || r.report_date.startsWith(year)) && (lga === "all" || r.lga === lga) && (facility === "all" || r.facility_name === facility) && (!csomOnly || r.csom)), [rows, year, lga, facility, csomOnly]);
   const filtered = useMemo(() => yearRows.filter((r) => (month === "all" || Number(r.report_date.slice(5, 7)) === Number(month)) && (!from || r.report_date >= from) && (!to || r.report_date <= to)), [yearRows, month, from, to]);
+  const filteredPatients = useMemo(() => patients.filter((p) => (year === "all" || p.report_date.startsWith(year)) && (month === "all" || Number(p.report_date.slice(5, 7)) === Number(month)) && (!from || p.report_date >= from) && (!to || p.report_date <= to) && (lga === "all" || p.lga === lga) && (facility === "all" || p.facility_name === facility)), [patients, year, month, from, to, lga, facility]);
+  const pAgg = useMemo(() => aggregatePatients(filteredPatients), [filteredPatients]);
+  /** Screened-patient count per report (facility + day), for the reconciliation badge. */
+  const screenedByDay = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const p of patients) {
+      const k = `${p.facility_name.toLowerCase()}|${p.report_date}`;
+      m.set(k, (m.get(k) ?? 0) + 1);
+    }
+    return m;
+  }, [patients]);
 
   const agg = aggregate(filtered); const S = agg.summary; const T = totals(S); const c = agg.csom;
   const pick = (x: { m: number; f: number }) => (sex === "all" ? t(x) : x[sex]);
@@ -88,7 +101,7 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
     try { await deleteReport(projectId, r.id); setRows((x) => x.filter((y) => y.id !== r.id)); toast.success("Report deleted"); } catch (e) { toast.error(e instanceof Error ? e.message : "Delete failed"); }
   };
 
-  if (form.open) return <EyeDailyReportForm projectId={projectId} projectName={projectName} facilities={facilities} mode={{ kind: "user", userId }} existing={form.existing} otherReports={rows} onClose={() => setForm({ open: false })} onSaved={() => void load()} />;
+  if (form.open) return <EyeDailyReportForm projectId={projectId} projectName={projectName} facilities={facilities} mode={{ kind: "user", userId }} existing={form.existing} existingPatients={form.existing ? patients.filter((p) => p.report_id === form.existing!.id) : []} wgOnly={form.wgOnly} otherReports={rows} onClose={() => setForm({ open: false })} onSaved={() => void load()} />;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-eye-sky">
@@ -102,6 +115,7 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
           <p className="mt-1 max-w-xl text-sm opacity-85">Daily facility reports, aggregated by month and year, with cataract surgery outcome monitoring.</p>
           <div className="mt-4 flex flex-wrap gap-2">
             {canReport && <Button onClick={() => setForm({ open: true })} className="bg-eye-gold text-eye-ink hover:bg-eye-gold/90"><Plus className="mr-1 h-4 w-4" /> New daily report</Button>}
+            {canReport && <Button onClick={() => setForm({ open: true, wgOnly: true })} variant="secondary"><Accessibility className="mr-1 h-4 w-4" /> WG-SS screening only</Button>}
             <Button onClick={doExport} disabled={exporting} variant="secondary">{exporting ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <FileSpreadsheet className="mr-1 h-4 w-4" />} Export Summary & CSOM</Button>
             <Button onClick={() => void load()} variant="ghost" className="text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"><RefreshCw className={`mr-1 h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh</Button>
             {fromCache && <span className="inline-flex items-center gap-1 rounded-full bg-eye-gold px-3 py-1 text-xs font-semibold text-eye-ink"><CloudOff className="h-3 w-3" /> Showing saved offline copy</span>}
@@ -164,6 +178,32 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
           </div>
         </section>
 
+        <section className="grid gap-4 lg:grid-cols-3">
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-eye-violet via-eye-blue to-eye-deep p-5 text-primary-foreground shadow-md">
+            <Accessibility className="absolute -right-4 -top-4 h-28 w-28 opacity-15" />
+            <h3 className="flex items-center gap-2 text-sm font-bold"><Accessibility className="h-4 w-4" /> Disability screening (WG-SS)</h3>
+            <p className="mt-3 text-3xl font-extrabold tabular-nums">{pAgg.screened}</p>
+            <p className="text-xs opacity-85">patients screened · {pAgg.days} days · {pAgg.facilities} facilities</p>
+            <div className="mt-3 flex items-end gap-2">
+              <p className="text-2xl font-extrabold text-eye-gold">{pct(pAgg.withDisability, pAgg.screened)}%</p>
+              <p className="pb-0.5 text-xs opacity-85">with a disability ({pAgg.withDisability})</p>
+            </div>
+            <p className="mt-2 text-[11px] opacity-75">M {pAgg.bySex.m} · F {pAgg.bySex.f}{pAgg.bySex.other ? ` · unstated ${pAgg.bySex.other}` : ""}</p>
+          </div>
+          <div className="rounded-2xl border bg-card p-4 shadow-sm lg:col-span-2">
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold"><Accessibility className="h-4 w-4 text-eye-violet" /> Disability domains identified</h3>
+            {pAgg.domains.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">No WG-SS screenings match these filters yet.</p>}
+            <div className="grid gap-2.5 sm:grid-cols-2">
+              {pAgg.domains.map((d) => (
+                <div key={d.label}>
+                  <div className="flex justify-between text-xs"><span className="font-medium">{d.label}</span><span className="font-bold">{d.count} · {pct(d.count, pAgg.screened)}%</span></div>
+                  <div className="mt-1 h-2.5 overflow-hidden rounded-full bg-muted"><motion.div className="h-full rounded-full bg-eye-violet" initial={{ width: 0 }} animate={{ width: `${Math.min(100, pct(d.count, pAgg.screened))}%` }} /></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         <section className="rounded-2xl border bg-card shadow-sm">
           <h3 className="flex items-center gap-2 border-b p-4 text-sm font-bold"><Building2 className="h-4 w-4 text-eye-blue" /> Facility performance</h3>
           <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-sm">
@@ -176,11 +216,12 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
         <section className="rounded-2xl border bg-card shadow-sm">
           <h3 className="flex items-center gap-2 border-b p-4 text-sm font-bold"><FileSpreadsheet className="h-4 w-4 text-eye-orange" /> Individual daily reports ({filtered.length})</h3>
           <div className="max-h-[480px] overflow-auto"><table className="w-full min-w-[760px] text-sm">
-            <thead className="sticky top-0 bg-eye-deep text-left text-xs uppercase tracking-wider text-primary-foreground"><tr><th className="p-3">Date</th><th className="p-3">Facility</th><th className="p-3 text-right">Consulted</th><th className="p-3 text-right">Cataract</th><th className="p-3 text-right">Glasses</th><th className="p-3">CSOM</th><th className="p-3">Prepared by</th><th className="p-3 text-right">Actions</th></tr></thead>
-            <tbody>{filtered.map((r, i) => { const s = normSummary(r.summary), tt = totals(s), cs = normCsom(r.csom); const mine = r.created_by === userId; return (
+            <thead className="sticky top-0 bg-eye-deep text-left text-xs uppercase tracking-wider text-primary-foreground"><tr><th className="p-3">Date</th><th className="p-3">Facility</th><th className="p-3 text-right">Consulted</th><th className="p-3 text-right">Cataract</th><th className="p-3 text-right">Glasses</th><th className="p-3">CSOM</th><th className="p-3">WG-SS</th><th className="p-3">Prepared by</th><th className="p-3 text-right">Actions</th></tr></thead>
+            <tbody>{filtered.map((r, i) => { const s = normSummary(r.summary), tt = totals(s), cs = normCsom(r.csom); const mine = r.created_by === userId; const screened = screenedByDay.get(`${r.facility_name.toLowerCase()}|${r.report_date}`) ?? 0; const consultedN = t(tt.consulted); return (
               <tr key={r.id} className={`border-t ${i % 2 ? "bg-eye-sky/30" : ""}`}>
-                <td className="p-3 font-mono text-xs">{r.report_date}</td><td className="p-3 font-semibold">{r.facility_name}</td><td className="p-3 text-right font-bold">{t(tt.consulted)}</td><td className="p-3 text-right">{t(s.surgery.cataract)}</td><td className="p-3 text-right">{t(tt.glasses)}</td>
+                <td className="p-3 font-mono text-xs">{r.report_date}</td><td className="p-3 font-semibold">{r.facility_name}</td><td className="p-3 text-right font-bold">{consultedN}</td><td className="p-3 text-right">{t(s.surgery.cataract)}</td><td className="p-3 text-right">{t(tt.glasses)}</td>
                 <td className="p-3">{cs ? <span className="rounded-full bg-eye-mint px-2 py-0.5 text-xs font-semibold text-eye-teal">{cs.surgeries} surg.</span> : "—"}</td>
+                <td className="p-3">{screened > 0 ? <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${screened === consultedN ? "bg-status-success/15 text-status-success" : "bg-eye-gold/20 text-eye-ink"}`} title={`${screened} of ${consultedN} consulted patients screened`}>{screened}/{consultedN}</span> : <span className="text-xs text-muted-foreground">—</span>}</td>
                 <td className="p-3 text-xs">{r.prepared_by ?? r.collector_label ?? "—"}</td>
                 <td className="p-3"><div className="flex justify-end gap-1">
                   <Button size="icon" variant="ghost" aria-label="Download report" onClick={() => void exportDailyReport(r, projectName)}><Download className="h-4 w-4 text-eye-blue" /></Button>

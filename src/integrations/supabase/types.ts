@@ -5500,8 +5500,97 @@ export type Database = {
           },
         ]
       }
+      eye_daily_patients: {
+        Row: {
+          age_band: string | null
+          collector_label: string | null
+          created_at: string
+          created_by: string | null
+          device_id: string | null
+          disability_domains: string[]
+          facility_id: string | null
+          facility_name: string
+          has_disability: boolean
+          id: string
+          lga: string | null
+          patient_label: string
+          project_id: string
+          report_date: string
+          report_id: string | null
+          sex: string | null
+          state: string | null
+          updated_at: string
+          wg_ss: Json
+        }
+        Insert: {
+          age_band?: string | null
+          collector_label?: string | null
+          created_at?: string
+          created_by?: string | null
+          device_id?: string | null
+          disability_domains?: string[]
+          facility_id?: string | null
+          facility_name: string
+          has_disability?: boolean
+          id?: string
+          lga?: string | null
+          patient_label: string
+          project_id: string
+          report_date: string
+          report_id?: string | null
+          sex?: string | null
+          state?: string | null
+          updated_at?: string
+          wg_ss?: Json
+        }
+        Update: {
+          age_band?: string | null
+          collector_label?: string | null
+          created_at?: string
+          created_by?: string | null
+          device_id?: string | null
+          disability_domains?: string[]
+          facility_id?: string | null
+          facility_name?: string
+          has_disability?: boolean
+          id?: string
+          lga?: string | null
+          patient_label?: string
+          project_id?: string
+          report_date?: string
+          report_id?: string | null
+          sex?: string | null
+          state?: string | null
+          updated_at?: string
+          wg_ss?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eye_daily_patients_facility_id_fkey"
+            columns: ["facility_id"]
+            isOneToOne: false
+            referencedRelation: "health_facilities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eye_daily_patients_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eye_daily_patients_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "eye_daily_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       eye_daily_reports: {
         Row: {
+          attachments: Json
           collector_label: string | null
           confirmed_by: string | null
           created_at: string
@@ -5521,6 +5610,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          attachments?: Json
           collector_label?: string | null
           confirmed_by?: string | null
           created_at?: string
@@ -5540,6 +5630,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          attachments?: Json
           collector_label?: string | null
           confirmed_by?: string | null
           created_at?: string

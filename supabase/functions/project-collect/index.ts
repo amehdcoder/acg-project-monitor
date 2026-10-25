@@ -81,6 +81,7 @@ Deno.serve(async (req) => {
           notes: d.notes ? String(d.notes).slice(0, 2000) : null,
           prepared_by: d.prepared_by ? String(d.prepared_by).slice(0,120) : ctx.label,
           confirmed_by: d.confirmed_by ? String(d.confirmed_by).slice(0,120) : null,
+          attachments: Array.isArray(d.attachments) ? d.attachments.slice(0, 30) : [],
           created_by: ctx.collectorUserId, device_id: ctx.deviceId, collector_label: ctx.label,
         };
         const { error } = await db.from('eye_daily_reports').upsert(row, { onConflict: 'id' });
@@ -89,7 +90,34 @@ Deno.serve(async (req) => {
         accepted.push(record.id);
       } catch (error) { rejected.push({id:record.id,reason:String((error as Error).message || 'write_failed')}); }
     }
-    for (const record of records.filter(r => r.kind && !['form','case','seeclear','microplan','eye_daily'].includes(r.kind))) rejected.push({id:record.id,reason:'invalid_record_kind'});
+    // Eye Health per-patient WG-SS disability screenings (may arrive before the summary).
+    for (const record of records.filter(r => r.kind === 'eye_wgss')) {
+      if (!eyeProject) { rejected.push({id:record.id,reason:'eye_reporting_not_enabled'}); continue; }
+      try {
+        const patients = Array.isArray((record.data as any)?.patients) ? (record.data as any).patients.slice(0, 200) : [];
+        if (patients.length === 0) throw new Error('no_patients');
+        const rows = patients.map((p: any) => {
+          const facility = String(p.facility_name ?? '').trim().slice(0, 200);
+          const date = String(p.report_date ?? '');
+          const label = String(p.patient_label ?? '').trim().slice(0, 80);
+          if (!facility || !label || !/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('invalid_patient_screening');
+          return {
+            id: p.id || crypto.randomUUID(), project_id: ctx.projectId,
+            report_id: p.report_id || null, facility_id: p.facility_id || null, facility_name: facility,
+            state: p.state ? String(p.state).slice(0,80) : null, lga: p.lga ? String(p.lga).slice(0,80) : null,
+            report_date: date, patient_label: label,
+            sex: ['m','f'].includes(p.sex) ? p.sex : null, age_band: p.age_band ? String(p.age_band).slice(0,20) : null,
+            wg_ss: p.wg_ss ?? {}, has_disability: !!p.has_disability,
+            disability_domains: Array.isArray(p.disability_domains) ? p.disability_domains.map((x: any) => String(x).slice(0, 40)).slice(0, 6) : [],
+            created_by: ctx.collectorUserId, device_id: ctx.deviceId, collector_label: ctx.label,
+          };
+        });
+        const { error } = await db.from('eye_daily_patients').upsert(rows, { onConflict: 'id' });
+        if (error) throw new Error(error.message);
+        accepted.push(record.id);
+      } catch (error) { rejected.push({id:record.id,reason:String((error as Error).message || 'write_failed')}); }
+    }
+    for (const record of records.filter(r => r.kind && !['form','case','seeclear','microplan','eye_daily','eye_wgss'].includes(r.kind))) rejected.push({id:record.id,reason:'invalid_record_kind'});
 
     // See Clear facility visits go to the checklist table (and on to Kobo).
     const seeclear = records.filter((r) => r.kind === "seeclear");
