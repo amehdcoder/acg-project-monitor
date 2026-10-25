@@ -1,4 +1,5 @@
 import VulnerabilityScore from "./VulnerabilityScore";
+import BeneficiaryPortalAccess from "./BeneficiaryPortalAccess";
 import LivelihoodAssessmentDialog from "./LivelihoodAssessmentDialog";
 import type { LivelihoodAssessmentRow } from "@/lib/programmeModule/livelihood";
 import { useMemo, useState } from "react";
@@ -187,6 +188,7 @@ const GraduationPathwayPanel = ({ projectId, moduleId, beneficiary, componentKey
           <p className="text-xs text-muted-foreground">Delivery stages unlock after selection. Admins can select any assessed beneficiary in the opportunity register regardless of vulnerability score, with consent and safeguarding checks.</p>
         )}
       </div>
+      <BeneficiaryPortalAccess beneficiaryId={beneficiary.id} onChanged={onChanged} />
     </Card>
   );
 };
