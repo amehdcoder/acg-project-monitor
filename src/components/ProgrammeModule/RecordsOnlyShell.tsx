@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { HeartPulse, LogOut, ShieldCheck, ArrowLeft, Lock, LayoutGrid } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +25,7 @@ interface Props {
  */
 const RecordsOnlyShell = ({ projects, initialProjectId, onExit, onSwitchToFullApp }: Props) => {
   const { profile, signOut, isAdmin, isSuperAdmin, isOwner } = useAuth();
+  const scrollRef = useRef<HTMLElement>(null);
   const [projectId, setProjectId] = useState<string>(
     initialProjectId && projects.some((p) => p.id === initialProjectId)
       ? initialProjectId
@@ -42,9 +43,8 @@ const RecordsOnlyShell = ({ projects, initialProjectId, onExit, onSwitchToFullAp
   );
 
   return (
-    <div className="records-scroll min-h-[100dvh] bg-health-surface">
-      <ScrollRail />
-      <header className="sticky top-0 z-40 border-b border-primary/20 bg-primary text-primary-foreground shadow-lg">
+    <div className="flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-health-surface">
+      <header className="z-40 shrink-0 border-b border-primary/20 bg-primary text-primary-foreground shadow-lg">
         <div className="mx-auto flex max-w-[1500px] flex-col gap-3 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3">
             {onExit && (
@@ -131,7 +131,9 @@ const RecordsOnlyShell = ({ projects, initialProjectId, onExit, onSwitchToFullAp
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1500px] px-3 py-4 sm:px-6 sm:py-6">
+      <main ref={scrollRef} data-app-scroll-root className="records-scroll min-h-0 w-full flex-1 overflow-x-hidden overscroll-contain">
+        <ScrollRail target={scrollRef} />
+        <div className="mx-auto max-w-[1500px] px-3 py-4 pr-5 sm:px-6 sm:py-6">
         {active ? (
           <ProgrammeModuleWorkspace
             key={active.id}
@@ -145,6 +147,7 @@ const RecordsOnlyShell = ({ projects, initialProjectId, onExit, onSwitchToFullAp
             No beneficiary-records project is assigned to you yet.
           </div>
         )}
+        </div>
       </main>
     </div>
   );

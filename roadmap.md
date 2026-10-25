@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Fix Android scrolling in the switched records-only workspace; connect the colourful draggable rail to its bounded scroll container and verify touch scrolling and rail dragging.
+
 - [x] Restrict facility focal persons to assigned-facility navigation, clinical components and care tools; enforce restrictive record/child/document policies, protect user-scoped offline caches, and preserve admin access. Seventeen regression tests passed; live admin workspace verified.
 - [ ] Verify the facility-focal workflow with a real assigned account — no active facility focal-person assignments exist yet.
 

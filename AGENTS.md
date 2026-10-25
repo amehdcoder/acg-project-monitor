@@ -1,5 +1,7 @@
 # Architecture rules
 
+- Records-only and full-app records use bounded viewport scroll roots; render the draggable rail in a body portal measured from that root, never infer document scrolling — why: Android/WebView body lockdown and nested layouts must not hide the rail or trap page scrolling.
+
 - Keep major longitudinal tabs separate from grouped navigation and project-gated — why: direct reporting without duplicate entries or permission bypass.
 - Workspace groups with a hub open their permission-filtered card page directly rather than a dropdown — why: one entry point without duplicate navigation.
 - Dispatch CCFF paths to a standalone form-only shell before mounting workspace providers; use anonymous public-function requests and published QR origins — why: community visitors cannot enter records through form navigation, shared overlays, error states or editor-only links.
