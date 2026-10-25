@@ -15,6 +15,7 @@ export interface DeviceSessionBundle {
   caseTypes: any[];
   /** Built-in checklists this project's devices may fill, e.g. "seeclear". */
   specialForms?: string[];
+  microplanning?: { scope: {states: string[]; lgas: string[]; wards: string[]} } | null;
   syncedAt: string;
 }
 
@@ -27,6 +28,7 @@ export interface DeviceSession {
   allowForms: boolean;
   allowCases: boolean;
   allowSeeclear: boolean;
+  allowMicroplanning?: boolean;
   bundle: DeviceSessionBundle;
   joinedAt: string;
   lastRefreshAt: string | null;
@@ -159,6 +161,7 @@ export async function enrolDevice(input: EnrolInput): Promise<DeviceSession> {
     allowForms: !!body.access?.allowForms,
     allowCases: !!body.access?.allowCases,
     allowSeeclear: !!body.access?.allowSeeclear,
+    allowMicroplanning: !!body.access?.allowMicroplanning,
     bundle: body.bundle,
     joinedAt: new Date().toISOString(),
     lastRefreshAt: new Date().toISOString(),
@@ -194,6 +197,7 @@ export async function refreshDeviceBundle(session: DeviceSession): Promise<Devic
       allowForms: !!body.access?.allowForms,
       allowCases: !!body.access?.allowCases,
       allowSeeclear: !!body.access?.allowSeeclear,
+    allowMicroplanning: !!body.access?.allowMicroplanning,
       // Never drop cached forms because a refresh came back thin — the collector
       // must keep working with what they already have.
       bundle: body.bundle?.project ? body.bundle : session.bundle,

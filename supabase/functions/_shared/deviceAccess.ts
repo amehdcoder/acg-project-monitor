@@ -37,6 +37,7 @@ export interface DeviceContext {
   allowForms: boolean;
   allowCases: boolean;
   allowSeeclear: boolean;
+  allowMicroplanning: boolean;
   collectorUserId: string | null;
 }
 
@@ -57,7 +58,7 @@ export async function verifyDeviceToken(req: Request): Promise<DeviceContext | n
 
   const { data: config } = await db
     .from("project_access_configs")
-    .select("enabled, allow_forms, allow_cases, allow_seeclear, expires_at, collector_user_id")
+    .select("enabled, allow_forms, allow_cases, allow_seeclear, allow_microplanning, expires_at, collector_user_id")
     .eq("project_id", device.project_id)
     .maybeSingle();
   if (!config || !config.enabled) return null;
@@ -76,6 +77,7 @@ export async function verifyDeviceToken(req: Request): Promise<DeviceContext | n
     allowForms: !!config.allow_forms,
     allowCases: !!config.allow_cases,
     allowSeeclear: !!config.allow_seeclear,
+    allowMicroplanning: !!config.allow_microplanning,
     collectorUserId: config.collector_user_id ?? null,
   };
 }
@@ -92,12 +94,13 @@ export async function buildProjectBundle(
   allowForms: boolean,
   allowCases: boolean,
   allowSeeclear = false,
+  allowMicroplanning = false,
 ) {
   const db = admin();
   const nowIso = new Date().toISOString();
 
   const [{ data: project }, ownResult, grantResult] = await Promise.all([
-    db.from("projects").select("id, name, description").eq("id", projectId).maybeSingle(),
+    db.from("projects").select("id, name, description, scope_states, scope_lgas, scope_wards").eq("id", projectId).maybeSingle(),
     allowForms
       ? db.from("forms").select("*").eq("project_id", projectId)
       : Promise.resolve({ data: [] as any[] }),
@@ -139,6 +142,7 @@ export async function buildProjectBundle(
     forms: forms ?? [],
     caseTypes,
     specialForms,
+    microplanning: allowMicroplanning ? { scope: { states: project?.scope_states || [], lgas: project?.scope_lgas || [], wards: project?.scope_wards || [] } } : null,
     syncedAt: new Date().toISOString(),
   };
 }

@@ -140,10 +140,11 @@ Deno.serve(async (req) => {
       const allowForms = body.allowForms !== false;
       const allowCases = body.allowCases === true;
       const allowSeeclear = body.allowSeeclear === true;
+      const allowMicroplanning = body.allowMicroplanning === true;
       const expiresAt = body.expiresAt ? new Date(body.expiresAt).toISOString() : null;
 
       const rotate = body.rotateCode === true || !existing;
-      const joinCode = rotate ? makeCode() : existing!.join_code;
+      const joinCode = rotate ? makeCode() : existing?.join_code || makeCode();
 
       let pinHash = existing?.pin_hash ?? null;
       if (body.pin === null) pinHash = null;
@@ -161,6 +162,7 @@ Deno.serve(async (req) => {
         allow_forms: allowForms,
         allow_cases: allowCases,
         allow_seeclear: allowSeeclear,
+        allow_microplanning: allowMicroplanning,
         expires_at: expiresAt,
         collector_user_id: existing?.collector_user_id ?? null,
         created_by: existing?.created_by ?? userId,

@@ -27,6 +27,7 @@ import {
   noteSessionAccepted,
   type DeviceSyncRecord,
 } from "@/lib/deviceSession";
+import { deviceEntryBelongsToProject } from "@/lib/microplanning/collectionRules";
 import { withQueueLock, backoffDelay, isRetryable } from "@/lib/syncLock";
 
 let started = false;
@@ -44,7 +45,7 @@ const toRecord = (entry: SavedFormEntry): DeviceSyncRecord => ({
   clientSubmittedAt: entry.finalizedAt || entry.createdAt || entry.updatedAt,
   // See Clear visits and cases are routed to their own intake server-side.
   kind:
-    entry.settings?.kind === "seeclear"
+    entry.settings?.kind === "microplan" ? "microplan" : entry.settings?.kind === "seeclear"
       ? "seeclear"
       : entry.settings?.kind === "case"
         ? "case"
@@ -72,7 +73,7 @@ async function drain(): Promise<{ synced: number; failed: number }> {
   let failed = 0;
   const owner = deviceUserId(session.deviceId);
   const entries = (await listAllSavedEntries("finalized")).filter(
-    (e) => e.userId === owner && !hasActiveSyncLease(e) && !isBackingOff(e),
+    (e) => deviceEntryBelongsToProject(e, session.deviceId, session.projectId) && !hasActiveSyncLease(e) && !isBackingOff(e),
   );
   if (entries.length === 0) return { synced: 0, failed: 0 };
 
