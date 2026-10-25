@@ -1,4 +1,8 @@
 import { useState, useCallback, useEffect, memo, useMemo, useRef } from "react";
+import { microplanArtwork } from "./microplanArtwork";
+import { useAuth } from "@/hooks/useAuth";
+import { readDeviceSession } from "@/lib/deviceSession";
+import type { ProjectScope } from "@/lib/projectScope";
 import MicroplanWizardChrome from "./MicroplanWizardChrome";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -24,6 +28,8 @@ interface MicroplanEntryFormProps {
   onSubmit: (data: MicroplanFormData) => Promise<void>;
   onCancel: () => void;
   isSubmitting?: boolean;
+  scopeOverride?: ProjectScope;
+  accountFree?: boolean;
 }
 
 export interface MicroplanFormData {
@@ -103,19 +109,16 @@ const defaultFormData: MicroplanFormData = {
 
 const nativeSelectClass = "flex h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 
-const Section = memo(({ id, title, icon: Icon, children }: { id?: string; title: string; icon: any; children: React.ReactNode }) => (
-  <Card id={id ? `section-${id}` : undefined} className="scroll-mt-24 rounded-lg border-border/40 bg-white shadow-sm">
-    <CardHeader className="pb-2 pt-3 px-3">
-      <CardTitle className="flex items-center gap-2 uppercase tracking-wide text-primary">
-        <Icon className="h-3.5 w-3.5" />
-        {title}
-      </CardTitle>
-    </CardHeader>
-    <CardContent className="px-3 pb-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-3 gap-y-2">
-      {children}
-    </CardContent>
-  </Card>
-));
+const Section = memo(({ id, title, icon: Icon, children }: { id?: string; title: string; icon: any; children: React.ReactNode }) => {
+  const art = microplanArtwork[id || ""];
+  return <section id={`section-${id}`} className={`microplan-section microplan-tone-${id}`}>
+    <div className="microplan-section-heading">
+      {art && <img src={art.image} alt="" width={512} height={256} loading="lazy" className="microplan-section-photo" />}
+      <div className="microplan-section-copy"><span className="microplan-section-number">{art?.number || <Icon className="h-4 w-4" />}</span><div><h2>{title}</h2><p>{art?.description}</p></div></div>
+    </div>
+    <div className="microplan-section-fields">{children}</div>
+  </section>;
+});
 Section.displayName = "Section";
 
 // Section ids used by the wizard chrome to anchor / navigate between steps.
@@ -128,13 +131,14 @@ export const MICROPLAN_WIZARD_SECTIONS = [
   { id: "terrain",      title: "Terrain & Accessibility" },
   { id: "population",   title: "Estimated Population" },
   { id: "disability",   title: "Disability Disaggregation" },
+  { id: "trachoma", title: "Trachoma" },
   { id: "cdd",          title: "CDD Information" },
   { id: "notes",        title: "Additional Notes" },
 ] as const;
 
 const Field = memo(({ label, required, children, className }: { label: string; required?: boolean; children: React.ReactNode; className?: string }) => (
-  <div className={`space-y-0.5 ${className || ""}`}>
-    <Label className="text-[11px] font-medium text-muted-foreground leading-none">
+  <div className={`microplan-field space-y-1 ${className || ""}`}>
+    <Label className="text-xs font-medium text-muted-foreground leading-snug">
       {label}{required && <span className="text-destructive ml-0.5">*</span>}
     </Label>
     {children}
@@ -223,11 +227,20 @@ const SearchableFieldCombobox = memo(({ label, required, value, options, onSelec
 });
 SearchableFieldCombobox.displayName = "SearchableFieldCombobox";
 
-const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubmitting }: MicroplanEntryFormProps) => {
-  const [form, setForm] = useState<MicroplanFormData>({ ...defaultFormData, ...initialData });
+const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubmitting, scopeOverride, accountFree = false }: MicroplanEntryFormProps) => {
+  const { user } = useAuth();
+  const device = accountFree ? readDeviceSession() : null;
+  const draftKey = `microplan:draft:${accountFree ? `device:${device?.deviceId}` : user?.id || 'signed-out'}:${projectId}:${(initialData as any)?.id || 'new'}`;
+  const [form, setForm] = useState<MicroplanFormData>(() => {
+    try { const draft = localStorage.getItem(draftKey); if (draft) return { ...defaultFormData, ...JSON.parse(draft) }; } catch { /* unavailable */ }
+    return { ...defaultFormData, ...initialData };
+  });
   const formScrollRef = useRef<HTMLFormElement | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
-  useEffect(() => { setLastSavedAt(Date.now()); }, [form]);
+  useEffect(() => {
+    try { localStorage.setItem(draftKey, JSON.stringify(form)); setLastSavedAt(Date.now()); }
+    catch { setLastSavedAt(null); }
+  }, [form, draftKey]);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [wardPickerOpen, setWardPickerOpen] = useState(false);
   const [showTrachoma, setShowTrachoma] = useState(() => {
@@ -242,7 +255,8 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
   const [grid3Settlements, setGrid3Settlements] = useState<FacilityWithCoords[]>([]);
 
   // Project geographic scope (limits the State/LGA/Ward cascade)
-  const { scope } = useProjectScope(projectId);
+  const { scope: loadedScope } = useProjectScope(accountFree ? null : projectId);
+  const scope = scopeOverride || loadedScope;
 
   // Cascaded admin hierarchy, restricted to the project's scope
   const allStates = filterStates(getAllStates(), scope);
@@ -542,7 +556,8 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       trachoma_0_5_months: null, trachoma_6m_6y: null, trachoma_7_14y: null, trachoma_15_plus: null,
     };
     await onSubmit(submitData);
-  }, [form, onSubmit, showTrachoma]);
+    localStorage.removeItem(draftKey);
+  }, [form, onSubmit, showTrachoma, draftKey]);
 
   const GPSRow = ({ latField, lngField, accField, latVal, lngVal }: { latField: keyof MicroplanFormData; lngField: keyof MicroplanFormData; accField?: keyof MicroplanFormData; latVal: number | null; lngVal: number | null }) => (
     <div className="col-span-1 sm:col-span-2 lg:col-span-3 grid grid-cols-[1fr_1fr_auto] gap-2 items-end">
@@ -553,7 +568,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
         <Input value={lngVal ?? ""} onChange={e => setNum(lngField, e.target.value)} type="number" step="any" className="h-8 text-xs" />
       </Field>
       <Button type="button" variant="outline" size="sm" onClick={() => captureGPS(latField, lngField, accField)} className="h-8 px-2 text-[11px] mb-0">
-        <Navigation className="h-3 w-3 mr-1" /> GPS
+        <Navigation className="h-3 w-3 mr-1" /> Get GPS
       </Button>
     </div>
   );
@@ -566,9 +581,9 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
   const settlementDistAutoComputed = !!(form.settlement_latitude && form.settlement_longitude && form.flhf_latitude && form.flhf_longitude);
 
   return (
-    <div className="relative flex-1 flex flex-col bg-slate-50/50">
+    <div className="microplan-entry relative min-h-0 flex-1 flex flex-col">
 
-    <form onSubmit={handleSubmit} ref={formScrollRef} className="space-y-3 overflow-y-auto px-1 pr-2 flex-1" style={{ scrollbarWidth: 'auto', scrollbarColor: 'hsl(var(--border)) transparent' }}>
+    <form onSubmit={handleSubmit} ref={formScrollRef} className="microplan-entry-scroll space-y-2 overflow-y-auto min-h-0 flex-1">
       <MicroplanWizardChrome
         sections={MICROPLAN_WIZARD_SECTIONS as unknown as { id: string; title: string }[]}
         scrollContainerRef={formScrollRef as unknown as React.RefObject<HTMLDivElement>}
@@ -694,7 +709,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       </Section>
 
       {/* Linked Fenced Communities (CES) — auto-populates from Locator-saved communities */}
-      {projectId && (form.state || form.lga || form.ward) && (
+      {!accountFree && projectId && (form.state || form.lga || form.ward) && (
         <LinkedFencedCommunitiesPanel
           projectId={projectId}
           state={form.state}
@@ -881,18 +896,9 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
 
 
       {/* Trachoma Age Disaggregation - Optional */}
-      <Card className="border-border/40 shadow-none">
-        <CardHeader className="pb-2 pt-3 px-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2 uppercase tracking-wide text-primary">
-              <Eye className="h-3.5 w-3.5" />
-              Trachoma Age Disaggregation (Optional)
-            </CardTitle>
-            <Switch checked={showTrachoma} onCheckedChange={setShowTrachoma} />
-          </div>
-        </CardHeader>
-        {showTrachoma && (
-          <CardContent className="px-3 pb-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-3 gap-y-2">
+      <Section id="trachoma" title="Trachoma Age Disaggregation (Optional)" icon={Eye}>
+        <div className="col-span-full flex items-center gap-3"><Switch checked={showTrachoma} onCheckedChange={setShowTrachoma} aria-label="Enable trachoma age disaggregation" /><Label className="text-xs">Enable trachoma age disaggregation</Label></div>
+        {showTrachoma && <>
             <Field label="0 - 5 Months">
               <Input value={form.trachoma_0_5_months ?? ""} onChange={e => setNum("trachoma_0_5_months", e.target.value)} type="number" placeholder="e.g. 150" className="h-8 text-xs" />
             </Field>
@@ -909,9 +915,8 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
               <Input value={tracTotal > 0 ? tracTotal : ""} readOnly className="h-8 text-xs bg-muted/30 font-semibold" />
               {tracTotal > 0 && <p className="text-[10px] text-muted-foreground">Auto-calculated: {tracTotal.toLocaleString()}</p>}
             </Field>
-          </CardContent>
-        )}
-      </Card>
+        </>}
+      </Section>
 
       {/* CDD Information */}
       <Section id="cdd" title="CDD Information" icon={UserCheck}>
@@ -940,12 +945,12 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       <div className="h-20 flex-shrink-0" />
 
       {/* Actions - fixed at bottom of scrollable area */}
-      <div className="sticky bottom-0 left-0 right-0 flex items-center justify-end gap-2 pt-3 pb-4 px-2 bg-background border-t border-border z-30 -mx-1" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+      <div className="microplan-footer sticky bottom-0 flex flex-wrap items-center justify-end gap-2 z-30">
         <Button type="button" variant="outline" size="default" onClick={onCancel} disabled={isSubmitting} className="min-h-[44px] min-w-[90px]">
           <X className="h-4 w-4 mr-1" /> Cancel
         </Button>
-        <Button type="submit" size="default" className="min-h-[44px] min-w-[140px] font-semibold" disabled={isSubmitting}>
-          <Save className="h-4 w-4 mr-1" /> {isSubmitting ? "Saving..." : "Save Entry"}
+        <Button type="submit" size="default" className="microplan-save min-h-[44px] min-w-[140px] font-semibold" disabled={isSubmitting}>
+          <Save className="h-4 w-4 mr-1" /> {isSubmitting ? "Saving..." : "Save Microplan Entry"}
         </Button>
       </div>
     </form>
