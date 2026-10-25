@@ -1188,6 +1188,8 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
       };
 
       if (editingEntry) {
+        payload.id = editingEntry.id;
+        payload.created_by = editingEntry.created_by;
         // ── GPS override write-back ─────────────────────────────────
         // If the original GRID3 lat/lng already exists and the user has
         // changed it, persist the new value into the *_override columns
@@ -1237,6 +1239,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
             toast({ title: "🔄 Existing entry updated", description: "Duplicate detected — the matching entry was updated." });
             setShowForm(false);
             setEditingEntry(null);
+            await cacheSet(`microplan-entries:${user?.id}|${selectedProjectId}|${entryOnly ? "own" : "all"}`, [{...existingMatch,...payload,id:existingMatch.id}, ...entries.filter(r => r.id !== existingMatch.id)]);
             fetchEntries();
             return;
           }

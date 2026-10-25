@@ -20,16 +20,19 @@ const GeoLockDialog = ({ project, onClose }: Props) => {
   const [lockedUsers, setLockedUsers] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const db = supabase as any;
 
   useEffect(() => {
     if (!project) return;
+    setSettingsLoaded(false);
     void (async () => {
       const { data, error } = await db.from("microplan_workspace_locks").select("user_id").eq("project_id", project.id);
       if (error) { toast({title:"Could not load workspace settings", description:error.message,variant:"destructive"}); return; }
       const rows = (data as { user_id: string | null }[]) || [];
       setWholeProject(rows.some((r) => r.user_id === null));
       setLockedUsers(new Set(rows.filter((r) => r.user_id).map((r) => r.user_id as string)));
+      setSettingsLoaded(true);
     })();
   }, [project?.id]);
 
@@ -66,7 +69,7 @@ const GeoLockDialog = ({ project, onClose }: Props) => {
             <Label className="text-sm font-semibold">Lock the whole project</Label>
             <p className="text-xs text-muted-foreground">Everyone assigned to this project.</p>
           </div>
-          <Switch checked={wholeProject} disabled={busy} onCheckedChange={(v) => void toggle(null, v)} />
+          <Switch checked={wholeProject} disabled={busy || !settingsLoaded} onCheckedChange={(v) => void toggle(null, v)} />
         </div>
         <div className="space-y-2">
           <Label className="text-sm font-semibold">Or lock chosen users</Label>
@@ -82,7 +85,7 @@ const GeoLockDialog = ({ project, onClose }: Props) => {
                 </div>
                 <Switch
                   checked={wholeProject || lockedUsers.has(u.user_id)}
-                  disabled={busy || wholeProject}
+                  disabled={busy || wholeProject || !settingsLoaded}
                   onCheckedChange={(v) => void toggle(u.user_id, v)}
                 />
               </div>

@@ -22,7 +22,7 @@ export default function DeviceMicroplanShell(){
   void load(); const timer=window.setInterval(()=>void load(),3000);
   let cancelled=false;
   const scope=session.bundle.microplanning?.scope;
-  const states=scope?.states.length ? scope.states : scope?.lgas.length ? [...new Set(scope.lgas.map(v=>v.split('|')[0]))] : getAllStates();
+  const states=scope?.states.length ? scope.states : scope?.lgas.length ? [...new Set(scope.lgas.map(v=>v.split('|')[0]))] : scope?.wards.length ? [...new Set(scope.wards.map(v=>v.split('|')[0]))] : getAllStates();
   void (async()=>{for(const state of states){if(cancelled || !navigator.onLine)break;await prefetchGrid3State(state);} if(!cancelled)setPreparing(false);})();
   return()=>{cancelled=true;window.clearInterval(timer);};
  },[session?.projectId]);

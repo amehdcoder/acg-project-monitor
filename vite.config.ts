@@ -198,7 +198,7 @@ export default defineConfig(({ mode }) => {
             // offline right after install — precacheFallback serves the
             // precached index.html shell so the REAL app loads instead of the
             // browser's generic "You're offline" page.
-            urlPattern: ({ request }: any) => request.mode === "navigate",
+            urlPattern: ({ request, url }: any) => request.mode === "navigate" && !url.pathname.startsWith('/~oauth'),
             handler: "NetworkFirst",
             options: {
               cacheName: "html-cache",
