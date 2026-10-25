@@ -48,10 +48,13 @@ export const DeviceSessionProvider = ({ children }: { children: React.ReactNode 
     requestDurableStorage();
     void refresh();
     const onOnline = () => void refresh();
+    const onVisible = () => { if (document.visibilityState === "visible") void refresh(); };
     window.addEventListener("online", onOnline);
-    const timer = window.setInterval(() => void refresh(), 15 * 60_000);
+    document.addEventListener("visibilitychange", onVisible);
+    const timer = window.setInterval(() => void refresh(), 2 * 60_000);
     return () => {
       window.removeEventListener("online", onOnline);
+      document.removeEventListener("visibilitychange", onVisible);
       window.clearInterval(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

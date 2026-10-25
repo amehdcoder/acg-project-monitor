@@ -17,6 +17,8 @@ export default function DeviceMicroplanShell(){
  const [formKey,setFormKey]=useState(0);
  const [preparing,setPreparing]=useState(true);
  const shellRef=useRef<HTMLDivElement>(null);
+ const project:any=session?.bundle?.project;
+ const microplanScope=session?.bundle?.microplanning?.scope ?? {states:project?.scope_states||[],lgas:project?.scope_lgas||[],wards:project?.scope_wards||[]};
  useEffect(()=>{
   const viewport=window.visualViewport;
   const resize=()=>shellRef.current?.style.setProperty('--microplan-viewport-height',`${viewport?.height ?? window.innerHeight}px`);
@@ -28,7 +30,7 @@ export default function DeviceMicroplanShell(){
   if(!session)return;
   void load(); const timer=window.setInterval(()=>void load(),3000);
   let cancelled=false;
-  const scope=session.bundle.microplanning?.scope;
+  const scope=microplanScope;
   const states=scope?.states.length ? scope.states : scope?.lgas.length ? [...new Set(scope.lgas.map(v=>v.split('|')[0]))] : scope?.wards.length ? [...new Set(scope.wards.map(v=>v.split('|')[0]))] : getAllStates();
   void (async()=>{for(const state of states){if(cancelled || !navigator.onLine)break;await prefetchGrid3State(state);} if(!cancelled)setPreparing(false);})();
   return()=>{cancelled=true;window.clearInterval(timer);};
@@ -50,7 +52,7 @@ export default function DeviceMicroplanShell(){
    <Button variant="ghost" size="sm" onClick={leave}><LogOut className="mr-1 h-4 w-4"/>Leave project</Button>
   </header>
   <main className="min-h-0 min-w-0 flex-1 flex flex-col w-full max-w-6xl mx-auto px-3 pt-3">
-   <MicroplanEntryForm key={formKey} projectId={session.projectId} scopeOverride={session.bundle.microplanning?.scope} accountFree onSubmit={save} onCancel={()=>setFormKey(v=>v+1)} isSubmitting={busy}/>
+   <MicroplanEntryForm key={formKey} projectId={session.projectId} scopeOverride={microplanScope} accountFree onSubmit={save} onCancel={()=>setFormKey(v=>v+1)} isSubmitting={busy}/>
   </main>
   <footer className="shrink-0 border-t bg-card px-4 py-2 flex items-center justify-between gap-3 text-xs">
    <span>{entries.filter(e=>e.status==='sent').length} synced · {entries.filter(e=>e.status==='finalized').length} pending</span>
