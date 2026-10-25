@@ -12,9 +12,10 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import hero from "@/assets/eye-report/hero.jpg";
 import {
-  AGE_BANDS, MONTHS, aggregate, byMonth, normCsom, normSummary, pct, t, totals, vaTotal, type EyeReportRow,
+  AGE_BANDS, MONTHS, aggregate, aggregatePatients, byMonth, normCsom, normSummary, pct, t, totals, vaTotal,
+  type EyePatientRow, type EyeReportRow,
 } from "@/lib/eyeReport/definition";
-import { deleteReport, loadReports } from "@/lib/eyeReport/store";
+import { deleteReport, loadPatients, loadReports } from "@/lib/eyeReport/store";
 import { exportAggregated, exportDailyReport } from "@/lib/eyeReport/exportExcel";
 import EyeDailyReportForm, { type EyeFacility } from "./EyeDailyReportForm";
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { BarChart3, ChevronRight, ClipboardPlus, Settings2 } from "lucide-react";
+import { Accessibility, BarChart3, ChevronRight, ClipboardPlus, Settings2 } from "lucide-react";
 import hero from "@/assets/eye-report/hero.jpg";
 import { cachedRead } from "@/lib/programmeModule/offlineReadCache";
 import { loadReports } from "@/lib/eyeReport/store";
