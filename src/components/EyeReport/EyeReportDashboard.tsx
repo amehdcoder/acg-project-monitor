@@ -101,7 +101,7 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
     try { await deleteReport(projectId, r.id); setRows((x) => x.filter((y) => y.id !== r.id)); toast.success("Report deleted"); } catch (e) { toast.error(e instanceof Error ? e.message : "Delete failed"); }
   };
 
-  if (form.open) return <EyeDailyReportForm projectId={projectId} projectName={projectName} facilities={facilities} mode={{ kind: "user", userId }} existing={form.existing} otherReports={rows} onClose={() => setForm({ open: false })} onSaved={() => void load()} />;
+  if (form.open) return <EyeDailyReportForm projectId={projectId} projectName={projectName} facilities={facilities} mode={{ kind: "user", userId }} existing={form.existing} existingPatients={form.existing ? patients.filter((p) => p.report_id === form.existing!.id) : []} wgOnly={form.wgOnly} otherReports={rows} onClose={() => setForm({ open: false })} onSaved={() => void load()} />;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-eye-sky">
@@ -115,6 +115,7 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
           <p className="mt-1 max-w-xl text-sm opacity-85">Daily facility reports, aggregated by month and year, with cataract surgery outcome monitoring.</p>
           <div className="mt-4 flex flex-wrap gap-2">
             {canReport && <Button onClick={() => setForm({ open: true })} className="bg-eye-gold text-eye-ink hover:bg-eye-gold/90"><Plus className="mr-1 h-4 w-4" /> New daily report</Button>}
+            {canReport && <Button onClick={() => setForm({ open: true, wgOnly: true })} variant="secondary"><Accessibility className="mr-1 h-4 w-4" /> WG-SS screening only</Button>}
             <Button onClick={doExport} disabled={exporting} variant="secondary">{exporting ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <FileSpreadsheet className="mr-1 h-4 w-4" />} Export Summary & CSOM</Button>
             <Button onClick={() => void load()} variant="ghost" className="text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"><RefreshCw className={`mr-1 h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh</Button>
             {fromCache && <span className="inline-flex items-center gap-1 rounded-full bg-eye-gold px-3 py-1 text-xs font-semibold text-eye-ink"><CloudOff className="h-3 w-3" /> Showing saved offline copy</span>}
