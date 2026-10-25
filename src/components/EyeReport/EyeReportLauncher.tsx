@@ -13,7 +13,17 @@ const db = supabase as any;
 interface Props { projectId: string | null; projects: { id: string; name: string }[]; userId?: string; isAdmin: boolean }
 
 /** Forms-page entry cards for the Eye Health daily report and its dashboard. */
-export default function EyeReportLauncher({ projectId, projects, userId, isAdmin }: Props) {
+export default function EyeReportLauncher({ projectId: selected, projects, userId, isAdmin }: Props) {
+  // With "All projects" selected, fall back to the first project that has the report.
+  const [fallback, setFallback] = useState<string | null>(null);
+  useEffect(() => {
+    if (selected) return;
+    void cachedRead<{ project_id: string }[]>("eye-projects", () => db.from("eye_report_projects").select("project_id")).then(({ data }) => {
+      const ids = new Set((data ?? []).map((r) => r.project_id));
+      setFallback(projects.find((p) => ids.has(p.id))?.id ?? null);
+    });
+  }, [selected, projects]);
+  const projectId = selected ?? fallback;
   const [perm, setPerm] = useState({ enabled: false, report: false, view: false });
   const [facilities, setFacilities] = useState<EyeFacility[]>([]);
   const [open, setOpen] = useState<"form" | "dash" | null>(null);
