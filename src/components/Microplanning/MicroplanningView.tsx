@@ -23,6 +23,7 @@ import { bindQueueAutoFlush, listQueued } from "@/lib/programmeModule/offlineQue
 import { cacheGet, cacheSet, cachedRead } from "@/lib/programmeModule/offlineReadCache";
 import MicroplanEntryForm, { MicroplanFormData } from "./MicroplanEntryForm";
 import MicroplanMap from "./MicroplanMap";
+import PopulationDisaggregationDialog from "./PopulationDisaggregationDialog";
 import CoverageView from "./CoverageView";
 import ReconciliationView from "./ReconciliationView";
 import MissingCommunitiesView from "./MissingCommunitiesView";
@@ -861,7 +862,8 @@ interface MicroplanningViewProps {
 const microplanEntriesCache = new Map<string, any[]>();
 
 const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: MicroplanningViewProps) => {
-  const { user, isOwner, isSuperAdmin, isAdmin } = useAuth();
+  const { user, role, isOwner, isSuperAdmin, isAdmin } = useAuth();
+  const [showPopulationSettings, setShowPopulationSettings] = useState(false);
   const [entries, setEntries] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
@@ -1721,7 +1723,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
     const tp = (e: any) =>
       e && e.__uploaded
         ? Math.round((Number(e.estimated_total_population) || 0) * (medTargetPct / 100))
-        : (calcTargetPop(e) || (e.estimated_total_population || 0));
+        : calcTargetPop(e);
 
     type Node = { e: any; tp: number; nFlhf: string };
     const byLga = new Map<string, Node[]>();        // normLga -> entries
@@ -1806,7 +1808,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
     if (e && e.__uploaded) {
       return Math.round((Number(e.estimated_total_population) || 0) * (medTargetPct / 100));
     }
-    return calcTargetPop(e) || (e.estimated_total_population || 0);
+    return calcTargetPop(e);
   };
 
   // User-configurable target drug-per-person ratio band (persisted)
@@ -2493,6 +2495,11 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
           {isSuperAdmin && (
             <Button size="sm" variant="outline" onClick={() => setShowKoboSettings(true)} className="shadow-sm">
               <HistoryIcon className="h-3.5 w-3.5 mr-1" /> Kobo Sync
+            </Button>
+          )}
+          {!entryOnly && role === "super_admin" && (
+            <Button size="sm" variant="outline" disabled={!selectedProjectId} onClick={() => setShowPopulationSettings(true)}>
+              <Target className="h-3.5 w-3.5 mr-1" /> Population disaggregation
             </Button>
           )}
           <Button size="sm" onClick={() => { setEditingEntry(null); setShowForm(true); }} className="shadow-sm font-semibold">
@@ -3766,6 +3773,8 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
           />
         </DialogContent>
       </Dialog>
+
+      {role === "super_admin" && <PopulationDisaggregationDialog open={showPopulationSettings} onOpenChange={setShowPopulationSettings} projectName={selectedProjectName} entries={filtered} />}
 
       {/* User Access Manager Dialog - only for full access */}
       {!entryOnly && (

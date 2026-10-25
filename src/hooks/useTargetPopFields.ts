@@ -39,7 +39,7 @@ const read = (storageKey: string, fallback: string[]): string[] => {
  * the 5–14 yrs cohort by default) and per-project persistence.
  */
 export function useTargetPopFields(projectName?: string | null) {
-  const { isSuperAdmin } = useAuth();
+  const { role } = useAuth();
   const storageKey = targetPopStorageKeyFor(projectName);
   const isGiveWell = !!projectName && /givewell/i.test(projectName);
   // Stable reference: a fresh array each render caused an endless re-render loop (page freeze).
@@ -83,7 +83,7 @@ export function useTargetPopFields(projectName?: string | null) {
   }, [projectKey, storageKey, fallback]);
 
   const setFields = useCallback(async (next: string[]) => {
-    if (!isSuperAdmin) throw new Error("Only Super Admins may configure Target Population.");
+    if (role !== "super_admin") throw new Error("Only Super Admins may configure Target Population.");
     if (!projectName) throw new Error("Select a project first.");
     if (!validTargetSelection(next)) throw new Error("Select age groups from one disaggregation only.");
     const { data: auth, error: authError } = await supabase.auth.getUser();
@@ -99,7 +99,7 @@ export function useTargetPopFields(projectName?: string | null) {
       window.dispatchEvent(new Event(EVENT_NAME));
     } catch {}
     setFieldsState(data.value);
-  }, [storageKey, projectKey, projectName, isSuperAdmin]);
+  }, [storageKey, projectKey, projectName, role]);
 
   const calcTargetPop = useCallback(
     (entry: Record<string, any> | null | undefined): number => {
