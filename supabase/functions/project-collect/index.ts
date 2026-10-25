@@ -36,7 +36,9 @@ Deno.serve(async (req) => {
   try {
     const ctx = await verifyDeviceToken(req);
     if (!ctx) return json({ error: "device_not_authorized" }, 401);
-    if (!ctx.allowForms && !ctx.allowSeeclear && !ctx.allowCases && !ctx.allowMicroplanning) {
+    const dbEarly = admin();
+    const { data: eyeProject } = await dbEarly.from("eye_report_projects").select("project_id").eq("project_id", ctx.projectId).maybeSingle();
+    if (!ctx.allowForms && !ctx.allowSeeclear && !ctx.allowCases && !ctx.allowMicroplanning && !eyeProject) {
       return json({ error: "collection_not_allowed" }, 403);
     }
     if (!ctx.collectorUserId) return json({ error: "collection_account_missing" }, 409);
@@ -64,7 +66,30 @@ Deno.serve(async (req) => {
         accepted.push(record.id);
       } catch (error) { rejected.push({id:record.id,reason:String((error as Error).message || 'write_failed')}); }
     }
-    for (const record of records.filter(r => r.kind && !['form','case','seeclear','microplan'].includes(r.kind))) rejected.push({id:record.id,reason:'invalid_record_kind'});
+    // Eye Health daily facility reports (one per facility per day).
+    for (const record of records.filter(r => r.kind === 'eye_daily')) {
+      if (!eyeProject) { rejected.push({id:record.id,reason:'eye_reporting_not_enabled'}); continue; }
+      try {
+        const d = (record.data ?? {}) as Record<string, any>;
+        const facility = String(d.facility_name ?? '').trim().slice(0, 200);
+        const date = String(d.report_date ?? '');
+        if (!facility || !/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('invalid_eye_report');
+        const row = {
+          id: record.id, project_id: ctx.projectId, facility_id: d.facility_id || null, facility_name: facility,
+          state: d.state ? String(d.state).slice(0,80) : null, lga: d.lga ? String(d.lga).slice(0,80) : null,
+          report_date: date, summary: d.summary ?? {}, csom: d.csom ?? null,
+          notes: d.notes ? String(d.notes).slice(0, 2000) : null,
+          prepared_by: d.prepared_by ? String(d.prepared_by).slice(0,120) : ctx.label,
+          confirmed_by: d.confirmed_by ? String(d.confirmed_by).slice(0,120) : null,
+          created_by: ctx.collectorUserId, device_id: ctx.deviceId, collector_label: ctx.label,
+        };
+        const { error } = await db.from('eye_daily_reports').upsert(row, { onConflict: 'id' });
+        if (error?.code === '23505') throw new Error('duplicate_facility_day');
+        if (error) throw new Error(error.message);
+        accepted.push(record.id);
+      } catch (error) { rejected.push({id:record.id,reason:String((error as Error).message || 'write_failed')}); }
+    }
+    for (const record of records.filter(r => r.kind && !['form','case','seeclear','microplan','eye_daily'].includes(r.kind))) rejected.push({id:record.id,reason:'invalid_record_kind'});
 
     // See Clear facility visits go to the checklist table (and on to Kobo).
     const seeclear = records.filter((r) => r.kind === "seeclear");

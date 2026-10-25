@@ -137,12 +137,22 @@ export async function buildProjectBundle(
   // Extra checklists the device may fill offline alongside the project forms.
   const specialForms = allowSeeclear ? ["seeclear"] : [];
 
+  // Eye Health daily facility reporting travels with any device whose project
+  // has the reporting form added, together with the project's facility list.
+  const { data: eyeEnabled } = await db.from("eye_report_projects").select("project_id").eq("project_id", projectId).maybeSingle();
+  let eyeReporting: { facilities: unknown[] } | null = null;
+  if (eyeEnabled) {
+    const { data: facilities } = await db.from("health_facilities").select("id, name, state, lga, ward").eq("project_id", projectId).neq("is_active", false).order("name");
+    eyeReporting = { facilities: facilities ?? [] };
+  }
+
   return {
     project: project ?? null,
     forms: forms ?? [],
     caseTypes,
     specialForms,
     microplanning: allowMicroplanning ? { scope: { states: project?.scope_states || [], lgas: project?.scope_lgas || [], wards: project?.scope_wards || [] } } : null,
+    eyeReporting,
     syncedAt: new Date().toISOString(),
   };
 }

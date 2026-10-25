@@ -30,6 +30,12 @@ export default {
         "report-display": ['Sora', 'system-ui', 'sans-serif'],
       },
       colors: {
+        eye: {
+          blue: "hsl(var(--eye-blue))", deep: "hsl(var(--eye-deep))", sky: "hsl(var(--eye-sky))",
+          teal: "hsl(var(--eye-teal))", mint: "hsl(var(--eye-mint))", violet: "hsl(var(--eye-violet))",
+          orange: "hsl(var(--eye-orange))", gold: "hsl(var(--eye-gold))", rose: "hsl(var(--eye-rose))",
+          ink: "hsl(var(--eye-ink))", paper: "hsl(var(--eye-paper))",
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

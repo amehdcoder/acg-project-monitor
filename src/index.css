@@ -99,6 +99,12 @@
     --acg-cream: 40 40% 96%;
     --acg-pattern-opacity: 0.05;
 
+    /* Eye Health facility reporting (WHO-style palette) */
+    --eye-blue: 202 87% 30%; --eye-deep: 204 85% 19%; --eye-sky: 203 64% 94%;
+    --eye-teal: 175 77% 26%; --eye-mint: 170 50% 94%; --eye-violet: 262 83% 58%;
+    --eye-orange: 21 90% 48%; --eye-gold: 45 100% 48%; --eye-rose: 0 72% 51%;
+    --eye-ink: 215 28% 17%; --eye-paper: 0 0% 100%;
+
     /* Status / Semantic colors */
     --status-success: 160 50% 35%;
     --status-success-light: 160 60% 25%;

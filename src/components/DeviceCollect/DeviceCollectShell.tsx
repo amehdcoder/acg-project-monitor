@@ -22,6 +22,9 @@ import { listAllSavedEntries } from "@/lib/savedForms";
 import { syncDeviceRecords } from "@/lib/deviceSync";
 import SeeClearFormFiller from "@/components/SeeClear/SeeClearFormFiller";
 import DeviceCaseFiller from "@/components/DeviceCollect/DeviceCaseFiller";
+import EyeDailyReportForm from "@/components/EyeReport/EyeDailyReportForm";
+import { listDeviceReports } from "@/lib/eyeReport/store";
+import type { EyeReportRow } from "@/lib/eyeReport/definition";
 
 type SavedMode = "edit" | "send" | "view" | null;
 
@@ -41,6 +44,8 @@ const DeviceCollectShell = () => {
   const [syncing, setSyncing] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [seeClearOpen, setSeeClearOpen] = useState(false);
+  const [eyeOpen, setEyeOpen] = useState(false);
+  const [eyeRows, setEyeRows] = useState<EyeReportRow[]>([]);
   const [caseType, setCaseType] = useState<any | null>(null);
   const [activeTab, setActiveTab] = useState("forms");
   const [search, setSearch] = useState("");
@@ -119,6 +124,21 @@ const DeviceCollectShell = () => {
           collectorLabel: session.label,
           projectId: session.projectId,
         }}
+      />
+    );
+  }
+
+  const eyeBundle = (session.bundle as any)?.eyeReporting as { facilities: any[] } | null | undefined;
+  if (eyeOpen && eyeBundle) {
+    return (
+      <EyeDailyReportForm
+        projectId={session.projectId}
+        projectName={session.projectName}
+        facilities={eyeBundle.facilities ?? []}
+        mode={{ kind: "device", deviceId: session.deviceId, label: session.label }}
+        otherReports={eyeRows}
+        onClose={() => setEyeOpen(false)}
+        onSaved={() => void loadCounts()}
       />
     );
   }
@@ -228,6 +248,17 @@ const DeviceCollectShell = () => {
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search forms and checklists" className="h-12 bg-card pl-10" aria-label="Search forms and checklists" />
             </div>
+            {(session.bundle as any)?.eyeReporting && (
+              <Card className="cursor-pointer border-eye-blue/40 bg-card shadow-soft transition-colors hover:border-eye-blue" onClick={async () => { setEyeRows(await listDeviceReports(session.deviceId, session.projectId)); setEyeOpen(true); }}>
+                <CardHeader className="py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-eye-blue text-primary-foreground"><ClipboardCheck className="h-5 w-5" /></div>
+                    <div className="min-w-0 flex-1"><CardTitle className="collector-title">Eye Health Daily Facility Report</CardTitle><CardDescription className="mt-1">Daily summary + CSOM · Offline ready</CardDescription></div>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                </CardHeader>
+              </Card>
+            )}
             {session.allowSeeclear && (
               <Card className="cursor-pointer border-primary/35 bg-card shadow-soft transition-colors hover:border-primary" onClick={() => setSeeClearOpen(true)}>
                 <CardHeader className="py-4">
