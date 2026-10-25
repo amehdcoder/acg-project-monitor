@@ -457,11 +457,20 @@ export const useMyTeamPermissions = (projectId?: string, isAdmin = false) => {
     void load();
     const refresh = () => { void load(); };
     window.addEventListener("programme-access-changed", refresh);
+    window.addEventListener("online", refresh);
+    window.addEventListener("focus", refresh);
+    const poll = window.setInterval(refresh, 60_000);
     const channel = supabase.channel(`my-team-access:${projectId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "project_access_profiles", filter: `project_id=eq.${projectId}` }, refresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "programme_team_members", filter: `project_id=eq.${projectId}` }, refresh)
       .subscribe();
-    return () => { window.removeEventListener("programme-access-changed", refresh); void supabase.removeChannel(channel); };
+    return () => {
+      window.removeEventListener("programme-access-changed", refresh);
+      window.removeEventListener("online", refresh);
+      window.removeEventListener("focus", refresh);
+      window.clearInterval(poll);
+      void supabase.removeChannel(channel);
+    };
   }, [load, projectId]);
 
   const can = useMemo(() => {
