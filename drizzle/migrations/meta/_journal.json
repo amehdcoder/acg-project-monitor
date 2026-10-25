@@ -260,6 +260,13 @@
       "when": 1792951965962,
       "tag": "0036_beneficiary_portal_accounts_and_progress",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1792952771461,
+      "tag": "0037_geo_account_free_collection",
+      "breakpoints": true
     }
   ]
 }

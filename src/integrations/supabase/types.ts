@@ -8636,6 +8636,7 @@ export type Database = {
           cdd_from_community: boolean | null
           cdd_names: string | null
           cdd_phone_numbers: string | null
+          collector_label: string | null
           community_distance_to_flhf_km: number | null
           community_gps_accuracy: number | null
           community_lat_override: number | null
@@ -8647,6 +8648,7 @@ export type Database = {
           community_name: string
           created_at: string
           created_by: string | null
+          device_id: string | null
           estimated_adults_15_plus: number | null
           estimated_children_0_4: number | null
           estimated_children_5_14: number | null
@@ -8714,6 +8716,7 @@ export type Database = {
           cdd_from_community?: boolean | null
           cdd_names?: string | null
           cdd_phone_numbers?: string | null
+          collector_label?: string | null
           community_distance_to_flhf_km?: number | null
           community_gps_accuracy?: number | null
           community_lat_override?: number | null
@@ -8725,6 +8728,7 @@ export type Database = {
           community_name: string
           created_at?: string
           created_by?: string | null
+          device_id?: string | null
           estimated_adults_15_plus?: number | null
           estimated_children_0_4?: number | null
           estimated_children_5_14?: number | null
@@ -8792,6 +8796,7 @@ export type Database = {
           cdd_from_community?: boolean | null
           cdd_names?: string | null
           cdd_phone_numbers?: string | null
+          collector_label?: string | null
           community_distance_to_flhf_km?: number | null
           community_gps_accuracy?: number | null
           community_lat_override?: number | null
@@ -8803,6 +8808,7 @@ export type Database = {
           community_name?: string
           created_at?: string
           created_by?: string | null
+          device_id?: string | null
           estimated_adults_15_plus?: number | null
           estimated_children_0_4?: number | null
           estimated_children_5_14?: number | null
@@ -10485,6 +10491,7 @@ export type Database = {
         Row: {
           allow_cases: boolean
           allow_forms: boolean
+          allow_microplanning: boolean
           allow_seeclear: boolean
           code_hash: string
           collector_user_id: string | null
@@ -10501,6 +10508,7 @@ export type Database = {
         Insert: {
           allow_cases?: boolean
           allow_forms?: boolean
+          allow_microplanning?: boolean
           allow_seeclear?: boolean
           code_hash: string
           collector_user_id?: string | null
@@ -10517,6 +10525,7 @@ export type Database = {
         Update: {
           allow_cases?: boolean
           allow_forms?: boolean
+          allow_microplanning?: boolean
           allow_seeclear?: boolean
           code_hash?: string
           collector_user_id?: string | null
