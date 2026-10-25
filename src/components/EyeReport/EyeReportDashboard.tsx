@@ -178,6 +178,32 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
           </div>
         </section>
 
+        <section className="grid gap-4 lg:grid-cols-3">
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-eye-violet via-eye-blue to-eye-deep p-5 text-primary-foreground shadow-md">
+            <Accessibility className="absolute -right-4 -top-4 h-28 w-28 opacity-15" />
+            <h3 className="flex items-center gap-2 text-sm font-bold"><Accessibility className="h-4 w-4" /> Disability screening (WG-SS)</h3>
+            <p className="mt-3 text-3xl font-extrabold tabular-nums">{pAgg.screened}</p>
+            <p className="text-xs opacity-85">patients screened · {pAgg.days} days · {pAgg.facilities} facilities</p>
+            <div className="mt-3 flex items-end gap-2">
+              <p className="text-2xl font-extrabold text-eye-gold">{pct(pAgg.withDisability, pAgg.screened)}%</p>
+              <p className="pb-0.5 text-xs opacity-85">with a disability ({pAgg.withDisability})</p>
+            </div>
+            <p className="mt-2 text-[11px] opacity-75">M {pAgg.bySex.m} · F {pAgg.bySex.f}{pAgg.bySex.other ? ` · unstated ${pAgg.bySex.other}` : ""}</p>
+          </div>
+          <div className="rounded-2xl border bg-card p-4 shadow-sm lg:col-span-2">
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold"><Accessibility className="h-4 w-4 text-eye-violet" /> Disability domains identified</h3>
+            {pAgg.domains.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">No WG-SS screenings match these filters yet.</p>}
+            <div className="grid gap-2.5 sm:grid-cols-2">
+              {pAgg.domains.map((d) => (
+                <div key={d.label}>
+                  <div className="flex justify-between text-xs"><span className="font-medium">{d.label}</span><span className="font-bold">{d.count} · {pct(d.count, pAgg.screened)}%</span></div>
+                  <div className="mt-1 h-2.5 overflow-hidden rounded-full bg-muted"><motion.div className="h-full rounded-full bg-eye-violet" initial={{ width: 0 }} animate={{ width: `${Math.min(100, pct(d.count, pAgg.screened))}%` }} /></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         <section className="rounded-2xl border bg-card shadow-sm">
           <h3 className="flex items-center gap-2 border-b p-4 text-sm font-bold"><Building2 className="h-4 w-4 text-eye-blue" /> Facility performance</h3>
           <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-sm">
