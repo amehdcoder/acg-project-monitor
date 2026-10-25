@@ -1,0 +1,154 @@
+// Eye Health daily facility reporting — State Ministry of Health, Primary Eye
+// Care. Mirrors the "Summary of Eye Health Screening and Other Medications"
+// annual template and the "Cataract Surgery Outcome Monitoring" (CSOM) sheet.
+
+export const EYE_REPORT_NAME = "Eye Health Daily Facility Report";
+export const EYE_DASH_NAME = "Eye Health Outputs & Outcomes Dashboard";
+
+export type MF = { m: number; f: number };
+export const AGE_BANDS = [
+  { key: "a0_4", label: "0–4 yrs" },
+  { key: "a5_14", label: "5–14 yrs" },
+  { key: "a15", label: "15+ yrs" },
+] as const;
+export const SURGERY_ITEMS = [
+  { key: "cataract", label: "Cataract operated" },
+  { key: "glaucoma", label: "Glaucoma operated" },
+  { key: "minor", label: "Patients needing minor surgery" },
+] as const;
+export const LENS_TYPES = [
+  { key: "dv", label: "Distance (DV)" },
+  { key: "nv", label: "Near (NV)" },
+  { key: "bf", label: "Bifocal (BF)" },
+] as const;
+
+export interface EyeSummary {
+  consult: { a0_4: MF; a5_14: MF; a15: MF };
+  pwd: MF;
+  surgery: { cataract: MF; glaucoma: MF; minor: MF };
+  lenses: { dv: MF; nv: MF; bf: MF };
+  glasses: { dv: MF; nv: MF; bf: MF };
+}
+export type VaBand = { good: number; borderline: number; poor: number };
+export interface EyeCsom {
+  surgeries: number;
+  biometry: number;
+  iol: number;
+  discharge: { presenting: VaBand; pinhole: VaBand };
+  followup: { presenting: VaBand; bcva: VaBand };
+}
+
+const mf = (): MF => ({ m: 0, f: 0 });
+const va = (): VaBand => ({ good: 0, borderline: 0, poor: 0 });
+export const emptySummary = (): EyeSummary => ({
+  consult: { a0_4: mf(), a5_14: mf(), a15: mf() },
+  pwd: mf(),
+  surgery: { cataract: mf(), glaucoma: mf(), minor: mf() },
+  lenses: { dv: mf(), nv: mf(), bf: mf() },
+  glasses: { dv: mf(), nv: mf(), bf: mf() },
+});
+export const emptyCsom = (): EyeCsom => ({
+  surgeries: 0, biometry: 0, iol: 0,
+  discharge: { presenting: va(), pinhole: va() },
+  followup: { presenting: va(), bcva: va() },
+});
+
+const n = (v: unknown) => (Number.isFinite(Number(v)) ? Math.max(0, Math.floor(Number(v))) : 0);
+/** Deep-normalises any stored/partial JSON into a full summary of integers. */
+export function normSummary(raw: any): EyeSummary {
+  const s = emptySummary();
+  const g = (o: any): MF => ({ m: n(o?.m), f: n(o?.f) });
+  for (const b of AGE_BANDS) s.consult[b.key] = g(raw?.consult?.[b.key]);
+  s.pwd = g(raw?.pwd);
+  for (const i of SURGERY_ITEMS) s.surgery[i.key] = g(raw?.surgery?.[i.key]);
+  for (const l of LENS_TYPES) { s.lenses[l.key] = g(raw?.lenses?.[l.key]); s.glasses[l.key] = g(raw?.glasses?.[l.key]); }
+  return s;
+}
+export function normCsom(raw: any): EyeCsom | null {
+  if (!raw) return null;
+  const b = (o: any): VaBand => ({ good: n(o?.good), borderline: n(o?.borderline), poor: n(o?.poor) });
+  return {
+    surgeries: n(raw.surgeries), biometry: n(raw.biometry), iol: n(raw.iol),
+    discharge: { presenting: b(raw.discharge?.presenting), pinhole: b(raw.discharge?.pinhole) },
+    followup: { presenting: b(raw.followup?.presenting), bcva: b(raw.followup?.bcva) },
+  };
+}
+
+export const t = (x: MF) => x.m + x.f;
+export const vaTotal = (b: VaBand) => b.good + b.borderline + b.poor;
+export const pct = (num: number, den: number) => (den > 0 ? Math.round((num / den) * 1000) / 10 : 0);
+export const sumMF = (...xs: MF[]): MF => xs.reduce((a, x) => ({ m: a.m + x.m, f: a.f + x.f }), mf());
+
+export function totals(s: EyeSummary) {
+  const consulted = sumMF(s.consult.a0_4, s.consult.a5_14, s.consult.a15);
+  return {
+    consulted,
+    lenses: sumMF(s.lenses.dv, s.lenses.nv, s.lenses.bf),
+    glasses: sumMF(s.glasses.dv, s.glasses.nv, s.glasses.bf),
+    surgeries: sumMF(s.surgery.cataract, s.surgery.glaucoma),
+  };
+}
+
+export interface Issue { field: string; message: string; level: "error" | "warning" }
+export const MAX_CELL = 5000;
+
+/** Validation rules for a single daily report. Errors block saving; warnings require confirmation. */
+export function validateReport(input: { facility: string; date: string; summary: EyeSummary; csom: EyeCsom | null; today?: string }): Issue[] {
+  const out: Issue[] = [];
+  const today = input.today ?? new Date().toISOString().slice(0, 10);
+  if (!input.facility.trim()) out.push({ field: "facility", message: "Select the reporting facility.", level: "error" });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) out.push({ field: "date", message: "Enter the report date.", level: "error" });
+  else if (input.date > today) out.push({ field: "date", message: "The report date cannot be in the future.", level: "error" });
+
+  const s = input.summary;
+  const all: [string, number][] = [];
+  const walk = (o: any, p: string) => { for (const [k, v] of Object.entries(o)) typeof v === "number" ? all.push([`${p}${k}`, v]) : walk(v, `${p}${k}.`); };
+  walk(s, "");
+  for (const [k, v] of all) if (v > MAX_CELL) out.push({ field: k, message: `${v} is unusually high for one day (max ${MAX_CELL}).`, level: "error" });
+
+  const T = totals(s);
+  for (const sex of ["m", "f"] as const) {
+    const label = sex === "m" ? "male" : "female";
+    if (s.pwd[sex] > T.consulted[sex]) out.push({ field: `pwd.${sex}`, message: `Persons with disability (${label}) cannot exceed ${label} persons consulted (${T.consulted[sex]}).`, level: "error" });
+    if (T.glasses[sex] > T.lenses[sex]) out.push({ field: `glasses.${sex}`, message: `Glasses dispensed (${label}) exceed lenses prescribed (${T.lenses[sex]}). Please confirm.`, level: "warning" });
+    if (T.surgeries[sex] > T.consulted[sex]) out.push({ field: `surgery.${sex}`, message: `Surgeries (${label}) are more than ${label} persons consulted today. Please confirm.`, level: "warning" });
+  }
+  if (t(T.consulted) === 0 && all.some(([, v]) => v > 0)) out.push({ field: "consult", message: "Services are recorded but no consultations. Please confirm.", level: "warning" });
+
+  const cat = t(s.surgery.cataract);
+  if (cat > 0 && !input.csom) out.push({ field: "csom", message: "Cataract surgeries were recorded — complete the CSOM outcome episode.", level: "error" });
+  const c = input.csom;
+  if (c) {
+    if (c.surgeries !== cat) out.push({ field: "csom.surgeries", message: `CSOM surgeries (${c.surgeries}) must equal cataract operated in the summary (${cat}).`, level: "error" });
+    if (c.biometry > c.surgeries) out.push({ field: "csom.biometry", message: "Surgeries done after biometry cannot exceed total surgeries.", level: "error" });
+    if (c.iol > c.surgeries) out.push({ field: "csom.iol", message: "Surgeries with IOL cannot exceed total surgeries.", level: "error" });
+    const dp = vaTotal(c.discharge.presenting), dh = vaTotal(c.discharge.pinhole);
+    if (dp > c.surgeries) out.push({ field: "csom.discharge", message: `Discharge outcomes (${dp}) cannot exceed surgeries (${c.surgeries}).`, level: "error" });
+    if (dh > 0 && dh !== dp) out.push({ field: "csom.discharge.pinhole", message: `Pinhole total (${dh}) must equal presenting total (${dp}) — same eyes.`, level: "error" });
+    const fp = vaTotal(c.followup.presenting), fb = vaTotal(c.followup.bcva);
+    if (fb > 0 && fb !== fp) out.push({ field: "csom.followup.bcva", message: `Pinhole/BCVA total (${fb}) must equal presenting total (${fp}).`, level: "error" });
+    if (c.discharge.pinhole.good > 0 && c.discharge.pinhole.good < c.discharge.presenting.good) out.push({ field: "csom.discharge.pinhole", message: "Good outcomes with pinhole are usually ≥ presenting. Please confirm.", level: "warning" });
+  }
+  return out;
+}
+
+export interface EyeReportRow {
+  id: string; project_id: string; facility_id: string | null; facility_name: string;
+  state: string | null; lga: string | null; report_date: string;
+  summary: any; csom: any; notes: string | null; prepared_by: string | null; confirmed_by: string | null;
+  created_by: string | null; device_id: string | null; collector_label: string | null; created_at?: string;
+}
+
+export interface Aggregate { summary: EyeSummary; csom: EyeCsom; reports: number; facilities: number; days: number }
+/** Sums many daily reports into one block (used for months, years and filters). */
+export function aggregate(rows: EyeReportRow[]): Aggregate {
+  const s = emptySummary(); const c = emptyCsom();
+  const add = (a: any, b: any) => { for (const k of Object.keys(a)) typeof a[k] === "number" ? (a[k] += b?.[k] ?? 0) : add(a[k], b?.[k]); };
+  for (const r of rows) { add(s, normSummary(r.summary)); const cs = normCsom(r.csom); if (cs) add(c, cs); }
+  return { summary: s, csom: c, reports: rows.length, facilities: new Set(rows.map((r) => r.facility_name.toLowerCase())).size, days: new Set(rows.map((r) => r.report_date)).size };
+}
+
+export const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+export function byMonth(rows: EyeReportRow[]): Aggregate[] {
+  return MONTHS.map((_, i) => aggregate(rows.filter((r) => Number(r.report_date.slice(5, 7)) === i + 1)));
+}
