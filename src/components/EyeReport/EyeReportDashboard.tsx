@@ -91,7 +91,7 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
   if (form.open) return <EyeDailyReportForm projectId={projectId} projectName={projectName} facilities={facilities} mode={{ kind: "user", userId }} existing={form.existing} otherReports={rows} onClose={() => setForm({ open: false })} onSaved={() => void load()} />;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-eye-sky/50">
+    <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-eye-sky">
       <header className="relative overflow-hidden bg-eye-deep text-primary-foreground">
         <img src={hero} alt="" width={1600} height={640} className="absolute inset-0 h-full w-full object-cover object-right opacity-40" />
         <div className="absolute inset-0 bg-gradient-to-r from-eye-deep via-eye-deep/90 to-transparent" />

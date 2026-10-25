@@ -150,7 +150,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-eye-sky/60">
+    <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-eye-sky">
       <header className="relative shrink-0 overflow-hidden bg-eye-deep text-primary-foreground">
         <img src={hero} alt="" width={1600} height={640} className="absolute inset-0 h-full w-full object-cover object-right opacity-35" />
         <div className="absolute inset-0 bg-gradient-to-r from-eye-deep via-eye-deep/90 to-eye-deep/30" />
@@ -236,7 +236,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
                       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="relative overflow-hidden rounded-2xl border-2 border-eye-gold bg-gradient-to-br from-eye-teal to-eye-deep p-4 text-primary-foreground shadow-lg">
                         <Sparkles className="absolute right-3 top-3 h-6 w-6 animate-pulse text-eye-gold" />
                         <p className="text-xs font-bold uppercase tracking-widest text-eye-gold">CSOM episode unlocked</p>
-                        <p className="mt-1 text-sm">{cataract} cataract surgery{cataract === 1 ? "" : "ies"} recorded. The Cataract Surgery Outcome Monitoring episode is now part of this report.</p>
+                        <p className="mt-1 text-sm">{cataract} cataract {cataract === 1 ? "surgery" : "surgeries"} recorded. The Cataract Surgery Outcome Monitoring episode is now part of this report.</p>
                         <Button size="sm" className="mt-3 bg-eye-gold text-eye-ink hover:bg-eye-gold/90" onClick={() => setStep(steps.findIndex((s) => s.key === "csom"))}>Open CSOM episode <ArrowRight className="ml-1 h-4 w-4" /></Button>
                       </motion.div>
                     )}
