@@ -24,6 +24,7 @@ import MhgapGuide from "./pages/MhgapGuide";
 import PublicFeedbackRoute from "./components/PublicFeedbackRoute";
 import { isPublicFeedbackLocation } from "@/lib/publicFeedback";
 import DonorPortalRoute from "./components/DonorPortal/DonorPortalRoute";
+import BeneficiaryPortalRoute from "./components/BeneficiaryPortal/BeneficiaryPortalRoute";
 import DataCleaner from "./pages/DataCleaner";
 import KoboHubPage from "./components/KoboHub/KoboHubPage";
 import MdaAnalysesHarness from "./pages/MdaAnalysesHarness";
@@ -227,6 +228,7 @@ const AppContent = () => {
   // Donor portal: standalone read-only shell with its own auth check — no
   // workspace providers, record navigation or editing affordances mount here.
   if (location.pathname.startsWith("/donor")) return <DonorPortalRoute />;
+  if (location.pathname === "/beneficiary") return <BeneficiaryPortalRoute />;
   return <WorkspaceApp />;
 };
 

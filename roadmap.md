@@ -1,5 +1,9 @@
 # Roadmap
 
+- [x] Add separate beneficiary account portal with verified record links, personal Graduation progress submissions and staff review; real unlinked account privacy/sign-out and mobile fit verified.
+- [ ] Verify linked beneficiary submission → staff approval → Graduation service end-to-end — needs a confirmed beneficiary/account link.
+- [ ] Assign and verify real focal/person programme categories — user supplied one account only; project, facility and second account not identified.
+
 - [x] Fix saved Access studio category enforcement, direct-page/profile guards and server-authorized actions; category preview and permission regressions passed.
 - [ ] Verify category enforcement signed in as a category-assigned team member — no programme team assignments exist yet.
 - [x] Remove Lovable sign-in from the donor portal; browser confirmed Google and email/password remain.

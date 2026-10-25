@@ -2067,6 +2067,115 @@ export type Database = {
           },
         ]
       }
+      beneficiary_pathway_submissions: {
+        Row: {
+          account_id: string
+          activity_date: string
+          created_at: string
+          id: string
+          notes: string
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          service_id: string | null
+          stage: string
+          status: string
+        }
+        Insert: {
+          account_id: string
+          activity_date: string
+          created_at?: string
+          id?: string
+          notes: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          service_id?: string | null
+          stage: string
+          status?: string
+        }
+        Update: {
+          account_id?: string
+          activity_date?: string
+          created_at?: string
+          id?: string
+          notes?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          service_id?: string | null
+          stage?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "beneficiary_pathway_submissions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiary_portal_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beneficiary_pathway_submissions_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiary_services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      beneficiary_portal_accounts: {
+        Row: {
+          active: boolean
+          beneficiary_id: string
+          id: string
+          project_id: string
+          user_id: string
+          verified_at: string
+          verified_by: string
+        }
+        Insert: {
+          active?: boolean
+          beneficiary_id: string
+          id?: string
+          project_id: string
+          user_id: string
+          verified_at?: string
+          verified_by: string
+        }
+        Update: {
+          active?: boolean
+          beneficiary_id?: string
+          id?: string
+          project_id?: string
+          user_id?: string
+          verified_at?: string
+          verified_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "beneficiary_portal_accounts_beneficiary_id_fkey"
+            columns: ["beneficiary_id"]
+            isOneToOne: true
+            referencedRelation: "beneficiaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beneficiary_portal_accounts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beneficiary_portal_accounts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       beneficiary_referrals: {
         Row: {
           accepted_at: string | null
@@ -14257,6 +14366,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      beneficiary_progress_reviews: {
+        Args: { _beneficiary: string }
+        Returns: Json
+      }
       bulk_grant_ces_roles: {
         Args: { _project_id: string; _roles: string[]; _user_ids: string[] }
         Returns: number
@@ -14551,6 +14664,7 @@ export type Database = {
         Args: { p_chat_group_id: string; p_user_id: string }
         Returns: number
       }
+      graduation_portal_stages: { Args: never; Returns: Json }
       has_active_mda_lens: { Args: { _user_id: string }; Returns: boolean }
       has_ces_role: {
         Args: { _project_id: string; _role: string; _user_id: string }
@@ -14681,6 +14795,10 @@ export type Database = {
         Args: { _value: Json }
         Returns: Json
       }
+      link_beneficiary_portal: {
+        Args: { _active?: boolean; _beneficiary: string; _email: string }
+        Returns: string
+      }
       log_access_attempt: {
         Args: {
           _action: string
@@ -14770,6 +14888,7 @@ export type Database = {
               ward: string
             }[]
           }
+      my_beneficiary_pathways: { Args: never; Returns: Json }
       next_beneficiary_case_id:
         | { Args: { _module_id: string }; Returns: string }
         | {
@@ -14906,6 +15025,10 @@ export type Database = {
         Args: { p_attempt_type?: string; p_quiz_id: string }
         Returns: number
       }
+      review_beneficiary_progress: {
+        Args: { _approve: boolean; _notes?: string; _submission: string }
+        Returns: string
+      }
       save_graduation_gate: {
         Args: { _beneficiary: string; _gate: Json }
         Returns: string
@@ -14938,6 +15061,15 @@ export type Database = {
       store_external_quiz_responses: {
         Args: { p_responses: Json; p_sync_id: string }
         Returns: number
+      }
+      submit_beneficiary_progress: {
+        Args: {
+          _account: string
+          _date: string
+          _notes: string
+          _stage: string
+        }
+        Returns: string
       }
       submit_bloomberg_validation: { Args: { _row: Json }; Returns: Json }
       submit_quiz_attempt: {
