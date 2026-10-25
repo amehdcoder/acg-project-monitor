@@ -16,7 +16,7 @@ import {
   validateReport, vaTotal, wgVsSummaryIssues,
   type EyeAttachment, type EyeCsom, type EyePatientRow, type EyeReportRow, type EyeSummary, type MF, type VaBand,
 } from "@/lib/eyeReport/definition";
-import { loadPatients, saveDevicePatients, saveDeviceReport, savePatients, saveReport } from "@/lib/eyeReport/store";
+import { loadPatients, loadReports, saveDevicePatients, saveDeviceReport, savePatients, saveReport } from "@/lib/eyeReport/store";
 import { GeoCombobox } from "@/components/ProgrammeModule/GeoCascadeFields";
 import { getAllStates, getLGAsForState } from "@/lib/nigeriaAdminData";
 import { fileToDataUrl, uploadBeneficiaryMedia } from "@/lib/programmeModule/media";
@@ -269,6 +269,26 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
   const states = getAllStates();
   const lgas = f.state ? getLGAsForState(f.state) : [];
 
+  // Shared facility list: registered facilities plus every name ever used on a
+  // report in this project, so a name typed once becomes a dropdown option for
+  // all reporters (loaded from the shared, access-controlled reports table).
+  const [known, setKnown] = useState<EyeFacility[]>(facilities);
+  const [manualFacility, setManualFacility] = useState(false);
+  useEffect(() => {
+    void (async () => {
+      const { rows } = await loadReports(projectId);
+      const byName = new Map<string, EyeFacility>();
+      for (const x of facilities) byName.set(x.name.trim().toLowerCase(), x);
+      for (const r of rows) {
+        const k = r.facility_name.trim().toLowerCase();
+        if (k && !byName.has(k)) byName.set(k, { id: "", name: r.facility_name.trim(), state: r.state, lga: r.lga });
+      }
+      setKnown([...byName.values()].sort((a, b) => a.name.localeCompare(b.name)));
+    })();
+  }, [projectId, facilities]);
+  const facilityKnown = known.some((x) => x.name.trim().toLowerCase() === f.facility.trim().toLowerCase());
+  const showManualFacility = manualFacility || known.length === 0 || (f.facility.trim() !== "" && !facilityKnown);
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-eye-sky">
       <header className="relative shrink-0 overflow-hidden bg-eye-deep text-primary-foreground">
@@ -314,13 +334,30 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="space-y-1.5 rounded-2xl border bg-card p-4 shadow-sm md:col-span-2">
                     <span className="flex items-center gap-2 text-sm font-bold"><Building2 className="h-4 w-4 text-eye-blue" /> Reporting facility <span className="text-destructive">*</span></span>
-                    {facilities.length > 0 ? (
-                      <select value={f.facilityId} onChange={(e) => { const x = facilities.find((y) => y.id === e.target.value); setF({ ...f, facilityId: x?.id ?? "", facility: x?.name ?? "", state: x?.state ?? "", lga: x?.lga ?? "" }); }} className={`h-12 w-full rounded-md border bg-background px-3 text-base ${has("facility") ? "border-destructive" : ""}`}>
-                        <option value="">Select facility…</option>
-                        {facilities.map((x) => <option key={x.id} value={x.id}>{x.name}{x.lga ? ` — ${x.lga}` : ""}</option>)}
-                      </select>
+                    {!showManualFacility ? (
+                      <>
+                        <select
+                          value={known.find((x) => x.name.trim().toLowerCase() === f.facility.trim().toLowerCase()) ? (known.find((x) => x.name.trim().toLowerCase() === f.facility.trim().toLowerCase())!.id || known.find((x) => x.name.trim().toLowerCase() === f.facility.trim().toLowerCase())!.name) : ""}
+                          onChange={(e) => {
+                            if (e.target.value === "__new__") { setManualFacility(true); setF({ ...f, facilityId: "", facility: "" }); return; }
+                            const x = known.find((y) => (y.id || y.name) === e.target.value);
+                            setF({ ...f, facilityId: x?.id ?? "", facility: x?.name ?? "", state: x?.state ?? "", lga: x?.lga ?? "" });
+                          }}
+                          className={`h-12 w-full rounded-md border bg-background px-3 text-base ${has("facility") ? "border-destructive" : ""}`}
+                        >
+                          <option value="">Select facility…</option>
+                          {known.map((x) => <option key={x.id || x.name} value={x.id || x.name}>{x.name}{x.lga ? ` — ${x.lga}` : ""}</option>)}
+                          <option value="__new__">＋ Add a new facility…</option>
+                        </select>
+                        <p className="text-[11px] text-muted-foreground">Every facility entered once appears here for all reporters.</p>
+                      </>
                     ) : (
-                      <Input value={f.facility} onChange={(e) => setF({ ...f, facility: e.target.value.slice(0, 200) })} placeholder="Facility name" className="h-12 text-base" />
+                      <div className="flex gap-2">
+                        <Input value={f.facility} onChange={(e) => setF({ ...f, facilityId: "", facility: e.target.value.slice(0, 200) })} placeholder="Type the facility name" className="h-12 text-base" autoFocus={manualFacility} />
+                        {known.length > 0 && (
+                          <Button type="button" variant="outline" className="h-12 shrink-0" onClick={() => setManualFacility(false)}>Choose from list</Button>
+                        )}
+                      </div>
                     )}
                   </label>
                   <label className="space-y-1.5 rounded-2xl border bg-card p-4 shadow-sm">
