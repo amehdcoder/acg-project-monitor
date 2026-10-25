@@ -1,5 +1,7 @@
 # Roadmap
 
+- [x] Add Super Admin-only project population disaggregation settings with standard/Trachoma/whole-community modes, live total preview and overlap protection; unify map/dashboard/medicine totals. Fifteen focused tests passed; Super Admin saved the existing standard selection and reloaded it successfully; build clean.
+
 - [x] Match New Microplan Entry to the supplied illustrated form while retaining all fields and validation; desktop and Android-size fit verified.
 - [x] Add project-wide Geo-only workspace settings including administrators; project isolation and lock rules tested.
 - [x] Enable durable offline Microplan entry and automatic reconnect sync; live account-free offline capture returned 1 synced / 0 pending and server row confirmed.

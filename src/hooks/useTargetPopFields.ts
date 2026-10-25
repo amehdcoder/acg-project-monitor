@@ -1,16 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { fetchSharedSetting, projectKeyFor, saveSharedSetting, subscribeSharedSetting } from "@/lib/microplanning/sharedSettings";
+import { fetchSharedSetting, projectKeyFor, subscribeSharedSetting } from "@/lib/microplanning/sharedSettings";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { TARGET_POP_DISAGGREGATION_FIELDS, targetPopulation, validTargetSelection } from "@/lib/microplanning/targetPopulation";
+export { TARGET_POP_DISAGGREGATION_FIELDS } from "@/lib/microplanning/targetPopulation";
 
-export const TARGET_POP_DISAGGREGATION_FIELDS: { key: string; label: string; field: string }[] = [
-  { key: "total_population", label: "Total Population (whole community)", field: "estimated_total_population" },
-  { key: "children_0_4", label: "Children 0–4 yrs", field: "estimated_children_0_4" },
-  { key: "children_5_14", label: "Children 5–14 yrs", field: "estimated_children_5_14" },
-  { key: "adults_15_plus", label: "Adults 15+ yrs", field: "estimated_adults_15_plus" },
-  { key: "trachoma_0_5m", label: "Trachoma 0–5 months", field: "trachoma_0_5_months" },
-  { key: "trachoma_6m_6y", label: "Trachoma 6m–6 yrs", field: "trachoma_6m_6y" },
-  { key: "trachoma_7_14y", label: "Trachoma 7–14 yrs", field: "trachoma_7_14y" },
-  { key: "trachoma_15_plus", label: "Trachoma 15+ yrs", field: "trachoma_15_plus" },
-];
 
 export const DEFAULT_TARGET_POP_FIELDS = ["children_5_14", "adults_15_plus"];
 export const TARGET_POP_STORAGE_KEY = "microplan-target-pop-fields";
@@ -25,9 +19,7 @@ export const defaultTargetPopFieldsFor = (projectName?: string | null): string[]
   projectName && /givewell/i.test(projectName) ? ["children_5_14"] : DEFAULT_TARGET_POP_FIELDS;
 
 const validate = (arr: unknown, fallback: string[]): string[] => {
-  if (!Array.isArray(arr)) return fallback;
-  const valid = arr.filter((f): f is string => typeof f === "string" && TARGET_POP_DISAGGREGATION_FIELDS.some(o => o.key === f));
-  return valid.length > 0 ? valid : fallback;
+  return validTargetSelection(arr) ? arr : fallback;
 };
 
 const read = (storageKey: string, fallback: string[]): string[] => {
@@ -47,6 +39,7 @@ const read = (storageKey: string, fallback: string[]): string[] => {
  * the 5–14 yrs cohort by default) and per-project persistence.
  */
 export function useTargetPopFields(projectName?: string | null) {
+  const { role } = useAuth();
   const storageKey = targetPopStorageKeyFor(projectName);
   const isGiveWell = !!projectName && /givewell/i.test(projectName);
   // Stable reference: a fresh array each render caused an endless re-render loop (page freeze).
@@ -89,28 +82,28 @@ export function useTargetPopFields(projectName?: string | null) {
     return () => { cancelled = true; off(); };
   }, [projectKey, storageKey, fallback]);
 
-  const setFields = useCallback((next: string[] | ((prev: string[]) => string[])) => {
-    setFieldsState(prev => {
-      const value = typeof next === "function" ? (next as (p: string[]) => string[])(prev) : next;
-      const cleaned = validate(value, fallback);
-      try {
-        window.localStorage.setItem(storageKey, JSON.stringify(cleaned));
-        window.dispatchEvent(new Event(EVENT_NAME));
-      } catch {}
-      void saveSharedSetting(projectKey, "target_pop_fields", cleaned);
-      return cleaned;
-    });
-  }, [storageKey, fallback, projectKey]);
+  const setFields = useCallback(async (next: string[]) => {
+    if (role !== "super_admin") throw new Error("Only Super Admins may configure Target Population.");
+    if (!projectName) throw new Error("Select a project first.");
+    if (!validTargetSelection(next)) throw new Error("Select age groups from one disaggregation only.");
+    const { data: auth, error: authError } = await supabase.auth.getUser();
+    if (authError || !auth.user) throw new Error("Please sign in again.");
+    const { data, error } = await supabase.from("microplan_project_settings").upsert(
+      { project_key: projectKey, setting_key: "target_pop_fields", value: next, updated_by: auth.user.id },
+      { onConflict: "project_key,setting_key" },
+    ).select("value").single();
+    if (error) throw error;
+    if (!data || !validTargetSelection(data.value)) throw new Error("Population settings were not saved.");
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify(data.value));
+      window.dispatchEvent(new Event(EVENT_NAME));
+    } catch {}
+    setFieldsState(data.value);
+  }, [storageKey, projectKey, projectName, role]);
 
   const calcTargetPop = useCallback(
     (entry: Record<string, any> | null | undefined): number => {
-      if (!entry) return 0;
-      return fields.reduce((sum, key) => {
-        const def = TARGET_POP_DISAGGREGATION_FIELDS.find(f => f.key === key);
-        if (!def) return sum;
-        const v = entry[def.field];
-        return sum + (typeof v === "number" ? v : 0);
-      }, 0);
+      return targetPopulation(entry, fields);
     },
     [fields]
   );
