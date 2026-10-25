@@ -2529,6 +2529,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
           {showFormsExplorer && (
           <div className="space-y-3">
+            {/* Eye Health daily reporting — always visible for the selected project, even with no custom forms */}
+            <EyeReportLauncher projectId={currentProjectId} projects={projects} userId={user?.id} isAdmin={!!(isOwner || isAdmin || isSuperAdmin)} />
             {/* Folder 1 — My Forms (custom forms) */}
             <div className="overflow-hidden rounded-2xl border border-border/60 bg-white shadow-sm">
               <button
@@ -2572,8 +2574,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                       </p>
                     </div>
                   ) : (
-                     <>
-                <EyeReportLauncher projectId={currentProjectId} projects={projects} userId={user?.id} isAdmin={!!(isOwner || isAdmin || isSuperAdmin)} />
+                 <>
                 {bmzFolderVisible && (
                   <div className="border-b border-border/60 bg-[#F4FBF8] p-3 sm:p-4">
                     <div className="mb-2 flex items-center justify-between gap-2">
