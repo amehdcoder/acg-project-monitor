@@ -26,7 +26,7 @@ export default function EyeReportLauncher({ projectId: selected, projects, userI
   const projectId = selected ?? fallback;
   const [perm, setPerm] = useState({ enabled: false, report: false, view: false });
   const [facilities, setFacilities] = useState<EyeFacility[]>([]);
-  const [open, setOpen] = useState<"form" | "dash" | null>(null);
+  const [open, setOpen] = useState<"form" | "dash" | "wg" | null>(null);
   const [manage, setManage] = useState(false);
   const [rows, setRows] = useState<EyeReportRow[]>([]);
 
@@ -86,6 +86,7 @@ export default function EyeReportLauncher({ projectId: selected, projects, userI
         </div>
       ) : <p className="text-xs text-muted-foreground">Not added to this project yet. Use Access → Projects to add it.</p>}
       {open === "form" && <EyeDailyReportForm projectId={projectId} projectName={projectName} facilities={facilities} mode={{ kind: "user", userId }} otherReports={rows} onClose={() => setOpen(null)} />}
+      {open === "wg" && <EyeDailyReportForm projectId={projectId} projectName={projectName} facilities={facilities} mode={{ kind: "user", userId }} wgOnly onClose={() => setOpen(null)} />}
       {open === "dash" && <EyeReportDashboard projectId={projectId} projectName={projectName} facilities={facilities} userId={userId} canReport={perm.report} canManage={isAdmin} onClose={() => setOpen(null)} />}
       <EyeReportAccessDialog open={manage} onOpenChange={setManage} projects={projects} projectId={projectId} userId={userId} onChanged={() => void check()} />
     </div>
