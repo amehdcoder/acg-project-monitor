@@ -5500,6 +5500,148 @@ export type Database = {
           },
         ]
       }
+      eye_daily_reports: {
+        Row: {
+          collector_label: string | null
+          confirmed_by: string | null
+          created_at: string
+          created_by: string | null
+          csom: Json | null
+          device_id: string | null
+          facility_id: string | null
+          facility_name: string
+          id: string
+          lga: string | null
+          notes: string | null
+          prepared_by: string | null
+          project_id: string
+          report_date: string
+          state: string | null
+          summary: Json
+          updated_at: string
+        }
+        Insert: {
+          collector_label?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          csom?: Json | null
+          device_id?: string | null
+          facility_id?: string | null
+          facility_name: string
+          id?: string
+          lga?: string | null
+          notes?: string | null
+          prepared_by?: string | null
+          project_id: string
+          report_date: string
+          state?: string | null
+          summary?: Json
+          updated_at?: string
+        }
+        Update: {
+          collector_label?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          csom?: Json | null
+          device_id?: string | null
+          facility_id?: string | null
+          facility_name?: string
+          id?: string
+          lga?: string | null
+          notes?: string | null
+          prepared_by?: string | null
+          project_id?: string
+          report_date?: string
+          state?: string | null
+          summary?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eye_daily_reports_facility_id_fkey"
+            columns: ["facility_id"]
+            isOneToOne: false
+            referencedRelation: "health_facilities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eye_daily_reports_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      eye_report_access: {
+        Row: {
+          can_report: boolean
+          can_view_dashboard: boolean
+          created_at: string
+          granted_by: string | null
+          id: string
+          project_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          can_report?: boolean
+          can_view_dashboard?: boolean
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          project_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          can_report?: boolean
+          can_view_dashboard?: boolean
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          project_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eye_report_access_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      eye_report_projects: {
+        Row: {
+          added_by: string | null
+          created_at: string
+          project_id: string
+        }
+        Insert: {
+          added_by?: string | null
+          created_at?: string
+          project_id: string
+        }
+        Update: {
+          added_by?: string | null
+          created_at?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eye_report_projects_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       facility_commodity_stock: {
         Row: {
           category: string
@@ -14415,6 +14557,10 @@ export type Database = {
         Returns: boolean
       }
       can_edit_dashboards: { Args: { _user_id: string }; Returns: boolean }
+      can_eye_report: {
+        Args: { _project: string; _user: string }
+        Returns: boolean
+      }
       can_join_mesh_room: { Args: { _room_id: string }; Returns: boolean }
       can_locate_community: {
         Args: { _project_id: string; _user_id: string }
@@ -14479,6 +14625,10 @@ export type Database = {
         Returns: boolean
       }
       can_view_all_locations: { Args: { _user_id: string }; Returns: boolean }
+      can_view_eye_dashboard: {
+        Args: { _project: string; _user: string }
+        Returns: boolean
+      }
       can_view_form_submissions: {
         Args: { _form_id: string; _user_id: string }
         Returns: boolean
@@ -14553,6 +14703,7 @@ export type Database = {
         Args: { _project_id: string }
         Returns: string
       }
+      eye_report_enabled: { Args: { _project: string }; Returns: boolean }
       facility_access_level: { Args: { _facility_id: string }; Returns: string }
       facility_access_level_for: {
         Args: { _facility_id: string; _user_id: string }
