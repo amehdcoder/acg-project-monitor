@@ -74,16 +74,13 @@ export const isInIframe = (() => {
   }
 })();
 
-export const isPreviewHost =
-  typeof window !== "undefined" &&
-  (window.location.hostname === "localhost" ||
-    window.location.hostname === "127.0.0.1" ||
-    window.location.hostname.includes("internal-preview--") ||
-    window.location.hostname.includes("id-preview--") ||
-    window.location.hostname.includes("lovableproject.com") ||
-    window.location.hostname.includes("amehnities-preview.internal"));
-
-export const shouldSkipServiceWorker = isInIframe || isPreviewHost;
+const hostname = typeof window === "undefined" ? "" : window.location.hostname.toLowerCase();
+const firstLabel = hostname.split('.')[0];
+export const isPreviewHost = hostname === "localhost" || hostname === "127.0.0.1" ||
+  /(?:^|\.)(?:lovableproject\.com|lovableproject-dev\.com|beta\.lovable\.dev)$/.test(hostname) ||
+  ((hostname.endsWith('.lovable.app') || hostname.endsWith('.gpt-eng.com') || hostname.endsWith('.gptengineer.run')) && /^(?:(?:id-preview|preview)(?:-[a-z0-9]+)?--.+|project--.+-dev)$/.test(firstLabel)) ||
+  hostname.includes("internal-preview--") || hostname.includes("amehnities-preview.internal");
+export const shouldSkipServiceWorker = !import.meta.env.PROD || isInIframe || isPreviewHost || (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('sw') === 'off');
 
 export const isSnoozed = (buildId: string): boolean => {
   try {

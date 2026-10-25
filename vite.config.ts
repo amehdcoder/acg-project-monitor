@@ -64,7 +64,7 @@ export default defineConfig(({ mode }) => {
 
       // App updates are coordinated by appUpdateManager so active form sessions
       // can be draft-snapshotted/restored instead of being interrupted by the SW.
-      registerType: "autoUpdate",
+      registerType: "prompt",
       injectRegister: null,
       devOptions: { enabled: false },
       includeAssets: ["favicon.ico", "favicon.png", "pwa-icon-192.png", "pwa-icon-512.png", "pwa-maskable-512.png", "apple-touch-icon.png"],

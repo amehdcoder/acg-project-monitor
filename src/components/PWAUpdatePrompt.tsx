@@ -57,6 +57,10 @@ const PWAUpdatePrompt = () => {
   const [dismissedBuild, setDismissedBuild] = useState("");
   const lastPromptedBuildRef = useRef("");
 
+  useEffect(() => {
+    if (!shouldSkipServiceWorker || !navigator.serviceWorker) return;
+    void navigator.serviceWorker.getRegistrations().then(registrations => Promise.all(registrations.filter(r => [r.active, r.waiting, r.installing].some(w => w && new URL(w.scriptURL).pathname === '/sw.js')).map(r => r.unregister())));
+  }, []);
   useEffect(() => subscribeToAppUpdates(() => setUpdateState(getAppUpdateState())), []);
   useEffect(() => startAppUpdatePolling(), []);
   useEffect(() => {
