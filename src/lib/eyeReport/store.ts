@@ -6,10 +6,11 @@ import { cachedRead, cachePatchRows } from "@/lib/programmeModule/offlineReadCac
 import { offlineMutate } from "@/lib/programmeModule/offlineWrite";
 import { saveSavedEntry, listAllSavedEntries } from "@/lib/savedForms";
 import { syncDeviceRecords } from "@/lib/deviceSync";
-import type { EyeReportRow } from "./definition";
+import type { EyePatientRow, EyeReportRow } from "./definition";
 
 const db = supabase as unknown as { from: (t: string) => any; rpc: (f: string, a: any) => any }; // eslint-disable-line @typescript-eslint/no-explicit-any
 export const cacheKey = (projectId: string) => `eye-reports:${projectId}`;
+export const patientCacheKey = (projectId: string) => `eye-patients:${projectId}`;
 
 export async function loadReports(projectId: string): Promise<{ rows: EyeReportRow[]; fromCache: boolean }> {
   const { data, fromCache } = await cachedRead<EyeReportRow[]>(cacheKey(projectId), () =>
