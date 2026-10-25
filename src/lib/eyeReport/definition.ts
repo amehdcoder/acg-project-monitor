@@ -225,3 +225,55 @@ export const MONTHS = ["January", "February", "March", "April", "May", "June", "
 export function byMonth(rows: EyeReportRow[]): Aggregate[] {
   return MONTHS.map((_, i) => aggregate(rows.filter((r) => Number(r.report_date.slice(5, 7)) === i + 1)));
 }
+
+// ── Facility name standardization ───────────────────────────────────────────
+
+const normFacilityName = (s: string) =>
+  s.toLowerCase()
+    .replace(/[^a-z0-9 ]/g, " ")
+    .replace(/\b(hosp|hp|hsp)\b/g, "hospital")
+    .replace(/\b(phc|phcc)\b/g, "primary health centre")
+    .replace(/\b(hc|ctr|cntr)\b/g, "centre")
+    .replace(/\b(gen|govt)\b/g, (m) => (m === "gen" ? "general" : "government"))
+    .replace(/\s+/g, " ")
+    .trim();
+
+const levenshtein = (a: string, b: string): number => {
+  const m = a.length, n = b.length;
+  if (!m) return n; if (!n) return m;
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[n];
+};
+
+const tokenJaccard = (a: string, b: string): number => {
+  const ta = new Set(a.split(" ").filter(Boolean)), tb = new Set(b.split(" ").filter(Boolean));
+  if (!ta.size || !tb.size) return 0;
+  let inter = 0;
+  for (const t of ta) if (tb.has(t)) inter++;
+  return inter / (ta.size + tb.size - inter);
+};
+
+/**
+ * Finds an existing facility name that is a likely variation of what was typed
+ * (abbreviations, spelling slips, word order). Returns the canonical existing
+ * name, or null when nothing is close enough — exact matches return null.
+ */
+export function similarFacilityName(typed: string, candidates: string[]): string | null {
+  const n = normFacilityName(typed);
+  if (n.length < 4) return null;
+  let best: string | null = null;
+  let bestScore = 0;
+  for (const c of candidates) {
+    const cn = normFacilityName(c);
+    if (!cn || cn === n) continue;
+    const lev = 1 - levenshtein(n, cn) / Math.max(n.length, cn.length);
+    const score = Math.max(lev, tokenJaccard(n, cn), cn.includes(n) || n.includes(cn) ? 0.85 : 0);
+    if (score > bestScore) { bestScore = score; best = c; }
+  }
+  return bestScore >= 0.72 ? best : null;
+}
