@@ -1,5 +1,8 @@
 # Roadmap
 
+- [ ] Harden in-app project camera QR scanning and image scanning; retain mandatory collector name and first-online enrollment.
+- [ ] Fit Microplan forms across Android/iOS/tablet/desktop with reliable two-axis scrolling; verify camera decoding and device layouts.
+
 - [x] Add Super Admin-only project population disaggregation settings with standard/Trachoma/whole-community modes, live total preview and overlap protection; unify map/dashboard/medicine totals. Fifteen focused tests passed; Super Admin saved the existing standard selection and reloaded it successfully; build clean.
 
 - [x] Match New Microplan Entry to the supplied illustrated form while retaining all fields and validation; desktop and Android-size fit verified.
