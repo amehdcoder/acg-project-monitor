@@ -24,6 +24,7 @@ import { SEECLEAR_FORM_NAME, SEECLEAR_FORM_DESC, SEECLEAR_DASH_NAME, SEECLEAR_DA
 import BmzFormFiller from "@/components/BMZ/BmzFormFiller";
 import BmzDashboard from "@/components/BMZ/BmzDashboard";
 import BmzAddToProjectDialog from "@/components/BMZ/BmzAddToProjectDialog";
+import EyeReportLauncher from "@/components/EyeReport/EyeReportLauncher";
 import MicroplanProjectAccessDialog from "@/components/Microplanning/MicroplanProjectAccessDialog";
 import MicroplanMoveEntriesDialog from "@/components/Microplanning/MicroplanMoveEntriesDialog";
 import chwHero from "@/assets/community-health-worker.jpg.asset.json";
@@ -2572,6 +2573,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     </div>
                   ) : (
                      <>
+                <EyeReportLauncher projectId={currentProjectId} projects={projects} userId={user?.id} isAdmin={!!(isOwner || isAdmin || isSuperAdmin)} />
                 {bmzFolderVisible && (
                   <div className="border-b border-border/60 bg-[#F4FBF8] p-3 sm:p-4">
                     <div className="mb-2 flex items-center justify-between gap-2">
