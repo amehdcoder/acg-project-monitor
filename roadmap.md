@@ -1,5 +1,9 @@
 # Roadmap
 
+- [ ] Fix saved Access studio category enforcement and verify permission regressions.
+- [ ] Remove Lovable sign-in from the donor portal.
+- [ ] Fix Graduation verification/selection persistence and verify saved decisions read back.
+
 - [x] Fix Android scrolling in the switched records-only workspace; bound the content scroller and measure a portal-rendered colourful rail below the header. Signed-in Android emulation verified swiping (255px), dragging (811px), People & care and a live beneficiary profile (6478px content); full-app rail and desktop fit checked. Physical Android hardware remains unverified.
 
 - [x] Restrict facility focal persons to assigned-facility navigation, clinical components and care tools; enforce restrictive record/child/document policies, protect user-scoped offline caches, and preserve admin access. Seventeen regression tests passed; live admin workspace verified.

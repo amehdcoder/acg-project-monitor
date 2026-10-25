@@ -54,9 +54,9 @@ function DonorSignIn() {
     finally { setBusy(false); }
   };
 
-  const socialSignIn = async (provider: "google" | "lovable") => {
+  const socialSignIn = async () => {
     setBusy(true); setError(null);
-    try { const result = await lovable.auth.signInWithOAuth(provider, { redirect_uri: `${window.location.origin}/donor` }); if (result.error) throw result.error; }
+    try { const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: `${window.location.origin}/donor` }); if (result.error) throw result.error; }
     catch (e) { setError((e as Error).message); }
     finally { setBusy(false); }
   };
@@ -76,7 +76,7 @@ function DonorSignIn() {
         {notice && <p role="status" className="text-sm text-status-success">{notice}</p>}
         <Button type="submit" className="h-[52px] w-full" disabled={busy}>{busy ? "Please wait…" : mode === "signup" ? "Create account" : mode === "forgot" ? "Send reset link" : "Sign in"}</Button>
         <Button type="button" variant="link" className="w-full" onClick={() => { setMode(mode === "forgot" ? "signin" : "forgot"); setError(null); setNotice(null); }}>{mode === "forgot" ? "Back to sign in" : "Forgot password?"}</Button>
-        {mode !== "forgot" && <div className="space-y-2 border-t border-border pt-4"><Button type="button" variant="outline" className="w-full" disabled={busy} onClick={() => void socialSignIn("google")}>Continue with Google</Button><Button type="button" variant="outline" className="w-full" disabled={busy} onClick={() => void socialSignIn("lovable")}>Sign in with Lovable</Button></div>}
+        {mode !== "forgot" && <div className="space-y-2 border-t border-border pt-4"><Button type="button" variant="outline" className="w-full" disabled={busy} onClick={() => void socialSignIn()}>Continue with Google</Button></div>}
       </form>
       <p className="flex items-center gap-2 text-sm opacity-70"><ShieldCheck className="h-4 w-4" />Secure accounts · Private project access</p>
     </main>
