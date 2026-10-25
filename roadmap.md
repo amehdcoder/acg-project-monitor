@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Add Super Admin-only project population disaggregation settings for standard and Trachoma age groups; enforce Target Population totals and verify saved settings in entry workflows.
+
 - [x] Match New Microplan Entry to the supplied illustrated form while retaining all fields and validation; desktop and Android-size fit verified.
 - [x] Add project-wide Geo-only workspace settings including administrators; project isolation and lock rules tested.
 - [x] Enable durable offline Microplan entry and automatic reconnect sync; live account-free offline capture returned 1 synced / 0 pending and server row confirmed.
