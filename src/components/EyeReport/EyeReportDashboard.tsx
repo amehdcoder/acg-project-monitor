@@ -37,13 +37,14 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
   const [facility, setFacility] = useState("all");
   const [sex, setSex] = useState<"all" | "m" | "f">("all");
   const [csomOnly, setCsomOnly] = useState(false);
-  const [form, setForm] = useState<{ open: boolean; existing?: EyeReportRow | null }>({ open: false });
+  const [form, setForm] = useState<{ open: boolean; existing?: EyeReportRow | null; wgOnly?: boolean }>({ open: false });
   const [exporting, setExporting] = useState(false);
+  const [patients, setPatients] = useState<EyePatientRow[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const r = await loadReports(projectId);
-    setRows(r.rows); setFromCache(r.fromCache); setLoading(false);
+    const [r, p] = await Promise.all([loadReports(projectId), loadPatients(projectId)]);
+    setRows(r.rows); setPatients(p.rows); setFromCache(r.fromCache || p.fromCache); setLoading(false);
   }, [projectId]);
   useEffect(() => { void load(); }, [load]);
 
@@ -53,6 +54,17 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
 
   const yearRows = useMemo(() => rows.filter((r) => (year === "all" || r.report_date.startsWith(year)) && (lga === "all" || r.lga === lga) && (facility === "all" || r.facility_name === facility) && (!csomOnly || r.csom)), [rows, year, lga, facility, csomOnly]);
   const filtered = useMemo(() => yearRows.filter((r) => (month === "all" || Number(r.report_date.slice(5, 7)) === Number(month)) && (!from || r.report_date >= from) && (!to || r.report_date <= to)), [yearRows, month, from, to]);
+  const filteredPatients = useMemo(() => patients.filter((p) => (year === "all" || p.report_date.startsWith(year)) && (month === "all" || Number(p.report_date.slice(5, 7)) === Number(month)) && (!from || p.report_date >= from) && (!to || p.report_date <= to) && (lga === "all" || p.lga === lga) && (facility === "all" || p.facility_name === facility)), [patients, year, month, from, to, lga, facility]);
+  const pAgg = useMemo(() => aggregatePatients(filteredPatients), [filteredPatients]);
+  /** Screened-patient count per report (facility + day), for the reconciliation badge. */
+  const screenedByDay = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const p of patients) {
+      const k = `${p.facility_name.toLowerCase()}|${p.report_date}`;
+      m.set(k, (m.get(k) ?? 0) + 1);
+    }
+    return m;
+  }, [patients]);
 
   const agg = aggregate(filtered); const S = agg.summary; const T = totals(S); const c = agg.csom;
   const pick = (x: { m: number; f: number }) => (sex === "all" ? t(x) : x[sex]);
