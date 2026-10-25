@@ -6,6 +6,7 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { admin, verifyDeviceToken } from "../_shared/deviceAccess.ts";
 import { intakeSeeClearRecord } from "../_shared/seeclearDeviceIntake.ts";
+import { validatedMicroplan } from "../_shared/microplanDeviceValidation.ts";
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -35,7 +36,7 @@ Deno.serve(async (req) => {
   try {
     const ctx = await verifyDeviceToken(req);
     if (!ctx) return json({ error: "device_not_authorized" }, 401);
-    if (!ctx.allowForms && !ctx.allowSeeclear && !ctx.allowCases) {
+    if (!ctx.allowForms && !ctx.allowSeeclear && !ctx.allowCases && !ctx.allowMicroplanning) {
       return json({ error: "collection_not_allowed" }, 403);
     }
     if (!ctx.collectorUserId) return json({ error: "collection_account_missing" }, 409);
@@ -49,6 +50,21 @@ Deno.serve(async (req) => {
     const accepted: string[] = [];
     const rejected: { id: string; reason: string }[] = [];
     const now = new Date().toISOString();
+
+    const {data: projectScope} = ctx.allowMicroplanning ? await db.from('projects').select('scope_states,scope_lgas,scope_wards').eq('id',ctx.projectId).single() : {data:null};
+    for (const record of records.filter(r => r.kind === 'microplan')) {
+      if (!ctx.allowMicroplanning || !projectScope) { rejected.push({id:record.id,reason:'microplanning_not_allowed'}); continue; }
+      try {
+        const values = validatedMicroplan(record.id, record.data, projectScope);
+        const {error} = await db.from('microplan_entries').insert({...values,id:record.id,project_id:ctx.projectId,created_by:ctx.collectorUserId,updated_by:ctx.collectorUserId,device_id:ctx.deviceId,collector_label:ctx.label});
+        if (error?.code === '23505') {
+          const {data: existing} = await db.from('microplan_entries').select('id').eq('id',record.id).eq('project_id',ctx.projectId).eq('device_id',ctx.deviceId).maybeSingle();
+          if (!existing) throw new Error('record_id_conflict');
+        } else if (error) throw new Error(error.message);
+        accepted.push(record.id);
+      } catch (error) { rejected.push({id:record.id,reason:String((error as Error).message || 'write_failed')}); }
+    }
+    for (const record of records.filter(r => r.kind && !['form','case','seeclear','microplan'].includes(r.kind))) rejected.push({id:record.id,reason:'invalid_record_kind'});
 
     // See Clear facility visits go to the checklist table (and on to Kobo).
     const seeclear = records.filter((r) => r.kind === "seeclear");
@@ -115,7 +131,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    const formRecords = records.filter((r) => r.kind !== "seeclear" && r.kind !== "case");
+    const formRecords = records.filter((r) => !r.kind || r.kind === "form");
 
     // Only forms that belong to this device's project may be written.
     const formIds = Array.from(new Set(formRecords.map((r) => String(r.formId))));
