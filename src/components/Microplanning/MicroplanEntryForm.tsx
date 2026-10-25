@@ -15,8 +15,6 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, ChevronsUpDown, MapPin, Navigation, Building2, Users, Shield, UserCheck, Save, X, Calendar, Info, Eye, Plus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { useVoiceFormEngine, VoiceQuestion } from "@/hooks/useVoiceFormEngine";
-import { VoiceFormOverlay } from "@/components/FormFiller/VoiceFormOverlay";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
 import { useProjectScope } from "@/hooks/useProjectScope";
 import { filterStates, filterLgas, filterWards } from "@/lib/projectScope";
@@ -242,7 +240,6 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
     try { localStorage.setItem(draftKey, JSON.stringify(form)); setLastSavedAt(Date.now()); }
     catch { setLastSavedAt(null); }
   }, [form, draftKey]);
-  const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [wardPickerOpen, setWardPickerOpen] = useState(false);
   const [showTrachoma, setShowTrachoma] = useState(() => {
     if (initialData) {
