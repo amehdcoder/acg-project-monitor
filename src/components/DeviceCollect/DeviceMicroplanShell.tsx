@@ -32,6 +32,7 @@ export default function DeviceMicroplanShell(){
   try{
    const id=crypto.randomUUID(),now=new Date().toISOString();
    await saveSavedEntry({id,userId:deviceUserId(session.deviceId),formId:`microplan:${session.projectId}`,formName:'Microplan Entry',formDescription:'',projectId:session.projectId,questions:[],groups:[],geofence:null,settings:{kind:'microplan'},responses:data,submissionData:data,gps:null,status:'finalized',createdAt:now,updatedAt:now,finalizedAt:now,submissionId:id,offline:!navigator.onLine,syncState:'queued',displayName:data.community_name});
+   localStorage.removeItem(`microplan:draft:device:${session.deviceId}:${session.projectId}:new`);
    toast.success('Microplan saved on this device');setFormKey(v=>v+1);
    void syncDeviceRecords().then(load);await load();
   }catch(error){toast.error('Could not save on this device. Free some storage and try again.');throw error;}finally{setBusy(false);}

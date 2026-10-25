@@ -555,8 +555,12 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       ...form,
       trachoma_0_5_months: null, trachoma_6m_6y: null, trachoma_7_14y: null, trachoma_15_plus: null,
     };
-    await onSubmit(submitData);
-    localStorage.removeItem(draftKey);
+    try {
+      await onSubmit(submitData);
+      localStorage.removeItem(draftKey);
+    } catch {
+      // Caller reports the persistence error; the draft remains available.
+    }
   }, [form, onSubmit, showTrachoma, draftKey]);
 
   const GPSRow = ({ latField, lngField, accField, latVal, lngVal }: { latField: keyof MicroplanFormData; lngField: keyof MicroplanFormData; accField?: keyof MicroplanFormData; latVal: number | null; lngVal: number | null }) => (

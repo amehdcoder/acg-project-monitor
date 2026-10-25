@@ -25,7 +25,8 @@ const GeoLockDialog = ({ project, onClose }: Props) => {
   useEffect(() => {
     if (!project) return;
     void (async () => {
-      const { data } = await db.from("microplan_workspace_locks").select("user_id").eq("project_id", project.id);
+      const { data, error } = await db.from("microplan_workspace_locks").select("user_id").eq("project_id", project.id);
+      if (error) { toast({title:"Could not load workspace settings", description:error.message,variant:"destructive"}); return; }
       const rows = (data as { user_id: string | null }[]) || [];
       setWholeProject(rows.some((r) => r.user_id === null));
       setLockedUsers(new Set(rows.filter((r) => r.user_id).map((r) => r.user_id as string)));
