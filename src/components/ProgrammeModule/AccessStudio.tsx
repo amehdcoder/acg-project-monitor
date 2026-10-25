@@ -68,9 +68,11 @@ export default function AccessStudio({ open, onOpenChange, projectId, onPreview 
         const follow = chosen.has(m.id);
         const own = Object.fromEntries(KEEP.filter((k) => m.permissions?.[k] !== undefined).map((k) => [k, m.permissions[k]]));
         const permissions = follow ? { ...draft, ...own, access_category: role } : { ...m.permissions, access_category: undefined };
-        await db.from("programme_team_members").update({ permissions }).eq("id", m.id);
+        const { error } = await db.from("programme_team_members").update({ permissions }).eq("id", m.id);
+        if (error) throw error;
       }
       await reloadMembers();
+      window.dispatchEvent(new Event("programme-access-changed"));
       toast({ title: "Access saved", description: `${VIEW_AS_ROLES.find((r) => r.key === role)?.label} access updated${chosen.size ? ` for ${chosen.size} team member(s)` : ""}.` });
     } catch (e) {
       toast({ title: "Could not save access", description: (e as Error).message, variant: "destructive" });

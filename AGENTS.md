@@ -1,5 +1,7 @@
 # Architecture rules
 
+- Resolve category actions/pages from current project access profiles, retaining only personal programme scope; enforce write actions server-side and save Graduation through an authorized JSON gate RPC — why: category edits apply immediately and stale profile snapshots or zero-row writes cannot silently lose decisions.
+
 - Records-only and full-app records use bounded viewport scroll roots; render the draggable rail in a body portal measured from that root, never infer document scrolling — why: Android/WebView body lockdown and nested layouts must not hide the rail or trap page scrolling.
 
 - Keep major longitudinal tabs separate from grouped navigation and project-gated — why: direct reporting without duplicate entries or permission bypass.
@@ -31,4 +33,4 @@
 - Assessments reuse QuizBuilder/server scoring; keys append to unpublished quizzes; pair by quiz/source/person. Exact activity links feed reporting-only aggregates by post-test month; dedup activity/person; user-scoped caches — why: no wrong-training totals.
 - The app's landing tab is the records workspace and that workspace's landing view is its Overview hub; people without records access keep Forms as home — why: one homepage that opens on project results without dead ends.
 
-- Access studio: per-project category access in `project_access_profiles` (Super Admin write); members follow a category via `permissions.access_category`, `hidden_views`/`hidden_sections` hide pages and profile tabs; "View as" uses the same profiles and never changes real access — why: one source of truth for what each kind of user sees.
+- Access studio: resolve saved categories for real members and previews; refresh on access events, reconnect, focus and bounded polling; enforce hidden pages/profile content and server-side action checks; use authorized `save_graduation_gate` RPC rather than replacing whole profiles — why: current permissions and explicit persistence failures prevent stale grants and lost decisions.

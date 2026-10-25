@@ -313,7 +313,7 @@ const LivelihoodPanel = ({
         status: decision === "selected" ? "selected" : ["not_eligible", "declined", "waitlisted"].includes(decision) ? "not_selected" : "mapped",
         opportunity_id: opportunityId, decision_source: "manual" as const, updated_by: await currentUserId(), decided_at: now,
         reason: decision === "selected" ? undefined : `Opportunity decision: ${decision.replace("_", " ")}` };
-      await offlineMutate({ table: "beneficiaries", action: "update", id: b.id, values: { profile: { ...profile, graduation: gate } } });
+      await offlineMutate({ table: "beneficiaries", action: "graduation", id: b.id, values: gate });
       await reloadAssessments(); onChanged?.();
       toast({ title: "Decision linked to Graduation pathway" });
     } catch (e) { toast({ title: "Could not save decision", description: (e as Error).message, variant: "destructive" }); }

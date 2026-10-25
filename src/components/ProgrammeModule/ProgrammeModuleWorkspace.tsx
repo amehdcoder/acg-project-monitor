@@ -201,7 +201,7 @@ const ProgrammeModuleWorkspace = ({
   const feedbackShareOnly = !canConfigure && !isOwner && !isSuperAdmin && Boolean(memberPerms?.feedback_share);
   // Health workers and programme staff always see the General dashboard and the
   // dashboards of their own components (scoped via componentFilter below).
-  const canDash = can("view_dashboards") || ((isHealthWorker || isProgrammeStaff) && can("view_records"));
+  const canDash = can("view_dashboards");
   const [view, setView] = useState<WorkspaceView>(() => canDash ? "overview" : "records");
 
   // Designated Programme Officers (plus Super Admins) see and fill the
@@ -251,6 +251,11 @@ const ProgrammeModuleWorkspace = ({
     return rows.filter((b) =>
       Boolean(facilityLevels[(b as unknown as { facility_id?: string }).facility_id || ""]));
   }, [beneficiaries, facilityLevels, isFocalPerson, viewAs]);
+  // The open record must follow fresh saved data, not the object captured on click.
+  useEffect(() => {
+    if (loadingBeneficiaries) return;
+    setSelected(previous => previous ? scopedBeneficiaries.find(b => b.id === previous.id) ?? null : null);
+  }, [scopedBeneficiaries, loadingBeneficiaries]);
   // Facilities every screen must stay inside (focal persons, or a "View as" facility).
   const scopeFacilityIds = useMemo(() => (isFocalPerson ? Object.keys(facilityLevels)
     : viewAs?.facilityId ? [viewAs.facilityId] : null), [isFocalPerson, facilityLevels, viewAs]);
@@ -342,9 +347,9 @@ const ProgrammeModuleWorkspace = ({
     if ((view === "brain" && canBrain) || (view === "guide" && canGuide)) return;
     // Manage-menu pages are not navigation items; keep them open for people allowed to manage.
     const canManageTeam = canConfigure || can("manage_team");
-    if ((view === "team" && (canManageTeam || onTeamRegister)) || (view === "donors" && canManageTeam)) return;
+    if ((view === "team" && pageAllowed(memberPerms, "team") && (canManageTeam || onTeamRegister)) || (view === "donors" && pageAllowed(memberPerms, "donors") && canManageTeam)) return;
     if (!visibleViews.includes(view)) setView(visibleViews.includes("records") ? "records" : visibleViews[0] || "records");
-  }, [accessLoading, view, canConfigure, canReport, canAssessments, canBrain, canGuide, isFocalPerson, isOfficer, onTeamRegister, isProgrammeStaff, areaKey]);
+  }, [accessLoading, view, canConfigure, canReport, canAssessments, canBrain, canGuide, isFocalPerson, isOfficer, onTeamRegister, isProgrammeStaff, areaKey, memberPerms, canDash, componentFilter]);
 
 
   useEffect(() => {
@@ -429,7 +434,7 @@ const ProgrammeModuleWorkspace = ({
 
   if (isFocalPerson && !FACILITY_WORKSPACE_VIEWS.has(view)) return <div role="status" className="p-8 text-center text-muted-foreground">Opening your facility workspace…</div>;
 
-  if (!accessLoading && selected && active && (!isFocalPerson || facilityLevels[selected.facility_id || ""])) {
+  if (!accessLoading && selected && active && can("view_records") && pageAllowed(memberPerms, "records") && (!isFocalPerson || facilityLevels[selected.facility_id || ""])) {
     const selectedFacility = (selected as unknown as { facility_id?: string }).facility_id || "";
     return (
       <div className="lbr-type"><BeneficiaryRecord
@@ -439,7 +444,7 @@ const ProgrammeModuleWorkspace = ({
         projectId={projectId}
         onBack={() => setSelected(null)}
         canManage={canConfigure || facilityLevels[selectedFacility] === "manage"}
-        canRecord={!isFocalPerson || ["record", "manage"].includes(facilityLevels[selectedFacility])}
+        canRecord={can("record_services")}
         componentsVisible={!isFocalPerson || Boolean(facilityLevels[selectedFacility])}
         componentFilter={componentFilter}
         hiddenSections={memberPerms?.hidden_sections}

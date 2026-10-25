@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { resolveCategoryPermissions } from "./categoryPermissions";
 
 const db = supabase as unknown as {
   from: (t: string) => any; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -437,14 +438,40 @@ export const useMyTeamPermissions = (projectId?: string, isAdmin = false) => {
     setLoading(true);
     const { data: auth } = await supabase.auth.getUser();
     if (!auth.user) { setRow(null); setLoading(false); return; }
-    const { data } = await db.from("programme_team_members").select("*")
+    const { data, error } = await db.from("programme_team_members").select("*")
       .eq("project_id", projectId).eq("user_id", auth.user.id)
       .eq("is_active", true).maybeSingle();
-    setRow((data as TeamMemberRow) || null);
+    if (error) { setRow(null); setLoading(true); return; }
+    const member = data as TeamMemberRow | null;
+    if (member?.permissions?.access_category) {
+      const { data: profiles, error: profileError } = await db.from("project_access_profiles")
+        .select("role_key,permissions").eq("project_id", projectId);
+      if (profileError) { setLoading(true); return; }
+      const map = Object.fromEntries((profiles || []).map((p: { role_key: string; permissions: TeamPermissions }) => [p.role_key, p.permissions]));
+      setRow({ ...member, permissions: resolveCategoryPermissions(member.permissions, map) });
+    } else setRow(member);
     setLoading(false);
   }, [projectId]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+    const refresh = () => { void load(); };
+    window.addEventListener("programme-access-changed", refresh);
+    window.addEventListener("online", refresh);
+    window.addEventListener("focus", refresh);
+    const poll = window.setInterval(refresh, 60_000);
+    const channel = supabase.channel(`my-team-access:${projectId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "project_access_profiles", filter: `project_id=eq.${projectId}` }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "programme_team_members", filter: `project_id=eq.${projectId}` }, refresh)
+      .subscribe();
+    return () => {
+      window.removeEventListener("programme-access-changed", refresh);
+      window.removeEventListener("online", refresh);
+      window.removeEventListener("focus", refresh);
+      window.clearInterval(poll);
+      void supabase.removeChannel(channel);
+    };
+  }, [load, projectId]);
 
   const can = useMemo(() => {
     const perms = row?.permissions || {};

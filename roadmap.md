@@ -1,8 +1,9 @@
 # Roadmap
 
-- [ ] Fix saved Access studio category enforcement and verify permission regressions.
-- [ ] Remove Lovable sign-in from the donor portal.
-- [ ] Fix Graduation verification/selection persistence and verify saved decisions read back.
+- [x] Fix saved Access studio category enforcement, direct-page/profile guards and server-authorized actions; category preview and permission regressions passed.
+- [ ] Verify category enforcement signed in as a category-assigned team member — no programme team assignments exist yet.
+- [x] Remove Lovable sign-in from the donor portal; browser confirmed Google and email/password remain.
+- [x] Fix Graduation verification/selection persistence; existing verification saved/read back and selected beneficiary appeared in their pathway; offline/error regressions passed.
 
 - [x] Fix Android scrolling in the switched records-only workspace; bound the content scroller and measure a portal-rendered colourful rail below the header. Signed-in Android emulation verified swiping (255px), dragging (811px), People & care and a live beneficiary profile (6478px content); full-app rail and desktop fit checked. Physical Android hardware remains unverified.
 

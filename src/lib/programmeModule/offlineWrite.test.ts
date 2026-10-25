@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { from: vi.fn(), auth: { getSession: async () => ({ data: { session: null } }) } } }));
 import { offlineMutate } from "./offlineWrite";
 import { enqueue, listQueued } from "./offlineQueue";
+import { supabase } from "@/integrations/supabase/client";
 
 describe("offline saving", () => {
   beforeEach(() => { localStorage.clear(); Object.defineProperty(navigator, "onLine", { value: false, configurable: true }); });
@@ -18,5 +19,16 @@ describe("offline saving", () => {
     const q = listQueued();
     expect(q).toHaveLength(1);
     expect(q[0].payload).toMatchObject({ full_name: "A", status: "active", id: b.submission_uuid });
+  });
+  it("queues a Graduation gate without replacing unrelated profile data", async () => {
+    const r = await offlineMutate({ table: "beneficiaries", action: "graduation", id: "beneficiary-1", values: { status: "verified", decision_source: "manual" } });
+    expect(r.queued).toBe(true);
+    expect(listQueued()[0].payload).toMatchObject({ action: "graduation", id: "beneficiary-1", values: { status: "verified" } });
+  });
+  it("rejects updates affecting zero rows instead of reporting success", async () => {
+    Object.defineProperty(navigator, "onLine", { value: true, configurable: true });
+    vi.mocked(supabase.from).mockReturnValue({ update: () => ({ eq: () => ({ select: async () => ({ data: [], error: null }) }) }) } as never);
+    await expect(offlineMutate({ table: "beneficiaries", action: "update", id: "missing", values: { status: "active" } })).rejects.toThrow("could not be updated");
+    expect(listQueued()).toHaveLength(0);
   });
 });

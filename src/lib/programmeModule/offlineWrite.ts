@@ -10,7 +10,7 @@ import { cachePatchRows } from "./offlineReadCache";
 
 const db = supabase as unknown as { from: (t: string) => any }; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-export type OpAction = "insert" | "update" | "delete";
+export type OpAction = "insert" | "update" | "delete" | "graduation";
 export interface OpPayload {
   table: string;
   action: OpAction;
@@ -25,14 +25,23 @@ const isNetworkError = (e: unknown): boolean => {
 
 /** Executes one operation against the server. Duplicate inserts count as done. */
 export async function runOp(op: OpPayload): Promise<void> {
+  if (op.action === "graduation") {
+    const { data, error } = await supabase.rpc("save_graduation_gate", { _beneficiary: op.id, _gate: op.values } as never);
+    if (error) throw new Error(error.message);
+    if (!data) throw new Error("Graduation decision was not saved.");
+    return;
+  }
   let res: { error: { code?: string; message: string } | null };
   if (op.action === "insert") res = await db.from(op.table).insert(op.values);
-  else if (op.action === "update") res = await db.from(op.table).update(op.values).eq("id", op.id);
-  else res = await db.from(op.table).delete().eq("id", op.id);
+  else if (op.action === "update") {
+    const result = await db.from(op.table).update(op.values).eq("id", op.id).select("id");
+    if (!result.error && !result.data?.length) throw new Error("This record could not be updated. Check your project access and try again.");
+    res = result;
+  } else res = await db.from(op.table).delete().eq("id", op.id);
   if (res.error && res.error.code !== "23505") throw new Error(res.error.message);
 }
 
-const CACHE_PREFIX: Record<string, string> = { beneficiaries: "beneficiaries:" };
+const CACHE_PREFIX: Record<string, string> = { beneficiaries: "beneficiaries:", livelihood_verifications: "livelihood-verifications:" };
 
 /** Current user id from the local session — works offline. */
 export async function currentUserId(): Promise<string | undefined> {
@@ -52,22 +61,27 @@ export async function offlineMutate(op: OpPayload & { forceQueue?: boolean }): P
     prepared.values = Array.isArray(op.values) ? op.values.map(add) : add(op.values || {});
   }
   const id = op.action === "insert" && !Array.isArray(prepared.values) ? (prepared.values as Record<string, unknown>).id as string : op.id;
+  const patchCache = async () => {
+    const prefix = CACHE_PREFIX[op.table];
+    if (prefix && id) await cachePatchRows(prefix, id, op.action === "delete" ? null : op.action === "graduation" ? { profile: { graduation: prepared.values } } : prepared.values as Record<string, unknown>, op.action === "insert");
+  };
 
   // Edits to a record that itself is still waiting to sync: fold them into it.
   if (op.action === "update" && op.id && mergeIntoQueued(op.id, op.values as Record<string, unknown>)) {
+    await patchCache();
     return { id: op.id, queued: true };
   }
 
-  const queue = () => {
+  const queue = async () => {
     enqueue("op", prepared as unknown as Record<string, unknown>);
-    const prefix = CACHE_PREFIX[op.table];
-    if (prefix && id && op.action !== "insert") void cachePatchRows(prefix, id, op.action === "delete" ? null : (op.values as Record<string, unknown>));
+    await patchCache();
     return { id, queued: true };
   };
 
   if (!navigator.onLine || op.forceQueue) return queue();
   try {
     await runOp(prepared);
+    await patchCache();
     void flushQueue();
     return { id, queued: false };
   } catch (e) {

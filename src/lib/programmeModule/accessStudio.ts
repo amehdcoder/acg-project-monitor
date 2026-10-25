@@ -56,12 +56,24 @@ export const useAccessProfiles = (projectId?: string) => {
   const [profiles, setProfiles] = useState<Profiles>({});
   const load = useCallback(async () => {
     if (!projectId) return;
-    const { data } = await db.from("project_access_profiles").select("role_key,permissions").eq("project_id", projectId);
+    const { data, error } = await db.from("project_access_profiles").select("role_key,permissions").eq("project_id", projectId);
+    if (error) return;
     const next: Profiles = {};
     for (const r of (data || []) as { role_key: ViewAsRole; permissions: TeamPermissions }[]) next[r.role_key] = r.permissions;
     setProfiles(next);
   }, [projectId]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+    const refresh = () => { void load(); };
+    window.addEventListener("programme-access-changed", refresh);
+    window.addEventListener("focus", refresh);
+    const poll = window.setInterval(refresh, 60_000);
+    return () => {
+      window.removeEventListener("programme-access-changed", refresh);
+      window.removeEventListener("focus", refresh);
+      window.clearInterval(poll);
+    };
+  }, [load]);
 
   const save = async (role: ViewAsRole, permissions: TeamPermissions) => {
     const { data: auth } = await supabase.auth.getUser();
@@ -70,10 +82,13 @@ export const useAccessProfiles = (projectId?: string) => {
     });
     if (error) throw error;
     setProfiles((p) => ({ ...p, [role]: permissions }));
+    window.dispatchEvent(new Event("programme-access-changed"));
   };
   const reset = async (role: ViewAsRole) => {
-    await db.from("project_access_profiles").delete().eq("project_id", projectId).eq("role_key", role);
+    const { error } = await db.from("project_access_profiles").delete().eq("project_id", projectId).eq("role_key", role);
+    if (error) throw error;
     setProfiles((p) => { const n = { ...p }; delete n[role]; return n; });
+    window.dispatchEvent(new Event("programme-access-changed"));
   };
   return { profiles, save, reset, reload: load };
 };
