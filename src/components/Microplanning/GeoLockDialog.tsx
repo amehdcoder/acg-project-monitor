@@ -45,6 +45,7 @@ const GeoLockDialog = ({ project, onClose }: Props) => {
     if (error) { toast({ title: "Could not update", description: error.message, variant: "destructive" }); return; }
     if (userId === null) setWholeProject(on);
     else setLockedUsers((s) => { const n = new Set(s); on ? n.add(userId) : n.delete(userId); return n; });
+    window.dispatchEvent(new Event("geo-lock-changed"));
     toast({ title: on ? "Locked to Geo Microplanning" : "Lock removed" });
   };
 
@@ -56,7 +57,7 @@ const GeoLockDialog = ({ project, onClose }: Props) => {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><MapPinned className="h-5 w-5 text-primary" /> Geo Microplanning workspace</DialogTitle>
           <DialogDescription>
-            Locked people see only the Geo Microplanning workspace for "{project?.name}" — no side menu, not even the Geo Microplanning item. Owners and Super Admins are never locked.
+            Locked people see only the Geo Microplanning workspace for "{project?.name}" — no side menu, not even the Geo Microplanning item. This also applies to assigned administrators, Owners and Super Admins.
           </DialogDescription>
         </DialogHeader>
         <div className="flex items-center justify-between rounded-lg border border-primary/25 bg-primary/5 p-3">

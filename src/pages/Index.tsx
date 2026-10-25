@@ -455,7 +455,7 @@ const Index = () => {
 
   // Projects the Owner / Co-Owner locked to the Longitudinal Beneficiary
   // Records system: everyone else sees that system and nothing else.
-  if (recordsLockActive) {
+  if (recordsLockActive && !geoLock.active) {
     return (
       <ErrorBoundary name="RecordsOnly">
         <RecordsOnlyShell
@@ -472,7 +472,7 @@ const Index = () => {
   if (geoLock.active) {
     return (
       <ErrorBoundary name="GeoWorkspace">
-        <GeoWorkspaceShell onSwitchToFullApp={geoLock.canManage ? () => geoLock.setOwnerMode(false) : undefined} />
+        <GeoWorkspaceShell projectIds={geoLock.projectIds} onSwitchToFullApp={geoLock.canManage && !geoLock.lockedForMe ? () => geoLock.setOwnerMode(false) : undefined} />
       </ErrorBoundary>
     );
   }

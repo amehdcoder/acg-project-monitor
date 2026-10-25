@@ -4,11 +4,12 @@ import { useAuth } from "@/hooks/useAuth";
 import MicroplanningView from "./MicroplanningView";
 
 interface Props {
+  projectIds?: string[];
   onSwitchToFullApp?: () => void;
 }
 
 /** Full-screen Geo Microplanning workspace with no side menu. */
-const GeoWorkspaceShell = ({ onSwitchToFullApp }: Props) => {
+const GeoWorkspaceShell = ({ onSwitchToFullApp, projectIds }: Props) => {
   const { profile, signOut } = useAuth();
   return (
     <div className="flex h-[100dvh] flex-col bg-background">
@@ -42,9 +43,9 @@ const GeoWorkspaceShell = ({ onSwitchToFullApp }: Props) => {
           </div>
         </div>
       </header>
-      <main className="flex-1 overflow-auto">
+      <main className="min-h-0 flex-1 overflow-auto overscroll-contain">
         <div className="mx-auto max-w-[1600px] px-3 py-4 sm:px-6">
-          <MicroplanningView />
+          <MicroplanningView allowedProjectIds={projectIds} />
         </div>
       </main>
     </div>
