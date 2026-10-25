@@ -805,11 +805,8 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
         </div>
       </Section>
 
-      {/* Spacer to ensure content isn't hidden behind fixed footer */}
-      <div className="h-20 flex-shrink-0" />
-
-      {/* Actions - fixed at bottom of scrollable area */}
-      <div className="microplan-footer sticky bottom-0 flex flex-wrap items-center justify-end gap-2 z-30">
+      {/* Actions — appear after all fields, at the end of the form */}
+      <div className="microplan-footer flex flex-wrap items-center justify-end gap-2">
         <Button type="button" variant="outline" size="default" onClick={onCancel} disabled={isSubmitting} className="min-h-[44px] min-w-[90px]">
           <X className="h-4 w-4 mr-1" /> Cancel
         </Button>
