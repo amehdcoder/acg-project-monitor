@@ -14414,6 +14414,10 @@ export type Database = {
         Returns: Json
       }
       donor_project_aggregates: { Args: { _project_id: string }; Returns: Json }
+      effective_programme_permissions: {
+        Args: { _project: string; _uid: string }
+        Returns: Json
+      }
       emit_webhook_event: {
         Args: { _event: string; _payload: Json; _project_id: string }
         Returns: undefined
@@ -14849,6 +14853,10 @@ export type Database = {
         }[]
       }
       profile_owner_flag: { Args: { _user_id: string }; Returns: boolean }
+      programme_action_allowed: {
+        Args: { _action: string; _project: string; _uid: string }
+        Returns: boolean
+      }
       programme_area_matches: {
         Args: { _areas: string[]; _component: string }
         Returns: boolean
@@ -14897,6 +14905,10 @@ export type Database = {
       reset_quiz_attempts: {
         Args: { p_attempt_type?: string; p_quiz_id: string }
         Returns: number
+      }
+      save_graduation_gate: {
+        Args: { _beneficiary: string; _gate: Json }
+        Returns: string
       }
       service_in_user_scope: {
         Args: {

@@ -246,6 +246,13 @@
       "when": 1792860725737,
       "tag": "0034_focal_guard_remaining_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1792951193982,
+      "tag": "0035_enforce_category_actions_and_graduation_saves",
+      "breakpoints": true
     }
   ]
 }
