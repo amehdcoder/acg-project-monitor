@@ -63,21 +63,20 @@ const GraduationPathwayPanel = ({ projectId, moduleId, beneficiary, componentKey
   const setStatus = async (status: SelectionStatus, why?: string) => {
     setBusy(true);
     try {
-      const { data: auth } = await supabase.auth.getUser();
       const now = new Date().toISOString();
       const next: GraduationGate = {
         ...(gate || { status }),
         status,
         decision_source: "manual",
-        updated_by: auth.user?.id,
+        updated_by: await currentUserId(),
         ...(status === "mapped" ? { mapped_at: now } : {}),
         ...(status === "verified" ? { verified_at: now, mapped_at: gate?.mapped_at || now } : {}),
         ...(status === "selected" || status === "not_selected"
           ? { decided_at: now, verified_at: gate?.verified_at || now, mapped_at: gate?.mapped_at || now, reason: why || undefined }
           : {}),
       };
-      await offlineMutate({ table: "beneficiaries", action: "update", values: { profile: { ...profile, graduation: next } }, id: beneficiary.id });
-      toast({ title: status === "not_selected" ? "Marked not selected" : `Household ${SELECTION_STEPS.find((s) => s.value === status)?.label.toLowerCase()}` });
+      const saved = await offlineMutate({ table: "beneficiaries", action: "graduation", values: next as unknown as Record<string, unknown>, id: beneficiary.id });
+      toast({ title: status === "not_selected" ? "Marked not selected" : `Household ${SELECTION_STEPS.find((s) => s.value === status)?.label.toLowerCase()}`, description: saved.queued ? "Saved on this device; will sync when connected." : undefined });
       setRejecting(false);
       setReason("");
       onChanged();

@@ -100,8 +100,8 @@ const LivelihoodAssessmentDialog = ({
         gate.decision_source = "manual";
         gate.reason = existing.decision_notes || `User decision: ${existing.decision.replace(/_/g, " ")}`;
       }
-      await offlineMutate({ table: "beneficiaries", action: "update", id: beneficiary.id,
-        values: { profile: { ...profile, graduation: { ...gate, opportunity_id: opportunityId || existing?.opportunity_id || undefined } } } });
+      await offlineMutate({ table: "beneficiaries", action: "graduation", id: beneficiary.id,
+        values: { ...gate, opportunity_id: opportunityId || existing?.opportunity_id || undefined } });
       toast({ title: "Assessment & Graduation pathway saved", description: `${beneficiary.full_name} scored ${result.vulnerability}/100 · ${gate.status.replace("_", " ")}.` });
       await onSaved?.(result);
       onOpenChange(false);

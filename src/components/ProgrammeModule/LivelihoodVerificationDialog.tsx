@@ -101,7 +101,7 @@ const LivelihoodVerificationDialog = ({
     }
     setSaving(true);
     try {
-      await saveVerification({
+      const saved = await saveVerification({
         id: existing?.id,
         project_id: projectId,
         module_id: moduleId || null,
@@ -120,7 +120,7 @@ const LivelihoodVerificationDialog = ({
         recommendation,
         notes: notes || null,
       });
-      toast({ title: "Verification recorded", description: "The ranking has been updated with what you found." });
+      toast({ title: "Verification recorded", description: saved.queued ? "Saved on this device; will sync when connected." : "The ranking has been updated with what you found." });
       onSaved?.();
       onOpenChange(false);
     } catch (e) {

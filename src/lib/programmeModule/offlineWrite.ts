@@ -10,7 +10,7 @@ import { cachePatchRows } from "./offlineReadCache";
 
 const db = supabase as unknown as { from: (t: string) => any }; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-export type OpAction = "insert" | "update" | "delete";
+export type OpAction = "insert" | "update" | "delete" | "graduation";
 export interface OpPayload {
   table: string;
   action: OpAction;
@@ -25,6 +25,12 @@ const isNetworkError = (e: unknown): boolean => {
 
 /** Executes one operation against the server. Duplicate inserts count as done. */
 export async function runOp(op: OpPayload): Promise<void> {
+  if (op.action === "graduation") {
+    const { data, error } = await supabase.rpc("save_graduation_gate", { _beneficiary: op.id, _gate: op.values } as never);
+    if (error) throw new Error(error.message);
+    if (!data) throw new Error("Graduation decision was not saved.");
+    return;
+  }
   let res: { error: { code?: string; message: string } | null };
   if (op.action === "insert") res = await db.from(op.table).insert(op.values);
   else if (op.action === "update") {
@@ -57,7 +63,7 @@ export async function offlineMutate(op: OpPayload & { forceQueue?: boolean }): P
   const id = op.action === "insert" && !Array.isArray(prepared.values) ? (prepared.values as Record<string, unknown>).id as string : op.id;
   const patchCache = async () => {
     const prefix = CACHE_PREFIX[op.table];
-    if (prefix && id) await cachePatchRows(prefix, id, op.action === "delete" ? null : prepared.values as Record<string, unknown>, op.action === "insert");
+    if (prefix && id) await cachePatchRows(prefix, id, op.action === "delete" ? null : op.action === "graduation" ? { profile: { graduation: prepared.values } } : prepared.values as Record<string, unknown>, op.action === "insert");
   };
 
   // Edits to a record that itself is still waiting to sync: fold them into it.

@@ -1,5 +1,7 @@
 # Architecture rules
 
+- Resolve category actions/pages from current project access profiles, retaining only personal programme scope; enforce write actions server-side and save Graduation through an authorized JSON gate RPC — why: category edits apply immediately and stale profile snapshots or zero-row writes cannot silently lose decisions.
+
 - Records-only and full-app records use bounded viewport scroll roots; render the draggable rail in a body portal measured from that root, never infer document scrolling — why: Android/WebView body lockdown and nested layouts must not hide the rail or trap page scrolling.
 
 - Keep major longitudinal tabs separate from grouped navigation and project-gated — why: direct reporting without duplicate entries or permission bypass.

@@ -92,7 +92,7 @@ export async function cachePatchRows(prefix: string, id: string, patch: Record<s
       if (key.startsWith(userPrefix) && Array.isArray(entry.value)) {
         const existing = entry.value as Record<string, unknown>[];
         const rows = existing
-          .map((r) => (r.id === id ? (patch ? { ...r, ...patch } : null) : r))
+          .map((r) => (r.id === id ? (patch ? { ...r, ...patch, ...(patch.profile ? { profile: { ...(r.profile as Record<string, unknown> || {}), ...(patch.profile as Record<string, unknown>) } } : {}) } : null) : r))
           .filter(Boolean);
         if (insert && patch && !existing.some(r => r.id === id)) rows.unshift({ ...patch, id });
         cur.update({ ...entry, value: rows });
