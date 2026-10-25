@@ -68,18 +68,22 @@ export async function loadPatients(projectId: string): Promise<{ rows: EyePatien
 export type PatientPayload = Omit<EyePatientRow, "id" | "created_by" | "device_id" | "collector_label" | "created_at" | "updated_at"> & { id?: string };
 
 /**
- * Saves the screenings for one facility day. When `reportId` is given the day's
- * previous rows are replaced so editing a report never duplicates patients.
+ * Saves the screenings for one facility day. When `replaceReportId` is given the
+ * day's previous rows are replaced so editing a report never duplicates patients.
+ * `removeIds` deletes standalone screenings that were absorbed into the report,
+ * so a pre-filled patient never exists both standalone and linked.
  */
-export async function savePatients(rows: PatientPayload[], userId: string, replaceReportId?: string | null): Promise<{ queued: boolean }> {
+export async function savePatients(rows: PatientPayload[], userId: string, replaceReportId?: string | null, removeIds?: string[]): Promise<{ queued: boolean }> {
   let queued = false;
-  if (replaceReportId) {
-    const existing = (await loadPatients(rows[0]?.project_id ?? "")).rows.filter((r) => r.report_id === replaceReportId);
-    for (const old of existing) {
-      const res = await offlineMutate({ table: "eye_daily_patients", action: "delete", id: old.id });
-      queued = queued || res.queued;
-      await cachePatchRows(patientCacheKey(old.project_id), old.id, null);
-    }
+  const projectId = rows[0]?.project_id ?? "";
+  const cached = replaceReportId || removeIds?.length ? (await loadPatients(projectId)).rows : [];
+  const toRemove = new Map<string, string>(); // patient id -> project id (for the cache key)
+  if (replaceReportId) for (const r of cached.filter((x) => x.report_id === replaceReportId)) toRemove.set(r.id, r.project_id);
+  for (const id of removeIds ?? []) { const r = cached.find((x) => x.id === id); if (r) toRemove.set(id, r.project_id); }
+  for (const [id, pid] of toRemove) {
+    const res = await offlineMutate({ table: "eye_daily_patients", action: "delete", id });
+    queued = queued || res.queued;
+    await cachePatchRows(patientCacheKey(pid), id, null);
   }
   for (const p of rows) {
     const id = p.id || crypto.randomUUID();

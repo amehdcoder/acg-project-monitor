@@ -16,7 +16,7 @@ import {
   validateReport, vaTotal, wgVsSummaryIssues,
   type EyeAttachment, type EyeCsom, type EyePatientRow, type EyeReportRow, type EyeSummary, type MF, type VaBand,
 } from "@/lib/eyeReport/definition";
-import { saveDevicePatients, saveDeviceReport, savePatients, saveReport } from "@/lib/eyeReport/store";
+import { loadPatients, saveDevicePatients, saveDeviceReport, savePatients, saveReport } from "@/lib/eyeReport/store";
 import { GeoCombobox } from "@/components/ProgrammeModule/GeoCascadeFields";
 import { getAllStates, getLGAsForState } from "@/lib/nigeriaAdminData";
 import { fileToDataUrl, uploadBeneficiaryMedia } from "@/lib/programmeModule/media";
@@ -99,7 +99,7 @@ function VaTable({ title, colA, colB, a, b, onA, onB, ceiling }: { title: string
   );
 }
 
-interface PatientEntry { draft: WgPatientDraft; record: WgResult }
+interface PatientEntry { draft: WgPatientDraft; record: WgResult; /** Id of the standalone screening row this entry was pre-filled from (deleted on save). */ srcId?: string }
 
 export default function EyeDailyReportForm({ projectId, projectName, facilities, mode, existing, existingPatients = [], wgOnly = false, otherReports = [], onClose, onSaved }: Props) {
   const draftKey = `eye-report-draft:${projectId}:${mode.kind === "user" ? mode.userId : mode.deviceId}${wgOnly ? ":wg" : ""}`;
@@ -125,6 +125,31 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
   const [online, setOnline] = useState(navigator.onLine);
   useEffect(() => { const a = () => setOnline(true), b = () => setOnline(false); addEventListener("online", a); addEventListener("offline", b); return () => { removeEventListener("online", a); removeEventListener("offline", b); }; }, []);
   useEffect(() => { if (!existing) localStorage.setItem(draftKey, JSON.stringify({ ...f, patients })); }, [f, patients, existing, draftKey]);
+
+  // Pre-fill the Patients step from standalone WG-SS screenings already submitted
+  // for the same facility and date, so the clerk never re-screens them. Runs once
+  // per facility+date combination; the summary-vs-screening validation stays on.
+  const [prefetched, setPrefetched] = useState<Record<string, true>>({});
+  useEffect(() => {
+    if (wgOnly || mode.kind !== "user" || !f.facility.trim() || !f.date) return;
+    const key = `${f.facility.trim().toLowerCase()}|${f.date}`;
+    if (prefetched[key]) return;
+    setPrefetched((m) => ({ ...m, [key]: true }));
+    void (async () => {
+      const { rows } = await loadPatients(projectId);
+      const matches = rows.filter((p) => !p.report_id && p.report_date === f.date && p.facility_name.trim().toLowerCase() === f.facility.trim().toLowerCase());
+      if (!matches.length) return;
+      setPatients((cur) => {
+        const have = new Set(cur.map((e) => e.draft.patient_label.trim().toLowerCase()));
+        const add = matches.filter((p) => !have.has(p.patient_label.trim().toLowerCase())).map((p) => {
+          const record = readWgResult(p.wg_ss) ?? buildWgRecord({});
+          return { draft: { patient_label: p.patient_label, sex: (p.sex as "m" | "f") ?? "", age_band: p.age_band ?? "", answers: record.answers }, record, srcId: p.id };
+        });
+        if (add.length) toast.info(`${add.length} patient${add.length === 1 ? "" : "s"} pre-filled from the standalone WG-SS screening for this facility and date.`);
+        return add.length ? [...cur, ...add] : cur;
+      });
+    })();
+  }, [wgOnly, mode.kind, f.facility, f.date, projectId, prefetched]);
 
   const S = f.summary; const T = totals(S);
   const cataract = t(S.surgery.cataract);
@@ -214,7 +239,11 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
           const payload = { id: existing?.id, project_id: projectId, facility_id: f.facilityId || null, facility_name: f.facility.trim(), state: f.state || null, lga: f.lga || null, report_date: f.date, summary: S, csom: cataract > 0 ? f.csom : null, notes: f.notes.trim() || null, prepared_by: f.prepared.trim() || null, confirmed_by: f.confirmed.trim() || null, attachments: f.attachments };
           const r = await saveReport(payload as any, mode.userId, !!existing);
           reportId = r.id;
-          if (patients.length || existing) await savePatients(patientPayloads(reportId) as any, mode.userId, existing?.id ?? null);
+          if (patients.length || existing) {
+            // Absorbed standalone screenings are removed so they are not counted twice.
+            const absorbed = patients.map((p) => p.srcId).filter(Boolean) as string[];
+            await savePatients(patientPayloads(reportId) as any, mode.userId, existing?.id ?? null, absorbed);
+          }
           toast.success(r.queued ? "Saved offline — it will sync automatically" : "Daily report submitted");
         } else {
           const r = await savePatients(patientPayloads(null) as any, mode.userId);
