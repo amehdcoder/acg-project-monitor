@@ -69,6 +69,13 @@ export default function EyeReportLauncher({ projectId: selected, projects, userI
               <ChevronRight className="mt-1 h-5 w-5 text-muted-foreground/60" />
             </button>
           )}
+          {perm.report && (
+            <button type="button" onClick={() => setOpen("wg")} className="group flex items-start gap-3 rounded-2xl border bg-card p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-eye-violet text-primary-foreground"><Accessibility className="h-6 w-6" /></span>
+              <span className="min-w-0 flex-1"><span className="block text-[15px] font-extrabold text-eye-deep">Patient Disability Screening (WG-SS)</span><span className="mt-1 block text-xs text-muted-foreground">Screen individual patients with the six Washington Group questions — even before the daily summary. Works offline.</span></span>
+              <ChevronRight className="mt-1 h-5 w-5 text-muted-foreground/60" />
+            </button>
+          )}
           {perm.view && (
             <button type="button" onClick={() => setOpen("dash")} className="group flex items-start gap-3 rounded-2xl border bg-card p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
               <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-eye-teal text-primary-foreground"><BarChart3 className="h-6 w-6" /></span>
