@@ -167,7 +167,49 @@ export interface EyeReportRow {
   id: string; project_id: string; facility_id: string | null; facility_name: string;
   state: string | null; lga: string | null; report_date: string;
   summary: any; csom: any; notes: string | null; prepared_by: string | null; confirmed_by: string | null;
+  attachments?: EyeAttachment[] | null;
   created_by: string | null; device_id: string | null; collector_label: string | null; created_at?: string;
+}
+
+/** WG-SS disability aggregation across screened patients (for the dashboard). */
+export interface PatientAggregate {
+  screened: number; withDisability: number; days: number; facilities: number;
+  /** Disability count per WG-SS domain label (Seeing, Hearing, …). */
+  domains: { label: string; count: number }[];
+  bySex: { m: number; f: number; other: number };
+}
+export function aggregatePatients(rows: EyePatientRow[]): PatientAggregate {
+  const domains = new Map<string, number>();
+  const bySex = { m: 0, f: 0, other: 0 };
+  let withDisability = 0;
+  for (const r of rows) {
+    if (r.has_disability) withDisability += 1;
+    for (const d of r.disability_domains ?? []) domains.set(d, (domains.get(d) ?? 0) + 1);
+    if (r.sex === "m") bySex.m += 1; else if (r.sex === "f") bySex.f += 1; else bySex.other += 1;
+  }
+  return {
+    screened: rows.length, withDisability,
+    days: new Set(rows.map((r) => r.report_date)).size,
+    facilities: new Set(rows.map((r) => r.facility_name.toLowerCase())).size,
+    domains: [...domains.entries()].map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count),
+    bySex,
+  };
+}
+
+/**
+ * Cross-checks WG-SS patient screenings against a daily summary. Mismatches are
+ * warnings (the clerk confirms) — screenings may legitimately be entered before
+ * the summary, or cover only part of the day.
+ */
+export function wgVsSummaryIssues(patientCount: number, disabledCount: number, summary: EyeSummary): Issue[] {
+  const out: Issue[] = [];
+  const T = totals(summary);
+  const consulted = t(T.consulted);
+  if (consulted > 0 && patientCount !== consulted)
+    out.push({ field: "patients", message: `${patientCount} patient${patientCount === 1 ? "" : "s"} screened with the WG-SS, but ${consulted} persons were consulted. Screen every patient or confirm the difference.`, level: "warning" });
+  if (disabledCount !== t(summary.pwd))
+    out.push({ field: "patients", message: `WG-SS classified ${disabledCount} patient${disabledCount === 1 ? "" : "s"} with a disability, but the summary records ${t(summary.pwd)} persons with disability. Please reconcile.`, level: "warning" });
+  return out;
 }
 
 export interface Aggregate { summary: EyeSummary; csom: EyeCsom; reports: number; facilities: number; days: number }
