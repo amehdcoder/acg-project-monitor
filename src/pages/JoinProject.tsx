@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
-import { Html5Qrcode } from "html5-qrcode";
+import ProjectQrScanner from '@/components/DeviceCollect/ProjectQrScanner';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,63 +27,11 @@ const JoinProject = () => {
   const [code, setCode] = useState((params.get("code") ?? "").toUpperCase());
   const [pin, setPin] = useState(params.get("pin") ?? "");
   const [label, setLabel] = useState("");
-  const [scanning, setScanning] = useState(false);
   const [busy, setBusy] = useState(false);
-  const scannerRef = useRef<Html5Qrcode | null>(null);
-  const containerId = useRef(`join-scan-${Math.random().toString(36).slice(2, 9)}`);
 
   useEffect(() => {
     if (session) navigate("/collect", { replace: true });
   }, [session, navigate]);
-
-  const stopScanner = async () => {
-    try {
-      await scannerRef.current?.stop();
-      scannerRef.current?.clear();
-    } catch {
-      /* already stopped */
-    }
-    scannerRef.current = null;
-    setScanning(false);
-  };
-
-  useEffect(() => () => void stopScanner(), []);
-
-  const applyScanned = (text: string) => {
-    // Accepts a raw code or a full join link: https://…/join?code=ABC123&pin=1234
-    try {
-      const url = new URL(text);
-      const c = url.searchParams.get("code");
-      const p = url.searchParams.get("pin");
-      if (c) setCode(c.toUpperCase());
-      if (p) setPin(p);
-      if (c) return;
-    } catch {
-      /* not a URL — treat as a plain code */
-    }
-    setCode(text.trim().toUpperCase());
-  };
-
-  const startScanner = async () => {
-    setScanning(true);
-    try {
-      const scanner = new Html5Qrcode(containerId.current);
-      scannerRef.current = scanner;
-      await scanner.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 240, height: 240 } },
-        (decoded) => {
-          applyScanned(decoded);
-          void stopScanner();
-          toast.success("Project code scanned");
-        },
-        () => {},
-      );
-    } catch {
-      setScanning(false);
-      toast.error("Camera unavailable — enter the code by hand instead.");
-    }
-  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,7 +45,6 @@ const JoinProject = () => {
     }
     setBusy(true);
     try {
-      await stopScanner();
       const next = await join({ code: code.trim(), pin: pin.trim() || undefined, label: label.trim() });
       toast.success(`Joined ${next.projectName}`);
       navigate("/collect", { replace: true });
@@ -109,7 +56,7 @@ const JoinProject = () => {
   };
 
   return (
-    <div className="collector-shell min-h-[100dvh] bg-background text-foreground">
+    <div className="collector-shell project-join-shell h-[100dvh] overflow-auto bg-background text-foreground">
       <header className="border-b border-primary/15 bg-primary text-primary-foreground">
         <div className="mx-auto flex max-w-md items-center justify-between px-5 py-4">
           <div className="flex items-center gap-3">
@@ -140,18 +87,11 @@ const JoinProject = () => {
             <CardDescription>No username or password is required.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
-            <div id={containerId.current} className={scanning ? "overflow-hidden rounded-md border border-primary/20" : "hidden"} />
-
-            {!scanning && (
-              <Button type="button" variant="secondary" size="lg" className="w-full border border-primary/15" onClick={startScanner}>
-                <Camera className="mr-2 h-5 w-5" /> Scan project QR code
-              </Button>
-            )}
-            {scanning && (
-              <Button type="button" variant="outline" size="lg" className="w-full" onClick={() => void stopScanner()}>
-                Stop camera
-              </Button>
-            )}
+            <ProjectQrScanner onScan={({code: scannedCode, pin: scannedPin}) => {
+              setCode(scannedCode); setPin(scannedPin || '');
+              toast.success('Project code scanned');
+              document.getElementById('label')?.focus();
+            }} />
 
             <div className="flex items-center gap-3" aria-hidden="true">
               <div className="h-px flex-1 bg-border" />

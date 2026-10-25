@@ -1593,8 +1593,11 @@ html[data-lbr-fit="on"][data-lbr-device="ios"] .lbr-type button { min-height: 44
 }
 
 /* Illustrated microplanning entry — scoped to the supplied form design. */
-.microplan-entry { --mp-green: 147 72% 28%; --mp-gold: 45 100% 48%; --mp-earth: 27 70% 32%; --mp-ink: 225 65% 17%; --mp-surface: 205 45% 97%; --mp-shadow: 210 30% 25% / .05; background: hsl(var(--mp-surface)); color: hsl(var(--foreground)); }
-.microplan-entry-scroll { padding: 0 8px 0 0; overscroll-behavior: contain; touch-action: pan-y; scrollbar-color: hsl(var(--mp-green)) hsl(var(--muted)); }
+.microplan-entry { --mp-green: 147 72% 28%; --mp-gold: 45 100% 48%; --mp-earth: 27 70% 32%; --mp-ink: 225 65% 17%; --mp-surface: 205 45% 97%; --mp-shadow: 210 30% 25% / .05; background: hsl(var(--mp-surface)); color: hsl(var(--foreground)); min-width: 0; width: 100%; container-type: inline-size; }
+.microplan-entry-scroll { padding: 0 8px 0 0; overflow: auto; overscroll-behavior: contain; touch-action: pan-x pan-y; scrollbar-color: hsl(var(--mp-green)) hsl(var(--muted)); scrollbar-gutter: stable; -webkit-overflow-scrolling: touch; }
+.microplan-entry-scroll::-webkit-scrollbar, .microplan-step-track::-webkit-scrollbar { width: 10px; height: 10px; }
+.microplan-entry-scroll::-webkit-scrollbar-thumb, .microplan-step-track::-webkit-scrollbar-thumb { background: hsl(var(--mp-green, var(--primary))); border-radius: 8px; border: 2px solid hsl(var(--muted)); }
+.microplan-entry-scroll::-webkit-scrollbar-track, .microplan-step-track::-webkit-scrollbar-track { background: hsl(var(--muted)); }
 .microplan-section { --mp-tone: var(--mp-green); display: grid; grid-template-columns: minmax(255px, 36%) minmax(0, 1fr); border: 1px solid hsl(var(--border) / .6); border-radius: 16px; overflow: hidden; background: hsl(var(--card)); box-shadow: 0 3px 14px hsl(var(--mp-shadow)); scroll-margin-top: 116px; min-height: 90px; }
 .microplan-tone-campaign,.microplan-tone-settlement,.microplan-tone-cdd { --mp-tone: var(--mp-gold); }
 .microplan-tone-flhf,.microplan-tone-terrain,.microplan-tone-disability,.microplan-tone-notes { --mp-tone: var(--mp-earth); }
@@ -1614,10 +1617,37 @@ html[data-lbr-fit="on"][data-lbr-device="ios"] .lbr-type button { min-height: 44
 .microplan-save { background: hsl(var(--mp-green)); color: hsl(var(--primary-foreground)); }
 .microplan-save:hover { background: hsl(var(--mp-green) / .9); }
 .microplan-wizard { background: hsl(var(--card) / .96); border-radius: 16px; padding: 16px 12px; backdrop-filter: blur(12px); border-bottom: 1px solid hsl(var(--border)); }
-.microplan-step-track { display: flex; overflow-x: auto; gap: 4px; padding: 12px 0 0; }
+.microplan-step-track { display: flex; overflow-x: auto; gap: 4px; padding: 12px 0 8px; min-width: 0; max-width: 100%; touch-action: pan-x pan-y; scrollbar-width: thin; scrollbar-color: hsl(var(--mp-green)) hsl(var(--muted)); }
 .microplan-step { flex: 1; min-width: 65px; padding: 2px; height: auto; display: flex; flex-direction: column; gap: 4px; background: transparent; }
 .microplan-step-icon { display: grid; place-items: center; height: 30px; width: 30px; border-radius: 50%; background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); }
 .microplan-step[aria-current=step] .microplan-step-icon { background: hsl(var(--mp-green)); color: hsl(var(--primary-foreground)); }
 .microplan-step span:last-child { font-size: 10px; color: hsl(var(--muted-foreground)); white-space: nowrap; }
 @media (min-width: 1100px) { .microplan-tone-population .microplan-section-fields { grid-template-columns: repeat(5,minmax(0,1fr)); } .microplan-tone-disability .microplan-section-fields { grid-template-columns: repeat(4,minmax(0,1fr)); } }
 @media (max-width: 640px) { .microplan-section { grid-template-columns: 1fr; } .microplan-section-heading { min-height: 96px; } .microplan-section-copy { margin-left: 33%; } .microplan-section-copy h2 { font-size: 16px; } .microplan-section-copy p { font-size: 13px; } .microplan-section-fields { padding: 12px; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; } .microplan-field label { font-size: 13px; } .microplan-entry input,.microplan-entry select,.microplan-entry [role=combobox] { height: 48px; font-size: 16px; } .microplan-wizard { padding: 12px 8px; } }
+
+/* Container queries also cover narrow dialogs within wide desktop shells. */
+@container (max-width: 850px) {
+  .microplan-section { grid-template-columns: 1fr; }
+  .microplan-section-heading { min-height: 96px; }
+  .microplan-section-fields { padding: 12px; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+  .microplan-section-copy h2 { font-size: 16px; }
+  .microplan-section-copy p, .microplan-field label { font-size: 14px; }
+  .microplan-entry input, .microplan-entry select, .microplan-entry [role=combobox] { min-height: 52px; height: auto; font-size: 16px; }
+  .microplan-entry textarea { font-size: 16px; }
+  .microplan-step { min-width: 72px; min-height: 52px; }
+}
+@container (max-width: 430px) {
+  .microplan-section-fields { grid-template-columns: minmax(0,1fr); }
+  .microplan-section-copy { margin-left: 28%; padding-right: 12px; }
+  .microplan-wizard { position: relative; }
+  .microplan-footer { flex-wrap: wrap; }
+  .microplan-footer button { flex: 1; min-height: 52px; }
+}
+.microplan-section-fields input, .microplan-section-fields select, .microplan-section-fields textarea { max-width: 100%; min-width: 0; }
+.microplan-section-copy { overflow-wrap: anywhere; }
+.microplan-device-shell { height: var(--microplan-viewport-height, 100dvh); min-width: 0; overflow: hidden; }
+.microplan-device-shell > header { padding-top: max(12px, env(safe-area-inset-top)); }
+.microplan-device-shell > footer { padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+.project-qr-camera { width: 100%; aspect-ratio: 1; background: hsl(var(--muted)); }
+.project-qr-camera video { width: 100% !important; height: 100% !important; object-fit: cover; }
+.project-join-shell { overscroll-behavior: contain; touch-action: pan-x pan-y; scrollbar-color: hsl(var(--primary)) hsl(var(--muted)); }

@@ -1,4 +1,4 @@
-import {useEffect,useState} from 'react';
+import {useEffect,useState,useRef} from 'react';
 import {useDeviceSession} from '@/hooks/useDeviceSession';
 import MicroplanEntryForm, {type MicroplanFormData} from '@/components/Microplanning/MicroplanEntryForm';
 import {Button} from '@/components/ui/button';
@@ -16,6 +16,13 @@ export default function DeviceMicroplanShell(){
  const [busy,setBusy]=useState(false);
  const [formKey,setFormKey]=useState(0);
  const [preparing,setPreparing]=useState(true);
+ const shellRef=useRef<HTMLDivElement>(null);
+ useEffect(()=>{
+  const viewport=window.visualViewport;
+  const resize=()=>shellRef.current?.style.setProperty('--microplan-viewport-height',`${viewport?.height ?? window.innerHeight}px`);
+  resize();viewport?.addEventListener('resize',resize);window.addEventListener('resize',resize);
+  return()=>{viewport?.removeEventListener('resize',resize);window.removeEventListener('resize',resize);};
+ },[]);
  const load=async()=>{if(session) setEntries((await listSavedEntries(deviceUserId(session.deviceId))).filter(e=>e.projectId===session.projectId && e.settings.kind==='microplan'));};
  useEffect(()=>{
   if(!session)return;
@@ -37,12 +44,12 @@ export default function DeviceMicroplanShell(){
    void syncDeviceRecords().then(load);await load();
   }catch(error){toast.error('Could not save on this device. Free some storage and try again.');throw error;}finally{setBusy(false);}
  };
- return <div className="flex h-[100dvh] flex-col bg-background">
+ return <div ref={shellRef} className="microplan-device-shell flex flex-col bg-background">
   <header className="shrink-0 border-b bg-card px-4 py-3 flex flex-wrap items-center justify-between gap-2">
    <div className="flex items-center gap-2"><MapPinned className="h-6 w-6 text-primary"/><div><h1 className="font-bold text-base">{session.projectName}</h1><p className="text-xs text-muted-foreground">{session.label} · {preparing?'Preparing location lists…':'Location lists prepared'}</p></div></div>
    <Button variant="ghost" size="sm" onClick={leave}><LogOut className="mr-1 h-4 w-4"/>Leave project</Button>
   </header>
-  <main className="min-h-0 flex-1 flex flex-col w-full max-w-6xl mx-auto px-3 pt-3">
+  <main className="min-h-0 min-w-0 flex-1 flex flex-col w-full max-w-6xl mx-auto px-3 pt-3">
    <MicroplanEntryForm key={formKey} projectId={session.projectId} scopeOverride={session.bundle.microplanning?.scope} accountFree onSubmit={save} onCancel={()=>setFormKey(v=>v+1)} isSubmitting={busy}/>
   </main>
   <footer className="shrink-0 border-t bg-card px-4 py-2 flex items-center justify-between gap-3 text-xs">
