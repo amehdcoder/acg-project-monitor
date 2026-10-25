@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { readDeviceSession } from "@/lib/deviceSession";
 import type { ProjectScope } from "@/lib/projectScope";
 import MicroplanWizardChrome from "./MicroplanWizardChrome";
+import ScrollRail from '@/components/ProgrammeModule/ScrollRail';
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -958,6 +959,8 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
         </Button>
       </div>
     </form>
+
+      <ScrollRail target={formScrollRef} />
 
       {/* Voice Form Overlay */}
       <VoiceFormOverlay
