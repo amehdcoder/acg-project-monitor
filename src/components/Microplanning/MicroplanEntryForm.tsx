@@ -817,24 +817,6 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
     </form>
 
       <ScrollRail target={formScrollRef} />
-
-      {/* Voice Form Overlay */}
-      <VoiceFormOverlay
-        isActive={voiceEngine.isActive}
-        state={voiceEngine.state}
-        currentIndex={voiceEngine.currentIndex}
-        totalQuestions={microplanVoiceQuestions.length}
-        currentQuestion={voiceEngine.currentQuestion}
-        lastConfidence={voiceEngine.lastConfidence}
-        lastPolicy={voiceEngine.lastPolicy}
-        isSpellingMode={voiceEngine.isSpellingMode}
-        spellingBuffer={voiceEngine.spellingBuffer}
-        mode={voiceEngine.mode}
-        currentAnswer={voiceEngine.currentQuestion ? voiceGetResponse(voiceEngine.currentQuestion.id) : undefined}
-        onStart={voiceEngine.startEngine}
-        onStop={voiceEngine.stopEngine}
-        onSetMode={voiceEngine.setMode}
-      />
     </div>
   );
 };
