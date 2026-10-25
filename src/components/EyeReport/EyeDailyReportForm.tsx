@@ -141,9 +141,9 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
       if (!matches.length) return;
       setPatients((cur) => {
         const have = new Set(cur.map((e) => e.draft.patient_label.trim().toLowerCase()));
-        const add = matches.filter((p) => !have.has(p.patient_label.trim().toLowerCase())).map((p) => {
+        const add: PatientEntry[] = matches.filter((p) => !have.has(p.patient_label.trim().toLowerCase())).map((p) => {
           const record = readWgResult(p.wg_ss) ?? buildWgRecord({});
-          return { draft: { patient_label: p.patient_label, sex: (p.sex as "m" | "f") ?? "", age_band: p.age_band ?? "", answers: record.answers }, record, srcId: p.id };
+          return { draft: { patient_label: p.patient_label, sex: (p.sex === "m" || p.sex === "f" ? p.sex : ""), age_band: p.age_band ?? "", answers: record.answers }, record, srcId: p.id };
         });
         if (add.length) toast.info(`${add.length} patient${add.length === 1 ? "" : "s"} pre-filled from the standalone WG-SS screening for this facility and date.`);
         return add.length ? [...cur, ...add] : cur;
