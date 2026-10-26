@@ -100,3 +100,16 @@ describe("eye daily report rules", () => {
     expect(validateReport(r).some((i) => i.field === "screen.otherSpecify")).toBe(false);
   });
 });
+
+import { combineArms as _combine, emptySummary as _empty, normSummary as _norm, totals as _totals } from "../definition";
+describe("facility + outreach split", () => {
+  it("report totals are facility plus outreach and survive a reload", () => {
+    const fac = _empty(); fac.consult.a0_14 = { m: 3, f: 2 };
+    const out = _empty(); out.consult.a40 = { m: 4, f: 1 };
+    const combined = _combine(fac, out, _empty());
+    expect(_totals(combined).consulted).toEqual({ m: 7, f: 3 });
+    const again = _norm(JSON.parse(JSON.stringify(combined)));
+    expect(_totals(again).consulted).toEqual({ m: 7, f: 3 });
+    expect(again.split?.outreach.consult.a40).toEqual({ m: 4, f: 1 });
+  });
+});

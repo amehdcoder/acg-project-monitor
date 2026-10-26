@@ -50,6 +50,9 @@ export interface EyeSummary {
   ages: Record<string, AgeMF>;
   lenses: { dv: MF; nv: MF; bf: MF };
   glasses: { dv: MF; nv: MF; bf: MF };
+  /** Same-day split between routine facility work and community outreach. The
+   *  top-level figures are always facility + outreach; disability stays combined. */
+  split?: { facility: EyeSummary; outreach: EyeSummary };
 }
 export type VaBand = { good: number; borderline: number; poor: number };
 export interface EyeCsom {
@@ -105,7 +108,29 @@ export function normSummary(raw: any): EyeSummary {
     const [grp, key] = path.split(".");
     (s as any)[grp][key] = ageTotal(ag);
   }
+  if (raw?.split?.facility && raw?.split?.outreach) {
+    const fac = normSummary({ ...raw.split.facility, split: undefined });
+    const out = normSummary({ ...raw.split.outreach, split: undefined });
+    return combineArms(fac, out, s);
+  }
   return s;
+}
+
+const deepAdd = (a: any, b: any): any => {
+  if (typeof a === "number") return a + (Number(b) || 0);
+  if (a && typeof a === "object") { const o: any = {}; for (const k of Object.keys(a)) o[k] = deepAdd(a[k], b?.[k]); return o; }
+  return a;
+};
+/** Combines facility and outreach arms; disability figures come from `base`. */
+export function combineArms(facility: EyeSummary, outreach: EyeSummary, base: EyeSummary): EyeSummary {
+  const strip = (x: EyeSummary) => { const { split: _s, ...rest } = x; return rest as EyeSummary; };
+  const fac = strip(facility), out = strip(outreach);
+  const sum = deepAdd(fac, out) as EyeSummary;
+  sum.screenOther = [fac.screenOther.trim() && `Facility: ${fac.screenOther.trim()}`, out.screenOther.trim() && `Outreach: ${out.screenOther.trim()}`].filter(Boolean).join(" · ").slice(0, 300);
+  if (!out.screenOther.trim()) sum.screenOther = fac.screenOther;
+  sum.pwdAge = structuredClone(base.pwdAge); sum.pwd = { ...base.pwd };
+  sum.split = { facility: fac, outreach: out };
+  return sum;
 }
 export function normCsom(raw: any): EyeCsom | null {
   if (!raw) return null;
