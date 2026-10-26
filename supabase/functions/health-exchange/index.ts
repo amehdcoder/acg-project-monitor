@@ -1,4 +1,5 @@
 import { computeNationalIndicators } from "../_shared/nationalIndicators.ts";
+import { computeEyeIndicators, EYE_INDICATORS } from "../_shared/eyeIndicators.ts";
 // Bi-directional health data exchange: DHIS2 (aggregate indicators + metadata),
 // HL7 FHIR (Patient / Condition) and LMIS (commodity stock).
 //
@@ -197,7 +198,26 @@ async function computeConnectionValues(db: ReturnType<typeof admin>, c: Connecti
     computeMonthlyValues(db, c.project_id, period), computeServiceValues(db, c.project_id, period, area),
     computeNationalValues(db, c.project_id, period, area),
   ]);
-  return [...base, ...services, ...national];
+  const eye = !area || area === "all" || area === "eye" ? await computeEyeValues(db, c.project_id, period) : [];
+  return [...base, ...services, ...national, ...eye];
+}
+
+/** Eye Health Daily Facility Report totals for one month, optionally one State/LGA/facility. */
+async function computeEyeValues(db: ReturnType<typeof admin>, projectId: string, period: string, scope: { state?: string; lga?: string; facility?: string } = {}) {
+  const { start, end } = monthRange(period);
+  const rows: any[] = [];
+  for (let from = 0; ; from += 1000) {
+    let q: any = db.from("eye_daily_reports").select("id,facility_name,state,lga,report_date,summary,csom")
+      .eq("project_id", projectId).gte("report_date", start.slice(0, 10)).lt("report_date", end.slice(0, 10));
+    if (scope.state) q = q.ilike("state", scope.state);
+    if (scope.lga) q = q.ilike("lga", scope.lga);
+    if (scope.facility) q = q.ilike("facility_name", scope.facility);
+    const { data, error } = await q.order("id").range(from, from + 999);
+    if (error) throw new Error(`Could not read eye reports: ${error.message}`);
+    rows.push(...(data ?? []));
+    if (!data || data.length < 1000) break;
+  }
+  return computeEyeIndicators(rows);
 }
 
 /** Standard national programme indicators (see _shared/nationalIndicators.ts). */
@@ -976,6 +996,52 @@ Deno.serve(async (req) => {
         }
         await log(db, connection, "pull", "microplan_pull", "success", upserts.length, `Pulled ${upserts.length} areas for ${period} (${byKpi.size} KPIs, ${autoMapped} auto-mapped)`, guard.userId);
         return json({ ok: true, period, areas: upserts.length, kpis: byKpi.size, autoMapped, mapped: Object.fromEntries([...byKpi].map(([k, v]) => [k, v.name])) });
+      }
+
+      /* ------------- Eye Health daily report exchange (push/pull) ------------- */
+      case "eye_values":
+      case "eye_push":
+      case "eye_pull": {
+        if (connection.kind !== "dhis2") return json({ error: "Eye Health exchange needs a DHIS2 connection" }, 400);
+        const period = String(payload.period ?? "");
+        if (!/^\d{6}$/.test(period)) return json({ error: "Choose a reporting month (YYYYMM)." }, 400);
+        const clean = (v: unknown) => { const x = String(v ?? "").trim(); return x && x.length <= 150 && /^[\p{L}\p{M}\p{N} .,'()&/-]+$/u.test(x) ? x : undefined; };
+        const scope = { state: clean(payload.state), lga: clean(payload.lga), facility: clean(payload.facility) };
+        const orgUnit = String(payload.org_unit ?? connection.org_unit_id ?? "").trim();
+        const local = await computeEyeValues(db, connection.project_id, period, scope);
+        if (action === "eye_values") return json({ ok: true, period, values: local });
+        if (action === "eye_push") {
+          if (!orgUnit) return json({ error: "Set the DHIS2 organisation unit for this connection first." }, 400);
+          const r = await pushDataValues(db, connection, headers, period, local, orgUnit, payload.dry_run === true, guard.userId, "eye_daily_push");
+          return json(r.body, r.httpStatus);
+        }
+        // Pull: read the mapped data values back from DHIS2 and compare with Amehnities.
+        const { data: maps } = await db.from("health_exchange_mappings").select("indicator_key, remote_id, category_option_combo")
+          .eq("connection_id", connection.id).like("indicator_key", "eye_daily:%");
+        const mapped = (maps ?? []).filter((m: any) => m.remote_id && m.remote_id !== "UNMAPPED");
+        if (!mapped.length) return json({ error: "Link at least one Eye Health indicator to a DHIS2 data element first." }, 400);
+        if (!orgUnit) return json({ error: "Set the DHIS2 organisation unit for this connection first." }, 400);
+        const des = [...new Set(mapped.map((m: any) => m.remote_id))];
+        const qs = new URLSearchParams({ period, orgUnit, children: "false" });
+        if (connection.dataset_id) qs.set("dataSet", connection.dataset_id);
+        for (const d of des) qs.append("dataElement", d as string);
+        const res = await remoteFetch(joinUrl(connection.base_url, `api/dataValueSets.json?${qs.toString()}`), { headers }, 60000);
+        if (!res.ok) {
+          const msg = remoteMessage(res.body, `HTTP ${res.status}`);
+          await log(db, connection, "pull", "eye_daily_pull", "error", 0, msg, guard.userId);
+          return json({ error: msg }, 502);
+        }
+        const dvs: any[] = (res.body as any)?.dataValues ?? [];
+        const localBy = new Map(local.map((v) => [v.indicator_key, v.value]));
+        const labelBy = new Map(EYE_INDICATORS.map((d) => [d.key, d.label]));
+        const rows = mapped.map((m: any) => {
+          const hits = dvs.filter((d) => d.dataElement === m.remote_id && (!m.category_option_combo || d.categoryOptionCombo === m.category_option_combo));
+          const remote = hits.length ? hits.reduce((a, d) => a + (Number(d.value) || 0), 0) : null;
+          const amehnities = localBy.get(m.indicator_key) ?? 0;
+          return { indicator_key: m.indicator_key, label: labelBy.get(m.indicator_key) ?? m.indicator_key, amehnities, dhis2: remote, match: remote === amehnities, lastUpdated: hits[0]?.lastUpdated ?? null };
+        });
+        await log(db, connection, "pull", "eye_daily_pull", "success", rows.length, `Pulled ${dvs.length} DHIS2 values for ${period}; ${rows.filter((r) => r.match).length}/${rows.length} match Amehnities.`, guard.userId);
+        return json({ ok: true, period, orgUnit, rows });
       }
 
       /* --------------------- DHIS2 indicator push ---------------------- */
