@@ -203,7 +203,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
   const setAge = (path: string, v: AgeMF) => setA((s) => { s.ages[path] = v; const [g, k] = path.split("."); (s as any)[g][k] = ageTotal(v); });
   const toggleOutreach = (on: boolean) => {
     if (on) { setF((p: any) => { const { split: _x, ...fac } = p.summary; return { ...p, summary: combineArms(fac as EyeSummary, emptySummary(), p.summary) }; }); setArm("outreach"); return; }
-    if (split && t(totals(split.outreach).consulted) + ageTotal(split.outreach.ages["screen.refractive"] ?? { a0_14: { m: 0, f: 0 }, a15_39: { m: 0, f: 0 }, a40: { m: 0, f: 0 } }).m >= 0 && JSON.stringify(split.outreach) !== JSON.stringify({ ...emptySummary(), split: undefined }) && !confirm("Remove all outreach figures recorded for this day?")) return;
+    if (split && armTotals(split.outreach) > 0 && !confirm("Remove all outreach figures recorded for this day?")) return;
     setF((p: any) => { const fac = p.summary.split?.facility ?? p.summary; return { ...p, summary: { ...fac, pwdAge: p.summary.pwdAge, pwd: p.summary.pwd, split: undefined } }; });
     setArm("facility");
   };
