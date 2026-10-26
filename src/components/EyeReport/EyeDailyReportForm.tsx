@@ -17,6 +17,7 @@ import {
   type EyeAttachment, type EyeCsom, type EyePatientRow, type EyeReportRow, type EyeSummary, type MF, type VaBand,
 } from "@/lib/eyeReport/definition";
 import { loadPatients, loadReports, saveDevicePatients, saveDeviceReport, savePatients, saveReport } from "@/lib/eyeReport/store";
+import { similarFacilityName } from "@/lib/eyeReport/definition";
 import { GeoCombobox } from "@/components/ProgrammeModule/GeoCascadeFields";
 import { getAllStates, getLGAsForState } from "@/lib/nigeriaAdminData";
 import { fileToDataUrl, uploadBeneficiaryMedia } from "@/lib/programmeModule/media";
@@ -288,6 +289,8 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
   }, [projectId, facilities]);
   const facilityKnown = known.some((x) => x.name.trim().toLowerCase() === f.facility.trim().toLowerCase());
   const showManualFacility = manualFacility || known.length === 0 || (f.facility.trim() !== "" && !facilityKnown);
+  const [dismissedVariant, setDismissedVariant] = useState("");
+  const similarName = useMemo(() => (f.facility.trim().length >= 3 && !facilityKnown ? similarFacilityName(f.facility, known.map((x) => x.name)) : null), [f.facility, facilityKnown, known]);
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-eye-sky">
@@ -357,6 +360,20 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
                         {known.length > 0 && (
                           <Button type="button" variant="outline" className="h-12 shrink-0" onClick={() => setManualFacility(false)}>Choose from list</Button>
                         )}
+                      </div>
+                    )}
+                    {showManualFacility && similarName && dismissedVariant !== f.facility.trim().toLowerCase() && (
+                      <div role="alert" className="mt-2 rounded-xl border border-eye-gold bg-eye-gold/10 p-3">
+                        <p className="text-sm font-semibold">Possible duplicate facility name</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">"{f.facility.trim()}" looks like the existing facility <strong className="text-foreground">{similarName}</strong>. Please standardise to one name so reports add up correctly.</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <Button type="button" size="sm" onClick={() => {
+                            const x = known.find((y) => y.name === similarName);
+                            setF({ ...f, facilityId: x?.id ?? "", facility: similarName, state: x?.state || f.state, lga: x?.lga || f.lga });
+                            setManualFacility(false);
+                          }}>Use "{similarName}"</Button>
+                          <Button type="button" size="sm" variant="outline" onClick={() => setDismissedVariant(f.facility.trim().toLowerCase())}>It's a different facility</Button>
+                        </div>
                       </div>
                     )}
                   </label>
