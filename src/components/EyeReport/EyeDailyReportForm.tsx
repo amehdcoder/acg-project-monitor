@@ -384,15 +384,24 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
   const [dismissedVariant, setDismissedVariant] = useState("");
   const similarName = useMemo(() => (f.facility.trim().length >= 3 && !facilityKnown ? similarFacilityName(f.facility, known.map((x) => x.name)) : null), [f.facility, facilityKnown, known]);
 
+  // Full-screen sheet: freeze the page underneath (signed-in and account-free alike)
+  // so Android swipes scroll the form, not the workspace behind it.
+  useEffect(() => {
+    const b = document.body, h = document.documentElement;
+    const prev = [b.style.overflow, h.style.overflow, b.style.overscrollBehavior];
+    b.style.overflow = "hidden"; h.style.overflow = "hidden"; b.style.overscrollBehavior = "none";
+    return () => { b.style.overflow = prev[0]; h.style.overflow = prev[1]; b.style.overscrollBehavior = prev[2]; };
+  }, []);
+
   return createPortal(
     <div data-eye-report-fullscreen className="fixed inset-0 z-[200] flex h-[100dvh] w-screen max-w-[100vw] flex-col overflow-hidden overscroll-contain bg-eye-sky pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]">
       <header className="relative shrink-0 overflow-hidden bg-eye-deep text-primary-foreground">
         <img src={hero} alt="" width={1600} height={640} className="absolute inset-0 h-full w-full object-cover object-right opacity-35" />
         <div className="absolute inset-0 bg-gradient-to-r from-eye-deep via-eye-deep/90 to-eye-deep/30" />
-        <div className="relative mx-auto flex max-w-5xl items-start justify-between gap-3 px-4 py-4 sm:py-5">
+        <div className="relative mx-auto flex max-w-5xl items-start justify-between gap-3 px-3 py-3 sm:px-4 sm:py-5">
           <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-eye-gold">State Ministry of Health · Primary Eye Care</p>
-            <h1 className="mt-1 text-xl font-extrabold leading-tight sm:text-2xl">{wgOnly ? "Patient Disability Screening (WG-SS)" : "Eye Health Daily Facility Report"}</h1>
+            <h1 className="mt-1 text-lg font-extrabold leading-tight sm:text-2xl">{wgOnly ? "Patient Disability Screening (WG-SS)" : "Eye Health Daily Facility Report"}</h1>
             <p className="mt-0.5 truncate text-xs opacity-80">{projectName}{!online && <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-eye-gold px-2 py-0.5 font-semibold text-eye-ink"><CloudOff className="h-3 w-3" /> Offline — saving on device</span>}</p>
           </div>
           <Button size="icon" variant="ghost" onClick={onClose} aria-label="Close" className="shrink-0 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"><X className="h-5 w-5" /></Button>
@@ -411,7 +420,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
       </header>
 
       <div className="shrink-0 border-b bg-card">
-        <div className={`mx-auto grid max-w-5xl gap-2 px-4 py-2 ${wgOnly ? "grid-cols-2" : "grid-cols-4"}`}>
+        <div className={`mx-auto grid max-w-5xl gap-2 px-4 py-2 ${wgOnly ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-4"}`}>
           {kpis.map((k) => (
             <div key={k.label} className="flex items-center gap-2 rounded-xl border bg-background px-2 py-1.5">
               <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${k.cls} text-primary-foreground`}><k.icon className="h-3.5 w-3.5" /></span>
@@ -422,7 +431,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
       </div>
 
       <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        <div className="mx-auto max-w-5xl px-4 py-5">
+        <div className="mx-auto w-full max-w-5xl px-3 py-4 pb-24 sm:px-4 sm:py-5">
           <AnimatePresence mode="wait">
             <motion.section key={cur.key} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.22 }} className="space-y-3">
               {cur.key === "who" && (
