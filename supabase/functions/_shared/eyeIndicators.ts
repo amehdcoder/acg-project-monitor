@@ -11,6 +11,7 @@ export interface EyeAgg { [k: string]: number }
 
 const n = (v: unknown) => (Number.isFinite(Number(v)) ? Math.max(0, Math.floor(Number(v))) : 0);
 const mfv = (o: any) => ({ m: n(o?.m), f: n(o?.f) });
+const structuredCloneSafe = (o: any) => { try { return JSON.parse(JSON.stringify(o)); } catch { return {}; } };
 
 const BANDS = [["a0_14", "aged 0–14 years"], ["a15_39", "aged 15–39 years"], ["a40", "aged 40 years and above"]] as const;
 const SCREEN = [["refractive", "refractive error"], ["cataract", "cataract"], ["glaucoma", "glaucoma"], ["tt", "trachomatous trichiasis (TT)"], ["other", "other eye conditions"]] as const;
@@ -55,7 +56,15 @@ export function computeEyeIndicators(rows: EyeIndicatorRow[]): { indicator_key: 
   const addMF = (key: string, o: any) => { const x = mfv(o); v[key] += x.m + x.f; v[`${key}:male`] += x.m; v[`${key}:female`] += x.f; };
   const facilities = new Set<string>();
   for (const r of rows) {
-    const s = r.summary ?? {};
+    const s: any = structuredCloneSafe(r.summary ?? {});
+    // Age breakdowns are the source of truth for item totals (as in the form).
+    for (const [path, a] of Object.entries<any>(s.ages ?? {})) {
+      const [grp, key] = path.split(".");
+      if (!a || !grp || !key) continue;
+      const tot = { m: 0, f: 0 };
+      for (const [b] of BANDS) { const x = mfv(a[b]); tot.m += x.m; tot.f += x.f; }
+      s[grp] = { ...(s[grp] ?? {}), [key]: tot };
+    }
     v["eye_daily:reports_submitted"] += 1;
     if (r.facility_name) facilities.add(String(r.facility_name).trim().toLowerCase());
     const consult = { ...(s.consult ?? {}) };
