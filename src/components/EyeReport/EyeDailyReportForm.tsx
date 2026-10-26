@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft, ArrowRight, Building2, CalendarDays, Check, CloudOff, Eye, Glasses, ImagePlus, Loader2, Paperclip,
@@ -383,8 +384,8 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
   const [dismissedVariant, setDismissedVariant] = useState("");
   const similarName = useMemo(() => (f.facility.trim().length >= 3 && !facilityKnown ? similarFacilityName(f.facility, known.map((x) => x.name)) : null), [f.facility, facilityKnown, known]);
 
-  return (
-    <div className="fixed inset-0 z-[60] flex h-[100dvh] w-screen max-w-[100vw] flex-col overflow-hidden bg-eye-sky pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]">
+  return createPortal(
+    <div data-eye-report-fullscreen className="fixed inset-0 z-[200] flex h-[100dvh] w-screen max-w-[100vw] flex-col overflow-hidden overscroll-contain bg-eye-sky pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]">
       <header className="relative shrink-0 overflow-hidden bg-eye-deep text-primary-foreground">
         <img src={hero} alt="" width={1600} height={640} className="absolute inset-0 h-full w-full object-cover object-right opacity-35" />
         <div className="absolute inset-0 bg-gradient-to-r from-eye-deep via-eye-deep/90 to-eye-deep/30" />
@@ -762,6 +763,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
           )}
         </div>
       </main>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -978,12 +978,19 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       return;
     }
     try {
-      setLoading(true);
-      const { data: formsData, error } = await withTimeout(supabase
+      // Only show the spinner when nothing is on screen yet — re-showing it over
+      // already-rendered forms made the page blink on every refresh.
+      if (forms.length === 0) setLoading(true);
+      const query = () => supabase
         .from("forms")
         .select("*")
         .eq("project_id", projectId)
-        .order("created_at", { ascending: false }), 10000, "project_forms_timeout");
+        .order("created_at", { ascending: false });
+      // Slow field networks: one longer retry before falling back to the offline copy.
+      let res: any;
+      try { res = await withTimeout(query(), 15000, "project_forms_timeout"); }
+      catch { res = await withTimeout(query(), 25000, "project_forms_timeout"); }
+      const { data: formsData, error } = res;
 
       if (error) throw error;
 
@@ -1000,11 +1007,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       pruneStaleForms(formsWithCounts.map((f) => f.id), projectId);
     } catch (error: any) {
       console.error("Error fetching forms:", error);
-      toast({
-        title: "Error loading forms",
-        description: error.message,
-        variant: "destructive",
-      });
+      // Timeouts are a connectivity condition, not an error the user can act on:
+      // keep showing the downloaded copies silently instead of a raw error code.
+      const isTimeout = /timeout/i.test(String(error?.message || ""));
+      if (!isTimeout && forms.length === 0 && offlineForms.length === 0) {
+        toast({
+          title: "Couldn't refresh forms",
+          description: "Showing forms saved on this device. We'll try again automatically.",
+        });
+      }
     } finally {
       setLoading(false);
     }

@@ -20,5 +20,14 @@ describe("eye DHIS2 indicators", () => {
     expect(val(out, "eye_daily:discharge_presenting_good")).toBe(3);
     expect(val(out, "eye_daily:discharge_pinhole_poor")).toBe(0);
   });
+  it("uses age breakdowns as item totals and sums real report values", () => {
+    const out = computeEyeIndicators([
+      { summary: { surgery: { cataract: { m: 99, f: 99 } }, ages: { "surgery.cataract": { a0_14: { m: 1, f: 0 }, a15_39: { m: 0, f: 2 }, a40: { m: 3, f: 4 } } }, lenses: { dv: { m: 2, f: 1 } } }, csom: null },
+      { summary: { surgery: { cataract: { m: 1, f: 1 } } }, csom: null },
+    ]);
+    expect(val(out, "eye_daily:surgery_cataract")).toBe(12);
+    expect(val(out, "eye_daily:surgery_cataract:female")).toBe(7);
+    expect(val(out, "eye_daily:lenses_dv")).toBe(3);
+  });
   it("server mirror is identical", () => { expect(shared).toBe(local); });
 });
