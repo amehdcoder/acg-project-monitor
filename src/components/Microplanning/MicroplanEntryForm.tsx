@@ -807,7 +807,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
 
       {/* Actions — appear after all fields, at the end of the form */}
       <div className="microplan-footer flex flex-wrap items-center justify-end gap-2">
-        <Button type="button" variant="outline" size="default" onClick={onCancel} disabled={isSubmitting} className="min-h-[44px] min-w-[90px]">
+        <Button type="button" variant="outline" size="default" onClick={() => { try { localStorage.removeItem(draftKey); } catch { /* unavailable */ } onCancel(); }} disabled={isSubmitting} className="min-h-[44px] min-w-[90px]">
           <X className="h-4 w-4 mr-1" /> Cancel
         </Button>
         <Button type="submit" size="default" className="microplan-save min-h-[44px] min-w-[140px] font-semibold" disabled={isSubmitting}>

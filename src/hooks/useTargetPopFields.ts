@@ -84,8 +84,16 @@ export function useTargetPopFields(projectName?: string | null) {
 
   const setFields = useCallback(async (next: string[]) => {
     if (role !== "super_admin") throw new Error("Only Super Admins may configure Target Population.");
-    if (!projectName) throw new Error("Select a project first.");
     if (!validTargetSelection(next)) throw new Error("Select age groups from one disaggregation only.");
+    if (!projectName) {
+      // No project context (e.g. Record Quality Brain): keep the device-level selection.
+      try {
+        window.localStorage.setItem(storageKey, JSON.stringify(next));
+        window.dispatchEvent(new Event(EVENT_NAME));
+      } catch {}
+      setFieldsState(next);
+      return;
+    }
     const { data: auth, error: authError } = await supabase.auth.getUser();
     if (authError || !auth.user) throw new Error("Please sign in again.");
     const { data, error } = await supabase.from("microplan_project_settings").upsert(
