@@ -609,6 +609,9 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
                   </div>
                   <VaTable title="Section 2 · At discharge" colA="Presenting" colB="With pinhole" ceiling={C.surgeries} a={C.discharge.presenting} b={C.discharge.pinhole} onA={(v) => setC((c) => { c.discharge.presenting = v; })} onB={(v) => setC((c) => { c.discharge.pinhole = v; })} />
                   <VaTable title="Section 3 · Follow up (≥ 4 weeks)" colA="Presenting" colB="Pinhole / BCVA" ceiling={C.surgeries} a={C.followup.presenting} b={C.followup.bcva} onA={(v) => setC((c) => { c.followup.presenting = v; })} onB={(v) => setC((c) => { c.followup.bcva = v; })} />
+                  {issues.filter((i) => i.field.startsWith("csom.")).map((i, k) => (
+                    <p key={k} role="alert" className={`flex items-start gap-2 rounded-xl border p-3 text-sm font-medium ${i.level === "error" ? "border-destructive bg-destructive/10 text-destructive" : "border-eye-gold bg-eye-gold/10 text-eye-ink"}`}><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />{i.message}</p>
+                  ))}
                 </motion.div>
               ); })()}
 
