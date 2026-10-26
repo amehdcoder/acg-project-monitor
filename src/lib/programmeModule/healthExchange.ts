@@ -1,3 +1,4 @@
+import { EYE_INDICATORS, computeEyeIndicators } from "@/lib/eyeReport/eyeIndicators";
 import { NATIONAL_INDICATORS, computeNationalIndicators, type IndicatorArea, type IndicatorRows } from "./nationalIndicators";
 // Client helpers for the national health data exchange (DHIS2 / FHIR / LMIS).
 // Credentials never travel through the browser twice: they are sent once to the
@@ -100,6 +101,7 @@ export const REPORTABLE_INDICATORS: { key: string; label: string; area?: Indicat
   { key: "services_delivered", label: "Number of services delivered (this server's programme area)" },
   { key: "beneficiaries_served", label: "Number of beneficiaries served (this server's programme area)" },
   ...NATIONAL_INDICATORS.map((i) => ({ key: i.key, label: i.label, area: i.area, definition: i.definition })),
+  ...EYE_INDICATORS.map((i) => ({ key: i.key, label: i.label, area: "eye" as IndicatorArea, definition: `Daily Facility Report · ${i.group}: ${i.definition}` })),
 ];
 
 export async function listConnections(projectId: string) {
@@ -284,6 +286,9 @@ export async function computeIndicatorValues(projectId: string, period: string) 
   };
   const rows = await fetchIndicatorRows(projectId, start, end);
   for (const v of computeNationalIndicators(rows)) map[v.indicator_key] = v.value;
+  const { data: eyeRows } = await T("eye_daily_reports").select("facility_name,report_date,summary,csom")
+    .eq("project_id", projectId).gte("report_date", start.slice(0, 10)).lt("report_date", end.slice(0, 10)).limit(10000);
+  for (const v of computeEyeIndicators((eyeRows ?? []) as any[])) map[v.indicator_key] = v.value;
   return REPORTABLE_INDICATORS.map((i) => ({ ...i, value: map[i.key] ?? 0 }));
 }
 
@@ -345,3 +350,12 @@ export interface Dhis2LoginResult {
 /** Signs in to DHIS2; the password is stored server-side only and never returned. */
 export const dhis2Login = (input: { project_id: string; base_url: string; username: string; password: string; connection_id?: string }) =>
   call({ action: "dhis2_login", ...input }) as Promise<Dhis2LoginResult>;
+
+// ── Eye Health Daily Facility Report exchange ───────────────────────────────
+export interface EyeScope { state?: string; lga?: string; facility?: string; org_unit?: string }
+export const eyeExchangeValues = (connection_id: string, period: string, scope: EyeScope = {}) =>
+  call({ action: "eye_values", connection_id, period, ...scope });
+export const eyeExchangePush = (connection_id: string, period: string, scope: EyeScope = {}, dry_run = false) =>
+  call({ action: "eye_push", connection_id, period, dry_run, ...scope });
+export const eyeExchangePull = (connection_id: string, period: string, scope: EyeScope = {}) =>
+  call({ action: "eye_pull", connection_id, period, ...scope });
