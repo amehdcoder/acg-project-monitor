@@ -15,12 +15,14 @@ describe("eye daily report rules", () => {
     const r = base(); r.summary.consult.a40 = { m: 3, f: 0 }; r.summary.pwd = { m: 4, f: 0 };
     expect(validateReport(r).some((i) => i.field === "pwd.m" && i.level === "error")).toBe(true);
   });
-  it("requires CSOM when cataract surgeries are recorded and matching totals", () => {
+  it("treats CSOM surgeries as its own input, independent of the day's summary", () => {
     const r = base(); r.summary.consult.a40 = { m: 5, f: 5 }; r.summary.surgery.cataract = { m: 2, f: 1 };
-    expect(validateReport(r).some((i) => i.field === "csom")).toBe(true);
-    const c = emptyCsom(); c.surgeries = 2;
+    expect(validateReport(r).some((i) => i.field.startsWith("csom"))).toBe(false);
+    const c = emptyCsom(); c.surgeries = 7;
+    expect(validateReport({ ...r, csom: c }).some((i) => i.field === "csom.surgeries")).toBe(false);
+    c.surgeries = 0; c.iol = 2;
     expect(validateReport({ ...r, csom: c }).some((i) => i.field === "csom.surgeries")).toBe(true);
-    c.surgeries = 3; c.discharge.presenting = { good: 2, borderline: 1, poor: 0 }; c.discharge.pinhole = { good: 2, borderline: 0, poor: 0 };
+    c.iol = 0; c.surgeries = 3; c.discharge.presenting = { good: 2, borderline: 1, poor: 0 }; c.discharge.pinhole = { good: 2, borderline: 0, poor: 0 };
     expect(validateReport({ ...r, csom: c }).some((i) => i.field === "csom.discharge.pinhole" && i.level === "error")).toBe(true);
   });
   it("computes percentages to one decimal", () => { expect(pct(2, 3)).toBe(66.7); expect(pct(1, 0)).toBe(0); });
@@ -85,5 +87,16 @@ describe("eye daily report rules", () => {
   it("blocks age-band disability counts above that band's consultations", () => {
     const r = base(); r.summary.consult.a15_39 = { m: 1, f: 0 }; r.summary.pwdAge.a15_39 = { m: 2, f: 0 };
     expect(validateReport(r).some((i) => i.field === "pwd.a15_39.m" && i.level === "error")).toBe(true);
+  });
+  it("derives item totals from the age-by-sex breakdown", async () => {
+    const d = await import("../definition");
+    const s = d.normSummary({ ages: { "surgery.cataract": { a0_14: { m: 1, f: 2 }, a40: { m: 3, f: 0 } } } });
+    expect(s.surgery.cataract).toEqual({ m: 4, f: 2 });
+  });
+  it("requires a description when other eye conditions are screened", () => {
+    const r = base(); r.summary.consult.a40 = { m: 5, f: 5 }; r.summary.screen.other = { m: 1, f: 0 };
+    expect(validateReport(r).some((i) => i.field === "screen.otherSpecify")).toBe(true);
+    r.summary.screenOther = "Pterygium";
+    expect(validateReport(r).some((i) => i.field === "screen.otherSpecify")).toBe(false);
   });
 });
