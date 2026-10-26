@@ -277,7 +277,7 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
         syncedAt={syncedAt}
         onRefresh={() => void refresh()}
         fields={fields}
-        onFields={setFields}
+        onFields={(next: string[]) => { setFields(next).catch((e) => toast({ title: "Target population not saved", description: e instanceof Error ? e.message : String(e), variant: "destructive" })); }}
         options={options}
         targetLabel={targetLabel}
       />
