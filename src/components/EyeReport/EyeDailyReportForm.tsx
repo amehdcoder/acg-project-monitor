@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import hero from "@/assets/eye-report/hero.jpg";
 import {
-  AGE_BANDS, LENS_TYPES, SURGERY_ITEMS, sumMF, wgAgeIssues, wgPwdByAge, emptyCsom, emptySummary, normAttachments, normCsom, normSummary, pct, t, totals,
+  AGE_BANDS, LENS_TYPES, SURGERY_ITEMS, SCREEN_ITEMS, ageTotal, type AgeMF, sumMF, wgAgeIssues, wgPwdByAge, emptyCsom, emptySummary, normAttachments, normCsom, normSummary, pct, t, totals,
   validateReport, vaTotal, wgVsSummaryIssues,
   type EyeAttachment, type EyeCsom, type EyePatientRow, type EyeReportRow, type EyeSummary, type MF, type VaBand,
 } from "@/lib/eyeReport/definition";
@@ -38,6 +38,7 @@ const today = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000
 const STEPS = [
   { key: "who", label: "Facility & date", icon: Building2, tone: "bg-eye-blue" },
   { key: "consult", label: "Consultations", icon: Stethoscope, tone: "bg-eye-blue" },
+  { key: "screening", label: "Screening", icon: ScanEye, tone: "bg-eye-blue" },
   { key: "surgery", label: "Surgeries", icon: Scissors, tone: "bg-eye-teal" },
   { key: "refraction", label: "Refraction & glasses", icon: Glasses, tone: "bg-eye-violet" },
   { key: "csom", label: "CSOM episode", icon: ScanEye, tone: "bg-eye-teal" },
@@ -100,6 +101,35 @@ function VaTable({ title, colA, colB, a, b, onA, onB, ceiling }: { title: string
   );
 }
 
+/** One item broken down by age band, each band split by sex (0–14 = boys/girls). */
+function AgeMFBlock({ label, icon: Icon, tone = "text-eye-blue", value, onChange, invalid, children }: { label: string; icon?: any; tone?: string; value: AgeMF; onChange: (v: AgeMF) => void; invalid?: boolean; children?: React.ReactNode }) {
+  const tot = ageTotal(value);
+  return (
+    <div className={`overflow-hidden rounded-2xl border bg-card shadow-sm ${invalid ? "border-destructive" : ""}`}>
+      <div className="flex items-center justify-between gap-2 border-b bg-eye-sky/60 px-3 py-2.5">
+        <span className="flex min-w-0 items-center gap-2 text-sm font-bold">{Icon && <Icon className={`h-4 w-4 shrink-0 ${tone}`} />}<span className="leading-tight">{label}</span></span>
+        <span className="shrink-0 rounded-full bg-eye-gold/25 px-2.5 py-1 text-xs font-bold tabular-nums text-eye-ink">M {tot.m} · F {tot.f} · {t(tot)}</span>
+      </div>
+      <div className="space-y-1.5 p-2.5">
+        {AGE_BANDS.map((b) => {
+          const kid = b.key === "a0_14";
+          return (
+            <div key={b.key} className="grid grid-cols-[4.6rem_1fr_1fr_2.6rem] items-center gap-1.5 sm:grid-cols-[6rem_1fr_1fr_3rem] sm:gap-2">
+              <span className="text-xs font-semibold leading-tight text-muted-foreground">{b.label}</span>
+              <div><span className="mb-0.5 block text-center text-[10px] font-bold uppercase tracking-wide text-eye-blue">{kid ? "Boys" : "Male"}</span>
+                <NumberCell label={`${label} ${b.label} ${kid ? "boys" : "male"}`} value={value[b.key].m} invalid={invalid} onChange={(m) => onChange({ ...value, [b.key]: { ...value[b.key], m } })} /></div>
+              <div><span className="mb-0.5 block text-center text-[10px] font-bold uppercase tracking-wide text-eye-rose">{kid ? "Girls" : "Female"}</span>
+                <NumberCell label={`${label} ${b.label} ${kid ? "girls" : "female"}`} value={value[b.key].f} invalid={invalid} onChange={(f) => onChange({ ...value, [b.key]: { ...value[b.key], f } })} /></div>
+              <span className="self-end rounded-lg bg-muted py-3 text-center text-sm font-bold tabular-nums">{t(value[b.key])}</span>
+            </div>
+          );
+        })}
+        {children}
+      </div>
+    </div>
+  );
+}
+
 interface PatientEntry { draft: WgPatientDraft; record: WgResult; /** Id of the standalone screening row this entry was pre-filled from (deleted on save). */ srcId?: string }
 
 export default function EyeDailyReportForm({ projectId, projectName, facilities, mode, existing, existingPatients = [], wgOnly = false, otherReports = [], onClose, onSaved }: Props) {
@@ -154,16 +184,12 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
 
   const S = f.summary; const T = totals(S);
   const cataract = t(S.surgery.cataract);
-  // The CSOM episode is unlocked by cataract surgeries and keeps its total in step.
-  useEffect(() => {
-    setF((p: any) => {
-      if (cataract === 0 && !p.csom) return p;
-      const c = p.csom ?? emptyCsom();
-      return c.surgeries === cataract ? (p.csom ? p : { ...p, csom: c }) : { ...p, csom: { ...c, surgeries: cataract } };
-    });
-  }, [cataract]);
+  // CSOM is a general episode: it keeps its own surgeries count (the denominator).
+  const csomUsed = !!f.csom && (f.csom.surgeries + f.csom.biometry + f.csom.iol + vaTotal(f.csom.discharge.presenting) + vaTotal(f.csom.discharge.pinhole) + vaTotal(f.csom.followup.presenting) + vaTotal(f.csom.followup.bcva)) > 0;
+  const csomOut = csomUsed ? f.csom : null;
 
   const setS = (fn: (s: EyeSummary) => void) => setF((p: any) => { const s = structuredClone(p.summary); fn(s); return { ...p, summary: s }; });
+  const setAge = (path: string, v: AgeMF) => setS((s) => { s.ages[path] = v; const [g, k] = path.split("."); (s as any)[g][k] = ageTotal(v); });
   const setC = (fn: (c: EyeCsom) => void) => setF((p: any) => { const c = structuredClone(p.csom ?? emptyCsom()); fn(c); return { ...p, csom: c }; });
 
   const disabledCount = patients.filter((p) => p.record.hasDisability).length;
@@ -180,7 +206,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
       return { ...p, summary: { ...p.summary, pwdAge: byAge, pwd: sumMF(byAge.a0_14, byAge.a15_39, byAge.a40) } };
     });
   }, [wgAvailable, wgSig]);
-  const csomForValidation = cataract > 0 ? f.csom : null;
+  const csomForValidation = csomOut;
   const issues = validateReport({
     facility: f.facility, date: f.date, summary: S, csom: csomForValidation, today: today(),
     state: f.state, lga: f.lga, preparedBy: f.prepared, confirmedBy: f.confirmed,
@@ -190,7 +216,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
     // WG-SS-only entries carry no summary — drop summary-driven rules, keep identity rules.
     for (let i = issues.length - 1; i >= 0; i--) {
       const k = issues[i].field;
-      if (k.startsWith("pwd") || k.startsWith("glasses") || k.startsWith("surgery") || k.startsWith("consult") || k.startsWith("csom") || k.startsWith("lenses")) issues.splice(i, 1);
+      if (k.startsWith("pwd") || k.startsWith("glasses") || k.startsWith("surgery") || k.startsWith("consult") || k.startsWith("csom") || k.startsWith("lenses") || k.startsWith("screen")) issues.splice(i, 1);
     }
     if (patients.length === 0) issues.push({ field: "patients", message: "Screen at least one patient with the WG-SS before saving.", level: "error" });
   } else {
@@ -202,9 +228,9 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
   const errors = issues.filter((i) => i.level === "error");
   const warnings = issues.filter((i) => i.level === "warning");
   const has = (prefix: string) => errors.some((e) => e.field.startsWith(prefix));
-  const steps = STEPS.filter((s) => (wgOnly ? (WG_ONLY_STEPS as readonly string[]).includes(s.key) : s.key !== "csom" || cataract > 0));
+  const steps = STEPS.filter((s) => (wgOnly ? (WG_ONLY_STEPS as readonly string[]).includes(s.key) : true));
   const cur = steps[Math.min(step, steps.length - 1)];
-  const stepErrors = (key: string) => errors.filter((e) => (key === "who" ? ["facility", "date", "state", "lga"].includes(e.field) : key === "consult" ? e.field.startsWith("pwd") || e.field.startsWith("consult") : key === "surgery" ? e.field.startsWith("surgery") : key === "refraction" ? e.field.startsWith("lenses") || e.field.startsWith("glasses") : key === "csom" ? e.field.startsWith("csom.") : key === "patients" ? e.field.startsWith("patients") : key === "docs" ? e.field.startsWith("attachments") : key === "review" ? ["prepared", "confirmed"].includes(e.field) : false));
+  const stepErrors = (key: string) => errors.filter((e) => (key === "who" ? ["facility", "date", "state", "lga"].includes(e.field) : key === "consult" ? e.field.startsWith("pwd") || e.field.startsWith("consult") : key === "screening" ? e.field.startsWith("screen") : key === "surgery" ? e.field.startsWith("surgery") : key === "refraction" ? e.field.startsWith("lenses") || e.field.startsWith("glasses") : key === "csom" ? e.field.startsWith("csom.") : key === "patients" ? e.field.startsWith("patients") : key === "docs" ? e.field.startsWith("attachments") : key === "review" ? ["prepared", "confirmed"].includes(e.field) : false));
 
   const addFiles = async (files: FileList | null) => {
     if (!files?.length) return;
@@ -243,7 +269,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
     try {
       if (mode.kind === "device") {
         if (!wgOnly) {
-          const payload = { id: existing?.id, project_id: projectId, facility_id: f.facilityId || null, facility_name: f.facility.trim(), state: f.state || null, lga: f.lga || null, report_date: f.date, summary: S, csom: cataract > 0 ? f.csom : null, notes: f.notes.trim() || null, prepared_by: f.prepared.trim() || null, confirmed_by: f.confirmed.trim() || null, attachments: f.attachments };
+          const payload = { id: existing?.id, project_id: projectId, facility_id: f.facilityId || null, facility_name: f.facility.trim(), state: f.state || null, lga: f.lga || null, report_date: f.date, summary: S, csom: csomOut, notes: f.notes.trim() || null, prepared_by: f.prepared.trim() || null, confirmed_by: f.confirmed.trim() || null, attachments: f.attachments };
           await saveDeviceReport(payload as any, { deviceId: mode.deviceId, projectId, label: mode.label });
         }
         if (patients.length) await saveDevicePatients(patientPayloads(existing?.id ?? null) as any, { deviceId: mode.deviceId, projectId, label: mode.label });
@@ -251,7 +277,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
       } else {
         let reportId = existing?.id ?? null;
         if (!wgOnly) {
-          const payload = { id: existing?.id, project_id: projectId, facility_id: f.facilityId || null, facility_name: f.facility.trim(), state: f.state || null, lga: f.lga || null, report_date: f.date, summary: S, csom: cataract > 0 ? f.csom : null, notes: f.notes.trim() || null, prepared_by: f.prepared.trim() || null, confirmed_by: f.confirmed.trim() || null, attachments: f.attachments };
+          const payload = { id: existing?.id, project_id: projectId, facility_id: f.facilityId || null, facility_name: f.facility.trim(), state: f.state || null, lga: f.lga || null, report_date: f.date, summary: S, csom: csomOut, notes: f.notes.trim() || null, prepared_by: f.prepared.trim() || null, confirmed_by: f.confirmed.trim() || null, attachments: f.attachments };
           const r = await saveReport(payload as any, mode.userId, !!existing);
           reportId = r.id;
           if (patients.length || existing) {
@@ -439,21 +465,41 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
                 </>
               )}
 
+              {cur.key === "screening" && (
+                <>
+                  <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-eye-blue via-eye-deep to-eye-deep p-5 text-primary-foreground shadow-lg">
+                    <ScanEye className="absolute -right-3 -top-3 h-24 w-24 opacity-15" />
+                    <p className="text-xs font-bold uppercase tracking-widest text-eye-gold">Eye screening</p>
+                    <p className="mt-1 text-xl font-extrabold">Persons screened by condition</p>
+                    <p className="mt-0.5 text-xs opacity-85">Record by age group and sex. Children 0–14 yrs are recorded as boys and girls.</p>
+                  </div>
+                  <div className="grid gap-3 lg:grid-cols-2">
+                    {SCREEN_ITEMS.map((i) => (
+                      <AgeMFBlock key={i.key} label={i.label} icon={i.key === "refractive" ? Glasses : i.key === "other" ? Sparkles : Eye} tone="text-eye-blue"
+                        value={S.ages[`screen.${i.key}`]} invalid={has(`screen.${i.key}`)} onChange={(v) => setAge(`screen.${i.key}`, v)}>
+                        {i.key === "other" && t(S.screen.other) > 0 && (
+                          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="pt-1">
+                            <label className="text-xs font-bold">Specify other eye condition(s) <span className="text-destructive">*</span></label>
+                            <Input autoFocus value={S.screenOther} onChange={(e) => { const v = e.target.value.slice(0, 300); setS((s) => { s.screenOther = v; }); }}
+                              placeholder="e.g. Pterygium, conjunctivitis" className={`mt-1 h-12 text-base ${has("screen.otherSpecify") ? "border-destructive" : ""}`} />
+                          </motion.div>
+                        )}
+                      </AgeMFBlock>
+                    ))}
+                  </div>
+                </>
+              )}
+
               {cur.key === "surgery" && (
                 <>
                   <h2 className="text-lg font-extrabold text-eye-deep">Surgeries</h2>
-                  <MFHead />
-                  {SURGERY_ITEMS.map((i) => <MFRow key={i.key} label={i.label} icon={Scissors} tone="text-eye-teal" value={S.surgery[i.key]} onChange={(v) => setS((s) => { s.surgery[i.key] = v; })} />)}
-                  <AnimatePresence>
-                    {cataract > 0 && (
-                      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="relative overflow-hidden rounded-2xl border-2 border-eye-gold bg-gradient-to-br from-eye-teal to-eye-deep p-4 text-primary-foreground shadow-lg">
-                        <Sparkles className="absolute right-3 top-3 h-6 w-6 animate-pulse text-eye-gold" />
-                        <p className="text-xs font-bold uppercase tracking-widest text-eye-gold">CSOM episode unlocked</p>
-                        <p className="mt-1 text-sm">{cataract} cataract {cataract === 1 ? "surgery" : "surgeries"} recorded. The Cataract Surgery Outcome Monitoring episode is now part of this report.</p>
-                        <Button size="sm" className="mt-3 bg-eye-gold text-eye-ink hover:bg-eye-gold/90" onClick={() => setStep(steps.findIndex((s) => s.key === "csom"))}>Open CSOM episode <ArrowRight className="ml-1 h-4 w-4" /></Button>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  <div className="grid gap-3 lg:grid-cols-2">
+                    {SURGERY_ITEMS.map((i) => <AgeMFBlock key={i.key} label={i.label} icon={Scissors} tone="text-eye-teal" value={S.ages[`surgery.${i.key}`]} onChange={(v) => setAge(`surgery.${i.key}`, v)} />)}
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-eye-gold bg-eye-gold/10 p-3">
+                    <p className="text-sm"><strong>CSOM outcome monitoring</strong> is recorded separately with its own number of surgeries, including follow-ups of earlier operations.</p>
+                    <Button size="sm" variant="outline" onClick={() => setStep(steps.findIndex((s) => s.key === "csom"))}>Open CSOM episode <ArrowRight className="ml-1 h-4 w-4" /></Button>
+                  </div>
                 </>
               )}
 
@@ -462,34 +508,38 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
                   {(["lenses", "glasses"] as const).map((grp) => (
                     <div key={grp} className="space-y-2">
                       <h2 className={`flex items-center gap-2 text-lg font-extrabold ${grp === "lenses" ? "text-eye-violet" : "text-eye-orange"}`}>{grp === "lenses" ? <Eye className="h-5 w-5" /> : <Glasses className="h-5 w-5" />}{grp === "lenses" ? "Refraction — lenses" : "Glasses dispensed"}</h2>
-                      <MFHead />
-                      {LENS_TYPES.map((l) => <MFRow key={l.key} label={l.label} tone={grp === "lenses" ? "text-eye-violet" : "text-eye-orange"} icon={grp === "lenses" ? Eye : Glasses} value={S[grp][l.key]} invalid={grp === "glasses" && warnings.some((w) => w.field.startsWith("glasses"))} onChange={(v) => setS((s) => { s[grp][l.key] = v; })} />)}
+                      {LENS_TYPES.map((l) => <AgeMFBlock key={l.key} label={l.label} tone={grp === "lenses" ? "text-eye-violet" : "text-eye-orange"} icon={grp === "lenses" ? Eye : Glasses} value={S.ages[`${grp}.${l.key}`]} invalid={grp === "glasses" && warnings.some((w) => w.field.startsWith("glasses"))} onChange={(v) => setAge(`${grp}.${l.key}`, v)} />)}
                       <div className={`flex justify-between rounded-2xl px-4 py-3 font-bold text-primary-foreground ${grp === "lenses" ? "bg-eye-violet" : "bg-eye-orange"}`}><span>Total</span><span className="tabular-nums">M {T[grp].m} · F {T[grp].f} · T {t(T[grp])}</span></div>
                     </div>
                   ))}
                 </div>
               )}
 
-              {cur.key === "csom" && f.csom && (
+              {cur.key === "csom" && (() => { const C = f.csom ?? emptyCsom(); return (
                 <motion.div initial={{ rotateX: -8 }} animate={{ rotateX: 0 }} className="space-y-4">
                   <div className="rounded-3xl bg-gradient-to-br from-eye-teal via-eye-teal to-eye-deep p-5 text-primary-foreground shadow-lg">
                     <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-eye-gold"><ScanEye className="h-4 w-4" /> Cataract Surgery Outcome Monitoring</p>
-                    <p className="mt-1 text-2xl font-extrabold">{f.csom.surgeries} surgeries this episode</p>
-                    <p className="text-xs opacity-80">Linked to cataract operated in the daily summary.</p>
+                    <p className="mt-1 text-2xl font-extrabold">{C.surgeries} surgeries this episode</p>
+                    <p className="text-xs opacity-80">A general episode, like follow-up — not tied to today's summary surgeries. Leave blank if not monitored today.</p>
+                  </div>
+                  <div className={`rounded-2xl border bg-card p-4 shadow-sm ${has("csom.surgeries") ? "border-destructive" : ""}`}>
+                    <p className="text-sm font-bold">Number of surgeries (CSOM)</p>
+                    <p className="text-xs text-muted-foreground">Denominator for the IOL and biometry percentages.</p>
+                    <div className="mt-2 w-32"><NumberCell label="Number of surgeries for CSOM" value={C.surgeries} invalid={has("csom.surgeries")} onChange={(v) => setC((c) => { c.surgeries = v; })} /></div>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     {([["biometry", "Surgeries done after biometry"], ["iol", "Surgeries with IOL"]] as const).map(([k, label]) => (
                       <div key={k} className={`rounded-2xl border bg-card p-4 shadow-sm ${has(`csom.${k}`) ? "border-destructive" : ""}`}>
                         <p className="text-sm font-bold">{label}</p>
-                        <div className="mt-2 flex items-center gap-3"><div className="w-24"><NumberCell label={label} value={f.csom![k]} onChange={(v) => setC((c) => { c[k] = v; })} /></div>
-                          <div className="flex-1"><div className="h-3 overflow-hidden rounded-full bg-muted"><motion.div className="h-full bg-eye-teal" animate={{ width: `${Math.min(100, pct(f.csom![k], f.csom!.surgeries))}%` }} /></div><p className="mt-1 text-right text-lg font-extrabold text-eye-teal">{pct(f.csom![k], f.csom!.surgeries)}%</p></div></div>
+                        <div className="mt-2 flex items-center gap-3"><div className="w-24"><NumberCell label={label} value={C[k]} onChange={(v) => setC((c) => { c[k] = v; })} /></div>
+                          <div className="flex-1"><div className="h-3 overflow-hidden rounded-full bg-muted"><motion.div className="h-full bg-eye-teal" animate={{ width: `${Math.min(100, pct(C[k], C.surgeries))}%` }} /></div><p className="mt-1 text-right text-lg font-extrabold text-eye-teal">{pct(C[k], C.surgeries)}%</p></div></div>
                       </div>
                     ))}
                   </div>
-                  <VaTable title="Section 2 · At discharge" colA="Presenting" colB="With pinhole" ceiling={f.csom.surgeries} a={f.csom.discharge.presenting} b={f.csom.discharge.pinhole} onA={(v) => setC((c) => { c.discharge.presenting = v; })} onB={(v) => setC((c) => { c.discharge.pinhole = v; })} />
-                  <VaTable title="Section 3 · Follow up (≥ 4 weeks)" colA="Presenting" colB="Pinhole / BCVA" ceiling={f.csom.surgeries} a={f.csom.followup.presenting} b={f.csom.followup.bcva} onA={(v) => setC((c) => { c.followup.presenting = v; })} onB={(v) => setC((c) => { c.followup.bcva = v; })} />
+                  <VaTable title="Section 2 · At discharge" colA="Presenting" colB="With pinhole" ceiling={C.surgeries} a={C.discharge.presenting} b={C.discharge.pinhole} onA={(v) => setC((c) => { c.discharge.presenting = v; })} onB={(v) => setC((c) => { c.discharge.pinhole = v; })} />
+                  <VaTable title="Section 3 · Follow up (≥ 4 weeks)" colA="Presenting" colB="Pinhole / BCVA" ceiling={C.surgeries} a={C.followup.presenting} b={C.followup.bcva} onA={(v) => setC((c) => { c.followup.presenting = v; })} onB={(v) => setC((c) => { c.followup.bcva = v; })} />
                 </motion.div>
-              )}
+              ); })()}
 
               {cur.key === "patients" && (
                 <div className="space-y-4">
