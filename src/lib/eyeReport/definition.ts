@@ -16,6 +16,20 @@ export const SURGERY_ITEMS = [
   { key: "glaucoma", label: "Glaucoma operated" },
   { key: "minor", label: "Patients needing minor surgery" },
 ] as const;
+export const SCREEN_ITEMS = [
+  { key: "refractive", label: "Refractive error" },
+  { key: "cataract", label: "Cataract" },
+  { key: "glaucoma", label: "Glaucoma" },
+  { key: "tt", label: "Trachomatous Trichiasis (TT)" },
+  { key: "other", label: "Other eye conditions" },
+] as const;
+export type AgeMF = { a0_14: MF; a15_39: MF; a40: MF };
+/** Item paths that carry an age-by-sex breakdown (totals are derived from it). */
+export const AGE_PATHS = [
+  ...SCREEN_ITEMS.map((i) => `screen.${i.key}`),
+  ...SURGERY_ITEMS.map((i) => `surgery.${i.key}`),
+  ...["lenses", "glasses"].flatMap((g) => ["dv", "nv", "bf"].map((l) => `${g}.${l}`)),
+];
 export const LENS_TYPES = [
   { key: "dv", label: "Distance (DV)" },
   { key: "nv", label: "Near (NV)" },
@@ -28,7 +42,12 @@ export interface EyeSummary {
   pwdAge: { a0_14: MF; a15_39: MF; a40: MF };
   /** Total persons with disability — always the sum of pwdAge. */
   pwd: MF;
+  screen: { refractive: MF; cataract: MF; glaucoma: MF; tt: MF; other: MF };
+  /** Free-text description of "Other eye conditions" screened. */
+  screenOther: string;
   surgery: { cataract: MF; glaucoma: MF; minor: MF };
+  /** Age-band breakdown for every screening, surgery and refraction item. */
+  ages: Record<string, AgeMF>;
   lenses: { dv: MF; nv: MF; bf: MF };
   glasses: { dv: MF; nv: MF; bf: MF };
 }
@@ -42,12 +61,17 @@ export interface EyeCsom {
 }
 
 const mf = (): MF => ({ m: 0, f: 0 });
+const emptyAge = (): AgeMF => ({ a0_14: mf(), a15_39: mf(), a40: mf() });
+export const ageTotal = (a: AgeMF): MF => sumMF(a.a0_14, a.a15_39, a.a40);
 const va = (): VaBand => ({ good: 0, borderline: 0, poor: 0 });
 export const emptySummary = (): EyeSummary => ({
   consult: { a0_14: mf(), a15_39: mf(), a40: mf() },
   pwdAge: { a0_14: mf(), a15_39: mf(), a40: mf() },
   pwd: mf(),
+  screen: { refractive: mf(), cataract: mf(), glaucoma: mf(), tt: mf(), other: mf() },
+  screenOther: "",
   surgery: { cataract: mf(), glaucoma: mf(), minor: mf() },
+  ages: Object.fromEntries(AGE_PATHS.map((k) => [k, emptyAge()])),
   lenses: { dv: mf(), nv: mf(), bf: mf() },
   glasses: { dv: mf(), nv: mf(), bf: mf() },
 });
@@ -70,6 +94,17 @@ export function normSummary(raw: any): EyeSummary {
   s.pwd = raw?.pwdAge ? byAge : g(raw?.pwd);
   for (const i of SURGERY_ITEMS) s.surgery[i.key] = g(raw?.surgery?.[i.key]);
   for (const l of LENS_TYPES) { s.lenses[l.key] = g(raw?.lenses?.[l.key]); s.glasses[l.key] = g(raw?.glasses?.[l.key]); }
+  for (const i of SCREEN_ITEMS) s.screen[i.key] = g(raw?.screen?.[i.key]);
+  s.screenOther = typeof raw?.screenOther === "string" ? raw.screenOther.slice(0, 300) : "";
+  // When an age breakdown is stored it is the source of truth for the item total.
+  for (const path of AGE_PATHS) {
+    const a = raw?.ages?.[path];
+    if (!a) continue;
+    const ag = { a0_14: g(a.a0_14), a15_39: g(a.a15_39), a40: g(a.a40) };
+    s.ages[path] = ag;
+    const [grp, key] = path.split(".");
+    (s as any)[grp][key] = ageTotal(ag);
+  }
   return s;
 }
 export function normCsom(raw: any): EyeCsom | null {
@@ -140,7 +175,7 @@ export function validateReport(input: {
 
   const s = input.summary;
   const all: [string, number][] = [];
-  const walk = (o: any, p: string) => { for (const [k, v] of Object.entries(o)) typeof v === "number" ? all.push([`${p}${k}`, v]) : walk(v, `${p}${k}.`); };
+  const walk = (o: any, p: string) => { for (const [k, v] of Object.entries(o)) typeof v === "number" ? all.push([`${p}${k}`, v]) : v && typeof v === "object" ? walk(v, `${p}${k}.`) : null; };
   walk(s, "");
   for (const [k, v] of all) if (v > MAX_CELL) out.push({ field: k, message: `${v} is unusually high for one day (max ${MAX_CELL}).`, level: "error" });
 
@@ -151,15 +186,19 @@ export function validateReport(input: {
     for (const b of AGE_BANDS) if (s.pwdAge[b.key][sex] > s.consult[b.key][sex])
       out.push({ field: `pwd.${b.key}.${sex}`, message: `Persons with disability aged ${b.label} (${label}: ${s.pwdAge[b.key][sex]}) cannot exceed ${label} persons consulted aged ${b.label} (${s.consult[b.key][sex]}).`, level: "error" });
     if (T.glasses[sex] > T.lenses[sex]) out.push({ field: `glasses.${sex}`, message: `Glasses dispensed (${label}) exceed lenses prescribed (${T.lenses[sex]}). Please confirm.`, level: "warning" });
+    for (const i of SCREEN_ITEMS) if (s.screen[i.key][sex] > T.consulted[sex])
+      out.push({ field: `screen.${i.key}.${sex}`, message: `${i.label} screened (${label}: ${s.screen[i.key][sex]}) cannot exceed ${label} persons consulted (${T.consulted[sex]}).`, level: "error" });
     if (T.surgeries[sex] > T.consulted[sex]) out.push({ field: `surgery.${sex}`, message: `Surgeries (${label}) are more than ${label} persons consulted today. Please confirm.`, level: "warning" });
   }
+  if (t(s.screen.other) > 0 && !s.screenOther.trim()) out.push({ field: "screen.otherSpecify", message: "Specify the other eye conditions screened.", level: "error" });
   if (t(T.consulted) === 0 && all.some(([, v]) => v > 0)) out.push({ field: "consult", message: "Services are recorded but no consultations. Please confirm.", level: "warning" });
 
-  const cat = t(s.surgery.cataract);
-  if (cat > 0 && !input.csom) out.push({ field: "csom", message: "Cataract surgeries were recorded — complete the CSOM outcome episode.", level: "error" });
+  // CSOM is a general episode (like follow-up): its own surgeries count is the
+  // denominator and is independent of the day's summary surgeries.
   const c = input.csom;
   if (c) {
-    if (c.surgeries !== cat) out.push({ field: "csom.surgeries", message: `CSOM surgeries (${c.surgeries}) must equal cataract operated in the summary (${cat}).`, level: "error" });
+    const used = c.biometry + c.iol + vaTotal(c.discharge.presenting) + vaTotal(c.followup.presenting);
+    if (c.surgeries === 0 && used > 0) out.push({ field: "csom.surgeries", message: "Enter the number of surgeries for this CSOM episode — it is the denominator for the percentages.", level: "error" });
     if (c.biometry > c.surgeries) out.push({ field: "csom.biometry", message: "Surgeries done after biometry cannot exceed total surgeries.", level: "error" });
     if (c.iol > c.surgeries) out.push({ field: "csom.iol", message: "Surgeries with IOL cannot exceed total surgeries.", level: "error" });
     const dp = vaTotal(c.discharge.presenting), dh = vaTotal(c.discharge.pinhole);
@@ -255,7 +294,7 @@ export interface Aggregate { summary: EyeSummary; csom: EyeCsom; reports: number
 /** Sums many daily reports into one block (used for months, years and filters). */
 export function aggregate(rows: EyeReportRow[]): Aggregate {
   const s = emptySummary(); const c = emptyCsom();
-  const add = (a: any, b: any) => { for (const k of Object.keys(a)) typeof a[k] === "number" ? (a[k] += b?.[k] ?? 0) : add(a[k], b?.[k]); };
+  const add = (a: any, b: any) => { for (const k of Object.keys(a)) typeof a[k] === "number" ? (a[k] += b?.[k] ?? 0) : a[k] && typeof a[k] === "object" ? add(a[k], b?.[k]) : null; };
   for (const r of rows) { add(s, normSummary(r.summary)); const cs = normCsom(r.csom); if (cs) add(c, cs); }
   return { summary: s, csom: c, reports: rows.length, facilities: new Set(rows.map((r) => r.facility_name.toLowerCase())).size, days: new Set(rows.map((r) => r.report_date)).size };
 }
