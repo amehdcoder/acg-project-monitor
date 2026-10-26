@@ -7,9 +7,9 @@ export const EYE_DASH_NAME = "Eye Health Outputs & Outcomes Dashboard";
 
 export type MF = { m: number; f: number };
 export const AGE_BANDS = [
-  { key: "a0_4", label: "0–4 yrs" },
-  { key: "a5_14", label: "5–14 yrs" },
-  { key: "a15", label: "15+ yrs" },
+  { key: "a0_14", label: "0–14 yrs" },
+  { key: "a15_39", label: "15–39 yrs" },
+  { key: "a40", label: "40+ yrs" },
 ] as const;
 export const SURGERY_ITEMS = [
   { key: "cataract", label: "Cataract operated" },
@@ -23,7 +23,10 @@ export const LENS_TYPES = [
 ] as const;
 
 export interface EyeSummary {
-  consult: { a0_4: MF; a5_14: MF; a15: MF };
+  consult: { a0_14: MF; a15_39: MF; a40: MF };
+  /** Persons with disability by age band (from WG-SS when screenings exist). */
+  pwdAge: { a0_14: MF; a15_39: MF; a40: MF };
+  /** Total persons with disability — always the sum of pwdAge. */
   pwd: MF;
   surgery: { cataract: MF; glaucoma: MF; minor: MF };
   lenses: { dv: MF; nv: MF; bf: MF };
@@ -41,7 +44,8 @@ export interface EyeCsom {
 const mf = (): MF => ({ m: 0, f: 0 });
 const va = (): VaBand => ({ good: 0, borderline: 0, poor: 0 });
 export const emptySummary = (): EyeSummary => ({
-  consult: { a0_4: mf(), a5_14: mf(), a15: mf() },
+  consult: { a0_14: mf(), a15_39: mf(), a40: mf() },
+  pwdAge: { a0_14: mf(), a15_39: mf(), a40: mf() },
   pwd: mf(),
   surgery: { cataract: mf(), glaucoma: mf(), minor: mf() },
   lenses: { dv: mf(), nv: mf(), bf: mf() },
@@ -53,13 +57,17 @@ export const emptyCsom = (): EyeCsom => ({
   followup: { presenting: va(), bcva: va() },
 });
 
+export const sumMF = (...xs: MF[]): MF => xs.reduce((a, x) => ({ m: a.m + x.m, f: a.f + x.f }), mf());
 const n = (v: unknown) => (Number.isFinite(Number(v)) ? Math.max(0, Math.floor(Number(v))) : 0);
 /** Deep-normalises any stored/partial JSON into a full summary of integers. */
 export function normSummary(raw: any): EyeSummary {
   const s = emptySummary();
   const g = (o: any): MF => ({ m: n(o?.m), f: n(o?.f) });
-  for (const b of AGE_BANDS) s.consult[b.key] = g(raw?.consult?.[b.key]);
-  s.pwd = g(raw?.pwd);
+  for (const b of AGE_BANDS) { s.consult[b.key] = g(raw?.consult?.[b.key]); s.pwdAge[b.key] = g(raw?.pwdAge?.[b.key]); }
+  // Legacy reports used 0–4 and 5–14 bands; merge them into 0–14.
+  if (raw?.consult && (raw.consult.a0_4 || raw.consult.a5_14) && !raw.consult.a0_14) s.consult.a0_14 = sumMF(g(raw.consult.a0_4), g(raw.consult.a5_14));
+  const byAge = sumMF(s.pwdAge.a0_14, s.pwdAge.a15_39, s.pwdAge.a40);
+  s.pwd = raw?.pwdAge ? byAge : g(raw?.pwd);
   for (const i of SURGERY_ITEMS) s.surgery[i.key] = g(raw?.surgery?.[i.key]);
   for (const l of LENS_TYPES) { s.lenses[l.key] = g(raw?.lenses?.[l.key]); s.glasses[l.key] = g(raw?.glasses?.[l.key]); }
   return s;
@@ -77,10 +85,9 @@ export function normCsom(raw: any): EyeCsom | null {
 export const t = (x: MF) => x.m + x.f;
 export const vaTotal = (b: VaBand) => b.good + b.borderline + b.poor;
 export const pct = (num: number, den: number) => (den > 0 ? Math.round((num / den) * 1000) / 10 : 0);
-export const sumMF = (...xs: MF[]): MF => xs.reduce((a, x) => ({ m: a.m + x.m, f: a.f + x.f }), mf());
 
 export function totals(s: EyeSummary) {
-  const consulted = sumMF(s.consult.a0_4, s.consult.a5_14, s.consult.a15);
+  const consulted = sumMF(s.consult.a0_14, s.consult.a15_39, s.consult.a40);
   return {
     consulted,
     lenses: sumMF(s.lenses.dv, s.lenses.nv, s.lenses.bf),
@@ -141,6 +148,8 @@ export function validateReport(input: {
   for (const sex of ["m", "f"] as const) {
     const label = sex === "m" ? "male" : "female";
     if (s.pwd[sex] > T.consulted[sex]) out.push({ field: `pwd.${sex}`, message: `Persons with disability (${label}) cannot exceed ${label} persons consulted (${T.consulted[sex]}).`, level: "error" });
+    for (const b of AGE_BANDS) if (s.pwdAge[b.key][sex] > s.consult[b.key][sex])
+      out.push({ field: `pwd.${b.key}.${sex}`, message: `Persons with disability aged ${b.label} (${label}: ${s.pwdAge[b.key][sex]}) cannot exceed ${label} persons consulted aged ${b.label} (${s.consult[b.key][sex]}).`, level: "error" });
     if (T.glasses[sex] > T.lenses[sex]) out.push({ field: `glasses.${sex}`, message: `Glasses dispensed (${label}) exceed lenses prescribed (${T.lenses[sex]}). Please confirm.`, level: "warning" });
     if (T.surgeries[sex] > T.consulted[sex]) out.push({ field: `surgery.${sex}`, message: `Surgeries (${label}) are more than ${label} persons consulted today. Please confirm.`, level: "warning" });
   }
@@ -201,6 +210,36 @@ export function aggregatePatients(rows: EyePatientRow[]): PatientAggregate {
  * warnings (the clerk confirms) — screenings may legitimately be entered before
  * the summary, or cover only part of the day.
  */
+export type WgScreen = { sex: string | null | ""; age_band: string | null | ""; has_disability: boolean };
+/** Persons with disability by age band and sex, counted from WG-SS screenings. */
+export function wgPwdByAge(rows: WgScreen[]): EyeSummary["pwdAge"] {
+  const out = emptySummary().pwdAge;
+  for (const r of rows) {
+    if (!r.has_disability || (r.sex !== "m" && r.sex !== "f")) continue;
+    const band = AGE_BANDS.find((b) => b.key === r.age_band);
+    if (band) out[band.key][r.sex] += 1;
+  }
+  return out;
+}
+/** Screened patients by age band and sex. */
+export function wgScreenedByAge(rows: WgScreen[]): EyeSummary["pwdAge"] {
+  const out = emptySummary().pwdAge;
+  for (const r of rows) { const band = AGE_BANDS.find((b) => b.key === r.age_band); if (band && (r.sex === "m" || r.sex === "f")) out[band.key][r.sex] += 1; }
+  return out;
+}
+/** Age/sex consistency between WG-SS screenings and consultations. */
+export function wgAgeIssues(rows: WgScreen[], summary: EyeSummary): Issue[] {
+  const out: Issue[] = [];
+  if (!rows.length || t(totals(summary).consulted) === 0) return out;
+  const scr = wgScreenedByAge(rows);
+  for (const b of AGE_BANDS) for (const sex of ["m", "f"] as const) {
+    const label = sex === "m" ? "male" : "female"; const c = summary.consult[b.key][sex];
+    if (scr[b.key][sex] > c) out.push({ field: `patients.${b.key}.${sex}`, message: `${scr[b.key][sex]} ${label} patients aged ${b.label} were screened with the WG-SS, but only ${c} were consulted in that age group. Correct the consultations or the patients' age/sex.`, level: "error" });
+    else if (scr[b.key][sex] < c) out.push({ field: `patients.${b.key}.${sex}`, message: `${c} ${label} persons aged ${b.label} were consulted, but only ${scr[b.key][sex]} were screened with the WG-SS.`, level: "warning" });
+  }
+  return out;
+}
+
 export function wgVsSummaryIssues(patientCount: number, disabledCount: number, summary: EyeSummary): Issue[] {
   const out: Issue[] = [];
   const T = totals(summary);

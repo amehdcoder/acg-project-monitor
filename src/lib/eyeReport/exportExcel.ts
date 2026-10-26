@@ -63,7 +63,7 @@ function buildSummarySheet(wb: ExcelJS.Workbook, rows: { label: string; s: EyeSu
   merge(ws, r, 26, r, 34, "REFRACTION", "FF7C3AED");
   merge(ws, r, 35, r, 43, "GLASSES", "FFC2410C");
   const groups = [
-    [2, "0–4 YRS"], [5, "5–14 YRS"], [8, "15+ YRS"], [11, "Total No. of Persons Consulted"], [14, "Total No. of Persons with Disability"],
+    [2, "0–14 YRS"], [5, "15–39 YRS"], [8, "40+ YRS"], [11, "Total No. of Persons Consulted"], [14, "Total No. of Persons with Disability"],
     [17, "Cataract Operated"], [20, "Glaucoma Operated"], [23, "Patients Need Minor Surgery"],
   ] as const;
   for (const [c, label] of groups) merge(ws, r + 1, c, r + 3, c + 2, label, c < 17 ? "FF1D7FB8" : "FF14A098");
@@ -157,13 +157,13 @@ function buildCsomSheet(wb: ExcelJS.Workbook, c: EyeCsom, s: EyeSummary, meta: E
 
 function dailySheet(wb: ExcelJS.Workbook, rows: EyeReportRow[]) {
   const ws = wb.addWorksheet("Daily Reports", { views: [{ state: "frozen", ySplit: 2, xSplit: 3 }] });
-  const head = ["Date", "Facility", "LGA", "Consulted M", "Consulted F", "Consulted T", "0–4", "5–14", "15+", "PWD", "Cataract", "Glaucoma", "Minor surg.", "Lenses", "Glasses", "CSOM surg.", "% Biometry", "% IOL", "Discharge good %", "Follow-up good %", "Prepared by", "Confirmed by", "Notes"];
+  const head = ["Date", "Facility", "LGA", "Consulted M", "Consulted F", "Consulted T", "0–14", "15–39", "40+", "PWD", "Cataract", "Glaucoma", "Minor surg.", "Lenses", "Glasses", "CSOM surg.", "% Biometry", "% IOL", "Discharge good %", "Follow-up good %", "Prepared by", "Confirmed by", "Notes"];
   banner(ws, 1, head.length, "INDIVIDUAL DAILY FACILITY REPORTS", WHO_BLUE, 12);
   head.forEach((h, i) => { const c = ws.getCell(2, i + 1); c.value = h; fill(c, WHO_DEEP); });
   ws.getRow(2).height = 30;
   [...rows].sort((a, b) => b.report_date.localeCompare(a.report_date)).forEach((r, i) => {
     const s = normSummary(r.summary), c = normCsom(r.csom), T = totals(s);
-    const vals = [r.report_date, r.facility_name, r.lga ?? "", T.consulted.m, T.consulted.f, t(T.consulted), t(s.consult.a0_4), t(s.consult.a5_14), t(s.consult.a15), t(s.pwd),
+    const vals = [r.report_date, r.facility_name, r.lga ?? "", T.consulted.m, T.consulted.f, t(T.consulted), t(s.consult.a0_14), t(s.consult.a15_39), t(s.consult.a40), t(s.pwd),
       t(s.surgery.cataract), t(s.surgery.glaucoma), t(s.surgery.minor), t(T.lenses), t(T.glasses),
       c?.surgeries ?? "", c ? `${pct(c.biometry, c.surgeries)}%` : "", c ? `${pct(c.iol, c.surgeries)}%` : "",
       c ? `${pct(c.discharge.presenting.good, vaTotal(c.discharge.presenting))}%` : "", c ? `${pct(c.followup.presenting.good, vaTotal(c.followup.presenting))}%` : "",
