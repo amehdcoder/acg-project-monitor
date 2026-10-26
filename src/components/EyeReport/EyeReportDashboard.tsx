@@ -235,6 +235,7 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
               </tr>); })}</tbody>
           </table></div>
         </section>
+        {canManage && <EyeDhis2Exchange projectId={projectId} rows={rows} />}
       </main>
     </div>
   );
