@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { aggregate, aggregatePatients, byMonth, emptyCsom, emptySummary, pct, totals, validateReport, wgVsSummaryIssues } from "../definition";
+import { aggregate, aggregatePatients, byMonth, combineArms, emptyCsom, emptySummary, pct, totals, validateReport, wgVsSummaryIssues } from "../definition";
 
 const base = () => ({ facility: "Dutse GH", date: "2026-10-20", today: "2026-10-25", summary: emptySummary(), csom: null as any });
 
@@ -23,7 +23,23 @@ describe("eye daily report rules", () => {
     c.surgeries = 0; c.iol = 2;
     expect(validateReport({ ...r, csom: c }).some((i) => i.field === "csom.surgeries")).toBe(true);
     c.iol = 0; c.surgeries = 3; c.discharge.presenting = { good: 2, borderline: 1, poor: 0 }; c.discharge.pinhole = { good: 2, borderline: 0, poor: 0 };
-    expect(validateReport({ ...r, csom: c }).some((i) => i.field === "csom.discharge.pinhole" && i.level === "error")).toBe(true);
+    expect(validateReport({ ...r, csom: c }).some((i) => i.field === "csom.discharge.pin" && i.level === "error")).toBe(true);
+  });
+  it("flags CSOM presenting or pinhole totals above CSOM surgeries, and identical figures", () => {
+    const r = base(); r.summary.consult.a40 = { m: 5, f: 5 };
+    const c = emptyCsom(); c.surgeries = 2;
+    c.followup.presenting = { good: 2, borderline: 1, poor: 0 }; c.followup.bcva = { good: 3, borderline: 0, poor: 0 };
+    const is = validateReport({ ...r, csom: c });
+    expect(is.some((i) => i.field === "csom.followup" && i.level === "error")).toBe(true);
+    expect(is.some((i) => i.field === "csom.followup.pin" && i.level === "error" && i.message.includes("exceeds"))).toBe(true);
+    c.surgeries = 5; c.discharge.presenting = { good: 1, borderline: 1, poor: 0 }; c.discharge.pinhole = { good: 1, borderline: 1, poor: 0 };
+    expect(validateReport({ ...r, csom: c }).some((i) => i.field === "csom.discharge.pin" && i.level === "warning" && i.message.includes("identical"))).toBe(true);
+  });
+  it("requires the outreach community name when outreach is recorded", () => {
+    const r = base(); const s = combineArms(emptySummary(), emptySummary(), emptySummary());
+    expect(validateReport({ ...r, summary: s }).some((i) => i.field === "outreach.community")).toBe(true);
+    s.outreachCommunity = "Kofar Fada";
+    expect(validateReport({ ...r, summary: s }).some((i) => i.field === "outreach.community")).toBe(false);
   });
   it("computes percentages to one decimal", () => { expect(pct(2, 3)).toBe(66.7); expect(pct(1, 0)).toBe(0); });
   it("requires state, LGA, sign-off names and a labelled source document", () => {

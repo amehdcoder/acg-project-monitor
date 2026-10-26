@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import hero from "@/assets/eye-report/hero.jpg";
 import {
-  AGE_BANDS, combineArms, LENS_TYPES, SURGERY_ITEMS, SCREEN_ITEMS, ageTotal, type AgeMF, sumMF, wgAgeIssues, wgPwdByAge, emptyCsom, emptySummary, normAttachments, normCsom, normSummary, pct, t, totals,
+  AGE_BANDS, REFER_IN, REFER_OUT, combineArms, LENS_TYPES, SURGERY_ITEMS, SCREEN_ITEMS, ageTotal, type AgeMF, sumMF, wgAgeIssues, wgPwdByAge, emptyCsom, emptySummary, normAttachments, normCsom, normSummary, pct, t, totals,
   validateReport, vaTotal, wgVsSummaryIssues,
   type EyeAttachment, type EyeCsom, type EyePatientRow, type EyeReportRow, type EyeSummary, type MF, type VaBand,
 } from "@/lib/eyeReport/definition";
@@ -37,12 +37,13 @@ interface Props {
 const today = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 const STEPS = [
   { key: "who", label: "Facility & date", icon: Building2, tone: "bg-eye-blue" },
+  { key: "patients", label: "Patients · WG-SS", icon: Accessibility, tone: "bg-eye-violet" },
   { key: "consult", label: "Consultations", icon: Stethoscope, tone: "bg-eye-blue" },
   { key: "screening", label: "Screening", icon: ScanEye, tone: "bg-eye-blue" },
   { key: "surgery", label: "Surgeries", icon: Scissors, tone: "bg-eye-teal" },
   { key: "refraction", label: "Refraction & glasses", icon: Glasses, tone: "bg-eye-violet" },
+  { key: "referrals", label: "Referrals in / out", icon: ArrowRight, tone: "bg-eye-orange" },
   { key: "csom", label: "CSOM episode", icon: ScanEye, tone: "bg-eye-teal" },
-  { key: "patients", label: "Patients · WG-SS", icon: Accessibility, tone: "bg-eye-violet" },
   { key: "docs", label: "Source documents", icon: Paperclip, tone: "bg-eye-orange" },
   { key: "review", label: "Review & sign-off", icon: ClipboardSignature, tone: "bg-eye-orange" },
 ] as const;
@@ -168,7 +169,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
     if (prefetched[key]) return;
     setPrefetched((m) => ({ ...m, [key]: true }));
     void (async () => {
-      const { rows } = await loadPatients(projectId);
+      const { rows } = await loadPatients(projectId).catch(() => ({ rows: [] as EyePatientRow[] }));
       const matches = rows.filter((p) => !p.report_id && p.report_date === f.date && p.facility_name.trim().toLowerCase() === f.facility.trim().toLowerCase());
       if (!matches.length) return;
       setPatients((cur) => {
@@ -231,6 +232,12 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
           })}
         </div>
       ) : <p className="px-4 py-2 text-xs text-muted-foreground">Recording routine facility activities. Tick the box to record outreach separately for the same day.</p>}
+      {split && (
+        <label className={`mx-2 mb-2 flex flex-col gap-1 rounded-2xl border-2 bg-eye-orange/5 p-3 ${has("outreach") ? "border-destructive" : "border-eye-orange/40"}`}>
+          <span className="flex items-center gap-2 text-sm font-bold text-eye-deep"><Tent className="h-4 w-4 text-eye-orange" /> Outreach community <span className="text-destructive">*</span></span>
+          <Input value={S.outreachCommunity ?? ""} onChange={(e) => { const v = e.target.value.slice(0, 200); setF((p: any) => ({ ...p, summary: { ...p.summary, outreachCommunity: v } })); }} placeholder="e.g. Kofar Fada community, Dutse Ward" className="h-12 text-base" />
+        </label>
+      )}
       {split && <p className={`px-4 pb-2 text-xs font-bold ${arm === "facility" ? "text-eye-blue" : "text-eye-orange"}`}>Now entering: {arm === "facility" ? "Facility (routine)" : "Outreach (community)"} · report totals combine both</p>}
     </div>
   );
@@ -274,7 +281,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
   const has = (prefix: string) => errors.some((e) => e.field.startsWith(prefix));
   const steps = STEPS.filter((s) => (wgOnly ? (WG_ONLY_STEPS as readonly string[]).includes(s.key) : true));
   const cur = steps[Math.min(step, steps.length - 1)];
-  const stepErrors = (key: string) => errors.filter((e) => (key === "who" ? ["facility", "date", "state", "lga"].includes(e.field) : key === "consult" ? e.field.startsWith("pwd") || e.field.startsWith("consult") : key === "screening" ? e.field.startsWith("screen") : key === "surgery" ? e.field.startsWith("surgery") : key === "refraction" ? e.field.startsWith("lenses") || e.field.startsWith("glasses") : key === "csom" ? e.field.startsWith("csom.") : key === "patients" ? e.field.startsWith("patients") : key === "docs" ? e.field.startsWith("attachments") : key === "review" ? ["prepared", "confirmed"].includes(e.field) : false));
+  const stepErrors = (key: string) => errors.filter((e) => (key === "who" ? ["facility", "date", "state", "lga"].includes(e.field) : key === "consult" ? e.field.startsWith("pwd") || e.field.startsWith("consult") || e.field.startsWith("outreach") : key === "screening" ? e.field.startsWith("screen") : key === "surgery" ? e.field.startsWith("surgery") : key === "refraction" ? e.field.startsWith("lenses") || e.field.startsWith("glasses") : key === "referrals" ? e.field.startsWith("refer") : key === "csom" ? e.field.startsWith("csom.") : key === "patients" ? e.field.startsWith("patients") : key === "docs" ? e.field.startsWith("attachments") : key === "review" ? ["prepared", "confirmed"].includes(e.field) : false));
 
   const addFiles = async (files: FileList | null) => {
     if (!files?.length) return;
@@ -361,7 +368,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
   const [manualFacility, setManualFacility] = useState(false);
   useEffect(() => {
     void (async () => {
-      const { rows } = await loadReports(projectId);
+      const { rows } = await loadReports(projectId).catch(() => ({ rows: [] as EyeReportRow[] }));
       const byName = new Map<string, EyeFacility>();
       for (const x of facilities) byName.set(x.name.trim().toLowerCase(), x);
       for (const r of rows) {
@@ -377,7 +384,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
   const similarName = useMemo(() => (f.facility.trim().length >= 3 && !facilityKnown ? similarFacilityName(f.facility, known.map((x) => x.name)) : null), [f.facility, facilityKnown, known]);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-eye-sky">
+    <div className="fixed inset-0 z-[60] flex h-[100dvh] w-screen max-w-[100vw] flex-col overflow-hidden bg-eye-sky pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]">
       <header className="relative shrink-0 overflow-hidden bg-eye-deep text-primary-foreground">
         <img src={hero} alt="" width={1600} height={640} className="absolute inset-0 h-full w-full object-cover object-right opacity-35" />
         <div className="absolute inset-0 bg-gradient-to-r from-eye-deep via-eye-deep/90 to-eye-deep/30" />
@@ -559,6 +566,26 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
                 </div></div>
               )}
 
+              {cur.key === "referrals" && (
+                <div className="space-y-4"><ArmSwitch />
+                  <p className="rounded-2xl border bg-card p-3 text-xs text-muted-foreground">Follows the WHO integrated people-centred eye care (IPEC) referral pathway: record where patients were <strong className="text-foreground">referred in from</strong> and the condition each patient was <strong className="text-foreground">referred out for</strong>. Count each patient once per direction.</p>
+                  <div className="grid gap-5 lg:grid-cols-2">
+                    {([["referIn", "Referrals in — received from", REFER_IN, "text-eye-teal", "bg-eye-teal"], ["referOut", "Referrals out — sent for", REFER_OUT, "text-eye-orange", "bg-eye-orange"]] as const).map(([grp, title, items, tone, bg]) => {
+                      const tot = sumMF(...Object.values(A[grp]));
+                      return (
+                        <div key={grp} className="space-y-2">
+                          <h2 className={`flex items-center gap-2 text-lg font-extrabold ${tone}`}>{grp === "referIn" ? <ArrowLeft className="h-5 w-5" /> : <ArrowRight className="h-5 w-5" />}{title}</h2>
+                          <MFHead />
+                          {items.map((r) => <MFRow key={r.key} label={r.label} tone={tone} value={A[grp][r.key]} invalid={grp === "referOut" && has("refer.out")} onChange={(v) => setA((s) => { s[grp][r.key] = v; })} />)}
+                          <div className={`flex justify-between rounded-2xl px-4 py-3 font-bold text-primary-foreground ${bg}`}><span>Total</span><span className="tabular-nums">M {tot.m} · F {tot.f} · T {t(tot)}</span></div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {split && <div className="flex justify-between rounded-2xl bg-eye-deep px-4 py-3 text-sm font-bold text-primary-foreground"><span>Day total (facility + outreach)</span><span className="tabular-nums">In {t(T.referIn)} · Out {t(T.referOut)}</span></div>}
+                </div>
+              )}
+
               {cur.key === "csom" && (() => { const C = f.csom ?? emptyCsom(); return (
                 <motion.div initial={{ rotateX: -8 }} animate={{ rotateX: 0 }} className="space-y-4">
                   <div className="rounded-3xl bg-gradient-to-br from-eye-teal via-eye-teal to-eye-deep p-5 text-primary-foreground shadow-lg">
@@ -582,6 +609,9 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
                   </div>
                   <VaTable title="Section 2 · At discharge" colA="Presenting" colB="With pinhole" ceiling={C.surgeries} a={C.discharge.presenting} b={C.discharge.pinhole} onA={(v) => setC((c) => { c.discharge.presenting = v; })} onB={(v) => setC((c) => { c.discharge.pinhole = v; })} />
                   <VaTable title="Section 3 · Follow up (≥ 4 weeks)" colA="Presenting" colB="Pinhole / BCVA" ceiling={C.surgeries} a={C.followup.presenting} b={C.followup.bcva} onA={(v) => setC((c) => { c.followup.presenting = v; })} onB={(v) => setC((c) => { c.followup.bcva = v; })} />
+                  {issues.filter((i) => i.field.startsWith("csom.")).map((i, k) => (
+                    <p key={k} role="alert" className={`flex items-start gap-2 rounded-xl border p-3 text-sm font-medium ${i.level === "error" ? "border-destructive bg-destructive/10 text-destructive" : "border-eye-gold bg-eye-gold/10 text-eye-ink"}`}><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />{i.message}</p>
+                  ))}
                 </motion.div>
               ); })()}
 
