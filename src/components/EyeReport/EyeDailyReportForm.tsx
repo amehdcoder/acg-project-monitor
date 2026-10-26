@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft, ArrowRight, Building2, CalendarDays, Check, CloudOff, Eye, Glasses, ImagePlus, Loader2, Paperclip,
   Pencil, ScanEye, Scissors, Sparkles, Stethoscope, AlertTriangle, ShieldCheck, Accessibility, Trash2, Users, X,
-  ClipboardSignature,
+  ClipboardSignature, Camera, Upload, Hospital, Tent,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import hero from "@/assets/eye-report/hero.jpg";
 import {
-  AGE_BANDS, LENS_TYPES, SURGERY_ITEMS, SCREEN_ITEMS, ageTotal, type AgeMF, sumMF, wgAgeIssues, wgPwdByAge, emptyCsom, emptySummary, normAttachments, normCsom, normSummary, pct, t, totals,
+  AGE_BANDS, combineArms, LENS_TYPES, SURGERY_ITEMS, SCREEN_ITEMS, ageTotal, type AgeMF, sumMF, wgAgeIssues, wgPwdByAge, emptyCsom, emptySummary, normAttachments, normCsom, normSummary, pct, t, totals,
   validateReport, vaTotal, wgVsSummaryIssues,
   type EyeAttachment, type EyeCsom, type EyePatientRow, type EyeReportRow, type EyeSummary, type MF, type VaBand,
 } from "@/lib/eyeReport/definition";
@@ -153,6 +153,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const camRef = useRef<HTMLInputElement>(null);
   const [online, setOnline] = useState(navigator.onLine);
   useEffect(() => { const a = () => setOnline(true), b = () => setOnline(false); addEventListener("online", a); addEventListener("offline", b); return () => { removeEventListener("online", a); removeEventListener("offline", b); }; }, []);
   useEffect(() => { if (!existing) localStorage.setItem(draftKey, JSON.stringify({ ...f, patients })); }, [f, patients, existing, draftKey]);
@@ -189,7 +190,50 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
   const csomOut = csomUsed ? f.csom : null;
 
   const setS = (fn: (s: EyeSummary) => void) => setF((p: any) => { const s = structuredClone(p.summary); fn(s); return { ...p, summary: s }; });
-  const setAge = (path: string, v: AgeMF) => setS((s) => { s.ages[path] = v; const [g, k] = path.split("."); (s as any)[g][k] = ageTotal(v); });
+  // Facility vs outreach: arm-able steps edit the active arm; totals recombine.
+  const [arm, setArm] = useState<"facility" | "outreach">("facility");
+  const split = S.split;
+  const A: EyeSummary = split ? split[arm] : S;
+  const setA = (fn: (s: EyeSummary) => void) => setF((p: any) => {
+    const cur: EyeSummary = p.summary;
+    if (!cur.split) { const s = structuredClone(cur); fn(s); return { ...p, summary: s }; }
+    const arms = structuredClone(cur.split); fn(arms[arm]);
+    return { ...p, summary: combineArms(arms.facility, arms.outreach, cur) };
+  });
+  const setAge = (path: string, v: AgeMF) => setA((s) => { s.ages[path] = v; const [g, k] = path.split("."); (s as any)[g][k] = ageTotal(v); });
+  const toggleOutreach = (on: boolean) => {
+    if (on) { setF((p: any) => { const { split: _x, ...fac } = p.summary; return { ...p, summary: combineArms(fac as EyeSummary, emptySummary(), p.summary) }; }); setArm("outreach"); return; }
+    if (split && t(totals(split.outreach).consulted) + ageTotal(split.outreach.ages["screen.refractive"] ?? { a0_14: { m: 0, f: 0 }, a15_39: { m: 0, f: 0 }, a40: { m: 0, f: 0 } }).m >= 0 && JSON.stringify(split.outreach) !== JSON.stringify({ ...emptySummary(), split: undefined }) && !confirm("Remove all outreach figures recorded for this day?")) return;
+    setF((p: any) => { const fac = p.summary.split?.facility ?? p.summary; return { ...p, summary: { ...fac, pwdAge: p.summary.pwdAge, pwd: p.summary.pwd, split: undefined } }; });
+    setArm("facility");
+  };
+  const armTotals = (x: EyeSummary) => { const tt = totals(x); return t(tt.consulted) + SCREEN_ITEMS.reduce((a, i) => a + t(x.screen[i.key]), 0) + t(tt.surgeries) + t(tt.glasses); };
+  const ArmSwitch = () => (
+    <div className="overflow-hidden rounded-3xl border bg-card shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-gradient-to-r from-eye-blue/10 via-eye-teal/10 to-eye-orange/10 px-4 py-3">
+        <p className="text-sm font-bold text-eye-deep">Where were these services delivered?</p>
+        <label className="flex items-center gap-2 text-xs font-semibold">
+          <Checkbox checked={!!split} onCheckedChange={(v) => toggleOutreach(!!v)} /> Community outreach also held today
+        </label>
+      </div>
+      {split ? (
+        <div className="grid grid-cols-2 gap-2 p-2">
+          {([["facility", "Facility (routine)", Hospital, "bg-eye-blue"], ["outreach", "Outreach (community)", Tent, "bg-eye-orange"]] as const).map(([k, label, Icon, bg]) => {
+            const on = arm === k;
+            return (
+              <button key={k} type="button" onClick={() => setArm(k)} aria-pressed={on}
+                className={`relative flex items-center gap-2 rounded-2xl border-2 p-3 text-left transition ${on ? `${bg} border-transparent text-primary-foreground shadow-md` : "border-border bg-background"}`}>
+                <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${on ? "bg-primary-foreground/20" : `${bg} text-primary-foreground`}`}><Icon className="h-4 w-4" /></span>
+                <span className="min-w-0"><span className="block text-sm font-extrabold leading-tight">{label}</span><span className={`block text-[11px] ${on ? "opacity-85" : "text-muted-foreground"}`}>{armTotals(split[k])} entries</span></span>
+                {on && <motion.span layoutId="arm-dot" className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-eye-gold" />}
+              </button>
+            );
+          })}
+        </div>
+      ) : <p className="px-4 py-2 text-xs text-muted-foreground">Recording routine facility activities. Tick the box to record outreach separately for the same day.</p>}
+      {split && <p className={`px-4 pb-2 text-xs font-bold ${arm === "facility" ? "text-eye-blue" : "text-eye-orange"}`}>Now entering: {arm === "facility" ? "Facility (routine)" : "Outreach (community)"} · report totals combine both</p>}
+    </div>
+  );
   const setC = (fn: (c: EyeCsom) => void) => setF((p: any) => { const c = structuredClone(p.csom ?? emptyCsom()); fn(c); return { ...p, csom: c }; });
 
   const disabledCount = patients.filter((p) => p.record.hasDisability).length;
@@ -437,12 +481,10 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
 
               {cur.key === "consult" && (
                 <>
+                  <ArmSwitch />
                   <h2 className="text-lg font-extrabold text-eye-deep">Persons consulted today</h2>
-                  <MFHead />
-                  {AGE_BANDS.map((b) => <MFRow key={b.key} label={b.label} icon={Stethoscope} value={S.consult[b.key]} onChange={(v) => setS((s) => { s.consult[b.key] = v; })} />)}
-                  <div className="grid grid-cols-[minmax(0,1.4fr)_1fr_1fr_auto] items-center gap-2 rounded-2xl bg-eye-blue p-3 text-primary-foreground">
-                    <span className="text-sm font-bold">Total persons consulted</span><span className="text-center text-lg font-bold">{T.consulted.m}</span><span className="text-center text-lg font-bold">{T.consulted.f}</span><span className="min-w-12 rounded-xl bg-eye-gold px-2 py-2 text-center text-lg font-extrabold text-eye-ink">{t(T.consulted)}</span>
-                  </div>
+                  <AgeMFBlock label="Persons consulted" icon={Stethoscope} tone="text-eye-blue" value={A.consult} invalid={has("consult")} onChange={(v) => setA((s) => { s.consult = v; })} />
+                  {split && <div className="flex justify-between rounded-2xl bg-eye-blue px-4 py-3 font-bold text-primary-foreground"><span>Total consulted (facility + outreach)</span><span className="tabular-nums">M {T.consulted.m} · F {T.consulted.f} · T {t(T.consulted)}</span></div>}
                   <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
                     <h3 className="text-base font-extrabold text-eye-deep">Persons with disability</h3>
                     {wgAvailable
@@ -467,6 +509,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
 
               {cur.key === "screening" && (
                 <>
+                  <ArmSwitch />
                   <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-eye-blue via-eye-deep to-eye-deep p-5 text-primary-foreground shadow-lg">
                     <ScanEye className="absolute -right-3 -top-3 h-24 w-24 opacity-15" />
                     <p className="text-xs font-bold uppercase tracking-widest text-eye-gold">Eye screening</p>
@@ -476,11 +519,11 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
                   <div className="grid gap-3 lg:grid-cols-2">
                     {SCREEN_ITEMS.map((i) => (
                       <AgeMFBlock key={i.key} label={i.label} icon={i.key === "refractive" ? Glasses : i.key === "other" ? Sparkles : Eye} tone="text-eye-blue"
-                        value={S.ages[`screen.${i.key}`]} invalid={has(`screen.${i.key}`)} onChange={(v) => setAge(`screen.${i.key}`, v)}>
-                        {i.key === "other" && t(S.screen.other) > 0 && (
+                        value={A.ages[`screen.${i.key}`]} invalid={has(`screen.${i.key}`)} onChange={(v) => setAge(`screen.${i.key}`, v)}>
+                        {i.key === "other" && t(A.screen.other) > 0 && (
                           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="pt-1">
                             <label className="text-xs font-bold">Specify other eye condition(s) <span className="text-destructive">*</span></label>
-                            <Input autoFocus value={S.screenOther} onChange={(e) => { const v = e.target.value.slice(0, 300); setS((s) => { s.screenOther = v; }); }}
+                            <Input autoFocus value={A.screenOther} onChange={(e) => { const v = e.target.value.slice(0, 300); setA((s) => { s.screenOther = v; }); }}
                               placeholder="e.g. Pterygium, conjunctivitis" className={`mt-1 h-12 text-base ${has("screen.otherSpecify") ? "border-destructive" : ""}`} />
                           </motion.div>
                         )}
@@ -492,9 +535,10 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
 
               {cur.key === "surgery" && (
                 <>
+                  <ArmSwitch />
                   <h2 className="text-lg font-extrabold text-eye-deep">Surgeries</h2>
                   <div className="grid gap-3 lg:grid-cols-2">
-                    {SURGERY_ITEMS.map((i) => <AgeMFBlock key={i.key} label={i.label} icon={Scissors} tone="text-eye-teal" value={S.ages[`surgery.${i.key}`]} onChange={(v) => setAge(`surgery.${i.key}`, v)} />)}
+                    {SURGERY_ITEMS.map((i) => <AgeMFBlock key={i.key} label={i.label} icon={Scissors} tone="text-eye-teal" value={A.ages[`surgery.${i.key}`]} onChange={(v) => setAge(`surgery.${i.key}`, v)} />)}
                   </div>
                   <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-eye-gold bg-eye-gold/10 p-3">
                     <p className="text-sm"><strong>CSOM outcome monitoring</strong> is recorded separately with its own number of surgeries, including follow-ups of earlier operations.</p>
@@ -504,15 +548,15 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
               )}
 
               {cur.key === "refraction" && (
-                <div className="grid gap-5 lg:grid-cols-2">
+                <div className="space-y-4"><ArmSwitch /><div className="grid gap-5 lg:grid-cols-2">
                   {(["lenses", "glasses"] as const).map((grp) => (
                     <div key={grp} className="space-y-2">
                       <h2 className={`flex items-center gap-2 text-lg font-extrabold ${grp === "lenses" ? "text-eye-violet" : "text-eye-orange"}`}>{grp === "lenses" ? <Eye className="h-5 w-5" /> : <Glasses className="h-5 w-5" />}{grp === "lenses" ? "Refraction — lenses" : "Glasses dispensed"}</h2>
-                      {LENS_TYPES.map((l) => <AgeMFBlock key={l.key} label={l.label} tone={grp === "lenses" ? "text-eye-violet" : "text-eye-orange"} icon={grp === "lenses" ? Eye : Glasses} value={S.ages[`${grp}.${l.key}`]} invalid={grp === "glasses" && warnings.some((w) => w.field.startsWith("glasses"))} onChange={(v) => setAge(`${grp}.${l.key}`, v)} />)}
-                      <div className={`flex justify-between rounded-2xl px-4 py-3 font-bold text-primary-foreground ${grp === "lenses" ? "bg-eye-violet" : "bg-eye-orange"}`}><span>Total</span><span className="tabular-nums">M {T[grp].m} · F {T[grp].f} · T {t(T[grp])}</span></div>
+                      {LENS_TYPES.map((l) => <AgeMFBlock key={l.key} label={l.label} tone={grp === "lenses" ? "text-eye-violet" : "text-eye-orange"} icon={grp === "lenses" ? Eye : Glasses} value={A.ages[`${grp}.${l.key}`]} invalid={grp === "glasses" && warnings.some((w) => w.field.startsWith("glasses"))} onChange={(v) => setAge(`${grp}.${l.key}`, v)} />)}
+                      <div className={`flex justify-between rounded-2xl px-4 py-3 font-bold text-primary-foreground ${grp === "lenses" ? "bg-eye-violet" : "bg-eye-orange"}`}><span>Total</span><span className="tabular-nums">M {totals(A)[grp].m} · F {totals(A)[grp].f} · T {t(totals(A)[grp])}</span></div>
                     </div>
                   ))}
-                </div>
+                </div></div>
               )}
 
               {cur.key === "csom" && (() => { const C = f.csom ?? emptyCsom(); return (
@@ -607,11 +651,22 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
                     <p className="mt-1 text-xl font-extrabold">Photograph the records behind these figures</p>
                     <p className="mt-0.5 max-w-lg text-xs opacity-90">Attach clear photos of the register pages, tally sheets or theatre log these numbers came from. Label each one so reviewers can verify the report.</p>
                   </div>
-                  <input ref={fileRef} type="file" accept="image/*" multiple capture="environment" className="hidden"
+                  <input ref={camRef} type="file" accept="image/*" capture="environment" className="hidden"
                     onChange={(e) => { void addFiles(e.target.files); e.target.value = ""; }} />
-                  <Button type="button" variant="outline" className="h-12 w-full sm:w-auto" disabled={uploading} onClick={() => fileRef.current?.click()}>
-                    {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImagePlus className="mr-2 h-4 w-4" />} Add source document photos
-                  </Button>
+                  <input ref={fileRef} type="file" accept="image/*" multiple className="hidden"
+                    onChange={(e) => { void addFiles(e.target.files); e.target.value = ""; }} />
+                  <div className="grid grid-cols-2 gap-3">
+                    <motion.button type="button" whileTap={{ scale: 0.96 }} disabled={uploading} onClick={() => camRef.current?.click()}
+                      className="group relative flex flex-col items-center gap-2 overflow-hidden rounded-3xl bg-gradient-to-br from-eye-teal to-eye-blue p-5 text-primary-foreground shadow-lg disabled:opacity-60">
+                      <motion.span animate={{ scale: [1, 1.12, 1] }} transition={{ repeat: Infinity, duration: 2.2 }} className="flex h-14 w-14 items-center justify-center rounded-full bg-primary-foreground/20 ring-4 ring-primary-foreground/30"><Camera className="h-7 w-7" /></motion.span>
+                      <span className="text-sm font-extrabold">Snap a photo</span><span className="text-[11px] opacity-85">Opens the camera</span>
+                    </motion.button>
+                    <motion.button type="button" whileTap={{ scale: 0.96 }} disabled={uploading} onClick={() => fileRef.current?.click()}
+                      className="relative flex flex-col items-center gap-2 overflow-hidden rounded-3xl bg-gradient-to-br from-eye-violet to-eye-rose p-5 text-primary-foreground shadow-lg disabled:opacity-60">
+                      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-primary-foreground/20 ring-4 ring-primary-foreground/30">{uploading ? <Loader2 className="h-7 w-7 animate-spin" /> : <Upload className="h-7 w-7" />}</span>
+                      <span className="text-sm font-extrabold">Upload from device</span><span className="text-[11px] opacity-85">Choose one or many</span>
+                    </motion.button>
+                  </div>
                   {f.attachments.length === 0 && (
                     <div className={`rounded-2xl border border-dashed p-6 text-center text-sm ${has("attachments") ? "border-destructive text-destructive" : "text-muted-foreground"}`}>
                       At least one source document photo is required before this report can be submitted.
