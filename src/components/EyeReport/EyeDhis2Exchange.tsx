@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowDownToLine, ArrowUpFromLine, CheckCircle2, Loader2, Network, ShieldCheck, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -74,8 +74,8 @@ export default function EyeDhis2Exchange({ projectId, rows }: { projectId: strin
           <thead className="sticky top-0 bg-muted text-left text-xs text-muted-foreground"><tr><th className="p-2">Indicator</th><th className="p-2 text-right">Amehnities</th><th className="p-2 text-right">DHIS2</th><th className="p-2">Link</th></tr></thead>
           <tbody>
             {groups.map((g) => (
-              <>
-                <tr key={g} className="bg-eye-sky"><td colSpan={4} className="p-2 text-xs font-bold uppercase tracking-wide text-eye-blue">{g}</td></tr>
+              <Fragment key={g}>
+                <tr className="bg-eye-sky"><td colSpan={4} className="p-2 text-xs font-bold uppercase tracking-wide text-eye-blue">{g}</td></tr>
                 {values.filter((v) => v.group === g).map((v, i) => {
                   const p = pullBy.get(v.key);
                   return (
@@ -87,7 +87,7 @@ export default function EyeDhis2Exchange({ projectId, rows }: { projectId: strin
                     </motion.tr>
                   );
                 })}
-              </>
+              </Fragment>
             ))}
           </tbody>
         </table>

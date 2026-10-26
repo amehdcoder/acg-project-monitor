@@ -18,6 +18,8 @@ import {
 import { deleteReport, loadPatients, loadReports } from "@/lib/eyeReport/store";
 import { exportAggregated, exportDailyReport } from "@/lib/eyeReport/exportExcel";
 import EyeDailyReportForm, { type EyeFacility } from "./EyeDailyReportForm";
+import EyeFacilityTrend from "./EyeFacilityTrend";
+import EyeDhis2Exchange from "./EyeDhis2Exchange";
 
 interface Props { projectId: string; projectName?: string; facilities: EyeFacility[]; userId: string; canReport: boolean; canManage: boolean; onClose: () => void }
 
@@ -148,6 +150,8 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
           ))}
         </section>
 
+        <EyeFacilityTrend rows={rows} />
+
         <section className="grid gap-4 lg:grid-cols-3">
           <div className="rounded-2xl border bg-card p-4 shadow-sm lg:col-span-2">
             <h3 className="mb-2 flex items-center gap-2 text-sm font-bold"><CalendarRange className="h-4 w-4 text-eye-blue" /> Monthly trend {year !== "all" ? year : ""}</h3>
@@ -169,10 +173,10 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
           </div>
           <div className="rounded-2xl border bg-card p-4 shadow-sm">
             <h3 className="mb-3 flex items-center gap-2 text-sm font-bold"><Target className="h-4 w-4 text-eye-teal" /> CSOM quality indicators</h3>
-            {[["Surgeries after biometry", pct(c.biometry, c.surgeries), C.teal], ["Surgeries with IOL", pct(c.iol, c.surgeries), C.blue], ["Good outcome — discharge (presenting)", pct(c.discharge.presenting.good, vaTotal(c.discharge.presenting)), C.good], ["Good outcome — discharge (pinhole)", pct(c.discharge.pinhole.good, vaTotal(c.discharge.pinhole)), C.good], ["Good outcome — follow-up (presenting)", fuGood, C.violet], ["Good outcome — follow-up (BCVA)", pct(c.followup.bcva.good, vaTotal(c.followup.bcva)), C.violet], ["Poor outcome — follow-up", pct(c.followup.presenting.poor, vaTotal(c.followup.presenting)), C.rose]].map(([label, v, col]) => (
+            {[["Surgeries after biometry", pct(c.biometry, c.surgeries), C.teal], ["Surgeries with IOL", pct(c.iol, c.surgeries), C.blue], ["Good outcome — discharge (presenting)", pct(c.discharge.presenting.good, vaTotal(c.discharge.presenting)), C.good], ["Good outcome — discharge (pinhole)", vaTotal(c.discharge.pinhole) ? pct(c.discharge.pinhole.good, vaTotal(c.discharge.pinhole)) : null, C.good], ["Good outcome — follow-up (presenting)", fuGood, C.violet], ["Good outcome — follow-up (pinhole/BCVA)", vaTotal(c.followup.bcva) ? pct(c.followup.bcva.good, vaTotal(c.followup.bcva)) : null, C.violet], ["Poor outcome — follow-up", pct(c.followup.presenting.poor, vaTotal(c.followup.presenting)), C.rose]].map(([label, v, col]) => (
               <div key={label as string} className="mb-2.5">
-                <div className="flex justify-between text-xs"><span className="font-medium">{label}</span><span className="font-bold">{v}%</span></div>
-                <div className="mt-1 h-2.5 overflow-hidden rounded-full bg-muted"><motion.div className="h-full rounded-full" style={{ background: col as string }} initial={{ width: 0 }} animate={{ width: `${Math.min(100, v as number)}%` }} /></div>
+                <div className="flex justify-between text-xs"><span className="font-medium">{label}</span><span className="font-bold">{v === null ? <span className="font-medium text-muted-foreground" title="Pinhole is optional — zero means it was not used, so it does not count against the facility.">Not used</span> : `${v}%`}</span></div>
+                <div className="mt-1 h-2.5 overflow-hidden rounded-full bg-muted"><motion.div className="h-full rounded-full" style={{ background: col as string }} initial={{ width: 0 }} animate={{ width: `${Math.min(100, (v as number) ?? 0)}%` }} /></div>
               </div>
             ))}
           </div>
