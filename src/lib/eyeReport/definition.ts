@@ -53,7 +53,29 @@ export interface EyeSummary {
   /** Same-day split between routine facility work and community outreach. The
    *  top-level figures are always facility + outreach; disability stays combined. */
   split?: { facility: EyeSummary; outreach: EyeSummary };
+  /** Community where today's outreach was held (required when outreach is recorded). */
+  outreachCommunity?: string;
+  /** Referrals following WHO eye-care referral pathways (received in / sent out). */
+  referIn: Record<string, MF>;
+  referOut: Record<string, MF>;
 }
+/** Referral sources (in) — levels of the WHO integrated people-centred eye care pathway. */
+export const REFER_IN = [
+  { key: "community", label: "Community / CHW / outreach" },
+  { key: "phc", label: "Primary health care facility" },
+  { key: "secondary", label: "Secondary / general hospital" },
+  { key: "tertiary", label: "Tertiary / specialist eye centre" },
+  { key: "self", label: "Self-referral / private" },
+] as const;
+/** Referrals out — by condition requiring higher-level eye care. */
+export const REFER_OUT = [
+  { key: "cataract", label: "Cataract surgery" },
+  { key: "glaucoma", label: "Glaucoma management" },
+  { key: "refraction", label: "Refraction / low vision" },
+  { key: "tt", label: "TT surgery" },
+  { key: "retina", label: "Diabetic retinopathy / retina" },
+  { key: "other", label: "Other specialist care" },
+] as const;
 export type VaBand = { good: number; borderline: number; poor: number };
 export interface EyeCsom {
   surgeries: number;
@@ -77,6 +99,8 @@ export const emptySummary = (): EyeSummary => ({
   ages: Object.fromEntries(AGE_PATHS.map((k) => [k, emptyAge()])),
   lenses: { dv: mf(), nv: mf(), bf: mf() },
   glasses: { dv: mf(), nv: mf(), bf: mf() },
+  referIn: Object.fromEntries(REFER_IN.map((r) => [r.key, mf()])),
+  referOut: Object.fromEntries(REFER_OUT.map((r) => [r.key, mf()])),
 });
 export const emptyCsom = (): EyeCsom => ({
   surgeries: 0, biometry: 0, iol: 0,
@@ -98,6 +122,8 @@ export function normSummary(raw: any): EyeSummary {
   for (const i of SURGERY_ITEMS) s.surgery[i.key] = g(raw?.surgery?.[i.key]);
   for (const l of LENS_TYPES) { s.lenses[l.key] = g(raw?.lenses?.[l.key]); s.glasses[l.key] = g(raw?.glasses?.[l.key]); }
   for (const i of SCREEN_ITEMS) s.screen[i.key] = g(raw?.screen?.[i.key]);
+  for (const r of REFER_IN) s.referIn[r.key] = g(raw?.referIn?.[r.key]);
+  for (const r of REFER_OUT) s.referOut[r.key] = g(raw?.referOut?.[r.key]);
   s.screenOther = typeof raw?.screenOther === "string" ? raw.screenOther.slice(0, 300) : "";
   // When an age breakdown is stored it is the source of truth for the item total.
   for (const path of AGE_PATHS) {
@@ -111,7 +137,9 @@ export function normSummary(raw: any): EyeSummary {
   if (raw?.split?.facility && raw?.split?.outreach) {
     const fac = normSummary({ ...raw.split.facility, split: undefined });
     const out = normSummary({ ...raw.split.outreach, split: undefined });
-    return combineArms(fac, out, s);
+    const c = combineArms(fac, out, s);
+    c.outreachCommunity = typeof raw.outreachCommunity === "string" ? raw.outreachCommunity.slice(0, 200) : "";
+    return c;
   }
   return s;
 }
@@ -123,13 +151,14 @@ const deepAdd = (a: any, b: any): any => {
 };
 /** Combines facility and outreach arms; disability figures come from `base`. */
 export function combineArms(facility: EyeSummary, outreach: EyeSummary, base: EyeSummary): EyeSummary {
-  const strip = (x: EyeSummary) => { const { split: _s, ...rest } = x; return rest as EyeSummary; };
+  const strip = (x: EyeSummary) => { const { split: _s, outreachCommunity: _o, ...rest } = x; return rest as EyeSummary; };
   const fac = strip(facility), out = strip(outreach);
   const sum = deepAdd(fac, out) as EyeSummary;
   sum.screenOther = [fac.screenOther.trim() && `Facility: ${fac.screenOther.trim()}`, out.screenOther.trim() && `Outreach: ${out.screenOther.trim()}`].filter(Boolean).join(" · ").slice(0, 300);
   if (!out.screenOther.trim()) sum.screenOther = fac.screenOther;
   sum.pwdAge = structuredClone(base.pwdAge); sum.pwd = { ...base.pwd };
   sum.split = { facility: fac, outreach: out };
+  sum.outreachCommunity = base.outreachCommunity ?? "";
   return sum;
 }
 export function normCsom(raw: any): EyeCsom | null {
@@ -153,6 +182,8 @@ export function totals(s: EyeSummary) {
     lenses: sumMF(s.lenses.dv, s.lenses.nv, s.lenses.bf),
     glasses: sumMF(s.glasses.dv, s.glasses.nv, s.glasses.bf),
     surgeries: sumMF(s.surgery.cataract, s.surgery.glaucoma),
+    referIn: sumMF(...Object.values(s.referIn ?? {})),
+    referOut: sumMF(...Object.values(s.referOut ?? {})),
   };
 }
 
@@ -215,6 +246,9 @@ export function validateReport(input: {
       out.push({ field: `screen.${i.key}.${sex}`, message: `${i.label} screened (${label}: ${s.screen[i.key][sex]}) cannot exceed ${label} persons consulted (${T.consulted[sex]}).`, level: "error" });
     if (T.surgeries[sex] > T.consulted[sex]) out.push({ field: `surgery.${sex}`, message: `Surgeries (${label}) are more than ${label} persons consulted today. Please confirm.`, level: "warning" });
   }
+  if (s.split && !(s.outreachCommunity ?? "").trim()) out.push({ field: "outreach.community", message: "Enter the name of the community where today's outreach was held.", level: "error" });
+  for (const sex of ["m", "f"] as const) if (T.referOut[sex] > T.consulted[sex])
+    out.push({ field: `refer.out.${sex}`, message: `Referrals out (${sex === "m" ? "male" : "female"}: ${T.referOut[sex]}) cannot exceed persons consulted (${T.consulted[sex]}).`, level: "error" });
   if (t(s.screen.other) > 0 && !s.screenOther.trim()) out.push({ field: "screen.otherSpecify", message: "Specify the other eye conditions screened.", level: "error" });
   if (t(T.consulted) === 0 && all.some(([, v]) => v > 0)) out.push({ field: "consult", message: "Services are recorded but no consultations. Please confirm.", level: "warning" });
 
@@ -226,12 +260,17 @@ export function validateReport(input: {
     if (c.surgeries === 0 && used > 0) out.push({ field: "csom.surgeries", message: "Enter the number of surgeries for this CSOM episode — it is the denominator for the percentages.", level: "error" });
     if (c.biometry > c.surgeries) out.push({ field: "csom.biometry", message: "Surgeries done after biometry cannot exceed total surgeries.", level: "error" });
     if (c.iol > c.surgeries) out.push({ field: "csom.iol", message: "Surgeries with IOL cannot exceed total surgeries.", level: "error" });
-    const dp = vaTotal(c.discharge.presenting), dh = vaTotal(c.discharge.pinhole);
-    if (dp > c.surgeries) out.push({ field: "csom.discharge", message: `Discharge outcomes (${dp}) cannot exceed surgeries (${c.surgeries}).`, level: "error" });
-    if (dh > 0 && dh !== dp) out.push({ field: "csom.discharge.pinhole", message: `Pinhole total (${dh}) must equal presenting total (${dp}) — same eyes.`, level: "error" });
-    const fp = vaTotal(c.followup.presenting), fb = vaTotal(c.followup.bcva);
-    if (fb > 0 && fb !== fp) out.push({ field: "csom.followup.bcva", message: `Pinhole/BCVA total (${fb}) must equal presenting total (${fp}).`, level: "error" });
-    if (c.discharge.pinhole.good > 0 && c.discharge.pinhole.good < c.discharge.presenting.good) out.push({ field: "csom.discharge.pinhole", message: "Good outcomes with pinhole are usually ≥ presenting. Please confirm.", level: "warning" });
+    const sameBands = (a: VaBand, b: VaBand) => vaTotal(a) > 0 && a.good === b.good && a.borderline === b.borderline && a.poor === b.poor;
+    const checkPair = (sec: string, label: string, pres: VaBand, pin: VaBand, pinLabel: string) => {
+      const p = vaTotal(pres), h = vaTotal(pin);
+      if (p > c.surgeries) out.push({ field: `csom.${sec}`, message: `${label} presenting total (${p}) exceeds the number of CSOM surgeries (${c.surgeries}).`, level: "error" });
+      if (h > c.surgeries) out.push({ field: `csom.${sec}.pin`, message: `${label} ${pinLabel} total (${h}) exceeds the number of CSOM surgeries (${c.surgeries}).`, level: "error" });
+      if (h > 0 && h !== p) out.push({ field: `csom.${sec}.pin`, message: `${label} ${pinLabel} total (${h}) must equal presenting total (${p}) — same eyes measured twice.`, level: "error" });
+      if (sameBands(pres, pin)) out.push({ field: `csom.${sec}.pin`, message: `${label}: presenting and ${pinLabel} figures are identical. ${pinLabel} vision is ideally better (more “Good”) — please re-check the register.`, level: "warning" });
+      else if (h > 0 && pin.good < pres.good) out.push({ field: `csom.${sec}.pin`, message: `${label}: fewer “Good” outcomes with ${pinLabel} (${pin.good}) than presenting (${pres.good}). ${pinLabel} should ideally be higher — please confirm.`, level: "warning" });
+    };
+    checkPair("discharge", "At discharge", c.discharge.presenting, c.discharge.pinhole, "pinhole");
+    checkPair("followup", "At follow-up", c.followup.presenting, c.followup.bcva, "pinhole/BCVA");
   }
   return out;
 }
