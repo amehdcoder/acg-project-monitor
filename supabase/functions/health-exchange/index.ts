@@ -198,8 +198,7 @@ async function computeConnectionValues(db: ReturnType<typeof admin>, c: Connecti
     computeMonthlyValues(db, c.project_id, period), computeServiceValues(db, c.project_id, period, area),
     computeNationalValues(db, c.project_id, period, area),
   ]);
-  const eye = !area || area === "all" || area === "eye" ? await computeEyeValues(db, c.project_id, period) : [];
-  return [...base, ...services, ...national, ...eye];
+  return [...base, ...services, ...national];
 }
 
 /** Eye Health Daily Facility Report totals for one month, optionally one State/LGA/facility. */
@@ -480,7 +479,7 @@ Deno.serve(async (req) => {
       username: z.string().trim().max(150).optional(),
       password: z.string().max(500).optional(),
       token: z.string().trim().max(500).optional(),
-      scope: z.enum(["cases", "microplanning", "integrations"]).default("cases"),
+      scope: z.enum(["cases", "microplanning", "integrations", "eye_report"]).default("cases"),
       connection_id: z.string().uuid().optional(),
       label: z.string().trim().max(80).optional(),
     }).safeParse(payload);
@@ -610,7 +609,12 @@ Deno.serve(async (req) => {
   // Microplanning and Cases DHIS2 setups never share connections.
   const connScope = (connection as unknown as { scope?: string }).scope ?? "cases";
   const pageScoped = connScope === "microplanning" || connScope === "integrations";
-  if (!action.startsWith("dash_") && action.startsWith("mp_") !== pageScoped && ["test", "pull_metadata", "dhis2_browse"].indexOf(action) < 0) {
+  // The Eye Health Daily Facility Report has its own, separate DHIS2 servers.
+  const shared = ["test", "pull_metadata", "dhis2_browse"].includes(action);
+  if (connScope === "eye_report" ? !(action.startsWith("eye_") || shared) : action.startsWith("eye_")) {
+    return json({ error: connScope === "eye_report" ? "This DHIS2 connection belongs to the Eye Health Daily Facility Report." : "Connect DHIS2 inside the Eye Health Daily Facility Report first." }, 400);
+  }
+  if (connScope !== "eye_report" && !action.startsWith("dash_") && action.startsWith("mp_") !== pageScoped && ["test", "pull_metadata", "dhis2_browse"].indexOf(action) < 0) {
     return json({ error: action.startsWith("mp_") ? "Connect DHIS2 on the Geo Microplanning page first." : "This DHIS2 connection belongs to Geo Microplanning." }, 400);
   }
 
