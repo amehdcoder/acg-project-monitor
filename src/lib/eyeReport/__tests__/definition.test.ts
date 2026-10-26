@@ -61,4 +61,10 @@ describe("eye daily report rules", () => {
     expect(months[0].days).toBe(2);
     expect(aggregate([]).reports).toBe(0);
   });
+  it("flags near-duplicate facility names but not exact or unrelated ones", async () => {
+    const { similarFacilityName } = await import("../definition");
+    expect(similarFacilityName("Dutse Gen Hosp", ["Dutse General Hospital"])).not.toBeNull();
+    expect(similarFacilityName("Dutse General Hospital", ["Dutse General Hospital"])).toBeNull();
+    expect(similarFacilityName("Kano Eye Clinic", ["Dutse General Hospital"])).toBeNull();
+  });
 });
