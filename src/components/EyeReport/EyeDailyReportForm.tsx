@@ -763,6 +763,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
           )}
         </div>
       </main>
-    </div>
+    </div>,
+    document.body,
   );
 }
