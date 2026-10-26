@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import hero from "@/assets/eye-report/hero.jpg";
 import {
-  AGE_BANDS, LENS_TYPES, SURGERY_ITEMS, emptyCsom, emptySummary, normAttachments, normCsom, normSummary, pct, t, totals,
+  AGE_BANDS, LENS_TYPES, SURGERY_ITEMS, sumMF, wgAgeIssues, wgPwdByAge, emptyCsom, emptySummary, normAttachments, normCsom, normSummary, pct, t, totals,
   validateReport, vaTotal, wgVsSummaryIssues,
   type EyeAttachment, type EyeCsom, type EyePatientRow, type EyeReportRow, type EyeSummary, type MF, type VaBand,
 } from "@/lib/eyeReport/definition";
@@ -167,6 +167,19 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
   const setC = (fn: (c: EyeCsom) => void) => setF((p: any) => { const c = structuredClone(p.csom ?? emptyCsom()); fn(c); return { ...p, csom: c }; });
 
   const disabledCount = patients.filter((p) => p.record.hasDisability).length;
+  // When WG-SS screenings exist they are the source of truth for persons with
+  // disability: override the manual figures by age band and sex.
+  const wgRows = patients.map((p) => ({ sex: p.draft.sex, age_band: p.draft.age_band, has_disability: p.record.hasDisability }));
+  const wgAvailable = !wgOnly && patients.length > 0;
+  const wgSig = JSON.stringify(wgPwdByAge(wgRows));
+  useEffect(() => {
+    if (!wgAvailable) return;
+    const byAge = JSON.parse(wgSig) as EyeSummary["pwdAge"];
+    setF((p: any) => {
+      if (JSON.stringify(p.summary.pwdAge) === wgSig) return p;
+      return { ...p, summary: { ...p.summary, pwdAge: byAge, pwd: sumMF(byAge.a0_14, byAge.a15_39, byAge.a40) } };
+    });
+  }, [wgAvailable, wgSig]);
   const csomForValidation = cataract > 0 ? f.csom : null;
   const issues = validateReport({
     facility: f.facility, date: f.date, summary: S, csom: csomForValidation, today: today(),
@@ -182,6 +195,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
     if (patients.length === 0) issues.push({ field: "patients", message: "Screen at least one patient with the WG-SS before saving.", level: "error" });
   } else {
     issues.push(...wgVsSummaryIssues(patients.length, disabledCount, S));
+    issues.push(...wgAgeIssues(wgRows, S));
   }
   const dup = !wgOnly && otherReports.find((r) => r.id !== existing?.id && r.report_date === f.date && r.facility_name.toLowerCase() === f.facility.trim().toLowerCase());
   if (dup) issues.unshift({ field: "date", message: `A report for ${f.facility} on ${f.date} already exists. Edit that report instead.`, level: "error" });
@@ -403,7 +417,25 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
                   <div className="grid grid-cols-[minmax(0,1.4fr)_1fr_1fr_auto] items-center gap-2 rounded-2xl bg-eye-blue p-3 text-primary-foreground">
                     <span className="text-sm font-bold">Total persons consulted</span><span className="text-center text-lg font-bold">{T.consulted.m}</span><span className="text-center text-lg font-bold">{T.consulted.f}</span><span className="min-w-12 rounded-xl bg-eye-gold px-2 py-2 text-center text-lg font-extrabold text-eye-ink">{t(T.consulted)}</span>
                   </div>
-                  <MFRow label="Persons with disability" icon={Accessibility} tone="text-eye-violet" value={S.pwd} invalid={has("pwd")} onChange={(v) => setS((s) => { s.pwd = v; })} />
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
+                    <h3 className="text-base font-extrabold text-eye-deep">Persons with disability</h3>
+                    {wgAvailable
+                      ? <span className="rounded-full bg-eye-violet/15 px-3 py-1 text-xs font-bold text-eye-violet">From WG-SS screenings · {patients.length} patient{patients.length === 1 ? "" : "s"}</span>
+                      : <span className="text-xs text-muted-foreground">Enter manually, or screen patients in step “Patients · WG-SS” to fill automatically.</span>}
+                  </div>
+                  {AGE_BANDS.map((b) => wgAvailable ? (
+                    <div key={b.key} className={`grid grid-cols-[minmax(0,1.4fr)_1fr_1fr_auto] items-center gap-2 rounded-2xl border bg-eye-violet/5 p-3 ${has(`pwd.${b.key}`) ? "border-destructive" : ""}`}>
+                      <span className="flex items-center gap-2 text-sm font-semibold"><Accessibility className="h-4 w-4 text-eye-violet" />{b.label}</span>
+                      <span className="text-center text-lg font-bold tabular-nums">{S.pwdAge[b.key].m}</span><span className="text-center text-lg font-bold tabular-nums">{S.pwdAge[b.key].f}</span>
+                      <span className="min-w-12 rounded-xl bg-eye-violet px-2 py-2 text-center text-lg font-extrabold text-primary-foreground">{t(S.pwdAge[b.key])}</span>
+                    </div>
+                  ) : (
+                    <MFRow key={b.key} label={b.label} icon={Accessibility} tone="text-eye-violet" value={S.pwdAge[b.key]} invalid={has(`pwd.${b.key}`)} onChange={(v) => setS((s) => { s.pwdAge[b.key] = v; s.pwd = sumMF(s.pwdAge.a0_14, s.pwdAge.a15_39, s.pwdAge.a40); })} />
+                  ))}
+                  <div className="grid grid-cols-[minmax(0,1.4fr)_1fr_1fr_auto] items-center gap-2 rounded-2xl bg-eye-violet p-3 text-primary-foreground">
+                    <span className="text-sm font-bold">Total persons with disability</span><span className="text-center text-lg font-bold">{S.pwd.m}</span><span className="text-center text-lg font-bold">{S.pwd.f}</span><span className="min-w-12 rounded-xl bg-eye-gold px-2 py-2 text-center text-lg font-extrabold text-eye-ink">{t(S.pwd)}</span>
+                  </div>
+                  {errors.filter((e) => e.field.startsWith("pwd") || e.field.startsWith("patients.")).map((e, i) => <p key={i} className="rounded-xl bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{e.message}</p>)}
                 </>
               )}
 
