@@ -270,7 +270,10 @@ export function similarFacilityName(typed: string, candidates: string[]): string
   let bestScore = 0;
   for (const c of candidates) {
     const cn = normFacilityName(c);
-    if (!cn || cn === n) continue;
+    if (!cn) continue;
+    const raw = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+    if (raw(c) === raw(typed)) return null; // already the exact existing name
+    if (cn === n) { best = c; bestScore = 1; continue; } // same name, different spelling/abbreviation
     const lev = 1 - levenshtein(n, cn) / Math.max(n.length, cn.length);
     const score = Math.max(lev, tokenJaccard(n, cn), cn.includes(n) || n.includes(cn) ? 0.85 : 0);
     if (score > bestScore) { bestScore = score; best = c; }
