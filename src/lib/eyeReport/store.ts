@@ -12,10 +12,20 @@ const db = supabase as unknown as { from: (t: string) => any; rpc: (f: string, a
 export const cacheKey = (projectId: string) => `eye-reports:${projectId}`;
 export const patientCacheKey = (projectId: string) => `eye-patients:${projectId}`;
 
-export async function loadReports(projectId: string): Promise<{ rows: EyeReportRow[]; fromCache: boolean }> {
-  const { data, fromCache } = await cachedRead<EyeReportRow[]>(cacheKey(projectId), () =>
-    db.from("eye_daily_reports").select("*").eq("project_id", projectId).order("report_date", { ascending: false }).limit(10000));
-  return { rows: data ?? [], fromCache };
+async function readAll<T>(table: string, projectId: string) {
+  const rows: T[] = [];
+  for (let offset = 0; ; offset += 1000) {
+    const { data, error } = await db.from(table).select("*").eq("project_id", projectId)
+      .order("report_date", { ascending: false }).order("id").range(offset, offset + 999);
+    if (error) return { data: null, error };
+    rows.push(...(data ?? []));
+    if (!data || data.length < 1000) return { data: rows, error: null };
+  }
+}
+
+export async function loadReports(projectId: string): Promise<{ rows: EyeReportRow[]; fromCache: boolean; unavailable: boolean }> {
+  const { data, fromCache } = await cachedRead<EyeReportRow[]>(cacheKey(projectId), () => readAll<EyeReportRow>("eye_daily_reports", projectId), 30_000);
+  return { rows: data ?? [], fromCache, unavailable: data === null };
 }
 
 export type ReportPayload = Omit<EyeReportRow, "id" | "created_by" | "device_id" | "collector_label"> & { id?: string };
@@ -59,10 +69,9 @@ export async function listDeviceReports(deviceId: string, projectId: string): Pr
 
 // ── Per-patient WG-SS screenings ────────────────────────────────────────────
 
-export async function loadPatients(projectId: string): Promise<{ rows: EyePatientRow[]; fromCache: boolean }> {
-  const { data, fromCache } = await cachedRead<EyePatientRow[]>(patientCacheKey(projectId), () =>
-    db.from("eye_daily_patients").select("*").eq("project_id", projectId).order("report_date", { ascending: false }).limit(20000));
-  return { rows: data ?? [], fromCache };
+export async function loadPatients(projectId: string): Promise<{ rows: EyePatientRow[]; fromCache: boolean; unavailable: boolean }> {
+  const { data, fromCache } = await cachedRead<EyePatientRow[]>(patientCacheKey(projectId), () => readAll<EyePatientRow>("eye_daily_patients", projectId), 30_000);
+  return { rows: data ?? [], fromCache, unavailable: data === null };
 }
 
 export type PatientPayload = Omit<EyePatientRow, "id" | "created_by" | "device_id" | "collector_label" | "created_at" | "updated_at"> & { id?: string };

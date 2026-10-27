@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import hero from "@/assets/eye-report/hero.jpg";
 import {
   AGE_BANDS, MONTHS, aggregate, aggregatePatients, byMonth, normCsom, normSummary, pct, t, totals, vaTotal,
@@ -30,6 +31,7 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
   const [rows, setRows] = useState<EyeReportRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [fromCache, setFromCache] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
   const thisYear = new Date().getFullYear();
   const [year, setYear] = useState(String(thisYear));
   const [month, setMonth] = useState("all");
@@ -46,9 +48,18 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
   const load = useCallback(async () => {
     setLoading(true);
     const [r, p] = await Promise.all([loadReports(projectId), loadPatients(projectId)]);
-    setRows(r.rows); setPatients(p.rows); setFromCache(r.fromCache || p.fromCache); setLoading(false);
+    setRows(r.rows); setPatients(p.rows); setFromCache(r.fromCache || p.fromCache); setUnavailable(r.unavailable || p.unavailable); setLoading(false);
   }, [projectId]);
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const channel = supabase.channel(`eye-dashboard:${projectId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "eye_daily_reports", filter: `project_id=eq.${projectId}` }, () => void load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "eye_daily_patients", filter: `project_id=eq.${projectId}` }, () => void load())
+      .subscribe();
+    const reconnect = () => void load();
+    window.addEventListener("online", reconnect);
+    return () => { void supabase.removeChannel(channel); window.removeEventListener("online", reconnect); };
+  }, [projectId, load]);
 
   const years = useMemo(() => Array.from(new Set([String(thisYear), ...rows.map((r) => r.report_date.slice(0, 4))])).sort().reverse(), [rows, thisYear]);
   const lgas = useMemo(() => Array.from(new Set(rows.map((r) => r.lga).filter(Boolean) as string[])).sort(), [rows]);
@@ -139,11 +150,12 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
       </div>
 
       <main className="mx-auto max-w-7xl space-y-5 px-4 py-5">
+        {unavailable && <p role="alert" className="border-l-4 border-destructive bg-card p-4 text-sm text-destructive">Submission totals could not be loaded. Reconnect and select Refresh; unavailable data is not a zero submission count.</p>}
         <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {kpis.map((k, i) => (
             <motion.div key={k.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }} className={`rounded-2xl bg-gradient-to-br ${k.cls} p-4 text-primary-foreground shadow-md`}>
               <k.icon className="h-5 w-5 opacity-90" />
-              <p className="mt-2 text-2xl font-extrabold tabular-nums sm:text-3xl">{k.value}</p>
+              <p className="mt-2 text-2xl font-extrabold tabular-nums sm:text-3xl">{unavailable || (loading && !rows.length) ? "—" : k.value}</p>
               <p className="text-xs font-semibold">{k.label}</p>
               <p className="mt-0.5 truncate text-[11px] opacity-80">{k.sub}</p>
             </motion.div>
@@ -235,7 +247,7 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
               </tr>); })}</tbody>
           </table></div>
         </section>
-        {canManage && <EyeDhis2Exchange projectId={projectId} rows={rows} />}
+        {canManage && !unavailable && !loading && <EyeDhis2Exchange projectId={projectId} rows={rows} />}
       </main>
     </div>
   );
