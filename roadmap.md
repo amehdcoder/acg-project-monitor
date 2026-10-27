@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Fix Eye Health dashboard/DHIS2 exchange zero totals from real submissions and automatically load connected DHIS2 organisation units; verify live readback and regression tests.
+
 - [x] Harden in-app project camera QR scanning and offline image decoding; tested real video decoding, real QR enrollment with collector name and camera release; retain mandatory collector name and first-online enrollment. Thirteen enrollment/QR tests passed.
 - [x] Fit shared Microplan forms across Android/iOS/tablet/desktop with two-axis scroll roots, styled scrollbars, container-aware fields and keyboard-height tracking; five viewport checks passed with no overflow and reachable Save actions, offline draft persisted, no runtime errors. Physical hardware remains unverified; changes not yet published.
 
