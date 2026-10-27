@@ -6,11 +6,12 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { EYE_INDICATORS, computeEyeIndicators } from "@/lib/eyeReport/eyeIndicators";
 import {
-  browseDhis2, dhis2Login, dhis2SearchUnits, eyeExchangePull, eyeExchangePush, listEyeConnections, listMappings, saveConnection, saveMapping,
+  browseDhis2, dhis2Children, dhis2Login, dhis2SearchUnits, eyeExchangePull, eyeExchangePush, listEyeConnections, listMappings, saveConnection, saveMapping,
   type Dhis2Catalog, type Dhis2OrgUnit, type ExchangeConnection, type ExchangeMapping,
 } from "@/lib/programmeModule/healthExchange";
 import { supabase } from "@/integrations/supabase/client";
 import type { EyeReportRow } from "@/lib/eyeReport/definition";
+import { latestEyeReportingMonth } from "@/lib/eyeReport/exchangePeriod";
 
 interface PullRow { indicator_key: string; label: string; amehnities: number; dhis2: number | null; match: boolean }
 const Sel = (p: React.SelectHTMLAttributes<HTMLSelectElement>) => <select {...p} className={`h-9 w-full rounded-md border bg-background px-2 text-sm ${p.className ?? ""}`} />;
@@ -21,13 +22,15 @@ export default function EyeDhis2Exchange({ projectId, rows }: { projectId: strin
   const [connId, setConnId] = useState("");
   const [maps, setMaps] = useState<ExchangeMapping[]>([]);
   const [catalog, setCatalog] = useState<Dhis2Catalog | null>(null);
-  const prev = new Date(); prev.setUTCDate(1); prev.setUTCMonth(prev.getUTCMonth() - 1);
-  const [month, setMonth] = useState(prev.toISOString().slice(0, 7));
+  const [chosenMonth, setChosenMonth] = useState<string | null>(null);
+  const month = chosenMonth ?? latestEyeReportingMonth(rows);
   const [busy, setBusy] = useState("");
   const [pull, setPull] = useState<PullRow[] | null>(null);
   const [login, setLogin] = useState({ url: "", user: "", pass: "", token: "", open: false });
   const [ouQ, setOuQ] = useState("");
   const [ous, setOus] = useState<Dhis2OrgUnit[]>([]);
+  const [ouLoading, setOuLoading] = useState(false);
+  const [ouError, setOuError] = useState("");
 
   const loadConns = useCallback(async (select?: string) => {
     const c = await listEyeConnections(projectId).catch(() => []);
@@ -37,17 +40,31 @@ export default function EyeDhis2Exchange({ projectId, rows }: { projectId: strin
   useEffect(() => { void loadConns(); }, [loadConns]);
   const conn = conns.find((c) => c.id === connId);
   useEffect(() => {
-    setPull(null); setCatalog(null); setMaps([]);
+    let active = true;
+    setPull(null); setCatalog(null); setMaps([]); setOus([]); setOuQ(""); setOuError("");
     if (!connId) return;
-    listMappings(connId).then(setMaps).catch(() => undefined);
-    browseDhis2(connId).then(setCatalog).catch((e) => toast.error(`DHIS2: ${e instanceof Error ? e.message : "could not load reports"}`));
+    setOuLoading(true);
+    listMappings(connId).then((m) => { if (active) setMaps(m); }).catch(() => undefined);
+    browseDhis2(connId).then((c) => {
+      if (!active) return;
+      setCatalog(c); setOus(c.roots);
+      if (!c.roots.length) setOuError("No organisation units assigned to this DHIS2 account. Search below or check its access.");
+    }).catch((e) => {
+      if (!active) return;
+      const message = e instanceof Error ? e.message : "Could not load DHIS2 organisation units";
+      setOuError(message); toast.error(`DHIS2: ${message}`);
+    }).finally(() => { if (active) setOuLoading(false); });
+    return () => { active = false; };
   }, [connId]);
+  useEffect(() => { setPull(null); }, [month, rows]);
 
   const period = month.replace("-", "");
+  const periodRows = useMemo(() => rows.filter((r) => r.report_date.startsWith(month)), [rows, month]);
+  const availableMonths = useMemo(() => [...new Set(rows.map((r) => r.report_date.slice(0, 7)))].sort().reverse(), [rows]);
   const values = useMemo(() => {
-    const v = computeEyeIndicators(rows.filter((r) => r.report_date.startsWith(month)));
+    const v = computeEyeIndicators(periodRows);
     return EYE_INDICATORS.map((d, i) => ({ ...d, value: v[i].value }));
-  }, [rows, month]);
+  }, [periodRows]);
   const dataSet = catalog?.dataSets.find((d) => d.id === conn?.dataset_id);
   const elements = dataSet?.dataElements ?? catalog?.dataSets.flatMap((d) => d.dataElements) ?? [];
   const mapBy = new Map(maps.map((m) => [m.indicator_key, m]));
@@ -64,8 +81,12 @@ export default function EyeDhis2Exchange({ projectId, rows }: { projectId: strin
   };
   const patchConn = async (patch: Partial<ExchangeConnection>) => {
     if (!conn) return;
-    const saved = await saveConnection({ ...conn, ...patch });
-    setConns((cs) => cs.map((c) => (c.id === saved.id ? saved : c)));
+    try {
+      const saved = await saveConnection({ ...conn, ...patch });
+      setConns((cs) => cs.map((c) => (c.id === saved.id ? saved : c)));
+      setPull(null);
+      if (patch.org_unit_id) toast.success("Organisation unit saved");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not save connection settings"); }
   };
   const disconnect = async () => {
     if (!conn || !confirm(`Disconnect ${conn.name} from the Daily Facility Report?`)) return;
@@ -74,9 +95,20 @@ export default function EyeDhis2Exchange({ projectId, rows }: { projectId: strin
     toast.success("Disconnected"); await loadConns();
   };
   const searchOus = async () => {
-    if (!connId || ouQ.trim().length < 2) return;
+    if (!connId) return;
     setBusy("ou");
-    try { setOus((await dhis2SearchUnits(connId, ouQ.trim())).orgUnits); } catch (e) { toast.error(e instanceof Error ? e.message : "Search failed"); } finally { setBusy(""); }
+    try {
+      const units = ouQ.trim() ? (await dhis2SearchUnits(connId, ouQ.trim())).orgUnits : catalog?.roots ?? [];
+      setOus(units); setOuError(units.length ? "" : "No matching organisation units found.");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Search failed"); } finally { setBusy(""); }
+  };
+  const loadChildren = async () => {
+    if (!connId || !conn?.org_unit_id) return;
+    setBusy("ou");
+    try {
+      const units = (await dhis2Children(connId, conn.org_unit_id)).orgUnits;
+      setOus(units); setOuError(units.length ? "" : "This organisation unit has no child units.");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not load child units"); } finally { setBusy(""); }
   };
   const link = async (key: string, label: string, remote_id: string, coc?: string | null) => {
     const el = elements.find((e) => e.id === remote_id);
@@ -132,26 +164,33 @@ export default function EyeDhis2Exchange({ projectId, rows }: { projectId: strin
             {catalog?.dataSets.map((d) => <option key={d.id} value={d.id}>{d.name} ({d.periodType})</option>)}
           </Sel>
         </label>
-        <div className="text-xs font-semibold">Organisation unit <span className="font-mono font-normal text-muted-foreground">{conn?.org_unit_id || "not set"}</span>
+        <div className="text-xs font-semibold">Organisation unit
+          <Sel aria-label="Organisation unit" className="mt-1" disabled={!conn || ouLoading || busy === "ou"} value={conn?.org_unit_id ?? ""} onChange={(e) => e.target.value && void patchConn({ org_unit_id: e.target.value })}>
+            <option value="">{ouLoading ? "Loading organisation units…" : "Choose organisation unit"}</option>
+            {conn?.org_unit_id && !ous.some((o) => o.id === conn.org_unit_id) && <option value={conn.org_unit_id}>{catalog?.roots.find((o) => o.id === conn.org_unit_id)?.name ?? conn.org_unit_id}</option>}
+            {ous.map((o) => <option key={o.id} value={o.id}>{o.name}{o.level ? ` · level ${o.level}` : ""}</option>)}
+          </Sel>
           <div className="mt-1 flex gap-1">
-            <Input className="h-9" placeholder="Search facility / LGA / State" value={ouQ} disabled={!conn} onChange={(e) => setOuQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void searchOus()} />
-            <Button size="icon" variant="outline" className="h-9 w-9 shrink-0" disabled={!conn || busy === "ou"} onClick={() => void searchOus()}>{busy === "ou" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}</Button>
+            <Input aria-label="Search organisation units" className="h-9" placeholder="Search facility / LGA / State" value={ouQ} disabled={!conn} onChange={(e) => setOuQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void searchOus()} />
+            <Button aria-label="Search DHIS2 organisation units" size="icon" variant="outline" className="h-9 w-9 shrink-0" disabled={!conn || busy === "ou"} onClick={() => void searchOus()}>{busy === "ou" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}</Button>
           </div>
-          {ous.length > 0 && (
-            <Sel className="mt-1" value="" onChange={(e) => { void patchConn({ org_unit_id: e.target.value }); setOus([]); toast.success("Organisation unit saved"); }}>
-              <option value="">Choose from {ous.length} matches…</option>
-              {ous.map((o) => <option key={o.id} value={o.id}>{o.name}{o.level ? ` · level ${o.level}` : ""}</option>)}
-            </Sel>
-          )}
+          {conn?.org_unit_id && <Button variant="link" size="sm" className="h-7 px-0 text-xs" disabled={busy === "ou"} onClick={() => void loadChildren()}>Browse child units</Button>}
+          {ouError && <p className="mt-1 text-xs font-normal text-destructive" role="status">{ouError}</p>}
         </div>
         <label className="text-xs font-semibold">Reporting month
-          <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="mt-1 block h-9 w-full rounded-md border bg-background px-2 text-sm" />
+          <input aria-label="Reporting month" type="month" value={month} onChange={(e) => setChosenMonth(e.target.value || null)} className="mt-1 block h-9 w-full rounded-md border bg-background px-2 text-sm" />
+          {availableMonths.length > 0 && <Sel aria-label="Months with submissions" className="mt-1" value={availableMonths.includes(month) ? month : ""} onChange={(e) => e.target.value && setChosenMonth(e.target.value)}>
+            <option value="" disabled>Months with submissions</option>
+            {availableMonths.map((m) => <option key={m} value={m}>{m} · {rows.filter((r) => r.report_date.startsWith(m)).length} reports</option>)}
+          </Sel>}
         </label>
         <div className="flex flex-wrap items-center gap-2 md:col-span-2 lg:col-span-4">
-          <Button variant="outline" disabled={!connId || !!busy} onClick={() => void run("dry")}>{busy === "dry" ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-1 h-4 w-4" />} Dry run</Button>
-          <Button disabled={!connId || !!busy} onClick={() => void run("push")} className="bg-eye-blue text-primary-foreground hover:bg-eye-blue/90">{busy === "push" ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <ArrowUpFromLine className="mr-1 h-4 w-4" />} Push to DHIS2</Button>
+          <Button variant="outline" disabled={!connId || !!busy || !periodRows.length} onClick={() => void run("dry")}>{busy === "dry" ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-1 h-4 w-4" />} Dry run</Button>
+          <Button disabled={!connId || !!busy || !periodRows.length} onClick={() => void run("push")} className="bg-eye-blue text-primary-foreground hover:bg-eye-blue/90">{busy === "push" ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <ArrowUpFromLine className="mr-1 h-4 w-4" />} Push to DHIS2</Button>
           <Button variant="secondary" disabled={!connId || !!busy} onClick={() => void run("pull")}>{busy === "pull" ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <ArrowDownToLine className="mr-1 h-4 w-4" />} Pull & compare</Button>
           {conn && <span className="text-xs text-muted-foreground">{linked}/{EYE_INDICATORS.length} indicators linked</span>}
+          <span className="text-xs font-semibold text-eye-blue">{periodRows.length} submitted reports · {month}</span>
+          {!periodRows.length && <p className="w-full text-sm text-muted-foreground" role="status">No submitted reports for {month}. Choose a month with submissions to view its totals.</p>}
         </div>
       </div>
 
@@ -168,7 +207,7 @@ export default function EyeDhis2Exchange({ projectId, rows }: { projectId: strin
                   return (
                     <motion.tr key={v.key} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: Math.min(i * 0.01, 0.3) }} className="border-t">
                       <td className="p-2">{v.label}</td>
-                      <td className="p-2 text-right font-bold tabular-nums">{v.value}</td>
+                      <td className="p-2 text-right font-bold tabular-nums">{periodRows.length ? v.value : "—"}</td>
                       <td className="whitespace-nowrap p-2 text-right tabular-nums">{p ? (p.dhis2 ?? "—") : ""}{p && (p.match ? <CheckCircle2 className="ml-1 inline h-4 w-4 text-status-success" /> : <XCircle className="ml-1 inline h-4 w-4 text-destructive" />)}</td>
                       <td className="min-w-[240px] p-2">
                         {elements.length ? (
