@@ -1,5 +1,6 @@
 # Roadmap
 
+- [ ] Default new reporting-facility selection to today's date and fresh WG-SS entries rather than reusing prior screenings.
 - [ ] Fix Eye Health dashboard/DHIS2 exchange zero totals from real submissions and automatically load connected DHIS2 organisation units; verify live readback and regression tests.
 
 - [x] Harden in-app project camera QR scanning and offline image decoding; tested real video decoding, real QR enrollment with collector name and camera release; retain mandatory collector name and first-online enrollment. Thirteen enrollment/QR tests passed.
