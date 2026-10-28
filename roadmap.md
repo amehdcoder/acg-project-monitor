@@ -1,7 +1,7 @@
 # Roadmap
 
-- [ ] Default new reporting-facility selection to today's date and fresh WG-SS entries rather than reusing prior screenings.
-- [ ] Fix Eye Health dashboard/DHIS2 exchange zero totals from real submissions and automatically load connected DHIS2 organisation units; verify live readback and regression tests.
+- [x] Default new reporting-facility selection to today's local date and fresh WG-SS entries rather than reusing prior screenings; verified live date reset and empty patient section, retaining saved report edits. Thirty Eye Health tests passed.
+- [x] Fix Eye Health dashboard/DHIS2 exchange zero totals from real submissions and automatically load connected DHIS2 organisation units; live BMZ dashboard and server both show 324 consultations from 3 October reports, exchange opens October, and connected account detects Jigawa/Yobe/FCT. Regression tests passed; preview build clean. No production DHIS2 push performed (existing links target unrelated indicators).
 
 - [x] Harden in-app project camera QR scanning and offline image decoding; tested real video decoding, real QR enrollment with collector name and camera release; retain mandatory collector name and first-online enrollment. Thirteen enrollment/QR tests passed.
 - [x] Fit shared Microplan forms across Android/iOS/tablet/desktop with two-axis scroll roots, styled scrollbars, container-aware fields and keyboard-height tracking; five viewport checks passed with no overflow and reachable Save actions, offline draft persisted, no runtime errors. Physical hardware remains unverified; changes not yet published.
