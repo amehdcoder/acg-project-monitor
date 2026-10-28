@@ -17,7 +17,8 @@ import {
   validateReport, vaTotal, wgVsSummaryIssues,
   type EyeAttachment, type EyeCsom, type EyePatientRow, type EyeReportRow, type EyeSummary, type MF, type VaBand,
 } from "@/lib/eyeReport/definition";
-import { loadPatients, loadReports, saveDevicePatients, saveDeviceReport, savePatients, saveReport } from "@/lib/eyeReport/store";
+import { loadReports, saveDevicePatients, saveDeviceReport, savePatients, saveReport } from "@/lib/eyeReport/store";
+import { facilityEntryDefaults, localReportDate } from "@/lib/eyeReport/entryDefaults";
 import { similarFacilityName } from "@/lib/eyeReport/definition";
 import { GeoCombobox } from "@/components/ProgrammeModule/GeoCascadeFields";
 import { getAllStates, getLGAsForState } from "@/lib/nigeriaAdminData";
@@ -35,7 +36,7 @@ interface Props {
   otherReports?: EyeReportRow[]; onClose: () => void; onSaved?: () => void;
 }
 
-const today = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+const today = localReportDate;
 const STEPS = [
   { key: "who", label: "Facility & date", icon: Building2, tone: "bg-eye-blue" },
   { key: "patients", label: "Patients · WG-SS", icon: Accessibility, tone: "bg-eye-violet" },
@@ -160,30 +161,17 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
   useEffect(() => { const a = () => setOnline(true), b = () => setOnline(false); addEventListener("online", a); addEventListener("offline", b); return () => { removeEventListener("online", a); removeEventListener("offline", b); }; }, []);
   useEffect(() => { if (!existing) localStorage.setItem(draftKey, JSON.stringify({ ...f, patients })); }, [f, patients, existing, draftKey]);
 
-  // Pre-fill the Patients step from standalone WG-SS screenings already submitted
-  // for the same facility and date, so the clerk never re-screens them. Runs once
-  // per facility+date combination; the summary-vs-screening validation stays on.
-  const [prefetched, setPrefetched] = useState<Record<string, true>>({});
-  useEffect(() => {
-    if (wgOnly || mode.kind !== "user" || !f.facility.trim() || !f.date) return;
-    const key = `${f.facility.trim().toLowerCase()}|${f.date}`;
-    if (prefetched[key]) return;
-    setPrefetched((m) => ({ ...m, [key]: true }));
-    void (async () => {
-      const { rows } = await loadPatients(projectId).catch(() => ({ rows: [] as EyePatientRow[] }));
-      const matches = rows.filter((p) => !p.report_id && p.report_date === f.date && p.facility_name.trim().toLowerCase() === f.facility.trim().toLowerCase());
-      if (!matches.length) return;
-      setPatients((cur) => {
-        const have = new Set(cur.map((e) => e.draft.patient_label.trim().toLowerCase()));
-        const add: PatientEntry[] = matches.filter((p) => !have.has(p.patient_label.trim().toLowerCase())).map((p) => {
-          const record = readWgResult(p.wg_ss) ?? buildWgRecord({});
-          return { draft: { patient_label: p.patient_label, sex: (p.sex === "m" || p.sex === "f" ? p.sex : ""), age_band: p.age_band ?? "", answers: record.answers }, record, srcId: p.id };
-        });
-        if (add.length) toast.info(`${add.length} patient${add.length === 1 ? "" : "s"} pre-filled from the standalone WG-SS screening for this facility and date.`);
-        return add.length ? [...cur, ...add] : cur;
-      });
-    })();
-  }, [wgOnly, mode.kind, f.facility, f.date, projectId, prefetched]);
+  const selectFacility = (facility: EyeFacility) => {
+    const defaults = facilityEntryDefaults(!!existing, f.date, patients);
+    setF((previous) => ({
+      ...previous, facilityId: facility.id, facility: facility.name,
+      state: facility.state ?? "", lga: facility.lga ?? "", date: defaults.date,
+      summary: existing ? previous.summary : { ...previous.summary, pwd: { m: 0, f: 0 }, pwdAge: emptySummary().pwdAge },
+    }));
+    setPatients(defaults.patients);
+    setWizard({ open: false, index: null });
+    setAck(false);
+  };
 
   const S = f.summary; const T = totals(S);
   const cataract = t(S.surgery.cataract);
@@ -441,11 +429,12 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
                     {!showManualFacility ? (
                       <>
                         <select
-                          value={known.find((x) => x.name.trim().toLowerCase() === f.facility.trim().toLowerCase()) ? (known.find((x) => x.name.trim().toLowerCase() === f.facility.trim().toLowerCase())!.id || known.find((x) => x.name.trim().toLowerCase() === f.facility.trim().toLowerCase())!.name) : ""}
+                          aria-label="Reporting facility"
+                          value={known.find((x) => x.name.trim().toLowerCase() === f.facility.trim().toLowerCase())?.id || known.find((x) => x.name.trim().toLowerCase() === f.facility.trim().toLowerCase())?.name || ""}
                           onChange={(e) => {
-                            if (e.target.value === "__new__") { setManualFacility(true); setF({ ...f, facilityId: "", facility: "" }); return; }
+                            if (e.target.value === "__new__") { setManualFacility(true); selectFacility({ id: "", name: "" }); return; }
                             const x = known.find((y) => (y.id || y.name) === e.target.value);
-                            setF({ ...f, facilityId: x?.id ?? "", facility: x?.name ?? "", state: x?.state ?? "", lga: x?.lga ?? "" });
+                            selectFacility(x ?? { id: "", name: "" });
                           }}
                           className={`h-12 w-full rounded-md border bg-background px-3 text-base ${has("facility") ? "border-destructive" : ""}`}
                         >
@@ -480,7 +469,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
                   </label>
                   <label className="space-y-1.5 rounded-2xl border bg-card p-4 shadow-sm">
                     <span className="flex items-center gap-2 text-sm font-bold"><CalendarDays className="h-4 w-4 text-eye-blue" /> Report date <span className="text-destructive">*</span></span>
-                    <Input type="date" max={today()} value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} className={`h-12 text-base ${has("date") ? "border-destructive" : ""}`} />
+                    <Input aria-label="Report date" type="date" max={today()} value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} className={`h-12 text-base ${has("date") ? "border-destructive" : ""}`} />
                   </label>
                   <div className="rounded-2xl border bg-card p-4 shadow-sm">
                     <span className="text-sm font-bold">Location <span className="text-destructive">*</span></span>
