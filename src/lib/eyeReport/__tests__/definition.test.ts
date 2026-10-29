@@ -129,7 +129,7 @@ describe("facility + outreach split", () => {
     expect(again.split?.outreach.consult.a40).toEqual({ m: 4, f: 1 });
   });
   it("validates discharge and follow-up outcomes against their own surgery counts", () => {
-    const r = { ...validInput() } as any;
+    const r = base();
     const c = emptyCsom(); c.surgeries = 10; c.dischargeSurgeries = 4; c.followupSurgeries = 3;
     c.discharge.presenting = { good: 3, borderline: 1, poor: 0 };
     c.followup.presenting = { good: 2, borderline: 1, poor: 1 };
