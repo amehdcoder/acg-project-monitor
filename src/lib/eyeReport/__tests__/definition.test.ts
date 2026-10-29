@@ -128,4 +128,15 @@ describe("facility + outreach split", () => {
     expect(_totals(again).consulted).toEqual({ m: 7, f: 3 });
     expect(again.split?.outreach.consult.a40).toEqual({ m: 4, f: 1 });
   });
+  it("validates discharge and follow-up outcomes against their own surgery counts", () => {
+    const r = { ...validInput() } as any;
+    const c = emptyCsom(); c.surgeries = 10; c.dischargeSurgeries = 4; c.followupSurgeries = 3;
+    c.discharge.presenting = { good: 3, borderline: 1, poor: 0 };
+    c.followup.presenting = { good: 2, borderline: 1, poor: 1 };
+    const iss = validateReport({ ...r, csom: c });
+    expect(iss.some((i) => i.field === "csom.discharge" && i.level === "error")).toBe(false);
+    expect(iss.some((i) => i.field === "csom.followup" && i.level === "error")).toBe(true);
+    c.followupSurgeries = 11;
+    expect(validateReport({ ...r, csom: c }).some((i) => i.field === "csom.followupSurgeries")).toBe(true);
+  });
 });

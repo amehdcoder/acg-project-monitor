@@ -79,6 +79,10 @@ export const REFER_OUT = [
 export type VaBand = { good: number; borderline: number; poor: number };
 export interface EyeCsom {
   surgeries: number;
+  /** Surgeries assessed at discharge — denominator for discharge outcomes (falls back to surgeries). */
+  dischargeSurgeries?: number;
+  /** Surgeries assessed at follow-up (≥ 4 weeks) — denominator for follow-up outcomes (falls back to surgeries). */
+  followupSurgeries?: number;
   biometry: number;
   iol: number;
   discharge: { presenting: VaBand; pinhole: VaBand };
@@ -166,6 +170,8 @@ export function normCsom(raw: any): EyeCsom | null {
   const b = (o: any): VaBand => ({ good: n(o?.good), borderline: n(o?.borderline), poor: n(o?.poor) });
   return {
     surgeries: n(raw.surgeries), biometry: n(raw.biometry), iol: n(raw.iol),
+    ...(raw.dischargeSurgeries != null ? { dischargeSurgeries: n(raw.dischargeSurgeries) } : {}),
+    ...(raw.followupSurgeries != null ? { followupSurgeries: n(raw.followupSurgeries) } : {}),
     discharge: { presenting: b(raw.discharge?.presenting), pinhole: b(raw.discharge?.pinhole) },
     followup: { presenting: b(raw.followup?.presenting), bcva: b(raw.followup?.bcva) },
   };
@@ -263,8 +269,16 @@ export function validateReport(input: {
     const sameBands = (a: VaBand, b: VaBand) => vaTotal(a) > 0 && a.good === b.good && a.borderline === b.borderline && a.poor === b.poor;
     const checkPair = (sec: string, label: string, pres: VaBand, pin: VaBand, pinLabel: string) => {
       const p = vaTotal(pres), h = vaTotal(pin);
-      if (p > c.surgeries) out.push({ field: `csom.${sec}`, message: `${label} presenting total (${p}) exceeds the number of CSOM surgeries (${c.surgeries}).`, level: "error" });
-      if (h > c.surgeries) out.push({ field: `csom.${sec}.pin`, message: `${label} ${pinLabel} total (${h}) exceeds the number of CSOM surgeries (${c.surgeries}).`, level: "error" });
+      const own = sec === "discharge" ? c.dischargeSurgeries : c.followupSurgeries;
+      const d = own ?? c.surgeries;
+      const dl = own != null ? `${label.toLowerCase()} surgeries` : "CSOM surgeries";
+      if (own != null) {
+        if (own > c.surgeries) out.push({ field: `csom.${sec}Surgeries`, message: `${label} surgeries (${own}) cannot exceed the CSOM episode surgeries (${c.surgeries}).`, level: "error" });
+        if (own === 0 && p + h > 0) out.push({ field: `csom.${sec}Surgeries`, message: `Enter the number of surgeries ${label.toLowerCase()} — it validates these outcomes.`, level: "error" });
+        if (own > 0 && p !== own) out.push({ field: `csom.${sec}`, message: `${label} presenting total (${p}) should equal the ${dl} (${own}) — every operated eye needs an outcome.`, level: p > own ? "error" : "warning" });
+      }
+      if (own == null && p > d) out.push({ field: `csom.${sec}`, message: `${label} presenting total (${p}) exceeds the number of ${dl} (${d}).`, level: "error" });
+      if (h > d) out.push({ field: `csom.${sec}.pin`, message: `${label} ${pinLabel} total (${h}) exceeds the number of ${dl} (${d}).`, level: "error" });
       if (h > 0 && h !== p) out.push({ field: `csom.${sec}.pin`, message: `${label} ${pinLabel} total (${h}) must equal presenting total (${p}) — same eyes measured twice.`, level: "error" });
       if (sameBands(pres, pin)) out.push({ field: `csom.${sec}.pin`, message: `${label}: presenting and ${pinLabel} figures are identical. ${pinLabel} vision is ideally better (more “Good”) — please re-check the register.`, level: "warning" });
       else if (h > 0 && pin.good < pres.good) out.push({ field: `csom.${sec}.pin`, message: `${label}: fewer “Good” outcomes with ${pinLabel} (${pin.good}) than presenting (${pres.good}). ${pinLabel} should ideally be higher — please confirm.`, level: "warning" });

@@ -606,8 +606,17 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
                       </div>
                     ))}
                   </div>
-                  <VaTable title="Section 2 · At discharge" colA="Presenting" colB="With pinhole" ceiling={C.surgeries} a={C.discharge.presenting} b={C.discharge.pinhole} onA={(v) => setC((c) => { c.discharge.presenting = v; })} onB={(v) => setC((c) => { c.discharge.pinhole = v; })} />
-                  <VaTable title="Section 3 · Follow up (≥ 4 weeks)" colA="Presenting" colB="Pinhole / BCVA" ceiling={C.surgeries} a={C.followup.presenting} b={C.followup.bcva} onA={(v) => setC((c) => { c.followup.presenting = v; })} onB={(v) => setC((c) => { c.followup.bcva = v; })} />
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {([["dischargeSurgeries", "Surgeries · At discharge", "Validates Section 2 outcomes"], ["followupSurgeries", "Surgeries · Follow up (≥ 4 weeks)", "Validates Section 3 outcomes"]] as const).map(([k, label, hint]) => (
+                      <div key={k} className={`rounded-2xl border bg-card p-4 shadow-sm ${has(`csom.${k}`) ? "border-destructive" : ""}`}>
+                        <p className="text-sm font-bold">{label}</p>
+                        <p className="text-xs text-muted-foreground">{hint}</p>
+                        <div className="mt-2 w-32"><NumberCell label={label} value={C[k] ?? 0} invalid={has(`csom.${k}`)} onChange={(v) => setC((c) => { c[k] = v; })} /></div>
+                      </div>
+                    ))}
+                  </div>
+                  <VaTable title="Section 2 · At discharge" colA="Presenting" colB="With pinhole" ceiling={C.dischargeSurgeries ?? C.surgeries} a={C.discharge.presenting} b={C.discharge.pinhole} onA={(v) => setC((c) => { c.discharge.presenting = v; })} onB={(v) => setC((c) => { c.discharge.pinhole = v; })} />
+                  <VaTable title="Section 3 · Follow up (≥ 4 weeks)" colA="Presenting" colB="Pinhole / BCVA" ceiling={C.followupSurgeries ?? C.surgeries} a={C.followup.presenting} b={C.followup.bcva} onA={(v) => setC((c) => { c.followup.presenting = v; })} onB={(v) => setC((c) => { c.followup.bcva = v; })} />
                   {issues.filter((i) => i.field.startsWith("csom.")).map((i, k) => (
                     <p key={k} role="alert" className={`flex items-start gap-2 rounded-xl border p-3 text-sm font-medium ${i.level === "error" ? "border-destructive bg-destructive/10 text-destructive" : "border-eye-gold bg-eye-gold/10 text-eye-ink"}`}><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />{i.message}</p>
                   ))}
