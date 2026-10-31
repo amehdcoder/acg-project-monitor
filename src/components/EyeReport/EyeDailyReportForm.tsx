@@ -17,14 +17,17 @@ import {
   validateReport, vaTotal, wgVsSummaryIssues,
   type EyeAttachment, type EyeCsom, type EyePatientRow, type EyeReportRow, type EyeSummary, type MF, type VaBand,
 } from "@/lib/eyeReport/definition";
-import { loadReports, saveDevicePatients, saveDeviceReport, savePatients, saveReport } from "@/lib/eyeReport/store";
+import { loadReports, saveDevicePatients, saveDeviceReport, savePatients, saveReportWithPatients } from "@/lib/eyeReport/store";
+import { clearEyeDraft, loadEyeDraft, restoredPatients, saveEyeDraft } from "@/lib/eyeReport/drafts";
+import { queueOrUploadMedia } from "@/lib/offlineMedia";
 import { facilityEntryDefaults, localReportDate } from "@/lib/eyeReport/entryDefaults";
 import { similarFacilityName } from "@/lib/eyeReport/definition";
 import { GeoCombobox } from "@/components/ProgrammeModule/GeoCascadeFields";
 import { getAllStates, getLGAsForState } from "@/lib/nigeriaAdminData";
-import { fileToDataUrl, uploadBeneficiaryMedia } from "@/lib/programmeModule/media";
+import { fileToDataUrl, MEDIA_BUCKET } from "@/lib/programmeModule/media";
 import { buildWgRecord, readWgResult, type WgResult } from "@/lib/programmeModule/washingtonGroup";
 import WgPatientWizard, { emptyWgPatient, type WgPatientDraft } from "./WgPatientWizard";
+import ScrollRail from "@/components/ProgrammeModule/ScrollRail";
 
 export interface EyeFacility { id: string; name: string; state?: string | null; lga?: string | null }
 type Mode = { kind: "user"; userId: string } | { kind: "device"; deviceId: string; label: string };
@@ -133,7 +136,7 @@ function AgeMFBlock({ label, icon: Icon, tone = "text-eye-blue", value, onChange
   );
 }
 
-interface PatientEntry { draft: WgPatientDraft; record: WgResult; /** Id of the standalone screening row this entry was pre-filled from (deleted on save). */ srcId?: string }
+interface PatientEntry { id?: string; draft: WgPatientDraft; record: WgResult; /** Id of the standalone screening row this entry was pre-filled from (deleted on save). */ srcId?: string }
 
 export default function EyeDailyReportForm({ projectId, projectName, facilities, mode, existing, existingPatients = [], wgOnly = false, otherReports = [], onClose, onSaved }: Props) {
   const draftKey = `eye-report-draft:${projectId}:${mode.kind === "user" ? mode.userId : mode.deviceId}${wgOnly ? ":wg" : ""}`;
@@ -148,7 +151,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
   const [patients, setPatients] = useState<PatientEntry[]>(() =>
     existingPatients.map((p) => {
       const record = readWgResult(p.wg_ss) ?? buildWgRecord({});
-      return { draft: { patient_label: p.patient_label, sex: (p.sex as "m" | "f") ?? "", age_band: p.age_band ?? "", answers: record.answers }, record };
+      return { id: p.id, draft: { patient_label: p.patient_label, sex: (p.sex as "m" | "f") ?? "", age_band: p.age_band ?? "", answers: record.answers }, record };
     }));
   const [wizard, setWizard] = useState<{ open: boolean; index: number | null }>({ open: false, index: null });
   const [step, setStep] = useState(0);
@@ -157,9 +160,29 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const camRef = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef<HTMLElement>(null);
   const [online, setOnline] = useState(navigator.onLine);
   useEffect(() => { const a = () => setOnline(true), b = () => setOnline(false); addEventListener("online", a); addEventListener("offline", b); return () => { removeEventListener("online", a); removeEventListener("offline", b); }; }, []);
-  useEffect(() => { if (!existing) localStorage.setItem(draftKey, JSON.stringify({ ...f, patients })); }, [f, patients, existing, draftKey]);
+  const [draftReady, setDraftReady] = useState(!!existing);
+  const submissionId = useRef(existing?.id ?? crypto.randomUUID());
+  const draftWrites = useRef(Promise.resolve());
+  useEffect(() => {
+    if (existing) return;
+    let live = true;
+    void loadEyeDraft<typeof initial & { patients?: PatientEntry[]; submissionId?: string }>(draftKey).then((saved) => {
+      if (!live) return;
+      const draft = saved ?? initial;
+      if (saved) setF({ ...saved, summary: normSummary(saved.summary), csom: normCsom(saved.csom), attachments: normAttachments(saved.attachments) });
+      setPatients(restoredPatients(draft, [], false));
+      if (saved?.submissionId) submissionId.current = saved.submissionId;
+      setDraftReady(true);
+    });
+    return () => { live = false; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (existing || !draftReady) return;
+    draftWrites.current = draftWrites.current.then(() => saveEyeDraft(draftKey, { ...f, patients, submissionId: submissionId.current })).catch(() => { toast.error("Could not keep this draft on your device. Please check available storage."); });
+  }, [f, patients, existing, draftKey, draftReady]);
 
   const selectFacility = (facility: EyeFacility) => {
     const defaults = facilityEntryDefaults(!!existing, f.date, patients);
@@ -280,12 +303,11 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
       try {
         const mime = file.type || "image/jpeg";
         const base = { name: file.name || "source document", mime, size: file.size, kind: "image" as const, label: "", captured_at: new Date().toISOString() };
-        if (navigator.onLine) {
-          try {
-            const ref = await uploadBeneficiaryMedia(file, projectId, `eye-reports/${existing?.id ?? "new"}`);
-            added.push({ ...base, ref });
-            continue;
-          } catch { /* fall through to on-device storage */ }
+        if (mode.kind === "user") {
+          const path = `${projectId}/eye-reports/${submissionId.current}/${crypto.randomUUID()}.jpg`;
+          const media = await queueOrUploadMedia(MEDIA_BUCKET, path, file, { upsert: false, contentType: mime });
+          added.push({ ...base, ref: media.path });
+          continue;
         }
         added.push({ ...base, ref: await fileToDataUrl(file), pending: true });
       } catch { toast.error(`Could not attach ${file.name}`); }
@@ -296,6 +318,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
   };
 
   const patientPayloads = (reportId: string | null) => patients.map((p) => ({
+    id: p.id ?? (p.id = crypto.randomUUID()),
     project_id: projectId, report_id: reportId, facility_id: f.facilityId || null, facility_name: f.facility.trim(),
     state: f.state || null, lga: f.lga || null, report_date: f.date, patient_label: p.draft.patient_label.trim(),
     sex: p.draft.sex || null, age_band: p.draft.age_band || null, wg_ss: p.record,
@@ -309,28 +332,23 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
     try {
       if (mode.kind === "device") {
         if (!wgOnly) {
-          const payload = { id: existing?.id, project_id: projectId, facility_id: f.facilityId || null, facility_name: f.facility.trim(), state: f.state || null, lga: f.lga || null, report_date: f.date, summary: S, csom: csomOut, notes: f.notes.trim() || null, prepared_by: f.prepared.trim() || null, confirmed_by: f.confirmed.trim() || null, attachments: f.attachments };
+          const payload = { id: submissionId.current, project_id: projectId, facility_id: f.facilityId || null, facility_name: f.facility.trim(), state: f.state || null, lga: f.lga || null, report_date: f.date, summary: S, csom: csomOut, notes: f.notes.trim() || null, prepared_by: f.prepared.trim() || null, confirmed_by: f.confirmed.trim() || null, attachments: f.attachments };
           await saveDeviceReport(payload as any, { deviceId: mode.deviceId, projectId, label: mode.label });
         }
-        if (patients.length) await saveDevicePatients(patientPayloads(existing?.id ?? null) as any, { deviceId: mode.deviceId, projectId, label: mode.label });
+        if (patients.length) await saveDevicePatients(patientPayloads(wgOnly ? null : submissionId.current) as any, { deviceId: mode.deviceId, projectId, label: mode.label });
         toast.success(navigator.onLine ? "Saved and sending" : "Saved on this device — it will send when you are back online");
       } else {
-        let reportId = existing?.id ?? null;
         if (!wgOnly) {
-          const payload = { id: existing?.id, project_id: projectId, facility_id: f.facilityId || null, facility_name: f.facility.trim(), state: f.state || null, lga: f.lga || null, report_date: f.date, summary: S, csom: csomOut, notes: f.notes.trim() || null, prepared_by: f.prepared.trim() || null, confirmed_by: f.confirmed.trim() || null, attachments: f.attachments };
-          const r = await saveReport(payload as any, mode.userId, !!existing);
-          reportId = r.id;
-          if (patients.length || existing) {
-            // Absorbed standalone screenings are removed so they are not counted twice.
-            const absorbed = patients.map((p) => p.srcId).filter(Boolean) as string[];
-            await savePatients(patientPayloads(reportId) as any, mode.userId, existing?.id ?? null, absorbed);
-          }
+          const payload = { id: submissionId.current, project_id: projectId, facility_id: f.facilityId || null, facility_name: f.facility.trim(), state: f.state || null, lga: f.lga || null, report_date: f.date, summary: S, csom: csomOut, notes: f.notes.trim() || null, prepared_by: f.prepared.trim() || null, confirmed_by: f.confirmed.trim() || null, attachments: f.attachments };
+          const r = await saveReportWithPatients(payload as any, patientPayloads(submissionId.current) as any, mode.userId, !!existing);
           toast.success(r.queued ? "Saved offline — it will sync automatically" : "Daily report submitted");
         } else {
           const r = await savePatients(patientPayloads(null) as any, mode.userId);
           toast.success(r.queued ? "Saved offline — it will sync automatically" : `${patients.length} screening${patients.length === 1 ? "" : "s"} submitted`);
         }
       }
+      await draftWrites.current;
+      await clearEyeDraft(draftKey);
       localStorage.removeItem(draftKey);
       onSaved?.(); onClose();
     } catch (e) { toast.error(e instanceof Error ? e.message : "Could not save"); }
@@ -418,7 +436,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
         </div>
       </div>
 
-      <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+      <main ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain records-scroll">
         <div className="mx-auto w-full max-w-5xl px-3 py-4 pb-24 sm:px-4 sm:py-5">
           <AnimatePresence mode="wait">
             <motion.section key={cur.key} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.22 }} className="space-y-3">
@@ -445,7 +463,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
                         <p className="text-[11px] text-muted-foreground">Every facility entered once appears here for all reporters.</p>
                       </>
                     ) : (
-                      <div className="flex gap-2">
+                      <div className="flex flex-col gap-2 sm:flex-row">
                         <Input value={f.facility} onChange={(e) => setF({ ...f, facilityId: "", facility: e.target.value.slice(0, 200) })} placeholder="Type the facility name" className="h-12 text-base" autoFocus={manualFacility} />
                         {known.length > 0 && (
                           <Button type="button" variant="outline" className="h-12 shrink-0" onClick={() => setManualFacility(false)}>Choose from list</Button>
@@ -644,7 +662,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
                       suggestedLabel={`Patient ${patients.length + 1}`}
                       onCancel={() => setWizard({ open: false, index: null })}
                       onSave={(draft, record) => {
-                        setPatients((p) => wizard.index !== null ? p.map((x, i) => (i === wizard.index ? { draft, record } : x)) : [...p, { draft, record }]);
+                        setPatients((p) => wizard.index !== null ? p.map((x, i) => (i === wizard.index ? { ...x, id: crypto.randomUUID(), draft, record } : x)) : [...p, { id: crypto.randomUUID(), draft, record }]);
                         setWizard({ open: false, index: null });
                       }}
                     />
@@ -770,6 +788,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
           )}
         </div>
       </main>
+      <ScrollRail target={scrollRef} elevated />
     </div>,
     document.body,
   );

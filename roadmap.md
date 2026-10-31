@@ -1,6 +1,7 @@
 # Roadmap
 
-- [ ] Sign in as the supplied Daily Facility Report user, verify complete offline summary/CSOM/WG-SS/attachments entry and recovery, and check Android, tablet and desktop layouts; fix blockers found.
+- [ ] Verify the supplied Daily Facility Report account's offline submission and reconnect readback — current sign-in and managed-session mint fail because the hosted service is unavailable; isolated offline completion/layout verification continues.
+- [ ] Fix and test Eye Report draft patient recovery, photo storage, stable report/patient retries, and Android/tablet/desktop fit.
 
 - [x] Default new reporting-facility selection to today's local date and fresh WG-SS entries rather than reusing prior screenings; verified live date reset and empty patient section, retaining saved report edits. Thirty Eye Health tests passed.
 - [x] Fix Eye Health dashboard/DHIS2 exchange zero totals from real submissions and automatically load connected DHIS2 organisation units; live BMZ dashboard and server both show 324 consultations from 3 October reports, exchange opens October, and connected account detects Jigawa/Yobe/FCT. Regression tests passed; preview build clean. No production DHIS2 push performed (existing links target unrelated indicators).
