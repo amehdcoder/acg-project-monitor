@@ -27,6 +27,7 @@ import { getAllStates, getLGAsForState } from "@/lib/nigeriaAdminData";
 import { fileToDataUrl, MEDIA_BUCKET } from "@/lib/programmeModule/media";
 import { buildWgRecord, readWgResult, type WgResult } from "@/lib/programmeModule/washingtonGroup";
 import WgPatientWizard, { emptyWgPatient, type WgPatientDraft } from "./WgPatientWizard";
+import ScrollRail from "@/components/ProgrammeModule/ScrollRail";
 
 export interface EyeFacility { id: string; name: string; state?: string | null; lga?: string | null }
 type Mode = { kind: "user"; userId: string } | { kind: "device"; deviceId: string; label: string };
@@ -159,6 +160,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const camRef = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef<HTMLElement>(null);
   const [online, setOnline] = useState(navigator.onLine);
   useEffect(() => { const a = () => setOnline(true), b = () => setOnline(false); addEventListener("online", a); addEventListener("offline", b); return () => { removeEventListener("online", a); removeEventListener("offline", b); }; }, []);
   const [draftReady, setDraftReady] = useState(!!existing);
@@ -336,11 +338,9 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
         if (patients.length) await saveDevicePatients(patientPayloads(wgOnly ? null : submissionId.current) as any, { deviceId: mode.deviceId, projectId, label: mode.label });
         toast.success(navigator.onLine ? "Saved and sending" : "Saved on this device — it will send when you are back online");
       } else {
-        let reportId = existing?.id ?? null;
         if (!wgOnly) {
           const payload = { id: submissionId.current, project_id: projectId, facility_id: f.facilityId || null, facility_name: f.facility.trim(), state: f.state || null, lga: f.lga || null, report_date: f.date, summary: S, csom: csomOut, notes: f.notes.trim() || null, prepared_by: f.prepared.trim() || null, confirmed_by: f.confirmed.trim() || null, attachments: f.attachments };
           const r = await saveReportWithPatients(payload as any, patientPayloads(submissionId.current) as any, mode.userId, !!existing);
-          reportId = r.id;
           toast.success(r.queued ? "Saved offline — it will sync automatically" : "Daily report submitted");
         } else {
           const r = await savePatients(patientPayloads(null) as any, mode.userId);
@@ -436,7 +436,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
         </div>
       </div>
 
-      <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain records-scroll-root">
+      <main ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain records-scroll">
         <div className="mx-auto w-full max-w-5xl px-3 py-4 pb-24 sm:px-4 sm:py-5">
           <AnimatePresence mode="wait">
             <motion.section key={cur.key} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.22 }} className="space-y-3">
@@ -662,7 +662,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
                       suggestedLabel={`Patient ${patients.length + 1}`}
                       onCancel={() => setWizard({ open: false, index: null })}
                       onSave={(draft, record) => {
-                        setPatients((p) => wizard.index !== null ? p.map((x, i) => (i === wizard.index ? { ...x, draft, record } : x)) : [...p, { id: crypto.randomUUID(), draft, record }]);
+                        setPatients((p) => wizard.index !== null ? p.map((x, i) => (i === wizard.index ? { ...x, id: crypto.randomUUID(), draft, record } : x)) : [...p, { id: crypto.randomUUID(), draft, record }]);
                         setWizard({ open: false, index: null });
                       }}
                     />
@@ -788,6 +788,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
           )}
         </div>
       </main>
+      <ScrollRail target={scrollRef} />
     </div>,
     document.body,
   );

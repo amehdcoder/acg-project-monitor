@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
  * hide native scrollbars, so this draws its own colourful thumb.
  * Pass a ref to the scroll container, or omit it to follow the page.
  */
-const ScrollRail = ({ target }: { target?: RefObject<HTMLElement> }) => {
+const ScrollRail = ({ target, elevated = false }: { target?: RefObject<HTMLElement>; elevated?: boolean }) => {
   const [m, setM] = useState({ top: 0, size: 0, show: false, offset: 0, height: 0, right: 2 });
   const drag = useRef<{ y: number; start: number } | null>(null);
 
@@ -68,7 +68,7 @@ const ScrollRail = ({ target }: { target?: RefObject<HTMLElement> }) => {
   const onUp = () => { drag.current = null; };
 
   return createPortal(
-    <div className="records-rail" aria-hidden="true" style={{ top: m.offset, height: m.height, right: m.right }}>
+    <div className={`records-rail ${elevated ? "z-[210]" : ""}`} aria-hidden="true" style={{ top: m.offset, height: m.height, right: m.right }}>
       <div
         className="records-rail-thumb"
         style={{ height: m.size, transform: `translateY(${m.top}px)` }}
