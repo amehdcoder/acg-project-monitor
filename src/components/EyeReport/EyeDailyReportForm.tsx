@@ -788,7 +788,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
           )}
         </div>
       </main>
-      <ScrollRail target={scrollRef} />
+      <ScrollRail target={scrollRef} elevated />
     </div>,
     document.body,
   );
