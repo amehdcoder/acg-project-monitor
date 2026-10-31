@@ -10,12 +10,14 @@ import { cachePatchRows } from "./offlineReadCache";
 
 const db = supabase as unknown as { from: (t: string) => any }; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-export type OpAction = "insert" | "update" | "delete" | "graduation";
+export type OpAction = "insert" | "update" | "delete" | "graduation" | "batch";
 export interface OpPayload {
   table: string;
   action: OpAction;
   values?: Record<string, unknown> | Record<string, unknown>[];
   id?: string;
+  operations?: OpPayload[];
+  userId?: string;
 }
 
 const isNetworkError = (e: unknown): boolean => {
@@ -25,6 +27,10 @@ const isNetworkError = (e: unknown): boolean => {
 
 /** Executes one operation against the server. Duplicate inserts count as done. */
 export async function runOp(op: OpPayload): Promise<void> {
+  if (op.action === "batch") {
+    for (const child of op.operations ?? []) await runOp(child);
+    return;
+  }
   if (op.action === "graduation") {
     const { data, error } = await supabase.rpc("save_graduation_gate", { _beneficiary: op.id, _gate: op.values } as never);
     if (error) throw new Error(error.message);

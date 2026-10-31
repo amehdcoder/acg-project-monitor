@@ -2,8 +2,8 @@
 //  • Signed-in users: offlineMutate (direct when online, queued on the device otherwise).
 //  • Account-free devices: saved-form queue drained by project-collect (kind "eye_daily").
 import { supabase } from "@/integrations/supabase/client";
-import { cachedRead, cachePatchRows } from "@/lib/programmeModule/offlineReadCache";
-import { offlineMutate } from "@/lib/programmeModule/offlineWrite";
+import { cachedRead, cachePatchRows, cacheGet, cacheSet } from "@/lib/programmeModule/offlineReadCache";
+import { offlineMutate, type OpPayload } from "@/lib/programmeModule/offlineWrite";
 import { saveSavedEntry, listAllSavedEntries } from "@/lib/savedForms";
 import { syncDeviceRecords } from "@/lib/deviceSync";
 import type { EyePatientRow, EyeReportRow } from "./definition";
@@ -30,13 +30,36 @@ export async function loadReports(projectId: string): Promise<{ rows: EyeReportR
 
 export type ReportPayload = Omit<EyeReportRow, "id" | "created_by" | "device_id" | "collector_label"> & { id?: string };
 
+async function patchEyeCache(key: string, id: string, values: Record<string, unknown> | null) {
+  if (await cacheGet(key) === null) await cacheSet(key, []);
+  await cachePatchRows(key, id, values, !!values);
+}
+
+/** One retryable envelope: stable parent/patient IDs, inserts before removals. */
+export async function saveReportWithPatients(payload: ReportPayload, rows: PatientPayload[], userId: string, editing: boolean) {
+  const id = payload.id || crypto.randomUUID();
+  const values = { ...payload, id, ...(editing ? {} : { created_by: userId }) };
+  const patients = rows.map((p) => ({ ...p, id: p.id || crypto.randomUUID(), report_id: id, created_by: userId }));
+  const prior = editing ? (await loadPatients(payload.project_id)).rows.filter((p) => p.report_id === id && !patients.some((n) => n.id === p.id)) : [];
+  const operations: OpPayload[] = [
+    editing ? { table: "eye_daily_reports", action: "update", id, values } : { table: "eye_daily_reports", action: "insert", values },
+    ...patients.map((p): OpPayload => ({ table: "eye_daily_patients", action: "insert", values: p })),
+    ...prior.map((p): OpPayload => ({ table: "eye_daily_patients", action: "delete", id: p.id })),
+  ];
+  const result = await offlineMutate({ table: "eye_daily_reports", action: "batch", operations, userId });
+  await patchEyeCache(cacheKey(payload.project_id), id, values);
+  for (const p of patients) await patchEyeCache(patientCacheKey(payload.project_id), p.id, p);
+  for (const p of prior) await patchEyeCache(patientCacheKey(payload.project_id), p.id, null);
+  return { id, queued: result.queued };
+}
+
 export async function saveReport(payload: ReportPayload, userId: string, editing: boolean): Promise<{ id: string; queued: boolean }> {
   const id = payload.id || crypto.randomUUID();
   const values = { ...payload, id, ...(editing ? {} : { created_by: userId }) };
   const res = editing
     ? await offlineMutate({ table: "eye_daily_reports", action: "update", id, values: { ...payload, id: undefined } as any })
     : await offlineMutate({ table: "eye_daily_reports", action: "insert", values });
-  await cachePatchRows(cacheKey(payload.project_id), id, { ...values, created_by: userId }, !editing);
+  await patchEyeCache(cacheKey(payload.project_id), id, { ...values, created_by: userId });
   return { id, queued: res.queued };
 }
 
@@ -82,9 +105,9 @@ export type PatientPayload = Omit<EyePatientRow, "id" | "created_by" | "device_i
  * `removeIds` deletes standalone screenings that were absorbed into the report,
  * so a pre-filled patient never exists both standalone and linked.
  */
-export async function savePatients(rows: PatientPayload[], userId: string, replaceReportId?: string | null, removeIds?: string[]): Promise<{ queued: boolean }> {
+export async function savePatients(rows: PatientPayload[], userId: string, replaceReportId?: string | null, removeIds?: string[], scopeProjectId?: string): Promise<{ queued: boolean }> {
   let queued = false;
-  const projectId = rows[0]?.project_id ?? "";
+  const projectId = rows[0]?.project_id ?? scopeProjectId ?? "";
   const cached = replaceReportId || removeIds?.length ? (await loadPatients(projectId)).rows : [];
   const toRemove = new Map<string, string>(); // patient id -> project id (for the cache key)
   if (replaceReportId) for (const r of cached.filter((x) => x.report_id === replaceReportId)) toRemove.set(r.id, r.project_id);
@@ -99,7 +122,7 @@ export async function savePatients(rows: PatientPayload[], userId: string, repla
     const values = { ...p, id, created_by: userId };
     const res = await offlineMutate({ table: "eye_daily_patients", action: "insert", values });
     queued = queued || res.queued;
-    await cachePatchRows(patientCacheKey(p.project_id), id, values, true);
+    await patchEyeCache(patientCacheKey(p.project_id), id, values);
   }
   return { queued };
 }
@@ -113,7 +136,7 @@ export async function saveDevicePatients(rows: PatientPayload[], device: { devic
     id, userId: `device:${device.deviceId}`, formId: "eye_wgss", formName: "Eye Health WG-SS Screenings",
     displayName: `${first?.facility_name ?? "Facility"} · ${first?.report_date ?? ""} · ${rows.length} patients`, formDescription: "", projectId: device.projectId,
     questions: [], groups: [], geofence: null, settings: { kind: "eye_wgss" }, responses: { patients: rows } as any, gps: null,
-    submissionData: { patients: rows.map((p) => ({ ...p, collector_label: device.label })) } as any, status: "finalized",
+    submissionData: { patients: rows.map((p) => ({ ...p, id: p.id || crypto.randomUUID(), collector_label: device.label })) } as any, status: "finalized",
     createdAt: now, updatedAt: now, finalizedAt: now, submissionId: id, offline: !navigator.onLine, deviceId: device.deviceId,
   } as any);
   if (navigator.onLine) void syncDeviceRecords().catch(() => undefined);

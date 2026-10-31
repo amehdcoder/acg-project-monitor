@@ -61,7 +61,7 @@ export const enqueue = (kind: QueueKind, payload: Record<string, unknown>): Queu
     payload,
     queued_at: new Date().toISOString(),
     attempts: 0,
-    user_id: kind === "op" && payload.table === "microplan_entries" ? String((payload.values as Record<string, unknown>)?.updated_by || (payload.values as Record<string, unknown>)?.created_by || "") : undefined,
+    user_id: kind === "op" && payload.userId ? String(payload.userId) : kind === "op" && payload.table === "microplan_entries" ? String((payload.values as Record<string, unknown>)?.updated_by || (payload.values as Record<string, unknown>)?.created_by || "") : undefined,
   };
   item.payload.submission_uuid = item.submission_uuid;
   // Pending beneficiaries keep the same id on the server, so services or visits
