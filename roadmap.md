@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Add offline-preserved GPS capture to Daily Facility Reports and a filtered Eye Health State/LGA map with report-location and output/outcome symbology.
+
 - [ ] Verify the supplied Daily Facility Report account's offline submission and reconnect readback — current sign-in and managed-session mint fail because the hosted service is unavailable; isolated offline completion/layout verification continues.
 - [ ] Fix and test Eye Report draft patient recovery, photo storage, stable report/patient retries, and Android/tablet/desktop fit.
 
