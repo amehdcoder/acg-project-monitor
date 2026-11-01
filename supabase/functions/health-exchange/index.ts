@@ -1016,10 +1016,17 @@ Deno.serve(async (req) => {
         const { data: mapping, error: configError } = await db.from("health_exchange_mappings").select("dimensions").eq("connection_id",connection.id).eq("indicator_key","eye_config:tracker").maybeSingle();
         if (configError) throw configError;
         const config = validateTrackerConfig(mapping?.dimensions?.config);
+        const lgaLinks = mapping?.dimensions?.lgas;
+        if (!lgaLinks || typeof lgaLinks !== "object" || Object.entries(lgaLinks).some(([id,lga]) => !/^[A-Za-z][A-Za-z0-9]{10}$/.test(id) || typeof lga !== "string" || !lga.trim() || lga.length > 80)) return json({error:"Save valid facility-to-LGA mappings first."},400);
+        const programRes = await remoteFetch(joinUrl(connection.base_url,`api/programs/${config.program}?fields=id,programStages[programStageDataElements[dataElement[id,valueType]]]`),{headers});
+        if(!programRes.ok) throw new Error(`DHIS2 HTTP ${programRes.status}: tracker metadata unavailable.`);
+        const elements=(programRes.body as any)?.programStages?.flatMap((s:any)=>s.programStageDataElements.map((d:any)=>d.dataElement))??[];
+        if([config.surgeryDate,config.eye,config.baseline,config.day30,config.day90,config.day180].some((id)=>!elements.some((e:any)=>e.id===id))) return json({error:"Tracker fields do not belong to the selected program."},400);
+        if([config.baseline,config.day30,config.day90,config.day180].some((id)=>!elements.some((e:any)=>e.id===id&&["NUMBER","INTEGER","INTEGER_ZERO_OR_POSITIVE","INTEGER_POSITIVE"].includes(e.valueType)))) return json({error:"Acuity fields must contain measured numeric logMAR."},400);
         if (!connection.org_unit_id || !/^[A-Za-z][A-Za-z0-9]{10}$/.test(connection.org_unit_id)) return json({error:"Choose the DHIS2 tracker reporting area first."},400);
         const events: any[] = [];
         for (let page=1;page<=50;page++) {
-          const qs = new URLSearchParams({ program: config.program, orgUnit: connection.org_unit_id, ouMode:"DESCENDANTS", page:String(page), pageSize:"200", totalPages:"true", fields:"event,program,orgUnit,enrollment,trackedEntity,occurredAt,updatedAt,deleted,dataValues[dataElement,value]" });
+          const qs = new URLSearchParams({ program: config.program, orgUnit: connection.org_unit_id, orgUnitMode:"DESCENDANTS", page:String(page), pageSize:"200", totalPages:"true", fields:"event,program,orgUnit,enrollment,trackedEntity,occurredAt,updatedAt,deleted,dataValues[dataElement,value]" });
           const res = await remoteFetch(joinUrl(connection.base_url,`api/tracker/events?${qs}`),{headers});
           if (!res.ok) return json({error:`DHIS2 HTTP ${res.status}: ${remoteMessage(res.body,"Tracker observations could not be loaded")}`,status:res.status},502);
           const body = res.body as any;
@@ -1045,6 +1052,7 @@ Deno.serve(async (req) => {
         for (const row of result.rows) {
           const {data:prior,error} = await db.from("eye_visual_trajectories").select("*").eq("project_id",connection.project_id).eq("episode_key",row.episode_key).maybeSingle();
           if (error) throw error;
+          if(prior && !prior.tracker_evidence) throw new Error("A matching episode was entered manually. It was not overwritten.");
           const values = { ...row, id:prior?.id ?? crypto.randomUUID(), project_id:connection.project_id,source:"tracker_import",created_by:prior?.created_by??guard.userId };
           // Only a full source pull replaces DHIS2-owned episodes. Missing milestones stay null.
           const {error:writeError} = await db.from("eye_visual_trajectories").upsert(values,{onConflict:"project_id,episode_key"});
@@ -1067,6 +1075,8 @@ Deno.serve(async (req) => {
         const fields = stage.programStageDataElements??[];
         const ids=[config.reportId,config.accuracy,config.capturedAt];
         if (ids.some((id)=>!fields.some((f:any)=>f.dataElement?.id===id)) || fields.some((f:any)=>f.compulsory&&!ids.includes(f.dataElement?.id))) return json({error:"GPS program has unmapped required fields; choose a dedicated report-location stage."},400);
+        const assigned=new Set((metadata.organisationUnits??[]).map((u:any)=>u.id));
+        if(Object.values(config.facilities).some((id)=>!assigned.has(id))) return json({error:"Every mapped GPS facility must be assigned to the selected DHIS2 event program."},400);
         const source=await loadEyeRows(db,connection.project_id,period);
         const events=[];let skipped=0;
         for(const report of source){const e=await gpsEvent(report,config,connection.id);if(e)events.push(e);else skipped++;}
