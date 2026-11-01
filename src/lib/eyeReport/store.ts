@@ -42,8 +42,8 @@ export async function saveReportWithPatients(payload: ReportPayload, rows: Patie
   const patients = rows.map((p) => ({ ...p, id: p.id || crypto.randomUUID(), report_id: id, created_by: userId }));
   const prior = editing ? (await loadPatients(payload.project_id)).rows.filter((p) => p.report_id === id && !patients.some((n) => n.id === p.id)) : [];
   const operations: OpPayload[] = [
-    editing ? { table: "eye_daily_reports", action: "update", id, values } : { table: "eye_daily_reports", action: "insert", values },
-    ...patients.map((p): OpPayload => ({ table: "eye_daily_patients", action: "insert", values: p })),
+    editing ? { table: "eye_daily_reports", action: "update", id, values } : { table: "eye_daily_reports", action: "upsert", values },
+    ...patients.map((p): OpPayload => ({ table: "eye_daily_patients", action: "upsert", values: p })),
     ...prior.map((p): OpPayload => ({ table: "eye_daily_patients", action: "delete", id: p.id })),
   ];
   const result = await offlineMutate({ table: "eye_daily_reports", action: "batch", operations, userId });
