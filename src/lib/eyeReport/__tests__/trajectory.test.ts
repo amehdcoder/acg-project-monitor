@@ -1,0 +1,11 @@
+import {describe,expect,it} from "vitest";
+import {meanMilestones,recoveryStatus,remoteGoodOutcome,validateTrajectory,type VisualTrajectory} from "../trajectory";
+const episode={baseline:1,day30:0.6,day90:null,day180:null} as VisualTrajectory;
+describe("Measured visual acuity trajectories",()=>{
+  it("uses good vision at 0.3 logMAR for Full Recovery",()=>{expect(recoveryStatus({...episode,day30:0.3})).toBe("Full Recovery");expect(recoveryStatus({...episode,day30:0.31})).toBe("Partial Improvement");});
+  it("requires 0.2 logMAR change for improvement or deterioration",()=>{expect(recoveryStatus({...episode,day30:0.8})).toBe("Partial Improvement");expect(recoveryStatus({...episode,day30:0.9})).toBe("Unchanged");expect(recoveryStatus({...episode,day30:1.2})).toBe("Deteriorated");});
+  it("uses the latest measured milestone and never invents missing follow-up",()=>{expect(recoveryStatus({...episode,day180:1})).toBe("Unchanged");expect(recoveryStatus({...episode,day30:null})).toBe("Awaiting follow-up");expect(meanMilestones([episode])[2]).toEqual({milestone:"90 days",value:null,n:0});});
+  it("counts each milestone's own observed denominator",()=>{expect(meanMilestones([episode,{...episode,day30:null,baseline:0.6}])[1]).toEqual({milestone:"30 days",value:0.6,n:1});});
+  it("requires baseline and preserves zero logMAR as a valid observation",()=>{const valid={episode_key:"E-R-1",facility_name:"Hospital",lga:"Dutse",surgery_date:"2026-11-01",baseline:1,day30:0};expect(validateTrajectory(valid).day30).toBe(0);expect(validateTrajectory(valid).day90).toBeNull();expect(()=>validateTrajectory({...valid,baseline:""})).toThrow();expect(()=>validateTrajectory({...valid,surgery_date:"2026-02-30"})).toThrow();});
+  it("cannot report a DHIS2 success rate with missing outcome bands",()=>{expect(remoteGoodOutcome({month:"2026-11",rows:[{indicator_key:"eye_daily:discharge_presenting_good",dhis2:80}]})).toBeNull();expect(remoteGoodOutcome({month:"2026-11",rows:[{indicator_key:"eye_daily:discharge_presenting_good",dhis2:80},{indicator_key:"eye_daily:discharge_presenting_borderline",dhis2:15},{indicator_key:"eye_daily:discharge_presenting_poor",dhis2:5}]})).toEqual({rate:80,n:100});});
+});

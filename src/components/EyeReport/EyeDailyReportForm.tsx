@@ -28,6 +28,8 @@ import { fileToDataUrl, MEDIA_BUCKET } from "@/lib/programmeModule/media";
 import { buildWgRecord, readWgResult, type WgResult } from "@/lib/programmeModule/washingtonGroup";
 import WgPatientWizard, { emptyWgPatient, type WgPatientDraft } from "./WgPatientWizard";
 import ScrollRail from "@/components/ProgrammeModule/ScrollRail";
+import EyeGpsCapture from "./EyeGpsCapture";
+import { normEyeGps, type EyeGps } from "@/lib/eyeReport/gps";
 
 export interface EyeFacility { id: string; name: string; state?: string | null; lga?: string | null }
 type Mode = { kind: "user"; userId: string } | { kind: "device"; deviceId: string; label: string };
@@ -141,10 +143,10 @@ interface PatientEntry { id?: string; draft: WgPatientDraft; record: WgResult; /
 export default function EyeDailyReportForm({ projectId, projectName, facilities, mode, existing, existingPatients = [], wgOnly = false, otherReports = [], onClose, onSaved }: Props) {
   const draftKey = `eye-report-draft:${projectId}:${mode.kind === "user" ? mode.userId : mode.deviceId}${wgOnly ? ":wg" : ""}`;
   const initial = useMemo(() => {
-    if (existing) return { facilityId: existing.facility_id ?? "", facility: existing.facility_name, state: existing.state ?? "", lga: existing.lga ?? "", date: existing.report_date, summary: normSummary(existing.summary), csom: normCsom(existing.csom), notes: existing.notes ?? "", prepared: existing.prepared_by ?? "", confirmed: existing.confirmed_by ?? "", attachments: normAttachments(existing.attachments) };
-    try { const d = JSON.parse(localStorage.getItem(draftKey) || "null"); if (d) return { ...d, summary: normSummary(d.summary), csom: normCsom(d.csom), attachments: normAttachments(d.attachments) }; } catch { /* ignore */ }
+    if (existing) return { facilityId: existing.facility_id ?? "", facility: existing.facility_name, state: existing.state ?? "", lga: existing.lga ?? "", date: existing.report_date, summary: normSummary(existing.summary), csom: normCsom(existing.csom), notes: existing.notes ?? "", prepared: existing.prepared_by ?? "", confirmed: existing.confirmed_by ?? "", attachments: normAttachments(existing.attachments), gps: normEyeGps(existing.gps) };
+    try { const d = JSON.parse(localStorage.getItem(draftKey) || "null"); if (d) return { ...d, summary: normSummary(d.summary), csom: normCsom(d.csom), attachments: normAttachments(d.attachments), gps: normEyeGps(d.gps) }; } catch { /* ignore */ }
     const only = facilities.length === 1 ? facilities[0] : null;
-    return { facilityId: only?.id ?? "", facility: only?.name ?? "", state: only?.state ?? "", lga: only?.lga ?? "", date: today(), summary: emptySummary(), csom: null as EyeCsom | null, notes: "", prepared: mode.kind === "device" ? mode.label : "", confirmed: "", attachments: [] as EyeAttachment[] };
+    return { facilityId: only?.id ?? "", facility: only?.name ?? "", state: only?.state ?? "", lga: only?.lga ?? "", date: today(), summary: emptySummary(), csom: null as EyeCsom | null, notes: "", prepared: mode.kind === "device" ? mode.label : "", confirmed: "", attachments: [] as EyeAttachment[], gps: null as EyeGps | null };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [f, setF] = useState(initial);
@@ -172,7 +174,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
     void loadEyeDraft<typeof initial & { patients?: PatientEntry[]; submissionId?: string }>(draftKey).then((saved) => {
       if (!live) return;
       const draft = saved ?? initial;
-      if (saved) setF({ ...saved, summary: normSummary(saved.summary), csom: normCsom(saved.csom), attachments: normAttachments(saved.attachments) });
+      if (saved) setF({ ...saved, summary: normSummary(saved.summary), csom: normCsom(saved.csom), attachments: normAttachments(saved.attachments), gps: normEyeGps(saved.gps) });
       setPatients(restoredPatients(draft, [], false));
       if (saved?.submissionId) submissionId.current = saved.submissionId;
       setDraftReady(true);
@@ -188,6 +190,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
     const defaults = facilityEntryDefaults(!!existing, f.date, patients);
     setF((previous) => ({
       ...previous, facilityId: facility.id, facility: facility.name,
+      gps: null,
       state: facility.state ?? "", lga: facility.lga ?? "", date: defaults.date,
       summary: existing ? previous.summary : { ...previous.summary, pwd: { m: 0, f: 0 }, pwdAge: emptySummary().pwdAge },
     }));
@@ -332,14 +335,14 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
     try {
       if (mode.kind === "device") {
         if (!wgOnly) {
-          const payload = { id: submissionId.current, project_id: projectId, facility_id: f.facilityId || null, facility_name: f.facility.trim(), state: f.state || null, lga: f.lga || null, report_date: f.date, summary: S, csom: csomOut, notes: f.notes.trim() || null, prepared_by: f.prepared.trim() || null, confirmed_by: f.confirmed.trim() || null, attachments: f.attachments };
+          const payload = { id: submissionId.current, project_id: projectId, facility_id: f.facilityId || null, facility_name: f.facility.trim(), state: f.state || null, lga: f.lga || null, report_date: f.date, summary: S, csom: csomOut, notes: f.notes.trim() || null, prepared_by: f.prepared.trim() || null, confirmed_by: f.confirmed.trim() || null, attachments: f.attachments, gps: normEyeGps(f.gps) };
           await saveDeviceReport(payload as any, { deviceId: mode.deviceId, projectId, label: mode.label });
         }
         if (patients.length) await saveDevicePatients(patientPayloads(wgOnly ? null : submissionId.current) as any, { deviceId: mode.deviceId, projectId, label: mode.label });
         toast.success(navigator.onLine ? "Saved and sending" : "Saved on this device — it will send when you are back online");
       } else {
         if (!wgOnly) {
-          const payload = { id: submissionId.current, project_id: projectId, facility_id: f.facilityId || null, facility_name: f.facility.trim(), state: f.state || null, lga: f.lga || null, report_date: f.date, summary: S, csom: csomOut, notes: f.notes.trim() || null, prepared_by: f.prepared.trim() || null, confirmed_by: f.confirmed.trim() || null, attachments: f.attachments };
+          const payload = { id: submissionId.current, project_id: projectId, facility_id: f.facilityId || null, facility_name: f.facility.trim(), state: f.state || null, lga: f.lga || null, report_date: f.date, summary: S, csom: csomOut, notes: f.notes.trim() || null, prepared_by: f.prepared.trim() || null, confirmed_by: f.confirmed.trim() || null, attachments: f.attachments, gps: normEyeGps(f.gps) };
           const r = await saveReportWithPatients(payload as any, patientPayloads(submissionId.current) as any, mode.userId, !!existing);
           toast.success(r.queued ? "Saved offline — it will sync automatically" : "Daily report submitted");
         } else {
@@ -442,6 +445,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
             <motion.section key={cur.key} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.22 }} className="space-y-3">
               {cur.key === "who" && (
                 <div className="grid gap-4 md:grid-cols-2">
+                  {!wgOnly && <EyeGpsCapture value={f.gps} onChange={(gps) => setF((previous: typeof initial) => ({ ...previous, gps }))} />}
                   <label className="space-y-1.5 rounded-2xl border bg-card p-4 shadow-sm md:col-span-2">
                     <span className="flex items-center gap-2 text-sm font-bold"><Building2 className="h-4 w-4 text-eye-blue" /> Reporting facility <span className="text-destructive">*</span></span>
                     {!showManualFacility ? (

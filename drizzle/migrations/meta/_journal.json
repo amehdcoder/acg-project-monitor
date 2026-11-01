@@ -288,6 +288,20 @@
       "when": 1792963779601,
       "tag": "0040_eye_report_wgss_patients_attachments",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1793565549518,
+      "tag": "0041_eye_report_gps",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1793566081119,
+      "tag": "0042_eye_visual_trajectories",
+      "breakpoints": true
     }
   ]
 }

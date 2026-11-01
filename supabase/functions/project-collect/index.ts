@@ -7,6 +7,7 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { admin, verifyDeviceToken } from "../_shared/deviceAccess.ts";
 import { intakeSeeClearRecord } from "../_shared/seeclearDeviceIntake.ts";
 import { validatedMicroplan } from "../_shared/microplanDeviceValidation.ts";
+import { eyeGps } from "../_shared/eyeGps.ts";
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -78,6 +79,7 @@ Deno.serve(async (req) => {
           id: record.id, project_id: ctx.projectId, facility_id: d.facility_id || null, facility_name: facility,
           state: d.state ? String(d.state).slice(0,80) : null, lga: d.lga ? String(d.lga).slice(0,80) : null,
           report_date: date, summary: d.summary ?? {}, csom: d.csom ?? null,
+          gps: eyeGps(d.gps),
           notes: d.notes ? String(d.notes).slice(0, 2000) : null,
           prepared_by: d.prepared_by ? String(d.prepared_by).slice(0,120) : ctx.label,
           confirmed_by: d.confirmed_by ? String(d.confirmed_by).slice(0,120) : null,

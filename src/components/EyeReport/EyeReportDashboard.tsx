@@ -21,6 +21,9 @@ import { exportAggregated, exportDailyReport } from "@/lib/eyeReport/exportExcel
 import EyeDailyReportForm, { type EyeFacility } from "./EyeDailyReportForm";
 import EyeFacilityTrend from "./EyeFacilityTrend";
 import EyeDhis2Exchange from "./EyeDhis2Exchange";
+import EyeReportMap from "./EyeReportMap";
+import VisualAcuityTrajectory from "./VisualAcuityTrajectory";
+import type { DhisOutcomeEvidence } from "@/lib/eyeReport/trajectory";
 
 interface Props { projectId: string; projectName?: string; facilities: EyeFacility[]; userId: string; canReport: boolean; canManage: boolean; onClose: () => void }
 
@@ -44,6 +47,7 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
   const [form, setForm] = useState<{ open: boolean; existing?: EyeReportRow | null; wgOnly?: boolean }>({ open: false });
   const [exporting, setExporting] = useState(false);
   const [patients, setPatients] = useState<EyePatientRow[]>([]);
+  const [dhisOutcomes, setDhisOutcomes] = useState<DhisOutcomeEvidence | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -114,7 +118,7 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
     try { await deleteReport(projectId, r.id); setRows((x) => x.filter((y) => y.id !== r.id)); toast.success("Report deleted"); } catch (e) { toast.error(e instanceof Error ? e.message : "Delete failed"); }
   };
 
-  if (form.open) return <EyeDailyReportForm projectId={projectId} projectName={projectName} facilities={facilities} mode={{ kind: "user", userId }} existing={form.existing} existingPatients={form.existing ? patients.filter((p) => p.report_id === form.existing!.id) : []} wgOnly={form.wgOnly} otherReports={rows} onClose={() => setForm({ open: false })} onSaved={() => void load()} />;
+  if (form.open) return <EyeDailyReportForm projectId={projectId} projectName={projectName} facilities={facilities} mode={{ kind: "user", userId }} existing={form.existing} existingPatients={patients.filter((p) => p.report_id === form.existing?.id)} wgOnly={form.wgOnly} otherReports={rows} onClose={() => setForm({ open: false })} onSaved={() => void load()} />;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-eye-sky">
@@ -162,6 +166,8 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
           ))}
         </section>
 
+        <EyeReportMap rows={filtered} sex={sex} />
+        <VisualAcuityTrajectory projectId={projectId} userId={userId} canReport={canReport} reports={filtered} period={{ year, month, from, to }} dhis={dhisOutcomes} />
         <EyeFacilityTrend rows={rows} />
 
         <section className="grid gap-4 lg:grid-cols-3">
@@ -247,7 +253,7 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
               </tr>); })}</tbody>
           </table></div>
         </section>
-        {canManage && !unavailable && !loading && <EyeDhis2Exchange projectId={projectId} rows={rows} />}
+        {canManage && !unavailable && !loading && <EyeDhis2Exchange projectId={projectId} rows={rows} onPulled={setDhisOutcomes} />}
       </main>
     </div>
   );

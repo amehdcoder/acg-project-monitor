@@ -99,6 +99,7 @@
     "next-themes": "^0.3.0",
     "onnxruntime-web": "^1.26.0",
     "pdfjs-dist": "^6.1.200",
+    "polygon-clipping": "^0.15.7",
     "pptxgenjs": "^4.0.1",
     "qrcode.react": "^4.2.0",
     "react": "^18.3.1",

@@ -296,6 +296,7 @@ export interface EyeReportRow {
   state: string | null; lga: string | null; report_date: string;
   summary: any; csom: any; notes: string | null; prepared_by: string | null; confirmed_by: string | null;
   attachments?: EyeAttachment[] | null;
+  gps?: import("./gps").EyeGps | null;
   created_by: string | null; device_id: string | null; collector_label: string | null; created_at?: string;
 }
 

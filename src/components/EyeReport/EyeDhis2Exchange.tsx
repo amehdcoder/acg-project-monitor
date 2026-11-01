@@ -13,11 +13,11 @@ import { supabase } from "@/integrations/supabase/client";
 import type { EyeReportRow } from "@/lib/eyeReport/definition";
 import { latestEyeReportingMonth } from "@/lib/eyeReport/exchangePeriod";
 
-interface PullRow { indicator_key: string; label: string; amehnities: number; dhis2: number | null; match: boolean }
+export interface PullRow { indicator_key: string; label: string; amehnities: number; dhis2: number | null; match: boolean }
 const Sel = (p: React.SelectHTMLAttributes<HTMLSelectElement>) => <select {...p} className={`h-9 w-full rounded-md border bg-background px-2 text-sm ${p.className ?? ""}`} />;
 
 /** Standalone DHIS2 Data Exchange for the Eye Health Daily Facility Report (own servers, own mappings). */
-export default function EyeDhis2Exchange({ projectId, rows }: { projectId: string; rows: EyeReportRow[] }) {
+export default function EyeDhis2Exchange({ projectId, rows, onPulled }: { projectId: string; rows: EyeReportRow[]; onPulled?: (evidence: { month: string; rows: PullRow[] } | null) => void }) {
   const [conns, setConns] = useState<ExchangeConnection[]>([]);
   const [connId, setConnId] = useState("");
   const [maps, setMaps] = useState<ExchangeMapping[]>([]);
@@ -42,6 +42,7 @@ export default function EyeDhis2Exchange({ projectId, rows }: { projectId: strin
   useEffect(() => {
     let active = true;
     setPull(null); setCatalog(null); setMaps([]); setOus([]); setOuQ(""); setOuError("");
+    onPulled?.(null);
     if (!connId) return;
     setOuLoading(true);
     listMappings(connId).then((m) => { if (active) setMaps(m); }).catch(() => undefined);
@@ -120,7 +121,7 @@ export default function EyeDhis2Exchange({ projectId, rows }: { projectId: strin
     if (!connId) return;
     setBusy(kind);
     try {
-      if (kind === "pull") { const r = await eyeExchangePull(connId, period); setPull(r.rows); toast.success(`Pulled from DHIS2 — ${r.rows.filter((x: PullRow) => x.match).length}/${r.rows.length} match`); }
+      if (kind === "pull") { const r = await eyeExchangePull(connId, period); setPull(r.rows); onPulled?.({ month, rows: r.rows }); toast.success(`Pulled from DHIS2 — ${r.rows.filter((x: PullRow) => x.match).length}/${r.rows.length} match`); }
       else { const r = await eyeExchangePush(connId, period, {}, kind === "dry"); toast.success(r.message || (kind === "dry" ? "Dry run passed" : "Sent to DHIS2")); }
     } catch (e) { toast.error(e instanceof Error ? e.message : "DHIS2 exchange failed"); } finally { setBusy(""); }
   };

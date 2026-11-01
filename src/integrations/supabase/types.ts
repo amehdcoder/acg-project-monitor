@@ -5599,6 +5599,7 @@ export type Database = {
           device_id: string | null
           facility_id: string | null
           facility_name: string
+          gps: Json | null
           id: string
           lga: string | null
           notes: string | null
@@ -5619,6 +5620,7 @@ export type Database = {
           device_id?: string | null
           facility_id?: string | null
           facility_name: string
+          gps?: Json | null
           id?: string
           lga?: string | null
           notes?: string | null
@@ -5639,6 +5641,7 @@ export type Database = {
           device_id?: string | null
           facility_id?: string | null
           facility_name?: string
+          gps?: Json | null
           id?: string
           lga?: string | null
           notes?: string | null
@@ -5728,6 +5731,62 @@ export type Database = {
             foreignKeyName: "eye_report_projects_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      eye_visual_trajectories: {
+        Row: {
+          baseline: number
+          created_at: string
+          created_by: string
+          day180: number | null
+          day30: number | null
+          day90: number | null
+          episode_key: string
+          facility_name: string
+          id: string
+          lga: string
+          project_id: string
+          source: string
+          surgery_date: string
+        }
+        Insert: {
+          baseline: number
+          created_at?: string
+          created_by: string
+          day180?: number | null
+          day30?: number | null
+          day90?: number | null
+          episode_key: string
+          facility_name: string
+          id?: string
+          lga: string
+          project_id: string
+          source?: string
+          surgery_date: string
+        }
+        Update: {
+          baseline?: number
+          created_at?: string
+          created_by?: string
+          day180?: number | null
+          day30?: number | null
+          day90?: number | null
+          episode_key?: string
+          facility_name?: string
+          id?: string
+          lga?: string
+          project_id?: string
+          source?: string
+          surgery_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eye_visual_trajectories_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
