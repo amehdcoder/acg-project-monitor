@@ -144,13 +144,13 @@ export default function EyeReportMap({ rows, sex }: { rows: EyeReportRow[]; sex:
     </div>
     {error && <p role="alert" className="px-4 py-3 text-sm text-destructive">{error}</p>}
     <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
-      <div className="relative isolate min-w-0 bg-eye-sky"><div ref={root} className="h-[440px] w-full sm:h-[520px]" aria-label="State and LGA boundary map" />
+      <div className="relative isolate min-w-0 self-start bg-eye-sky"><div ref={root} className="h-[440px] w-full sm:h-[520px]" aria-label="State and LGA boundary map" />
         {!located.length && <p className="absolute bottom-4 left-4 right-4 z-[500] border bg-card/95 p-3 text-sm text-eye-deep">{geo ? "No captured GPS locations in the selected reporting period." : "Loading Nigerian boundaries…"}</p>}
       </div>
       <aside className="space-y-4 px-4 lg:pl-0">
         <h3 className="text-sm font-bold text-eye-deep">Evidence layers</h3>
         <div className="space-y-1">{([
-          ["reports", "Facility reporting", "bg-eye-blue"], ["cataract", "Cataract screened", "bg-eye-orange"], ["tt", "Trachomatous trichiasis", "bg-eye-rose"], ["heat", "Morbidity heatmap", "bg-eye-gold"], ["dust", "Dust-prone zones", "bg-eye-gold"], ["water", "Water access points", "bg-eye-teal"], ["wash", "WASH locations", "bg-eye-teal"], ["basemap", "Street basemap", "bg-muted-foreground"],
+          ["reports", "Facility reporting", "bg-eye-blue"], ["cataract", "Cataract screened", "bg-eye-orange"], ["tt", "Trachomatous trichiasis", "bg-eye-rose"], ["heat", "Morbidity heatmap", "bg-eye-gold"], ["dust", "Dust-prone zones", "bg-eye-gold"], ["water", "Water access points", "bg-eye-blue"], ["wash", "WASH locations", "bg-eye-teal"], ["basemap", "Street basemap", "bg-muted-foreground"],
         ] as const).map(([key, label, swatch]) => <label key={key} className="flex min-h-10 cursor-pointer items-center justify-between gap-2 text-xs"><span className="flex items-center gap-2"><span className={`h-2.5 w-2.5 shrink-0 rounded-full ${swatch}`} />{label}</span><Switch aria-label={label} checked={visible[key]} onCheckedChange={(checked) => setVisible((v) => ({ ...v, [key]: checked }))} /></label>)}</div>
         <div className="space-y-2 border-y py-3 text-xs">
           <p className="flex items-center gap-2 font-semibold text-eye-teal"><Wind className="h-4 w-4" /><Droplets className="h-4 w-4" />Environmental evidence</p>
