@@ -1,9 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { dustOverlap, facilityReporting, morbidityCount, parseEnvironmentalEvidence } from "../environment";
+import { dustBand, dustOverlap, facilityReporting, morbidityCount, parseEnvironmentalEvidence } from "../environment";
+import snapshot from "@/assets/eye-report/jigawa-environment.json";
 import { emptySummary, type EyeReportRow } from "../definition";
 
 const dust = { type: "Feature", properties: { kind: "dust", name: "Survey zone", source: "Field survey", observed_at: "2026-11-01" }, geometry: { type: "Polygon", coordinates: [[[9,11],[10,11],[10,12],[9,12],[9,11]]] } };
 describe("Environmental overlay evidence", () => {
+  it("loads real attributed Jigawa records and dated dust model observations", () => {
+    const data = parseEnvironmentalEvidence(snapshot);
+    expect(data.features.filter(f=>f.properties.kind==="water")).toHaveLength(10574);
+    expect(data.features.filter(f=>f.properties.kind==="dust")).toHaveLength(29);
+    expect(data.features.filter(f=>f.properties.kind==="water").every(f=>f.properties.observed_at.startsWith("2015-") && f.properties.source.includes("Federal Ministry"))).toBe(true);
+    expect(data.features.filter(f=>f.properties.kind==="dust").every(f=>f.properties.value !== undefined && f.properties.observed_at==="2026-10-31")).toBe(true);
+    expect(dustBand(99)).toBe("eye-gold"); expect(dustBand(150)).toBe("eye-rose");
+  });
   it("accepts sourced dust zones and evaluates spatial overlap without inventing risk", () => {
     const data = parseEnvironmentalEvidence({ type: "FeatureCollection", features: [dust] });
     expect(dustOverlap(11.5,9.5,data.features)).toHaveLength(1);

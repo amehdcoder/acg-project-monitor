@@ -6,7 +6,7 @@ import polygonClipping from "polygon-clipping";
 import { Crosshair, MapPinned, Layers3, AlertTriangle, Upload, Droplets, Wind } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { dustOverlap, facilityReporting, morbidityCount, parseEnvironmentalEvidence, type EnvironmentalFeature } from "@/lib/eyeReport/environment";
+import { dustBand, dustOverlap, facilityReporting, morbidityCount, parseEnvironmentalEvidence, type EnvironmentalFeature } from "@/lib/eyeReport/environment";
 import { loadNigeriaGeo } from "@/components/Dashboard/ops/lgaGeo";
 import { boundaryAt, locatedReports, MAP_METRICS, mapValue, type MapMetric, type BoundaryFeature } from "@/lib/eyeReport/mapModel";
 import { normCsom, normSummary, t, totals, vaTotal, pct, type EyeReportRow } from "@/lib/eyeReport/definition";
@@ -27,6 +27,17 @@ export default function EyeReportMap({ rows, sex }: { rows: EyeReportRow[]; sex:
   const fileInput = useRef<HTMLInputElement>(null);
   const fittedState = useRef<string | null>(null);
   const [environment, setEnvironment] = useState<EnvironmentalFeature[]>([]);
+  const [environmentStatus, setEnvironmentStatus] = useState("Loading sourced Jigawa observations…");
+  const [environmentOrigin, setEnvironmentOrigin] = useState<"snapshot" | "import">("snapshot");
+  const loadEnvironment = async () => {
+    try {
+      const data = await import("@/assets/eye-report/jigawa-environment.json");
+      const collection = parseEnvironmentalEvidence(data.default);
+      setEnvironment(collection.features); setEnvironmentOrigin("snapshot");
+      setEnvironmentStatus("WPDx 2015 field assessments · CAMS 25–31 Oct 2026 archived forecasts");
+    } catch { setEnvironmentStatus("Sourced Jigawa snapshot unavailable. Reconnect or import attributed observations."); }
+  };
+  useEffect(() => { void loadEnvironment(); }, []);
   const [importError, setImportError] = useState("");
   const [visible, setVisible] = useState({ reports: true, cataract: true, tt: true, heat: false, dust: true, water: true, wash: true, basemap: true });
   useEffect(() => {
@@ -42,7 +53,7 @@ export default function EyeReportMap({ rows, sex }: { rows: EyeReportRow[]; sex:
   const active = points.find((r) => r.report.id === selected);
   useEffect(() => {
     if (!root.current) return;
-    const instance = L.map(root.current, { preferCanvas: false, scrollWheelZoom: true, minZoom: 4, maxZoom: 19 }).setView([12.1, 9.5], 8);
+    const instance = L.map(root.current, { preferCanvas: true, scrollWheelZoom: true, minZoom: 4, maxZoom: 19 }).setView([12.1, 9.5], 8);
     instance.attributionControl.addAttribution("Nigeria administrative boundaries · GADM");
     map.current = instance;
     const observer = new ResizeObserver(() => instance.invalidateSize({ pan: false })); observer.observe(root.current);
@@ -92,15 +103,18 @@ export default function EyeReportMap({ rows, sex }: { rows: EyeReportRow[]; sex:
     });
     // Clip dust zones to the selected State; retain original geometry for overlap analysis.
     L.geoJSON({ type: "FeatureCollection", features: env } as any, {
-      style: { color: token("eye-orange"), weight: 2, dashArray: "6 4", fillColor: token("eye-gold"), fillOpacity: 0.2 },
-      pointToLayer: (f, ll) => L.circleMarker(ll, { radius: 7, color: token("eye-paper"), weight: 2, fillColor: token(f.properties.kind === "water" ? "eye-blue" : "eye-teal"), fillOpacity: 1 }),
+      style: (f) => f?.properties.kind === "dust" ? { color: token("eye-orange"), weight: 1, dashArray: "6 4", fillColor: token(dustBand(f.properties.value)), fillOpacity: 0.35 } : { color: token("eye-paper"), weight: 0.5, fillColor: token(f?.properties.status?.toLowerCase().startsWith("non") ? "eye-rose" : f?.properties.kind === "wash" ? "eye-teal" : "eye-blue"), fillOpacity: 0.7 },
+      pointToLayer: (f, ll) => L.circleMarker(ll, { radius: 2.5, color: token("eye-paper"), weight: 0.5, fillColor: token(f.properties.status?.toLowerCase().startsWith("non") ? "eye-rose" : f.properties.kind === "water" ? "eye-blue" : "eye-teal"), fillOpacity: 0.7 }),
       onEachFeature: (f, layer) => {
         const popup = document.createElement("div");
         popup.append(text("strong", f.properties.name), text("p", `${f.properties.kind === "dust" ? "Dust-prone zone" : f.properties.kind === "water" ? "Water access" : "WASH point"} · ${f.properties.observed_at}`), text("p", `Source: ${f.properties.source}`));
         if (f.geometry.type === "Point") popup.append(text("p", `${f.geometry.coordinates[1].toFixed(6)}, ${f.geometry.coordinates[0].toFixed(6)}`));
+        if (f.properties.value !== undefined) popup.append(text("p", `${f.properties.period_start} to ${f.properties.observed_at} · mean ${f.properties.value} ${f.properties.units} · ${f.properties.model_resolution} · ${f.properties.evidence_type}`));
+        if (f.properties.status) popup.append(text("p", `Assessed status: ${f.properties.status} · ${f.properties.water_source ?? ""}`), text("p", "Historical assessment; current water safety and household access are unverified."));
         layer.bindPopup(popup).bindTooltip(text("div", f.properties.name));
       },
     }).addTo(layers);
+    L.geoJSON({ type: "FeatureCollection", features } as any, { style: { color: token("eye-deep"), weight: 1.2, fill: false, interactive: false } }).addTo(layers);
     L.geoJSON(outlines, { filter: (f) => !activeState || f.properties.state === activeState,
       style: { color: token("eye-deep"), weight: 3, fill: false, interactive: false } }).addTo(layers);
     const max = Math.max(1, ...points.map((p) => mapValue(p.report, metric, sex) ?? 0));
@@ -154,15 +168,18 @@ export default function EyeReportMap({ rows, sex }: { rows: EyeReportRow[]; sex:
         ] as const).map(([key, label, swatch]) => <label key={key} className="flex min-h-10 cursor-pointer items-center justify-between gap-2 text-xs"><span className="flex items-center gap-2"><span className={`h-2.5 w-2.5 shrink-0 rounded-full ${swatch}`} />{label}</span><Switch aria-label={label} checked={visible[key]} onCheckedChange={(checked) => setVisible((v) => ({ ...v, [key]: checked }))} /></label>)}</div>
         <div className="space-y-2 border-y py-3 text-xs">
           <p className="flex items-center gap-2 font-semibold text-eye-teal"><Wind className="h-4 w-4" /><Droplets className="h-4 w-4" />Environmental evidence</p>
-          <p className="text-muted-foreground">{environment.length ? `${environment.length} sourced features · this session only` : "No environmental dataset loaded. Dust exposure and water access are not inferred from case counts."}</p>
+          <p className="text-muted-foreground">{environmentStatus}</p>
+          {!!environment.length && <p className="font-semibold text-eye-deep">{environment.filter((f)=>f.properties.kind==="water").length.toLocaleString()} water-point records · {environment.filter((f)=>f.properties.kind==="dust").length} modeled dust cells</p>}
+          <p className="text-muted-foreground">Water assessments are from 2015, not current safe-water coverage. Dust is a ~45 km atmospheric model, not measured eye-disease risk. No sanitation inventory is connected.</p>
+          <div className="flex flex-wrap gap-2"><a className="text-eye-blue underline" href="https://www.waterpointdata.org/access-data/" target="_blank" rel="noreferrer">FMWR / WPDx</a><a className="text-eye-blue underline" href="https://open-meteo.com/en/docs/air-quality-api" target="_blank" rel="noreferrer">CAMS / Open-Meteo · CC BY 4.0</a></div>
           <p className="text-muted-foreground">No validated blindness corridor model connected.</p>
           <input ref={fileInput} type="file" accept=".geojson,.json" className="hidden" aria-label="Environmental GeoJSON" onChange={async (event) => {
             const file = event.target.files?.[0]; if (!file) return;
-            try { if (file.size > 5 * 1024 * 1024) throw new Error("Environmental file must be smaller than 5 MB."); setEnvironment(parseEnvironmentalEvidence(JSON.parse(await file.text())).features); setImportError(""); } catch (e) { setImportError(e instanceof Error ? e.message : "Could not read environmental evidence."); }
+            try { if (file.size > 10 * 1024 * 1024) throw new Error("Environmental file must be smaller than 10 MB."); setEnvironment(parseEnvironmentalEvidence(JSON.parse(await file.text())).features); setEnvironmentOrigin("import"); setEnvironmentStatus("Imported sourced observations · this session only"); setImportError(""); } catch (e) { setImportError(e instanceof Error ? e.message : "Could not read environmental evidence."); }
             event.target.value = "";
           }} />
           <Button variant="outline" size="sm" className="w-full" onClick={() => fileInput.current?.click()}><Upload className="mr-2 h-3.5 w-3.5" />Load environmental GeoJSON</Button>
-          {!!environment.length && <Button variant="ghost" size="sm" onClick={() => setEnvironment([])}>Clear environmental evidence</Button>}
+          {environmentOrigin === "import" && <Button variant="ghost" size="sm" onClick={() => void loadEnvironment()}>Restore sourced Jigawa dataset</Button>}
           {importError && <p role="alert" className="text-destructive">{importError}</p>}
         </div>
         <h3 className="flex items-center gap-2 text-sm font-bold text-eye-deep"><Layers3 className="h-4 w-4 text-eye-teal" /> Map legend</h3>
@@ -172,6 +189,7 @@ export default function EyeReportMap({ rows, sex }: { rows: EyeReportRow[]; sex:
           <p className="flex items-center gap-2"><span className="h-3 w-3 rounded-full border-2 border-eye-orange" />Cataract screening cluster</p>
           <p className="flex items-center gap-2"><span className="h-3 w-3 rounded-full border-2 border-dashed border-eye-rose" />TT screening cluster</p>
           <p className="flex gap-2"><span className="h-3 w-3 shrink-0 bg-eye-gold" />Heat: teal → yellow → orange → red; relative screening volume, not prevalence.</p>
+          <p className="text-muted-foreground">Dust mean μg/m³: gold &lt;100 · orange 100–149.9 · rose ≥150. Display bands, not WHO health thresholds. Water points: blue; recorded non-functional: rose.</p>
           {metric === "outcome" ? <><p className="flex items-center gap-2"><span className="h-3 w-3 rounded-full bg-eye-teal" />Good ≥80%</p><p className="flex items-center gap-2"><span className="h-3 w-3 rounded-full bg-eye-gold" />Good 60–79.9%</p><p className="flex items-center gap-2"><span className="h-3 w-3 rounded-full bg-eye-rose" />Good &lt;60%</p><p className="flex items-center gap-2"><span className="h-3 w-3 rounded-full bg-muted-foreground" />Not assessed</p></> : <><p className="flex items-center gap-2"><span className="h-4 w-4 rounded-full bg-eye-blue" />Larger circle = more services</p><p className="flex items-center gap-2"><span className="h-3 w-3 rounded-full bg-eye-violet" />Zero services recorded</p></>}
           <p className="text-muted-foreground">Points mark where reports were captured, not verified facility premises. State/LGA are located from GPS. {metric === "outcome" ? "Outcome percentages use assessed eyes, both sexes." : "Service counts follow the dashboard sex filter."}</p>
         </div>
