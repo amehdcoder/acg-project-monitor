@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
-import { intersection } from "polygon-clipping";
+import polygonClipping from "polygon-clipping";
 import { Crosshair, MapPinned, Layers3, AlertTriangle, Upload, Droplets, Wind } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -87,7 +87,7 @@ export default function EyeReportMap({ rows, sex }: { rows: EyeReportRow[]; sex:
       if (!visible[f.properties.kind]) return [];
       if (f.geometry.type === "Point") return boundaryAt(f.geometry.coordinates[1], f.geometry.coordinates[0], features) ? [f] : [];
       if (!stateGeometry) return [];
-      const clipped = intersection(f.geometry.coordinates, stateGeometry.coordinates);
+      const clipped = polygonClipping.intersection(f.geometry.coordinates, stateGeometry.coordinates);
       return clipped.length ? [{ ...f, geometry: { type: "MultiPolygon" as const, coordinates: clipped } }] : [];
     });
     // Clip dust zones to the selected State; retain original geometry for overlap analysis.
