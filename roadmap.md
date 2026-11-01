@@ -1,7 +1,7 @@
 # Roadmap
 
-- [ ] Connect sourced Jigawa dust and WASH environmental observations with attribution and honest availability states.
-- [ ] Add WHO 2030 Roadmap Milestone Scorecard with official targets, validated evidence, scope filters and evidence-qualified forecasts.
+- [x] Connect attributed Jigawa snapshot: 10,574 FMWR/WPDx 2015 water records and 29 CAMS modeled dust cells (25–31 Oct 2026), automatic loading and toggles verified in live BMZ dashboard. Current WASH/sanitation conditions and validated causal corridor remain unavailable.
+- [x] Add WHO 2030 milestone scorecard with official coverage gains and trachoma thresholds, validated survey import, State/LGA scopes and evidence-qualified forecasts; 61 Eye tests passed; isolated survey import updates UI to 83.3% complete / On track. Actual survey baselines/denominators are not available, so live progress correctly remains unmeasurable.
 
 - [x] Implement real DHIS2 measured per-eye tracker pull, explicit milestone/facility/LGA mappings, pseudonymous identity, observation provenance, preview and chart refresh; 55 Eye tests pass; live metadata/settings verified.
 - [x] Implement dated idempotent GPS event export, facility mapping, validation-only mode, separate retries and automatic configured GPS exchange after successful indicator pushes; facility premises unchanged.

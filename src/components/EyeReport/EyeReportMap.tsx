@@ -103,8 +103,8 @@ export default function EyeReportMap({ rows, sex }: { rows: EyeReportRow[]; sex:
     });
     // Clip dust zones to the selected State; retain original geometry for overlap analysis.
     L.geoJSON({ type: "FeatureCollection", features: env } as any, {
-      style: (f) => ({ color: token("eye-orange"), weight: 1, dashArray: "6 4", fillColor: token(dustBand(f?.properties.value)), fillOpacity: 0.35 }),
-      pointToLayer: (f, ll) => L.circleMarker(ll, { radius: 4, color: token("eye-paper"), weight: 1, fillColor: token(f.properties.status?.toLowerCase().startsWith("non") ? "eye-rose" : f.properties.kind === "water" ? "eye-blue" : "eye-teal"), fillOpacity: 0.85 }),
+      style: (f) => f?.properties.kind === "dust" ? { color: token("eye-orange"), weight: 1, dashArray: "6 4", fillColor: token(dustBand(f.properties.value)), fillOpacity: 0.35 } : { color: token("eye-paper"), weight: 0.5, fillColor: token(f?.properties.status?.toLowerCase().startsWith("non") ? "eye-rose" : f?.properties.kind === "wash" ? "eye-teal" : "eye-blue"), fillOpacity: 0.7 },
+      pointToLayer: (f, ll) => L.circleMarker(ll, { radius: 2.5, color: token("eye-paper"), weight: 0.5, fillColor: token(f.properties.status?.toLowerCase().startsWith("non") ? "eye-rose" : f.properties.kind === "water" ? "eye-blue" : "eye-teal"), fillOpacity: 0.7 }),
       onEachFeature: (f, layer) => {
         const popup = document.createElement("div");
         popup.append(text("strong", f.properties.name), text("p", `${f.properties.kind === "dust" ? "Dust-prone zone" : f.properties.kind === "water" ? "Water access" : "WASH point"} · ${f.properties.observed_at}`), text("p", `Source: ${f.properties.source}`));
@@ -114,6 +114,7 @@ export default function EyeReportMap({ rows, sex }: { rows: EyeReportRow[]; sex:
         layer.bindPopup(popup).bindTooltip(text("div", f.properties.name));
       },
     }).addTo(layers);
+    L.geoJSON({ type: "FeatureCollection", features } as any, { style: { color: token("eye-deep"), weight: 1.2, fill: false, interactive: false } }).addTo(layers);
     L.geoJSON(outlines, { filter: (f) => !activeState || f.properties.state === activeState,
       style: { color: token("eye-deep"), weight: 3, fill: false, interactive: false } }).addTo(layers);
     const max = Math.max(1, ...points.map((p) => mapValue(p.report, metric, sex) ?? 0));
