@@ -22,18 +22,20 @@ export default function EyeTrackerConnection({ connectionId, month, rows }: { co
     const g=maps.find((m)=>m.indicator_key==="eye_config:gps")?.dimensions as any;
     setTracker(t?.config??{program:"",surgeryDate:"",eye:"",baseline:"",day30:"",day90:"",day180:""});
     setGps(g?.config?Object.fromEntries(Object.entries(g.config).filter(([k])=>k!=="facilities")) as Record<string,string>:{program:"",stage:"",reportId:"",accuracy:"",capturedAt:""});
-    const names=[...new Set([...rows.map((r)=>r.facility_name),...Object.keys(g?.config?.facilities??{})])];
-    setFacilities(names.map((name)=>{const unit=g?.config?.facilities?.[name]??"";return {name,unit,lga:t?.lgas?.[unit]??rows.find((r)=>r.facility_name===name)?.lga??""};}));
+    setSendGps(!!g?.config);
+    setFacilities(t?.facilities??[...new Set([...rows.map((r)=>r.facility_name),...Object.keys(g?.config?.facilities??{})])].map((name)=>{const unit=g?.config?.facilities?.[name]??"";return {name,unit,lga:t?.lgas?.[unit]??rows.find((r)=>r.facility_name===name)?.lga??""};}));
   }).catch((e)=>toast.error(e.message));return()=>{live=false;};},[connectionId]);
   const run=async(fn:()=>Promise<void>)=>{setBusy(true);try{await fn();}catch(e){toast.error(e instanceof Error?e.message:"Exchange failed");}finally{setBusy(false);}};
   const load=()=>run(async()=>{const r=await eyeTrackerMetadata(connectionId);setPrograms(r.programs);setLoaded(true);});
   const fields=(program:string)=>[...new Map((programs.find((p)=>p.id===program)?.programStages??[]).flatMap((s)=>s.programStageDataElements.map((d)=>[d.dataElement.id,d.dataElement] as const))).values()];
   const save=async()=>{
-    const config=validateTrackerConfig(tracker);
+    const config=tracker.program?validateTrackerConfig(tracker):null;
     const lgas=Object.fromEntries(facilities.filter((f)=>f.unit&&f.lga).map((f)=>[f.unit,f.lga]));
     if(!Object.keys(lgas).length)throw new Error("Map at least one facility unit and its LGA.");
-    await saveMapping({connection_id:connectionId,indicator_key:"eye_config:tracker",remote_id:config.program,dimensions:{config,lgas} as any});
-    if(sendGps){const config=validateGpsConfig({...gps,facilities:Object.fromEntries(facilities.filter((f)=>f.unit).map((f)=>[f.name,f.unit]))});await saveMapping({connection_id:connectionId,indicator_key:"eye_config:gps",remote_id:config.program,dimensions:{config} as any});}
+    if(!config&&!sendGps)throw new Error("Choose a patient tracker or GPS destination.");
+    const gpsConfig=sendGps?validateGpsConfig({...gps,facilities:Object.fromEntries(facilities.filter((f)=>f.unit).map((f)=>[f.name,f.unit]))}):null;
+    if(config)await saveMapping({connection_id:connectionId,indicator_key:"eye_config:tracker",remote_id:config.program,dimensions:{config,lgas,facilities} as any});
+    if(gpsConfig)await saveMapping({connection_id:connectionId,indicator_key:"eye_config:gps",remote_id:gpsConfig.program,dimensions:{config:gpsConfig} as any});
     toast.success("Tracker and location mappings saved");
   };
   return <div className="space-y-4 border-y p-4">

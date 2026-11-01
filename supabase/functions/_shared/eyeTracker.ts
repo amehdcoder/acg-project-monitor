@@ -26,8 +26,9 @@ export async function trackerEpisodes(events: any[], config: TrackerConfig, conn
     const unit = units.get(event.orgUnit);
     if (!surgery || !["R","L","RIGHT","LEFT","OD","OS"].includes(eye) || !parent || !unit?.name || !unit.lga) { skipped++; continue; }
     const side = ["R","RIGHT","OD"].includes(eye) ? "R" : "L";
-    const key = `${parent}:${surgery}:${side}`;
-    const prior = groups.get(key) ?? { facility_name: unit.name, lga: unit.lga, surgery_date: surgery, baseline: null, day30: null, day90: null, day180: null };
+    const key = `${config.program}:${parent}:${surgery}:${side}`;
+    const old = groups.get(key);
+    const prior = old ? { ...old, tracker_evidence: { ...old.tracker_evidence, observations: { ...old.tracker_evidence.observations } } } : { facility_name: unit.name, lga: unit.lga, surgery_date: surgery, baseline: null, day30: null, day90: null, day180: null, tracker_evidence: { connection_id: connectionId, program: config.program, eye: side, observations: {} } };
     let invalid = false;
     for (const milestone of ["baseline","day30","day90","day180"] as const) {
       const raw = values.get(config[milestone]);
@@ -35,6 +36,7 @@ export async function trackerEpisodes(events: any[], config: TrackerConfig, conn
       const measured = Number(raw);
       if (!Number.isFinite(measured) || measured < -0.3 || measured > 3) { invalid = true; break; }
       prior[milestone] = measured;
+      prior.tracker_evidence.observations[milestone] = { observed_at: event.occurredAt ?? event.eventDate ?? null, updated_at: event.updatedAt ?? event.lastUpdated ?? null, data_element: config[milestone] };
     }
     if (invalid) { skipped++; continue; }
     groups.set(key, prior);
