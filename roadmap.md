@@ -1,6 +1,6 @@
 # Roadmap
 
-- [ ] Add live distinct facility counts in environmental dust cells and explicitly defined water/WASH proximity areas using authorized locations.
+- [x] Add live distinct facility counts in dust cells and explicit 1km water/WASH proximity areas with project-scoped cached locations, registered-location priority, capture-proxy labels, realtime/refresh updates and missing-GPS counts. 65 Eye tests passed; live BMZ shows 14 facilities missing GPS, 29 dust-cell labels; isolated duplicate-report test counts one facility. Preview build clean.
 - [ ] Verify real report/outcome/GPS → dashboard flow — user has no source report or confirmed GPS; do not create fabricated clinical records or WHO forecasts.
 
 - [x] Connect attributed Jigawa snapshot: 10,574 FMWR/WPDx 2015 water records and 29 CAMS modeled dust cells (25–31 Oct 2026), automatic loading and toggles verified in live BMZ dashboard. Current WASH/sanitation conditions and validated causal corridor remain unavailable.
