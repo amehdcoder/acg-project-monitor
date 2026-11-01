@@ -1,5 +1,8 @@
 # Roadmap
 
+- [ ] Connect sourced Jigawa dust and WASH environmental observations with attribution and honest availability states.
+- [ ] Add WHO 2030 Roadmap Milestone Scorecard with official targets, validated evidence, scope filters and evidence-qualified forecasts.
+
 - [x] Implement real DHIS2 measured per-eye tracker pull, explicit milestone/facility/LGA mappings, pseudonymous identity, observation provenance, preview and chart refresh; 55 Eye tests pass; live metadata/settings verified.
 - [x] Implement dated idempotent GPS event export, facility mapping, validation-only mode, separate retries and automatic configured GPS exchange after successful indicator pushes; facility premises unchanged.
 - [ ] Verify real tracker readback/chart and committed DHIS2 GPS events — connected account exposes 20 programs but no acuity fields or point-enabled reporting stages; needs access to suitable patient-acuity and GPS programs plus mappings. No real data was invented or sent.
