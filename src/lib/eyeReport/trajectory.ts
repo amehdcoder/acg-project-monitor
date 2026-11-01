@@ -3,6 +3,7 @@ export interface VisualTrajectory {
   id: string; project_id: string; episode_key: string; facility_name: string; lga: string; surgery_date: string;
   baseline: number; day30: number | null; day90: number | null; day180: number | null;
   source: "tracker_import" | "clinical_entry"; created_by: string;
+  tracker_evidence?: { connection_id: string; program: string; eye: string; observations: Record<string,{observed_at:string|null;updated_at:string|null;data_element:string}> } | null;
 }
 export type RecoveryStatus = "Full Recovery" | "Partial Improvement" | "Unchanged" | "Deteriorated" | "Awaiting follow-up";
 /** Descriptive analytics only: good vision is <=0.3 logMAR; meaningful change is 0.2 logMAR. */

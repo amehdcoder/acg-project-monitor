@@ -20,6 +20,7 @@ export async function importTrajectories(projectId: string, userId: string, raw:
   const normalized = raw.map((r,i) => { try { return validateTrajectory(r); } catch(e) { throw new Error(`Row ${i+2}: ${e instanceof Error ? e.message : "Invalid episode"}`); } });
   if (new Set(normalized.map((r)=>r.episode_key)).size !== normalized.length) throw new Error("The import contains duplicate episode keys.");
   const rows = normalized.map((r) => {
+    if (r.episode_key.startsWith("dhis:")) throw new Error("DHIS2 episodes are updated through Sync patient tracker, not spreadsheet replacement.");
     const prior = existing.find((p)=>p.episode_key===r.episode_key);
     if (prior && prior.created_by !== userId) throw new Error("An episode in this file belongs to another reporter. Ask its reporter to update it.");
     return {...r,id:prior?.id ?? crypto.randomUUID(),project_id:projectId,created_by:userId,source:"tracker_import" as const};

@@ -6,12 +6,13 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { EYE_INDICATORS, computeEyeIndicators } from "@/lib/eyeReport/eyeIndicators";
 import {
-  browseDhis2, dhis2Children, dhis2Login, dhis2SearchUnits, eyeExchangePull, eyeExchangePush, listEyeConnections, listMappings, saveConnection, saveMapping,
+  browseDhis2, dhis2Children, dhis2Login, dhis2SearchUnits, eyeExchangePull, eyeExchangePush, eyeGpsPush, listEyeConnections, listMappings, saveConnection, saveMapping,
   type Dhis2Catalog, type Dhis2OrgUnit, type ExchangeConnection, type ExchangeMapping,
 } from "@/lib/programmeModule/healthExchange";
 import { supabase } from "@/integrations/supabase/client";
 import type { EyeReportRow } from "@/lib/eyeReport/definition";
 import { latestEyeReportingMonth } from "@/lib/eyeReport/exchangePeriod";
+import EyeTrackerConnection from "./EyeTrackerConnection";
 
 export interface PullRow { indicator_key: string; label: string; amehnities: number; dhis2: number | null; match: boolean }
 const Sel = (p: React.SelectHTMLAttributes<HTMLSelectElement>) => <select {...p} className={`h-9 w-full rounded-md border bg-background px-2 text-sm ${p.className ?? ""}`} />;
@@ -69,7 +70,7 @@ export default function EyeDhis2Exchange({ projectId, rows, onPulled }: { projec
   const dataSet = catalog?.dataSets.find((d) => d.id === conn?.dataset_id);
   const elements = dataSet?.dataElements ?? catalog?.dataSets.flatMap((d) => d.dataElements) ?? [];
   const mapBy = new Map(maps.map((m) => [m.indicator_key, m]));
-  const linked = maps.filter((m) => m.remote_id && m.remote_id !== "UNMAPPED").length;
+  const linked = maps.filter((m) => m.indicator_key.startsWith("eye_daily:") && m.remote_id && m.remote_id !== "UNMAPPED").length;
 
   const doLogin = async () => {
     setBusy("login");
@@ -122,7 +123,16 @@ export default function EyeDhis2Exchange({ projectId, rows, onPulled }: { projec
     setBusy(kind);
     try {
       if (kind === "pull") { const r = await eyeExchangePull(connId, period); setPull(r.rows); onPulled?.({ month, rows: r.rows }); toast.success(`Pulled from DHIS2 — ${r.rows.filter((x: PullRow) => x.match).length}/${r.rows.length} match`); }
-      else { const r = await eyeExchangePush(connId, period, {}, kind === "dry"); toast.success(r.message || (kind === "dry" ? "Dry run passed" : "Sent to DHIS2")); }
+      else {
+        const r = await eyeExchangePush(connId, period, {}, kind === "dry");
+        if(r.status!=="success") { toast.warning(r.message||"Indicator exchange has conflicts; GPS was not sent."); return; }
+        toast.success(r.message || (kind === "dry" ? "Dry run passed" : "Sent to DHIS2"));
+        const current = await listMappings(connId);
+        if(current.some((m)=>m.indicator_key==="eye_config:gps")) {
+          try { const gps=await eyeGpsPush(connId,period,kind==="dry");toast.success(gps.message); }
+          catch(e) { toast.error(`Indicators ${kind==="dry"?"validated":"sent"}, but GPS failed: ${e instanceof Error?e.message:"Retry Send GPS locations"}`); }
+        }
+      }
     } catch (e) { toast.error(e instanceof Error ? e.message : "DHIS2 exchange failed"); } finally { setBusy(""); }
   };
 
@@ -195,6 +205,7 @@ export default function EyeDhis2Exchange({ projectId, rows, onPulled }: { projec
         </div>
       </div>
 
+      {connId && <EyeTrackerConnection connectionId={connId} month={month} rows={rows} />}
       <div className="max-h-[520px] overflow-auto">
         <table className="w-full text-sm">
           <thead className="sticky top-0 z-[1] bg-muted text-left text-xs text-muted-foreground"><tr><th className="p-2">Indicator</th><th className="p-2 text-right">Amehnities</th><th className="p-2 text-right">DHIS2</th><th className="p-2">Linked DHIS2 data element</th></tr></thead>

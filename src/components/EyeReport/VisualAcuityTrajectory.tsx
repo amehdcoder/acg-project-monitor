@@ -14,7 +14,7 @@ export default function VisualAcuityTrajectory({projectId,userId,canReport,repor
   const [lga,setLga]=useState("all"),[facility,setFacility]=useState("all"),[compare,setCompare]=useState<"cohort"|"facility"|"lga"|"episode">("cohort"),[episode,setEpisode]=useState("");
   const file=useRef<HTMLInputElement>(null);
   const load=useCallback(async()=>{setBusy(true);try {const r=await loadTrajectories(projectId);setRows(r.rows);setUnavailable(r.unavailable);} finally {setBusy(false);} },[projectId]);
-  useEffect(()=>{void load();const refresh=()=>void load();window.addEventListener("online",refresh);return()=>window.removeEventListener("online",refresh);},[load]);
+  useEffect(()=>{void load();const refresh=()=>void load();window.addEventListener("online",refresh);window.addEventListener("eye-tracker-synced",refresh);return()=>{window.removeEventListener("online",refresh);window.removeEventListener("eye-tracker-synced",refresh);};},[load]);
   const periodMatch=(date:string)=>(period.year==="all"||date.startsWith(period.year))&&(period.month==="all"||Number(date.slice(5,7))===Number(period.month))&&(!period.from||date>=period.from)&&(!period.to||date<=period.to);
   const eligible=rows.filter((r)=>periodMatch(r.surgery_date));
   const lgas=[...new Set(eligible.map((r)=>r.lga))].sort();
