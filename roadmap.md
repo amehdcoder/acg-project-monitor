@@ -1,5 +1,8 @@
 # Roadmap
 
+- [ ] Add live distinct facility counts in environmental dust cells and explicitly defined water/WASH proximity areas using authorized locations.
+- [ ] Verify real report/outcome/GPS → dashboard flow — user has no source report or confirmed GPS; do not create fabricated clinical records or WHO forecasts.
+
 - [x] Connect attributed Jigawa snapshot: 10,574 FMWR/WPDx 2015 water records and 29 CAMS modeled dust cells (25–31 Oct 2026), automatic loading and toggles verified in live BMZ dashboard. Current WASH/sanitation conditions and validated causal corridor remain unavailable.
 - [x] Add WHO 2030 milestone scorecard with official coverage gains and trachoma thresholds, validated survey import, State/LGA scopes and evidence-qualified forecasts; 61 Eye tests passed; isolated survey import updates UI to 83.3% complete / On track. Actual survey baselines/denominators are not available, so live progress correctly remains unmeasurable.
 

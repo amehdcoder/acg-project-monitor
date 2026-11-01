@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
@@ -10,11 +10,14 @@ import { dustBand, dustOverlap, facilityReporting, morbidityCount, parseEnvironm
 import { loadNigeriaGeo } from "@/components/Dashboard/ops/lgaGeo";
 import { boundaryAt, locatedReports, MAP_METRICS, mapValue, type MapMetric, type BoundaryFeature } from "@/lib/eyeReport/mapModel";
 import { normCsom, normSummary, t, totals, vaTotal, pct, type EyeReportRow } from "@/lib/eyeReport/definition";
+import { loadEnvironmentalLocations, type MapFacility } from "@/lib/eyeReport/environmentStore";
+import { facilityLocations, facilitiesInZone } from "@/lib/eyeReport/hotspots";
+import { supabase } from "@/integrations/supabase/client";
 
 const token = (name: string) => `hsl(${getComputedStyle(document.documentElement).getPropertyValue(`--${name}`).trim()})`;
 function text(tag: string, value: string, className = "") { const node = document.createElement(tag); node.textContent = value; node.className = className; return node; }
 
-export default function EyeReportMap({ rows, sex }: { rows: EyeReportRow[]; sex: "all" | "m" | "f" }) {
+export default function EyeReportMap({ rows, sex, projectId, unavailable = false }: { rows: EyeReportRow[]; sex: "all" | "m" | "f"; projectId?: string; unavailable?: boolean }) {
   const root = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const bounds = useRef<L.LatLngBounds | null>(null);
@@ -29,6 +32,33 @@ export default function EyeReportMap({ rows, sex }: { rows: EyeReportRow[]; sex:
   const [environment, setEnvironment] = useState<EnvironmentalFeature[]>([]);
   const [environmentStatus, setEnvironmentStatus] = useState("Loading sourced Jigawa observations…");
   const [environmentOrigin, setEnvironmentOrigin] = useState<"snapshot" | "import">("snapshot");
+  const [registry, setRegistry] = useState<MapFacility[]>([]);
+  const [projectWash, setProjectWash] = useState<EnvironmentalFeature[]>([]);
+  const [washUnlocated, setWashUnlocated] = useState(0);
+  const [locationsUnavailable, setLocationsUnavailable] = useState(false);
+  const [locationsLoading, setLocationsLoading] = useState(!!projectId);
+  const [locationsCached, setLocationsCached] = useState(false);
+  const refreshLocations = useCallback(async () => {
+    if (!projectId) return;
+    setLocationsLoading(true);
+    try {
+      const result = await loadEnvironmentalLocations(projectId);
+      setRegistry(result.facilities); setProjectWash(result.wash); setWashUnlocated(result.washUnlocated);
+      setLocationsUnavailable(result.unavailable); setLocationsCached(result.fromCache);
+    } catch { setLocationsUnavailable(true); }
+    finally { setLocationsLoading(false); }
+  }, [projectId]);
+  useEffect(() => {
+    setRegistry([]); setProjectWash([]); void refreshLocations();
+    if (!projectId) return;
+    const channel = supabase.channel(`eye-environment:${projectId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "health_facilities", filter: `project_id=eq.${projectId}` }, () => void refreshLocations())
+      .on("postgres_changes", { event: "*", schema: "public", table: "community_wash_sources", filter: `project_id=eq.${projectId}` }, () => void refreshLocations()).subscribe();
+    window.addEventListener("online", refreshLocations);
+    const timer = window.setInterval(() => { if (navigator.onLine && document.visibilityState === "visible") void refreshLocations(); }, 60000);
+    return () => { void supabase.removeChannel(channel); window.removeEventListener("online", refreshLocations); window.clearInterval(timer); };
+  }, [projectId, refreshLocations]);
+  const evidence = useMemo(() => [...environment, ...projectWash], [environment, projectWash]);
   const loadEnvironment = async () => {
     try {
       const data = await import("@/assets/eye-report/jigawa-environment.json");
@@ -51,6 +81,10 @@ export default function EyeReportMap({ rows, sex }: { rows: EyeReportRow[]; sex:
   const activeState = state !== "auto" && states.includes(state) ? state : located.find((r) => r.state)?.state ?? null;
   const points = located.filter((r) => r.state === activeState);
   const active = points.find((r) => r.report.id === selected);
+  const facilityEvidence = useMemo(() => facilityLocations(rows, registry), [rows, registry]);
+  const stateFacilities = useMemo(() => facilityEvidence.locations.filter((f) => boundaryAt(f.lat,f.lng,geo?.features ?? [])?.properties.state === activeState), [facilityEvidence, geo, activeState]);
+  const dustZones = useMemo(() => environment.filter((f) => f.properties.kind === "dust"), [environment]);
+  const zoneCounts = useMemo(() => dustZones.map((zone) => ({ zone, facilities: facilitiesInZone(zone,stateFacilities) })), [dustZones,stateFacilities]);
   useEffect(() => {
     if (!root.current) return;
     const instance = L.map(root.current, { preferCanvas: true, scrollWheelZoom: true, minZoom: 4, maxZoom: 19 }).setView([12.1, 9.5], 8);
@@ -94,7 +128,7 @@ export default function EyeReportMap({ rows, sex }: { rows: EyeReportRow[]; sex:
       }).addTo(layers);
     }
     const stateGeometry = outlines.features.find((f: any) => f.properties.state === activeState)?.geometry;
-    const env = environment.flatMap((f) => {
+    const env = evidence.flatMap((f) => {
       if (!visible[f.properties.kind]) return [];
       if (f.geometry.type === "Point") return boundaryAt(f.geometry.coordinates[1], f.geometry.coordinates[0], features) ? [f] : [];
       if (!stateGeometry) return [];
@@ -111,9 +145,28 @@ export default function EyeReportMap({ rows, sex }: { rows: EyeReportRow[]; sex:
         if (f.geometry.type === "Point") popup.append(text("p", `${f.geometry.coordinates[1].toFixed(6)}, ${f.geometry.coordinates[0].toFixed(6)}`));
         if (f.properties.value !== undefined) popup.append(text("p", `${f.properties.period_start} to ${f.properties.observed_at} · mean ${f.properties.value} ${f.properties.units} · ${f.properties.model_resolution} · ${f.properties.evidence_type}`));
         if (f.properties.status) popup.append(text("p", `Assessed status: ${f.properties.status} · ${f.properties.water_source ?? ""}`), text("p", "Historical assessment; current water safety and household access are unverified."));
-        layer.bindPopup(popup).bindTooltip(text("div", f.properties.name));
+        const members = facilitiesInZone(f as EnvironmentalFeature,stateFacilities);
+        const count = locationsUnavailable || unavailable || locationsLoading ? "Unavailable" : String(members.length);
+        popup.append(text("p", `${f.geometry.type === "Point" ? "Facilities within 1 km" : "Distinct facilities in zone"}: ${count}`));
+        if (members.length) popup.append(text("p", members.map((m) => `${m.name} (${m.evidence})`).join(" · ")));
+        if (f.properties.kind === "wash") popup.append(text("p", "Registry update date; service functionality and safe household access are not independently verified."));
+        layer.bindPopup(popup).bindTooltip(text("div", `${f.properties.name} · ${count} facilities${f.geometry.type === "Point" ? " within 1 km" : ""}`));
       },
     }).addTo(layers);
+    if (visible.dust) for (const { zone } of zoneCounts) {
+      const clipped = env.find((f) => f.properties === zone.properties);
+      if (!clipped) continue;
+      const shape = L.geoJSON(clipped as any), center = shape.getBounds().getCenter();
+      const members = facilitiesInZone(zone,stateFacilities);
+      const label = text("span", locationsUnavailable || unavailable || locationsLoading ? "—" : String(members.length), "inline-flex min-w-6 items-center justify-center rounded border border-eye-orange bg-card px-1 text-xs font-bold text-eye-deep");
+      L.marker(center, { icon: L.divIcon({ html: label, className: "", iconSize: [24,24] }) }).addTo(layers)
+        .bindTooltip(text("div", `${zone.properties.name} · ${members.length} distinct facilities`))
+        .bindPopup(text("div", `${zone.properties.name} · ${locationsUnavailable || unavailable || locationsLoading ? "Counts unavailable" : `${members.length} facilities: ${members.map((m)=>m.name).join(", ") || "none located"}`} · report captures are proxies, not verified premises.`));
+    }
+    if (visible.reports) for (const f of stateFacilities.filter((f)=>f.evidence === "Registered facility coordinates")) {
+      L.circleMarker([f.lat,f.lng], { radius:6,color:token("eye-paper"),weight:2,fillColor:token("eye-deep"),fillOpacity:1 }).addTo(layers)
+        .bindTooltip(text("div",f.name)).bindPopup(text("div",`${f.name} · Registered facility coordinates · ${f.lat.toFixed(6)}, ${f.lng.toFixed(6)}`));
+    }
     L.geoJSON({ type: "FeatureCollection", features } as any, { style: { color: token("eye-deep"), weight: 1.2, fill: false, interactive: false } }).addTo(layers);
     L.geoJSON(outlines, { filter: (f) => !activeState || f.properties.state === activeState,
       style: { color: token("eye-deep"), weight: 3, fill: false, interactive: false } }).addTo(layers);
@@ -124,7 +177,7 @@ export default function EyeReportMap({ rows, sex }: { rows: EyeReportRow[]; sex:
       popup.append(text("strong", p.report.facility_name), text("p", `${p.report.report_date} · ${p.lga ?? "Unmatched LGA"}`), text("p", `${MAP_METRICS.find((m) => m.key === metric)?.label}: ${value === null ? "Not assessed" : metric === "outcome" ? `${value.toFixed(1)}%` : value.toLocaleString()}`), text("p", `${p.gps.lat.toFixed(6)}, ${p.gps.lng.toFixed(6)} · ±${Math.round(p.gps.accuracy)} m`));
       const reporting = facilityReporting(p.report, rows, sex);
       popup.append(text("p", `Reporting-day coverage: ${reporting.rate?.toFixed(1) ?? "—"}% (${reporting.days}/${reporting.span} calendar days in observed period)`), text("p", `Cataract screened: ${morbidityCount(p.report, "cataract", sex)} · TT screened: ${morbidityCount(p.report, "tt", sex)}`));
-      const overlapping = dustOverlap(p.gps.lat, p.gps.lng, environment);
+      const overlapping = dustOverlap(p.gps.lat, p.gps.lng, evidence);
       if (overlapping.length) popup.append(text("p", `Dust-zone overlap: ${overlapping.map((f) => f.properties.name).join(", ")} · not a causal diagnosis`));
       const cases = diseaseTotal(p);
       if (!visible.reports && !cases) continue;
@@ -143,7 +196,7 @@ export default function EyeReportMap({ rows, sex }: { rows: EyeReportRow[]; sex:
     const b = lgaLayer.getBounds(); bounds.current = b;
     if (b.isValid() && fittedState.current !== activeState) { instance.fitBounds(b, { padding: [16, 16] }); fittedState.current = activeState; }
     return () => { instance.removeLayer(layers); };
-  }, [geo, outlines, activeState, located, metric, sex, visible, environment, rows]);
+  }, [geo, outlines, activeState, located, metric, sex, visible, evidence, rows, stateFacilities, zoneCounts, locationsUnavailable, locationsLoading, unavailable]);
   const c = active ? normCsom(active.report.csom) : null;
   const tt = active ? totals(normSummary(active.report.summary)) : null;
   const outside = located.filter((p) => !p.state).length;
@@ -162,6 +215,7 @@ export default function EyeReportMap({ rows, sex }: { rows: EyeReportRow[]; sex:
         {!located.length && <p className="absolute bottom-4 left-4 right-4 z-[500] border bg-card/95 p-3 text-sm text-eye-deep">{geo ? "No captured GPS locations in the selected reporting period." : "Loading Nigerian boundaries…"}</p>}
       </div>
       <aside className="space-y-4 px-4 lg:pl-0">
+        <div className="border-b pb-3 text-xs" aria-label="Live hotspot facility counts"><h3 className="font-bold text-eye-deep">Live hotspot facility counts</h3><p className="mt-2">{locationsLoading ? "Loading facility locations…" : locationsUnavailable || unavailable ? "Counts unavailable; reconnect to verify." : `${stateFacilities.length} located facilities in ${activeState} · ${facilityEvidence.unlocated} without usable coordinates in current project/period`}</p><p className="mt-1 text-muted-foreground">One count per facility. Registered locations take priority; latest report GPS is a capture-location proxy. {locationsCached ? "Saved offline locations." : ""}</p><p className="mt-1 text-muted-foreground">{projectWash.length} located project WASH points · {washUnlocated} missing GPS. Water-point counts use a 1 km proximity radius, not proof of safe-water access.</p><Button variant="ghost" size="sm" className="mt-1" onClick={()=>void refreshLocations()}>Refresh locations</Button></div>
         <h3 className="text-sm font-bold text-eye-deep">Evidence layers</h3>
         <div className="space-y-1">{([
           ["reports", "Facility reporting", "bg-eye-blue"], ["cataract", "Cataract screened", "bg-eye-orange"], ["tt", "Trachomatous trichiasis", "bg-eye-rose"], ["heat", "Morbidity heatmap", "bg-eye-gold"], ["dust", "Dust-prone zones", "bg-eye-gold"], ["water", "Water access points", "bg-eye-blue"], ["wash", "WASH locations", "bg-eye-teal"], ["basemap", "Street basemap", "bg-muted-foreground"],
@@ -170,7 +224,7 @@ export default function EyeReportMap({ rows, sex }: { rows: EyeReportRow[]; sex:
           <p className="flex items-center gap-2 font-semibold text-eye-teal"><Wind className="h-4 w-4" /><Droplets className="h-4 w-4" />Environmental evidence</p>
           <p className="text-muted-foreground">{environmentStatus}</p>
           {!!environment.length && <p className="font-semibold text-eye-deep">{environment.filter((f)=>f.properties.kind==="water").length.toLocaleString()} water-point records · {environment.filter((f)=>f.properties.kind==="dust").length} modeled dust cells</p>}
-          <p className="text-muted-foreground">Water assessments are from 2015, not current safe-water coverage. Dust is a ~45 km atmospheric model, not measured eye-disease risk. No sanitation inventory is connected.</p>
+          <p className="text-muted-foreground">Water assessments are from 2015, not current safe-water coverage. Dust is a ~45 km atmospheric model, not measured eye-disease risk. Project WASH registry points appear only when coordinates are recorded.</p>
           <div className="flex flex-wrap gap-2"><a className="text-eye-blue underline" href="https://www.waterpointdata.org/access-data/" target="_blank" rel="noreferrer">FMWR / WPDx</a><a className="text-eye-blue underline" href="https://open-meteo.com/en/docs/air-quality-api" target="_blank" rel="noreferrer">CAMS / Open-Meteo · CC BY 4.0</a></div>
           <p className="text-muted-foreground">No validated blindness corridor model connected.</p>
           <input ref={fileInput} type="file" accept=".geojson,.json" className="hidden" aria-label="Environmental GeoJSON" onChange={async (event) => {

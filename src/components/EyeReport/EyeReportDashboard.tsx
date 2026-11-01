@@ -168,7 +168,7 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
         </section>
 
         <WhoMilestoneScorecard rows={filtered} unavailable={unavailable} />
-        <EyeReportMap rows={filtered} sex={sex} />
+        <EyeReportMap rows={filtered} sex={sex} projectId={projectId} unavailable={unavailable} />
         <VisualAcuityTrajectory projectId={projectId} userId={userId} canReport={canReport} reports={filtered} period={{ year, month, from, to }} dhis={dhisOutcomes} />
         <EyeFacilityTrend rows={rows} />
 
