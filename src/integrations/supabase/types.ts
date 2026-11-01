@@ -5599,6 +5599,7 @@ export type Database = {
           device_id: string | null
           facility_id: string | null
           facility_name: string
+          gps: Json | null
           id: string
           lga: string | null
           notes: string | null
@@ -5619,6 +5620,7 @@ export type Database = {
           device_id?: string | null
           facility_id?: string | null
           facility_name: string
+          gps?: Json | null
           id?: string
           lga?: string | null
           notes?: string | null
@@ -5639,6 +5641,7 @@ export type Database = {
           device_id?: string | null
           facility_id?: string | null
           facility_name?: string
+          gps?: Json | null
           id?: string
           lga?: string | null
           notes?: string | null

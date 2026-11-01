@@ -1,0 +1,3 @@
+ALTER TABLE public.eye_daily_reports ADD COLUMN IF NOT EXISTS gps jsonb;
+ALTER TABLE public.eye_daily_reports ADD CONSTRAINT eye_daily_reports_gps_valid CHECK (gps IS NULL OR (jsonb_typeof(gps) = 'object' AND gps ?& ARRAY['lat','lng','accuracy','captured_at'] AND jsonb_typeof(gps->'lat') = 'number' AND jsonb_typeof(gps->'lng') = 'number' AND jsonb_typeof(gps->'accuracy') = 'number' AND (gps->>'lat')::numeric BETWEEN -90 AND 90 AND (gps->>'lng')::numeric BETWEEN -180 AND 180 AND (gps->>'accuracy')::numeric >= 0 AND jsonb_typeof(gps->'captured_at') = 'string'));
+COMMENT ON COLUMN public.eye_daily_reports.gps IS 'Device reporting location with latitude, longitude, accuracy in metres and GPS fix timestamp; optional for historical reports and unavailable GPS.';
