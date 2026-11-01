@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import { toast } from "sonner";
 import AppUpdateNotification from "@/components/AppUpdateNotification";
@@ -20,16 +20,18 @@ interface InnerProps {
 }
 
 const SwRegistrar = ({ onAvailable, registerSelf }: InnerProps) => {
+  const removeFocusListener = useRef<(() => void) | null>(null);
   const {
     needRefresh: [needRefresh],
-    updateServiceWorker,
   } = useRegisterSW({
     // The manager owns the only navigation; Workbox must not reload too.
     onNeedReload() {},
     onRegisteredSW(_swUrl, registration) {
       if (!registration) return;
+      removeFocusListener.current?.();
       const onFocus = () => registration.update().catch(() => {});
       window.addEventListener("focus", onFocus);
+      removeFocusListener.current = () => window.removeEventListener("focus", onFocus);
       registration.update().catch(() => {});
     },
     onRegisterError(error) {
@@ -70,7 +72,9 @@ const SwRegistrar = ({ onAvailable, registerSelf }: InnerProps) => {
         check();
       });
     });
-  }, [registerSelf, updateServiceWorker]);
+  }, [registerSelf]);
+
+  useEffect(() => () => removeFocusListener.current?.(), []);
 
   useEffect(() => {
     if (needRefresh) onAvailable();
@@ -131,7 +135,7 @@ const PWAUpdatePrompt = () => {
 
   }, [updateState.latestBuildId, updateState.updateAvailable]);
 
-  const handleAvailable = () => markServiceWorkerUpdateAvailable();
+  const handleAvailable = useCallback(() => markServiceWorkerUpdateAvailable(), []);
 
   const handleUpdate = async () => {
     if (isUpdating || getAppUpdateState().status === "updating") return;
@@ -149,7 +153,7 @@ const PWAUpdatePrompt = () => {
     setShowModal(false);
   };
 
-  const registerSelf = (fn: () => Promise<void>) => registerServiceWorkerUpdater(fn);
+  const registerSelf = useCallback((fn: () => Promise<void>) => registerServiceWorkerUpdater(fn), []);
 
   return (
     <>

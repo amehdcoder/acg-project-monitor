@@ -93,7 +93,7 @@ const AppUpdateButton = () => {
       {/* Always render a readable label so the control is fully visible on
           every screen width — including small Android and iPhone widths. */}
       <span>
-        {isBusy ? busyLabel : hasUpdate ? "Update" : "Update"}
+        {isBusy ? busyLabel : "Update"}
       </span>
     </Button>
   );
