@@ -16,6 +16,7 @@ describe("Environmental overlay evidence", () => {
   });
   it("maps Cataract and TT screened counts separately with the sex filter", () => {
     const summary = emptySummary(); summary.screen.cataract = { m: 5, f: 8 }; summary.screen.tt = { m: 2, f: 3 };
+    summary.ages["screen.cataract"].a15_39 = { m: 5, f: 8 }; summary.ages["screen.tt"].a15_39 = { m: 2, f: 3 };
     const report = { summary } as EyeReportRow;
     expect(morbidityCount(report,"cataract","all")).toBe(13);
     expect(morbidityCount(report,"tt","f")).toBe(3);
