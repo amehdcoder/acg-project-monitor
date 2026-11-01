@@ -10,7 +10,7 @@ import { cachePatchRows } from "./offlineReadCache";
 
 const db = supabase as unknown as { from: (t: string) => any }; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-export type OpAction = "insert" | "update" | "delete" | "graduation" | "batch";
+export type OpAction = "insert" | "update" | "delete" | "graduation" | "batch" | "upsert";
 export interface OpPayload {
   table: string;
   action: OpAction;
@@ -39,6 +39,12 @@ export async function runOp(op: OpPayload): Promise<void> {
   }
   let res: { error: { code?: string; message: string } | null };
   if (op.action === "insert") res = await db.from(op.table).insert(op.values);
+  else if (op.action === "upsert") {
+    // Retried envelopes overwrite the same stable id with the latest values.
+    const { error } = await db.from(op.table).upsert(op.values, { onConflict: "id" });
+    if (error) throw new Error(error.message);
+    return;
+  }
   else if (op.action === "update") {
     const result = await db.from(op.table).update(op.values).eq("id", op.id).select("id");
     if (!result.error && !result.data?.length) throw new Error("This record could not be updated. Check your project access and try again.");
