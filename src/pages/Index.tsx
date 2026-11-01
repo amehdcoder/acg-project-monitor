@@ -98,6 +98,7 @@ import GeoWorkspaceShell from "@/components/Microplanning/GeoWorkspaceShell";
 import { useGeoWorkspaceLock } from "@/lib/microplanning/geoWorkspaceLock";
 import ProgrammeModuleWorkspace from "@/components/ProgrammeModule/ProgrammeModuleWorkspace";
 import ScrollRail from "@/components/ProgrammeModule/ScrollRail";
+import { initialAppTab, requiredWorkspace } from "@/lib/appLanding";
 
 const Index = () => {
   const mainScrollRef = React.useRef<HTMLElement>(null);
@@ -105,17 +106,9 @@ const Index = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
-  // Initialize state from URL params — Forms is the default landing page for
-  // everyone, including people with Longitudinal Beneficiary Records access.
-  // An explicit ?tab= link or a deliberately stored tab from this session still wins.
-  const [activeTab, setActiveTab] = useState(() => {
-    const fromUrl = searchParams.get("tab");
-    if (fromUrl) return fromUrl;
-    try {
-      const stored = sessionStorage.getItem("amehnities:active-tab");
-      return stored || "forms";
-    } catch { return "forms"; }
-  });
+  // Default to Forms; explicit links remain usable, and required project
+  // workspaces override tab navigation below.
+  const [activeTab, setActiveTab] = useState(() => initialAppTab(searchParams.get("tab")));
 
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(searchParams.get("project"));
   
@@ -158,28 +151,8 @@ const Index = () => {
     }
   }, [searchParams]);
 
-  // Land on the records Overview: open the first project that has beneficiary
-  // records. People who cannot use the records workspace keep Forms as home.
-  const [landingResolved, setLandingResolved] = useState(false);
-  useEffect(() => {
-    if (landingResolved || loading || !user || recordsLock.loading) return;
-    setLandingResolved(true);
-    if (searchParams.get("tab") || activeTab !== "records") return;
-    if (recordsLockActive) return;
-    if (isAdmin || isOwner || isSuperAdmin || isCoOwner) {
-      if (selectedProjectId) return;
-      const first = recordsLock.locked[0];
-      if (first) setSelectedProjectId(first.id);
-      else setActiveTab("forms");
-      return;
-    }
-    setActiveTab("forms");
-  }, [landingResolved, loading, user, recordsLock.loading, recordsLock.locked, activeTab, selectedProjectId, recordsLockActive, isAdmin, isOwner, isSuperAdmin, isCoOwner, searchParams]);
-
-
   useEffect(() => {
     if (user?.id && activeTab) trackPageVisit(activeTab);
-    try { sessionStorage.setItem("amehnities:active-tab", activeTab); } catch { /* ignore */ }
 
     const currentParams = new URLSearchParams(window.location.search);
     const nextParams = new URLSearchParams(currentParams);
@@ -454,7 +427,8 @@ const Index = () => {
 
   // Projects the Owner / Co-Owner locked to the Longitudinal Beneficiary
   // Records system: everyone else sees that system and nothing else.
-  if (recordsLockActive && !geoLock.active) {
+  const workspace = requiredWorkspace(geoLock.active, recordsLockActive);
+  if (workspace === "records") {
     return (
       <ErrorBoundary name="RecordsOnly">
         <RecordsOnlyShell
@@ -468,7 +442,7 @@ const Index = () => {
   }
 
   // Geo Microplanning workspace lock (project-wide or per user).
-  if (geoLock.active) {
+  if (workspace === "geo") {
     return (
       <ErrorBoundary name="GeoWorkspace">
         <GeoWorkspaceShell projectIds={geoLock.projectIds} onSwitchToFullApp={geoLock.canManage && !geoLock.lockedForMe ? () => geoLock.setOwnerMode(false) : undefined} />
