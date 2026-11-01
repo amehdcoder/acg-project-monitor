@@ -12,6 +12,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import type { EyeReportRow } from "@/lib/eyeReport/definition";
 import { latestEyeReportingMonth } from "@/lib/eyeReport/exchangePeriod";
+import EyeTrackerConnection from "./EyeTrackerConnection";
 
 export interface PullRow { indicator_key: string; label: string; amehnities: number; dhis2: number | null; match: boolean }
 const Sel = (p: React.SelectHTMLAttributes<HTMLSelectElement>) => <select {...p} className={`h-9 w-full rounded-md border bg-background px-2 text-sm ${p.className ?? ""}`} />;
@@ -69,7 +70,7 @@ export default function EyeDhis2Exchange({ projectId, rows, onPulled }: { projec
   const dataSet = catalog?.dataSets.find((d) => d.id === conn?.dataset_id);
   const elements = dataSet?.dataElements ?? catalog?.dataSets.flatMap((d) => d.dataElements) ?? [];
   const mapBy = new Map(maps.map((m) => [m.indicator_key, m]));
-  const linked = maps.filter((m) => m.remote_id && m.remote_id !== "UNMAPPED").length;
+  const linked = maps.filter((m) => m.indicator_key.startsWith("eye_daily:") && m.remote_id && m.remote_id !== "UNMAPPED").length;
 
   const doLogin = async () => {
     setBusy("login");
@@ -195,6 +196,7 @@ export default function EyeDhis2Exchange({ projectId, rows, onPulled }: { projec
         </div>
       </div>
 
+      {connId && <EyeTrackerConnection connectionId={connId} month={month} rows={rows} />}
       <div className="max-h-[520px] overflow-auto">
         <table className="w-full text-sm">
           <thead className="sticky top-0 z-[1] bg-muted text-left text-xs text-muted-foreground"><tr><th className="p-2">Indicator</th><th className="p-2 text-right">Amehnities</th><th className="p-2 text-right">DHIS2</th><th className="p-2">Linked DHIS2 data element</th></tr></thead>
