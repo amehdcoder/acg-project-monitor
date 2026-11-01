@@ -1,0 +1,2 @@
+ALTER TABLE public.eye_visual_trajectories ADD COLUMN IF NOT EXISTS tracker_evidence jsonb;
+COMMENT ON COLUMN public.eye_visual_trajectories.tracker_evidence IS 'Server-imported DHIS2 connection/program identity and per-milestone observed timestamps; never synthesized acuity.';

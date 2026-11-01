@@ -5751,6 +5751,7 @@ export type Database = {
           project_id: string
           source: string
           surgery_date: string
+          tracker_evidence: Json | null
         }
         Insert: {
           baseline: number
@@ -5766,6 +5767,7 @@ export type Database = {
           project_id: string
           source?: string
           surgery_date: string
+          tracker_evidence?: Json | null
         }
         Update: {
           baseline?: number
@@ -5781,6 +5783,7 @@ export type Database = {
           project_id?: string
           source?: string
           surgery_date?: string
+          tracker_evidence?: Json | null
         }
         Relationships: [
           {
