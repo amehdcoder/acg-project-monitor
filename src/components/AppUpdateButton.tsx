@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RefreshCw, Sparkles, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -8,7 +8,6 @@ import {
   getAppUpdateState,
   getLastAppliedAt,
   hardReloadToLatest,
-  shouldSkipServiceWorker,
   subscribeToAppUpdates,
 } from "@/lib/appUpdateManager";
 
@@ -37,124 +36,32 @@ const AppUpdateButton = () => {
     return () => clearInterval(id);
   }, []);
 
-  // Belt-and-braces: make sure no stale service worker can keep serving the
-  // old shell, even if hardReloadToLatest's own cleanup was interrupted.
-  const purgeServiceWorkers = async () => {
-    try {
-      const regs = await navigator.serviceWorker?.getRegistrations();
-      await Promise.allSettled(
-        (regs || [])
-          .filter((r) => {
-            const script = r.active?.scriptURL || r.waiting?.scriptURL || r.installing?.scriptURL || "";
-            return !script.includes("push-sw.js");
-          })
-          .map((r) => r.unregister()),
-      );
-    } catch { /* best-effort */ }
-  };
-
+  const clickInFlight = useRef(false);
   const handleClick = async () => {
-    if (installing) return;
+    if (clickInFlight.current || getAppUpdateState().status === "updating") return;
+    clickInFlight.current = true;
     setInstalling(true);
     setStatusText("Checking…");
-    // Optimistic UI: acknowledge the tap instantly, before any network work.
-    const optimisticId = toast.loading(
-      updateState.updateAvailable ? "Updating the app…" : "Checking for updates…",
-    );
-
-    // Any tap on Update must result in a latest-shell reload, even when the
-    // version probe says the app is current. This prevents users on cached
-    // mobile/desktop shells from getting stuck without the newest build.
-    const forceLatestReload = async (message = "Refreshing latest version…") => {
-      setStatusText("Reloading…");
-      toast.loading(message, { id: optimisticId });
-      await purgeServiceWorkers();
-      await hardReloadToLatest({ force: true });
-    };
-
-
-    // If there is no known update yet, make the button a fast, reliable manual
-    // check instead of hiding it. This keeps the header control visible and
-    // responsive in preview, published, and installed-app contexts.
-    if (!updateState.updateAvailable) {
-      try {
-        const next = await Promise.race([
-          checkForAppUpdate({ force: true, source: shouldSkipServiceWorker ? "html" : "version" }),
-          new Promise<ReturnType<typeof getAppUpdateState>>((resolve) =>
-            setTimeout(() => resolve(getAppUpdateState()), 2500),
-          ),
-        ]);
-        setUpdateState(next);
-        if (!next.updateAvailable) {
-          toast.success("You're on the latest version — no update available", { id: optimisticId });
-          setStatusText(null);
-          setInstalling(false);
-          return;
-        }
-        toast.loading("New version found — updating…", { id: optimisticId });
-      } catch {
-        setStatusText("Retry");
-        toast.error("Couldn't check for updates — tap to retry", { id: optimisticId });
-        window.setTimeout(() => {
-          setInstalling(false);
-          setStatusText(null);
-        }, 900);
+    const toastId = toast.loading("Checking for updates…");
+    try {
+      const next = await checkForAppUpdate({ force: true });
+      if (next.status === "error") throw new Error(next.error || "Couldn't check for updates. Please try again.");
+      if (!next.updateAvailable) {
+        toast.success("You're on the latest version", { id: toastId });
         return;
       }
+      setStatusText("Updating…");
+      toast.loading("Applying update…", { id: toastId });
+      const applied = await hardReloadToLatest();
+      if (!applied) throw new Error(getAppUpdateState().error || "Couldn't update. Please try again.");
+      toast.dismiss(toastId);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't update. Please try again.", { id: toastId });
+    } finally {
+      clickInFlight.current = false;
+      setInstalling(false);
+      setStatusText(null);
     }
-
-
-    // Single click with a known update = guaranteed install. Show feedback
-    // instantly, then run the real update with a hard watchdog so a hung
-    // cache/probe can never leave the user stuck.
-
-    // Watchdog: no matter what happens below (probe hang, cache API stall,
-    // service-worker timeout), unregister any stale worker and force a
-    // cache-busted hard reload after 6s so the update ALWAYS completes.
-    const watchdog = setTimeout(() => {
-      void purgeServiceWorkers().finally(() => {
-        try {
-          const url = new URL(window.location.href);
-          url.searchParams.set("__v", String(Date.now()));
-          window.location.replace(url.toString());
-        } catch {
-          window.location.reload();
-        }
-      });
-    }, 6000);
-
-    // Retry the version probe a few times — transient network blips should never
-    // make a single click feel like it "did nothing". The watchdog still
-    // guarantees completion regardless of probe outcome.
-    const probeWithRetry = async () => {
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        setStatusText(attempt === 1 ? "Checking…" : `Retrying (${attempt})…`);
-        try {
-          await Promise.race([
-            checkForAppUpdate({ force: true, source: shouldSkipServiceWorker ? "html" : "version" }),
-            new Promise((_r, rej) => setTimeout(() => rej(new Error("probe-timeout")), 2000)),
-          ]);
-          return; // success
-        } catch {
-          if (attempt < 3) await new Promise((r) => setTimeout(r, 300));
-        }
-      }
-    };
-
-    try {
-      await probeWithRetry();
-      setStatusText("Applying…");
-      toast.loading("Applying update — reloading…", { id: optimisticId });
-
-      await purgeServiceWorkers();
-      await hardReloadToLatest({ force: true });
-    } catch {
-      // even if everything failed, the watchdog reload will recover.
-      setStatusText("Finishing…");
-    }
-    // Note: we intentionally do NOT clear the watchdog — hardReloadToLatest
-    // navigates away on success; if it didn't, the watchdog guarantees a reload.
-    void watchdog;
   };
 
   const isBusy = installing || updateState.status === "updating";
@@ -169,14 +76,15 @@ const AppUpdateButton = () => {
       size="sm"
       onClick={handleClick}
       disabled={isBusy}
+      aria-busy={isBusy}
       className={`h-9 min-w-[84px] shrink-0 gap-1.5 px-2.5 text-xs font-bold shadow-glow whitespace-nowrap sm:h-8 sm:min-w-[92px] sm:px-3 ${
-        hasUpdate ? "animate-pulse ring-2 ring-primary/40" : "ring-1 ring-primary/25"
+        hasUpdate ? "ring-2 ring-primary/40" : "ring-1 ring-primary/25"
       }`}
-      aria-label={hasUpdate ? "A new version is available — tap to update" : `Force refresh latest version. ${stamp}`}
-      title={hasUpdate ? "A new version is available — tap to update" : `Force refresh latest version. ${stamp}`}
+      aria-label={hasUpdate ? "A new version is available — tap to update" : `Check for updates. ${stamp}`}
+      title={hasUpdate ? "A new version is available — tap to update" : `Check for updates. ${stamp}`}
     >
       {isBusy ? (
-        <RefreshCw className="h-4 w-4 shrink-0 animate-spin" />
+        <RefreshCw className="h-4 w-4 shrink-0 motion-safe:animate-spin" />
       ) : hasUpdate ? (
         <Sparkles className="h-4 w-4 shrink-0" />
       ) : (
