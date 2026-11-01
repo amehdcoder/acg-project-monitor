@@ -22,7 +22,7 @@ export default function EyeReportMap({ rows, sex }: { rows: EyeReportRow[]; sex:
   const [selected, setSelected] = useState<string | null>(null);
   useEffect(() => {
     let live = true;
-    Promise.all([loadNigeriaGeo(), fetch("/nigeria-state-outlines.geojson").then((r) => { if (!r.ok) throw new Error(); return r.json(); })])
+    Promise.all([loadNigeriaGeo(), fetch("/eye-state-boundaries.geojson").then((r) => { if (!r.ok) throw new Error(); return r.json(); })])
       .then(([g, o]) => { if (live) { setGeo(g); setOutlines(o); } }).catch(() => { if (live) setError("State and LGA boundaries could not be loaded. Reconnect and reopen the dashboard."); });
     return () => { live = false; };
   }, []);
@@ -33,7 +33,7 @@ export default function EyeReportMap({ rows, sex }: { rows: EyeReportRow[]; sex:
   const active = points.find((r) => r.report.id === selected);
   useEffect(() => {
     if (!root.current) return;
-    const instance = L.map(root.current, { preferCanvas: true, scrollWheelZoom: false, minZoom: 4, maxZoom: 19 }).setView([9.082, 8.6753], 6);
+    const instance = L.map(root.current, { preferCanvas: false, scrollWheelZoom: false, minZoom: 4, maxZoom: 19 }).setView([9.082, 8.6753], 6);
     instance.attributionControl.addAttribution("Nigeria administrative boundaries · GADM");
     map.current = instance;
     const observer = new ResizeObserver(() => instance.invalidateSize({ pan: false })); observer.observe(root.current);
