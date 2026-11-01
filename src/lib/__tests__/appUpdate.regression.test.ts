@@ -63,7 +63,7 @@ describe("markServiceWorkerUpdateAvailable (stale SW integration)", () => {
             text: async () => "",
           } as unknown as Response;
         }
-        return { ok: true, json: async () => ({}), text: async () => "" } as unknown as Response;
+        return { ok: true, json: async () => ({}), text: async () => '<div id="root"></div><script src="/assets/index-next.js"></script>' } as unknown as Response;
       }),
     );
   };
@@ -149,7 +149,7 @@ describe("no automatic reload after a new build is published", () => {
         if (String(url).includes("version.json")) {
           return { ok: true, json: async () => ({ buildId: "build-brand-new-777" }), text: async () => "" } as unknown as Response;
         }
-        return { ok: true, json: async () => ({}), text: async () => "" } as unknown as Response;
+        return { ok: true, json: async () => ({}), text: async () => '<div id="root"></div><script src="/assets/index-next.js"></script>' } as unknown as Response;
       }),
     );
 

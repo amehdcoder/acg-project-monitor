@@ -1,5 +1,4 @@
 import { prepareSilentFormRestoreForUpdate } from "@/lib/formProgressPersistence";
-import { decideUpdate } from "@/lib/appUpdateDecision";
 
 export type AppUpdateStatus = "idle" | "checking" | "current" | "available" | "updating" | "error";
 
@@ -29,6 +28,36 @@ let state: AppUpdateState = {
 
 const listeners = new Set<() => void>();
 let swUpdater: (() => Promise<void>) | null = null;
+let checkPromise: Promise<AppUpdateState> | null = null;
+let applyPromise: Promise<boolean> | null = null;
+
+const withTimeout = async <T>(task: Promise<T>, ms: number, message: string): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([task, new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(message)), ms);
+    })]);
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+const probe = async <T>(url: string, read: (res: Response) => Promise<T>): Promise<T> => {
+  if (navigator.onLine === false) throw new Error("Connect to the internet to check for updates. Your saved work is still available.");
+  const controller = new AbortController();
+  try {
+    return await withTimeout((async () => {
+      const res = await fetch(url, {
+        cache: "no-store", credentials: "same-origin",
+        headers: { "Cache-Control": "no-cache" }, signal: controller.signal,
+      });
+      if (!res.ok) throw new Error("The update service is unavailable. Please try again.");
+      return read(res);
+    })(), 7000, "The update check timed out. Please try again when your connection is stable.");
+  } finally {
+    controller.abort();
+  }
+};
 
 const emit = () => listeners.forEach((listener) => listener());
 
@@ -114,13 +143,7 @@ const textHash = (text: string) => {
 
 const fetchVersionBuildId = async (): Promise<string | null> => {
   try {
-    const res = await fetch(`/version.json?__probe=${Date.now()}`, {
-      cache: "no-store",
-      credentials: "same-origin",
-      headers: { "Cache-Control": "no-cache" },
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
+    const data = await probe(`/version.json?__probe=${Date.now()}`, res => res.json());
     return typeof data?.buildId === "string" && data.buildId.trim() ? data.buildId.trim() : null;
   } catch (e) {
     console.warn("[UpdateManager] Failed to fetch version.json", e);
@@ -128,27 +151,19 @@ const fetchVersionBuildId = async (): Promise<string | null> => {
   }
 };
 
+const htmlBuildId = (html: string): string | null => {
+  // Only compiled app assets are evidence of a release; icons, metadata and
+  // development/HMR scripts must never create a false update notification.
+  const scripts = Array.from(html.matchAll(/<script[^>]+src=["']([^"']+)["']/gi))
+    .map(m => m[1]).filter(src => /\/assets\/.*\.js(?:\?|$)/.test(src)).sort();
+  const styles = Array.from(html.matchAll(/<link[^>]+href=["']([^"']+)["']/gi))
+    .map(m => m[1]).filter(src => /\/assets\/.*\.css(?:\?|$)/.test(src)).sort();
+  return scripts.length ? textHash(`${scripts.join(",")}|${styles.join(",")}`) : null;
+};
+
 const fetchHtmlBuildId = async (): Promise<string | null> => {
   try {
-    const res = await fetch(`/?__probe=${Date.now()}`, {
-      cache: "no-store",
-      credentials: "same-origin",
-      headers: { "Cache-Control": "no-cache" },
-    });
-    if (!res.ok) return null;
-    const html = await res.text();
-    
-    // To prevent false positives, we only hash script sources and stylesheet hrefs.
-    // Body content or dynamic meta tags (like og:image) change frequently in some environments.
-    const scripts = Array.from(html.matchAll(/<script[^>]+src=["']([^"']+)["']/g)).map(m => m[1]).sort().join(",");
-    const styles = Array.from(html.matchAll(/<link[^>]+href=["']([^"']+)["']/g)).map(m => m[1]).sort().join(",");
-    
-    if (!scripts && !styles) {
-      // Fallback to full hash if no assets found (unexpected)
-      return textHash(html);
-    }
-    
-    return textHash(`${scripts}|${styles}`);
+    return htmlBuildId(await probe(`/?__probe=${Date.now()}`, res => res.text()));
   } catch (e) {
     console.error("[UpdateManager] Failed to fetch HTML for update check", e);
     return null;
@@ -156,39 +171,27 @@ const fetchHtmlBuildId = async (): Promise<string | null> => {
 };
 
 export const markServiceWorkerUpdateAvailable = () => {
-  void (async () => {
-    // A service-worker refresh event can be stale/noisy after repeated deploys.
-    // Only surface the update UI after the same-origin version manifest proves
-    // that a newer code build exists for this device.
-    const latestBuildId = await fetchVersionBuildId();
-    const decision = decideUpdate({
-      currentBuildId: CURRENT_BUILD_ID,
-      latestBuildId,
-      source: "service-worker",
-    });
-    setState({
-      status: decision.status,
-      updateAvailable: decision.updateAvailable,
-      currentBuildId: decision.currentBuildId,
-      latestBuildId: decision.latestBuildId,
-      lastCheckedAt: Date.now(),
-      error: null,
-      source: "service-worker",
-    });
-  })();
+  void checkForAppUpdate({ force: true });
 };
 
 export const registerServiceWorkerUpdater = (fn: () => Promise<void>) => {
   swUpdater = fn;
 };
 
-export const checkForAppUpdate = async (opts: { force?: boolean; source?: "version" | "html" } = {}) => {
+export const checkForAppUpdate = (opts: { force?: boolean; source?: "version" | "html" } = {}): Promise<AppUpdateState> => {
+  if (applyPromise) return Promise.resolve(state);
+  if (checkPromise) return checkPromise;
+  checkPromise = runUpdateCheck(opts).finally(() => { checkPromise = null; });
+  return checkPromise;
+};
+
+const runUpdateCheck = async (opts: { force?: boolean; source?: "version" | "html" }) => {
   if (!opts.force && !isAutoUpdateEnabled()) return state;
   if (!opts.force && isPreviewHost) return state;
   setState({ status: "checking", error: null });
 
   try {
-    const source = opts.source || "version";
+    let source: "version" | "html" = "version";
 
     // IMPORTANT: never mix probe sources. Comparing an HTML asset-hash against the
     // compiled build id (CURRENT_BUILD_ID) can NEVER match, which used to flag a
@@ -198,42 +201,23 @@ export const checkForAppUpdate = async (opts: { force?: boolean; source?: "versi
     let latestBuildId: string | null;
     let currentBuildId: string;
 
-    if (source === "html") {
+    latestBuildId = await fetchVersionBuildId();
+    currentBuildId = CURRENT_BUILD_ID;
+    if (!latestBuildId && !isPreviewHost) {
+      source = "html";
       latestBuildId = await fetchHtmlBuildId();
       // If the HTML probe genuinely fails, treat it as "unknown" and DO NOT flag
       // an update — a transient network blip must never surface the banner.
       if (!latestBuildId) {
-        setState({
-          status: "current",
-          updateAvailable: false,
-          currentBuildId: CURRENT_BUILD_ID,
-          latestBuildId: CURRENT_BUILD_ID,
-          lastCheckedAt: Date.now(),
-          error: null,
-        });
-        return state;
+        throw new Error("Couldn't verify the latest version. Check your connection and try again.");
       }
-      currentBuildId = sessionStorage.getItem("app_html_build_id_v1") || latestBuildId;
-      if (!sessionStorage.getItem("app_html_build_id_v1")) {
-        sessionStorage.setItem("app_html_build_id_v1", latestBuildId);
-      }
-    } else {
-      latestBuildId = await fetchVersionBuildId();
-      // version.json unreachable → unknown, not "update available". Keep current
-      // state so the banner never appears on a false positive.
-      if (!latestBuildId) {
-        setState({
-          status: "current",
-          updateAvailable: false,
-          currentBuildId: CURRENT_BUILD_ID,
-          latestBuildId: CURRENT_BUILD_ID,
-          lastCheckedAt: Date.now(),
-          error: null,
-        });
-        return state;
-      }
-      currentBuildId = CURRENT_BUILD_ID;
+      // Compare against the shell actually running, never a freshly fetched
+      // baseline or session value that may describe a different source.
+      const runningHtmlId = htmlBuildId(document.documentElement.outerHTML);
+      if (!runningHtmlId) throw new Error("Couldn't verify this app version. Please try again.");
+      currentBuildId = runningHtmlId;
     }
+    if (!latestBuildId) throw new Error("Couldn't check for updates. Check your connection and try again.");
 
     const changed = latestBuildId !== currentBuildId;
     setState({
@@ -255,10 +239,7 @@ export const checkForAppUpdate = async (opts: { force?: boolean; source?: "versi
 
   } catch (error: unknown) {
     setState({
-      status: "current",
-      updateAvailable: false,
-      currentBuildId: CURRENT_BUILD_ID,
-      latestBuildId: CURRENT_BUILD_ID,
+      status: "error",
       lastCheckedAt: Date.now(),
       error: error instanceof Error ? error.message : "Update check failed",
     });
@@ -268,67 +249,6 @@ export const checkForAppUpdate = async (opts: { force?: boolean; source?: "versi
 
 export const APPLIED_BUILD_AT_KEY = "app_last_applied_at_v1";
 export const APPLIED_BUILD_ID_KEY = "app_last_applied_build_v1";
-
-const reloadProbe = async (): Promise<boolean> => {
-  if (typeof navigator !== "undefined" && navigator.onLine === false) return false;
-  try {
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), 7000);
-    try {
-      const res = await fetch(`/version.json?__reload_probe=${Date.now()}`, {
-        cache: "no-store",
-        credentials: "same-origin",
-        headers: { "Cache-Control": "no-cache" },
-        signal: controller.signal,
-      });
-      return res.ok;
-    } finally {
-      window.clearTimeout(timer);
-    }
-  } catch (error) {
-    console.warn("[UpdateManager] Reload probe failed; keeping current app shell", error);
-    return false;
-  }
-};
-
-const clearFreshShellCaches = async () => {
-  // Keep field/offline data caches intact. Only remove app-shell/runtime caches
-  // that can serve an old HTML shell or stale JS/CSS chunks after a deployment.
-  try {
-    const cacheNames = await caches.keys();
-    const shellCacheNames = cacheNames.filter((name) => {
-      const n = name.toLowerCase();
-      if (n.includes("map-tiles") || n.includes("grid3") || n.includes("font") || n.includes("location")) return false;
-      return (
-        n.includes("workbox-precache") ||
-        n.includes("html-cache") ||
-        n.includes("app-shell") ||
-        n.includes("precache") ||
-        n.includes("runtime") ||
-        n.includes("vite")
-      );
-    });
-    await Promise.allSettled(shellCacheNames.map((name) => caches.delete(name)));
-  } catch (error) {
-    console.warn("[UpdateManager] Unable to clear stale app shell caches", error);
-  }
-};
-
-const unregisterAppShellWorkers = async () => {
-  try {
-    const registrations = await navigator.serviceWorker?.getRegistrations();
-    await Promise.allSettled(
-      (registrations || [])
-        .filter((registration) => {
-          const script = registration.active?.scriptURL || registration.waiting?.scriptURL || registration.installing?.scriptURL || "";
-          return !script.includes("push-sw.js");
-        })
-        .map((registration) => registration.unregister()),
-    );
-  } catch (error) {
-    console.warn("[UpdateManager] Unable to unregister stale app service workers", error);
-  }
-};
 
 export const getLastAppliedAt = (): number | null => {
   try {
@@ -362,53 +282,42 @@ try {
   }
 } catch {}
 
-export const hardReloadToLatest = async (opts: { force?: boolean } = {}) => {
+export const hardReloadToLatest = (_opts: { force?: boolean } = {}): Promise<boolean> => {
+  if (applyPromise) return applyPromise;
+  applyPromise = applyLatest().finally(() => { applyPromise = null; });
+  return applyPromise;
+};
+
+const applyLatest = async (): Promise<boolean> => {
   setState({ status: "updating", error: null });
-  prepareSilentFormRestoreForUpdate();
-
-  // Never delete the app-shell/precache before a navigation. On weak Android
-  // networks that can strand users on Chrome's generic "site can't be reached"
-  // page. First prove the branded domain is reachable; if it is not, keep the
-  // currently running shell intact and retry from the normal polling loop.
-  const canReload = opts.force ? true : await reloadProbe();
-  if (!canReload) {
-    setState({
-      status: "error",
-      error: "The app will update automatically when the connection is stable.",
-    });
-    return;
-  }
-
   try {
-    localStorage.removeItem(SNOOZE_KEY);
-  } catch (error) {
-    console.warn("[UpdateManager] Unable to clear update snooze", error);
-  }
-
-  if (swUpdater) {
-    try {
-      await swUpdater();
-    } catch (error) {
-      console.warn("[UpdateManager] Service worker updater failed; falling back to hard reload", error);
+    // Even a manual/forced request must not strand an offline user. Validate
+    // the actual HTML shell, not merely a reachable JSON/404 fallback page.
+    const html = await probe(`/?__reload_probe=${Date.now()}`, res => res.text());
+    if (!/<script[^>]+src=/i.test(html) || !/id=["']root["']/i.test(html)) {
+      throw new Error("The latest app couldn't be loaded. Your current app and saved work are unchanged.");
     }
-  }
-
-  await clearFreshShellCaches();
-  await unregisterAppShellWorkers();
-
-  try {
-    sessionStorage.setItem("app_html_build_id_v1", state.latestBuildId || state.currentBuildId);
-    persistAppliedBuild(state.latestBuildId || state.currentBuildId);
+    prepareSilentFormRestoreForUpdate();
+    if (swUpdater && !shouldSkipServiceWorker) {
+      await withTimeout(swUpdater(), 12000, "The update couldn't finish downloading. Please try again.");
+    }
+    // Retain workers, precaches, reference data and all offline queues. Only
+    // invalidate navigation runtime HTML after the new shell is reachable.
+    if (typeof caches !== "undefined") {
+      await withTimeout(caches.delete("html-cache"), 2000, "Cache refresh timed out").catch(() => {});
+    }
+    if (navigator.onLine === false) throw new Error("Connection lost. Reconnect and tap Update again; your saved work is protected.");
+    try { localStorage.removeItem(SNOOZE_KEY); } catch { /* optional metadata */ }
+    const url = new URL(window.location.href);
+    url.searchParams.delete("__app_update");
+    url.searchParams.set("__v", String(Date.now()));
+    window.location.replace(url.toString());
+    // Applied-build metadata is stamped only by the build that actually boots.
+    return true;
   } catch (error) {
-    console.warn("[UpdateManager] Unable to persist applied build id", error);
+    setState({ status: "error", error: error instanceof Error ? error.message : "Couldn't apply the update. Please try again." });
+    return false;
   }
-
-  const url = new URL(window.location.href);
-  url.searchParams.delete("__app_update");
-  // Cache-bust to defeat any intermediary caches that might re-serve the
-  // previous (e.g. green-themed) shell from disk/CDN.
-  url.searchParams.set("__v", String(Date.now()));
-  window.location.replace(url.toString());
 };
 
 export const startAppUpdatePolling = () => {
@@ -417,7 +326,7 @@ export const startAppUpdatePolling = () => {
 
   if (isPreviewHost) return () => {};
 
-  const check = () => checkForAppUpdate({ source: shouldSkipServiceWorker ? "html" : "version" });
+  const check = () => { if (document.visibilityState !== "hidden") void checkForAppUpdate(); };
   const restart = () => {
     if (intervalId) clearInterval(intervalId);
     if (stopped) return;

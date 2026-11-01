@@ -1,5 +1,8 @@
 # Roadmap
 
+- [x] Repair header/banner Update controls with bounded single-flight checks, one safe navigation, worker activation, retryable failures and retained precaches/queues; 22 tests pass, signed-in current/offline checks and isolated release reload preserve draft/restore marker with no runtime errors; preview build clean.
+- [ ] Verify this update on a physically installed app after publication — requires publishing the changes and an installed-device check; preview cannot run production service workers.
+
 - [x] Make Forms the default on app entry without restoring previous tabs, preserving required full-screen Geo/Records workspaces and explicit navigation links; nine focused checks pass, signed-in previous-tab/reload flow returns to Forms with no runtime errors, preview build clean.
 
 - [x] Add live distinct facility counts in dust cells and explicit 1km water/WASH proximity areas with project-scoped cached locations, registered-location priority, capture-proxy labels, realtime/refresh updates and missing-GPS counts. 65 Eye tests passed; live BMZ shows 14 facilities missing GPS, 29 dust-cell labels; isolated duplicate-report test counts one facility. Preview build clean.

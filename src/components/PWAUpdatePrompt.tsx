@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRegisterSW } from "virtual:pwa-register/react";
+import { toast } from "sonner";
 import AppUpdateNotification from "@/components/AppUpdateNotification";
 import {
   hardReloadToLatest,
@@ -19,14 +20,18 @@ interface InnerProps {
 }
 
 const SwRegistrar = ({ onAvailable, registerSelf }: InnerProps) => {
+  const removeFocusListener = useRef<(() => void) | null>(null);
   const {
     needRefresh: [needRefresh],
-    updateServiceWorker,
   } = useRegisterSW({
+    // The manager owns the only navigation; Workbox must not reload too.
+    onNeedReload() {},
     onRegisteredSW(_swUrl, registration) {
       if (!registration) return;
+      removeFocusListener.current?.();
       const onFocus = () => registration.update().catch(() => {});
       window.addEventListener("focus", onFocus);
+      removeFocusListener.current = () => window.removeEventListener("focus", onFocus);
       registration.update().catch(() => {});
     },
     onRegisterError(error) {
@@ -36,9 +41,40 @@ const SwRegistrar = ({ onAvailable, registerSelf }: InnerProps) => {
 
   useEffect(() => {
     registerSelf(async () => {
-      updateServiceWorker(true);
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (!registration) return;
+      await registration.update();
+      // A worker may still be downloading its revisioned offline shell.
+      const worker = registration.waiting || registration.installing;
+      if (!worker) return;
+      if (worker.state === "installing") {
+        await new Promise<void>((resolve, reject) => {
+          const timer = setTimeout(() => { cleanup(); reject(new Error("The update download timed out. Please retry.")); }, 8000);
+          const cleanup = () => { clearTimeout(timer); worker.removeEventListener("statechange", check); };
+          const check = () => {
+            if (worker.state === "installed") { cleanup(); resolve(); }
+            if (worker.state === "redundant") { cleanup(); reject(new Error("The update download failed. Please retry.")); }
+          };
+          worker.addEventListener("statechange", check);
+          check();
+        });
+      }
+      if (worker.state === "activated") return;
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => { cleanup(); reject(new Error("The update activation timed out. Please retry.")); }, 3000);
+        const cleanup = () => { clearTimeout(timer); worker.removeEventListener("statechange", check); };
+        const check = () => {
+          if (worker.state === "activated") { cleanup(); resolve(); }
+          if (worker.state === "redundant") { cleanup(); reject(new Error("The update couldn't activate. Please retry.")); }
+        };
+        worker.addEventListener("statechange", check);
+        worker.postMessage({ type: "SKIP_WAITING" });
+        check();
+      });
     });
-  }, [registerSelf, updateServiceWorker]);
+  }, [registerSelf]);
+
+  useEffect(() => () => removeFocusListener.current?.(), []);
 
   useEffect(() => {
     if (needRefresh) onAvailable();
@@ -99,39 +135,15 @@ const PWAUpdatePrompt = () => {
 
   }, [updateState.latestBuildId, updateState.updateAvailable]);
 
-  const handleAvailable = () => markServiceWorkerUpdateAvailable();
+  const handleAvailable = useCallback(() => markServiceWorkerUpdateAvailable(), []);
 
   const handleUpdate = async () => {
+    if (isUpdating || getAppUpdateState().status === "updating") return;
     setIsUpdating(true);
-    // Immediately skip the waiting service worker so the newest build takes
-    // control before we reload — this flash-mounts the latest shell instantly.
     try {
-      const reg = await navigator.serviceWorker?.getRegistration();
-      reg?.waiting?.postMessage({ type: "SKIP_WAITING" });
-    } catch { /* best-effort */ }
-    // Watchdog: guarantee the update completes from a single click even if the
-    // cache purge / service-worker swap hangs. After 6s force a cache-busted reload.
-    const watchdog = setTimeout(() => {
-      try {
-        if (navigator.onLine === false) return;
-        const url = new URL(window.location.href);
-        url.searchParams.set("__v", String(Date.now()));
-        window.location.replace(url.toString());
-      } catch {
-        window.location.reload();
-      }
-    }, 6000);
-    // Give UI a moment to show the spinner before the hard reload starts clearing caches
-    await new Promise(r => setTimeout(r, 80));
-    try {
-      await hardReloadToLatest();
-    } catch (err) {
-      console.error("Update failed", err);
-      // Let the watchdog recover instead of leaving the user stuck.
+      const applied = await hardReloadToLatest();
+      if (!applied) toast.error(getAppUpdateState().error || "Couldn't update. Please try again.");
     } finally {
-      // Do not clear the watchdog. A successful hard reload navigates away;
-      // if navigation is blocked by a stale service worker race, the watchdog
-      // guarantees one final cache-busted reload instead of a dead button.
       setIsUpdating(false);
     }
   };
@@ -141,7 +153,7 @@ const PWAUpdatePrompt = () => {
     setShowModal(false);
   };
 
-  const registerSelf = (fn: () => Promise<void>) => registerServiceWorkerUpdater(fn);
+  const registerSelf = useCallback((fn: () => Promise<void>) => registerServiceWorkerUpdater(fn), []);
 
   return (
     <>
@@ -150,7 +162,7 @@ const PWAUpdatePrompt = () => {
       {updateState.updateAvailable && !activeFormProgress && dismissedBuild !== updateState.latestBuildId && (
         <AppUpdateNotification
           open={showModal}
-          isUpdating={isUpdating}
+          isUpdating={isUpdating || updateState.status === "updating"}
           onUpdate={handleUpdate}
           onDismiss={handleSnooze}
           onDismissBanner={() => {

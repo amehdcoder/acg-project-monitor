@@ -53,7 +53,7 @@ const AppUpdateNotification = ({
         role="status"
         aria-live="polite"
       >
-        <Sparkles className="h-4 w-4 animate-pulse" />
+        <Sparkles className="h-4 w-4 shrink-0" />
         <span className="text-sm font-semibold">A new update is available for Amehnities</span>
         <Button
           onClick={onUpdate}
