@@ -3,6 +3,7 @@ import { NATIONAL_INDICATORS, computeNationalIndicators, type IndicatorArea, typ
 // Credentials never travel through the browser twice: they are sent once to the
 // edge function, which stores them server-side.
 import { supabase } from "@/integrations/supabase/client";
+import { FunctionsHttpError } from "@supabase/supabase-js";
 
 export type ExchangeKind = "dhis2" | "fhir" | "lmis" | "sdmx";
 export type ExchangeFormat = "json" | "adx-xml" | "sdmx-json" | "sdmx-csv";
@@ -170,7 +171,12 @@ export async function deleteStock(id: string) {
 
 async function call(body: Record<string, unknown>) {
   const { data, error } = await supabase.functions.invoke("health-exchange", { body });
-  if (error) throw new Error((data as any)?.error || error.message);
+  if (error) {
+    const details = error instanceof FunctionsHttpError ? await error.context.text() : error.message;
+    let message = details;
+    try { message = JSON.parse(details).error ?? details; } catch { /* retain response */ }
+    throw new Error(message);
+  }
   if ((data as any)?.error) throw new Error((data as any).error);
   return data as any;
 }
@@ -354,6 +360,9 @@ export const eyeExchangePush = (connection_id: string, period: string, scope: Ey
   call({ action: "eye_push", connection_id, period, dry_run, ...scope });
 export const eyeExchangePull = (connection_id: string, period: string, scope: EyeScope = {}) =>
   call({ action: "eye_pull", connection_id, period, ...scope });
+export const eyeTrackerMetadata = (connection_id: string) => call({action:"eye_tracker_metadata",connection_id});
+export const eyeTrackerPull = (connection_id: string, dry_run = false) => call({action:"eye_tracker_pull",connection_id,dry_run});
+export const eyeGpsPush = (connection_id: string, period: string, dry_run = false) => call({action:"eye_gps_push",connection_id,period,dry_run});
 
 /** DHIS2 servers that belong only to the Eye Health Daily Facility Report. */
 export async function listEyeConnections(projectId: string) {

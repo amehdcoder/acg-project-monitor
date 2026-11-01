@@ -1,5 +1,6 @@
 import { computeNationalIndicators } from "../_shared/nationalIndicators.ts";
 import { computeEyeIndicators, EYE_INDICATORS } from "../_shared/eyeIndicators.ts";
+import { validateTrackerConfig, validateGpsConfig, trackerEpisodes, gpsEvent } from "../_shared/eyeTracker.ts";
 // Bi-directional health data exchange: DHIS2 (aggregate indicators + metadata),
 // HL7 FHIR (Patient / Condition) and LMIS (commodity stock).
 //
@@ -202,11 +203,11 @@ async function computeConnectionValues(db: ReturnType<typeof admin>, c: Connecti
 }
 
 /** Eye Health Daily Facility Report totals for one month, optionally one State/LGA/facility. */
-async function computeEyeValues(db: ReturnType<typeof admin>, projectId: string, period: string, scope: { state?: string; lga?: string; facility?: string } = {}) {
+async function loadEyeRows(db: ReturnType<typeof admin>, projectId: string, period: string, scope: { state?: string; lga?: string; facility?: string } = {}) {
   const { start, end } = monthRange(period);
   const rows: any[] = [];
   for (let from = 0; ; from += 1000) {
-    let q: any = db.from("eye_daily_reports").select("id,facility_name,state,lga,report_date,summary,csom")
+    let q: any = db.from("eye_daily_reports").select("id,facility_name,state,lga,report_date,summary,csom,gps")
       .eq("project_id", projectId).gte("report_date", start.slice(0, 10)).lt("report_date", end.slice(0, 10));
     if (scope.state) q = q.ilike("state", scope.state);
     if (scope.lga) q = q.ilike("lga", scope.lga);
@@ -216,7 +217,10 @@ async function computeEyeValues(db: ReturnType<typeof admin>, projectId: string,
     rows.push(...(data ?? []));
     if (!data || data.length < 1000) break;
   }
-  return computeEyeIndicators(rows);
+  return rows;
+}
+async function computeEyeValues(db: ReturnType<typeof admin>, projectId: string, period: string, scope: { state?: string; lga?: string; facility?: string } = {}) {
+  return computeEyeIndicators(await loadEyeRows(db, projectId, period, scope));
 }
 
 /** Standard national programme indicators (see _shared/nationalIndicators.ts). */
@@ -1003,6 +1007,82 @@ Deno.serve(async (req) => {
       }
 
       /* ------------- Eye Health daily report exchange (push/pull) ------------- */
+      case "eye_tracker_metadata": {
+        const res = await remoteFetch(joinUrl(connection.base_url, "api/programs?fields=id,displayName,programType,programStages[id,displayName,featureType,programStageDataElements[dataElement[id,displayName,valueType]]]&paging=false"), { headers });
+        if (!res.ok) return json({ error: `DHIS2 HTTP ${res.status}: ${remoteMessage(res.body,"Could not read tracker programs")}`, status: res.status }, 502);
+        return json({ programs: (res.body as any)?.programs ?? [] });
+      }
+      case "eye_tracker_pull": {
+        const { data: mapping, error: configError } = await db.from("health_exchange_mappings").select("dimensions").eq("connection_id",connection.id).eq("indicator_key","eye_config:tracker").maybeSingle();
+        if (configError) throw configError;
+        const config = validateTrackerConfig(mapping?.dimensions?.config);
+        if (!connection.org_unit_id || !/^[A-Za-z][A-Za-z0-9]{10}$/.test(connection.org_unit_id)) return json({error:"Choose the DHIS2 tracker reporting area first."},400);
+        const events: any[] = [];
+        for (let page=1;page<=50;page++) {
+          const qs = new URLSearchParams({ program: config.program, orgUnit: connection.org_unit_id, ouMode:"DESCENDANTS", page:String(page), pageSize:"200", totalPages:"true", fields:"event,program,orgUnit,enrollment,trackedEntity,occurredAt,updatedAt,deleted,dataValues[dataElement,value]" });
+          const res = await remoteFetch(joinUrl(connection.base_url,`api/tracker/events?${qs}`),{headers});
+          if (!res.ok) return json({error:`DHIS2 HTTP ${res.status}: ${remoteMessage(res.body,"Tracker observations could not be loaded")}`,status:res.status},502);
+          const body = res.body as any;
+          const items = body?.instances;
+          if (!Array.isArray(items)) throw new Error("DHIS2 did not return a modern tracker event collection. No episodes were saved.");
+          events.push(...items);
+          if (items.length < 200 || (body.pageCount && page>=body.pageCount)) break;
+          if (page===50) throw new Error("Tracker exceeds 10,000 events. Choose a smaller reporting area; no partial cohort was saved.");
+        }
+        const units = new Map<string,{name:string;lga:string}>();
+        for (const id of [...new Set(events.map((e)=>String(e.orgUnit)))]) {
+          if (!/^[A-Za-z][A-Za-z0-9]{10}$/.test(id)) continue;
+          const res = await remoteFetch(joinUrl(connection.base_url,`api/organisationUnits/${id}?fields=id,displayName,parent[id,displayName],ancestors[id,displayName,level]`),{headers});
+          if (!res.ok) throw new Error(`DHIS2 HTTP ${res.status}: facility metadata could not be loaded.`);
+          const u = res.body as any;
+          // LGA assignment is explicit: DHIS2 hierarchy levels are not assumed to equal Nigerian LGAs.
+          const lga = mapping?.dimensions?.lgas?.[id];
+          if (typeof lga === "string" && lga.trim()) units.set(id,{name:String(u.displayName??id),lga:lga.trim()});
+        }
+        const result = await trackerEpisodes(events,config,connection.id,units);
+        if (payload.dry_run === true) return json({ok:true,episodes:result.rows.length,skipped:result.skipped,events:events.length,dry_run:true});
+        const saved = [];
+        for (const row of result.rows) {
+          const {data:prior,error} = await db.from("eye_visual_trajectories").select("*").eq("project_id",connection.project_id).eq("episode_key",row.episode_key).maybeSingle();
+          if (error) throw error;
+          const values = { ...row, id:prior?.id ?? crypto.randomUUID(), project_id:connection.project_id,source:"tracker_import",created_by:prior?.created_by??guard.userId };
+          // Only a full source pull replaces DHIS2-owned episodes. Missing milestones stay null.
+          const {error:writeError} = await db.from("eye_visual_trajectories").upsert(values,{onConflict:"project_id,episode_key"});
+          if (writeError) throw writeError;
+          saved.push(values);
+        }
+        await log(db,connection,"pull","eye_tracker_pull","success",saved.length,`${saved.length} measured per-eye episodes; ${result.skipped} incomplete/invalid observations excluded.`,guard.userId);
+        return json({ok:true,episodes:saved.length,skipped:result.skipped,events:events.length});
+      }
+      case "eye_gps_push": {
+        const period = String(payload.period??"");
+        if (!/^\d{4}(0[1-9]|1[0-2])$/.test(period)) return json({error:"Choose a valid month (YYYYMM)."},400);
+        const {data:mapping,error} = await db.from("health_exchange_mappings").select("dimensions").eq("connection_id",connection.id).eq("indicator_key","eye_config:gps").maybeSingle();
+        if (error) throw error;
+        const config=validateGpsConfig(mapping?.dimensions?.config);
+        const program = await remoteFetch(joinUrl(connection.base_url,`api/programs/${config.program}?fields=id,programType,organisationUnits[id],programStages[id,featureType,programStageDataElements[compulsory,dataElement[id,valueType]]]`),{headers});
+        if (!program.ok) throw new Error(`DHIS2 HTTP ${program.status}: GPS program could not be loaded.`);
+        const metadata=program.body as any, stage=metadata.programStages?.find((s:any)=>s.id===config.stage);
+        if(metadata.programType!=="WITHOUT_REGISTRATION" || stage?.featureType!=="POINT") return json({error:"GPS destination must be a point-enabled event program without patient registration."},400);
+        const fields = stage.programStageDataElements??[];
+        const ids=[config.reportId,config.accuracy,config.capturedAt];
+        if (ids.some((id)=>!fields.some((f:any)=>f.dataElement?.id===id)) || fields.some((f:any)=>f.compulsory&&!ids.includes(f.dataElement?.id))) return json({error:"GPS program has unmapped required fields; choose a dedicated report-location stage."},400);
+        const source=await loadEyeRows(db,connection.project_id,period);
+        const events=[];let skipped=0;
+        for(const report of source){const e=await gpsEvent(report,config,connection.id);if(e)events.push(e);else skipped++;}
+        if(!events.length)return json({error:"No reports with valid GPS and an explicit facility mapping in this month."},400);
+        const results=[];
+        for(let offset=0;offset<events.length;offset+=100){
+          const qs=new URLSearchParams({async:"false",importStrategy:"CREATE_AND_UPDATE",importMode:payload.dry_run===true?"VALIDATE":"COMMIT"});
+          const res=await remoteFetch(joinUrl(connection.base_url,`api/tracker?${qs}`),{method:"POST",headers,body:JSON.stringify({events:events.slice(offset,offset+100)})},60000);
+          const body=res.body as any;
+          const failed=!res.ok || body?.status==="ERROR" || Number(body?.validationReport?.errorReports?.length??0)>0;
+          results.push({status:res.status,ok:!failed,response:body});
+          if(failed){await log(db,connection,"push","eye_gps_push","partial",offset,`GPS rejected: HTTP ${res.status}`,guard.userId);return json({error:`GPS import rejected: HTTP ${res.status}`,results,skipped},502);}
+        }
+        await log(db,connection,"push","eye_gps_push","success",events.length,`${payload.dry_run===true?"Validated":"Sent"} ${events.length} report GPS events; ${skipped} skipped. Facility premises unchanged.`,guard.userId);
+        return json({ok:true,sent:events.length,skipped,dry_run:payload.dry_run===true,message:`${payload.dry_run===true?"Validated":"Sent"} ${events.length} GPS report locations; ${skipped} without GPS/mapping.`,results});
+      }
       case "eye_values":
       case "eye_push":
       case "eye_pull": {
