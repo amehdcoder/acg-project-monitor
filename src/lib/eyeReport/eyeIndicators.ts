@@ -69,6 +69,7 @@ export function computeEyeIndicators(rows: EyeIndicatorRow[]): { indicator_key: 
     if (r.facility_name) facilities.add(String(r.facility_name).trim().toLowerCase());
     const consult = { ...(s.consult ?? {}) };
     if (!consult.a0_14 && (consult.a0_4 || consult.a5_14)) consult.a0_14 = { m: n(consult.a0_4?.m) + n(consult.a5_14?.m), f: n(consult.a0_4?.f) + n(consult.a5_14?.f) };
+    if (consult.a15 && !consult.a15_39 && !consult.a40) consult.a15_39 = { m: n(consult.a15?.m), f: n(consult.a15?.f) };
     for (const [b] of BANDS) { addMF(`eye_daily:consulted_${b}`, consult[b]); addMF("eye_daily:consulted", consult[b]); }
     if (s.pwdAge) for (const [b] of BANDS) addMF("eye_daily:pwd_consulted", s.pwdAge[b]); else addMF("eye_daily:pwd_consulted", s.pwd);
     for (const [k] of SCREEN) addMF(`eye_daily:screen_${k}`, s.screen?.[k]);

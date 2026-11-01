@@ -121,6 +121,8 @@ export function normSummary(raw: any): EyeSummary {
   for (const b of AGE_BANDS) { s.consult[b.key] = g(raw?.consult?.[b.key]); s.pwdAge[b.key] = g(raw?.pwdAge?.[b.key]); }
   // Legacy reports used 0–4 and 5–14 bands; merge them into 0–14.
   if (raw?.consult && (raw.consult.a0_4 || raw.consult.a5_14) && !raw.consult.a0_14) s.consult.a0_14 = sumMF(g(raw.consult.a0_4), g(raw.consult.a5_14));
+  // Legacy 15+ band cannot be split; keep it under 15–39 so adult totals are preserved.
+  if (raw?.consult?.a15 && !raw.consult.a15_39 && !raw.consult.a40) s.consult.a15_39 = g(raw.consult.a15);
   const byAge = sumMF(s.pwdAge.a0_14, s.pwdAge.a15_39, s.pwdAge.a40);
   s.pwd = raw?.pwdAge ? byAge : g(raw?.pwd);
   for (const i of SURGERY_ITEMS) s.surgery[i.key] = g(raw?.surgery?.[i.key]);
