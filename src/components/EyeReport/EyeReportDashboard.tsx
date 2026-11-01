@@ -23,6 +23,7 @@ import EyeFacilityTrend from "./EyeFacilityTrend";
 import EyeDhis2Exchange from "./EyeDhis2Exchange";
 import EyeReportMap from "./EyeReportMap";
 import VisualAcuityTrajectory from "./VisualAcuityTrajectory";
+import WhoMilestoneScorecard from "./WhoMilestoneScorecard";
 import type { DhisOutcomeEvidence } from "@/lib/eyeReport/trajectory";
 
 interface Props { projectId: string; projectName?: string; facilities: EyeFacility[]; userId: string; canReport: boolean; canManage: boolean; onClose: () => void }
@@ -166,6 +167,7 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
           ))}
         </section>
 
+        <WhoMilestoneScorecard rows={filtered} unavailable={unavailable} />
         <EyeReportMap rows={filtered} sex={sex} />
         <VisualAcuityTrajectory projectId={projectId} userId={userId} canReport={canReport} reports={filtered} period={{ year, month, from, to }} dhis={dhisOutcomes} />
         <EyeFacilityTrend rows={rows} />
