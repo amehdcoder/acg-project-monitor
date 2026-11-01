@@ -105,17 +105,16 @@ const Index = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
-  // Initialize state from URL params — Forms is the default landing page.
-  // The records Overview is the homepage: a fresh session opens there. "forms"
-  // was the legacy default, so a stored "forms" is not read as a deliberate
-  // choice — an explicit ?tab= link or any other stored tab still wins.
+  // Initialize state from URL params — Forms is the default landing page for
+  // everyone, including people with Longitudinal Beneficiary Records access.
+  // An explicit ?tab= link or a deliberately stored tab from this session still wins.
   const [activeTab, setActiveTab] = useState(() => {
     const fromUrl = searchParams.get("tab");
     if (fromUrl) return fromUrl;
     try {
       const stored = sessionStorage.getItem("amehnities:active-tab");
-      return stored && stored !== "forms" ? stored : "records";
-    } catch { return "records"; }
+      return stored || "forms";
+    } catch { return "forms"; }
   });
 
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(searchParams.get("project"));
