@@ -10,9 +10,9 @@ export async function loadEnvironmentalLocations(projectId: string) {
   const read = async <T,>(table: "health_facilities" | "community_wash_sources", fields: string) => {
     const rows: T[] = [];
     for (let offset = 0; ; offset += 1000) {
-      let query = supabase.from(table).select(fields).eq("project_id", projectId).order("id").range(offset, offset + 999);
-      if (table === "health_facilities") query = query.eq("is_active", true);
-      const { data, error } = await query;
+      const { data, error } = table === "health_facilities"
+        ? await supabase.from("health_facilities").select(fields).eq("project_id", projectId).eq("is_active",true).order("id").range(offset,offset+999)
+        : await supabase.from("community_wash_sources").select(fields).eq("project_id", projectId).order("id").range(offset,offset+999);
       if (error) return { data: null, error };
       rows.push(...(data ?? []) as unknown as T[]);
       if (!data || data.length < 1000) return { data: rows, error: null };
