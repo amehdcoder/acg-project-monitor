@@ -2,12 +2,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
+import { intersection } from "polygon-clipping";
 import { Crosshair, MapPinned, Layers3, AlertTriangle, Upload, Droplets, Wind } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { dustOverlap, facilityReporting, morbidityCount, parseEnvironmentalEvidence, type EnvironmentalFeature } from "@/lib/eyeReport/environment";
 import { loadNigeriaGeo } from "@/components/Dashboard/ops/lgaGeo";
-import { locatedReports, MAP_METRICS, mapValue, type MapMetric, type BoundaryFeature } from "@/lib/eyeReport/mapModel";
+import { boundaryAt, locatedReports, MAP_METRICS, mapValue, type MapMetric, type BoundaryFeature } from "@/lib/eyeReport/mapModel";
 import { normCsom, normSummary, t, totals, vaTotal, pct, type EyeReportRow } from "@/lib/eyeReport/definition";
 
 const token = (name: string) => `hsl(${getComputedStyle(document.documentElement).getPropertyValue(`--${name}`).trim()})`;
@@ -81,11 +82,18 @@ export default function EyeReportMap({ rows, sex }: { rows: EyeReportRow[]; sex:
         gradient: { 0.2: token("eye-teal"), 0.5: token("eye-gold"), 0.75: token("eye-orange"), 1: token("eye-rose") },
       }).addTo(layers);
     }
-    const env = environment.filter((f) => visible[f.properties.kind] && (f.geometry.type !== "Point" || locatedReports([{ gps: { lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0], accuracy: 0, captured_at: "2026-11-01T00:00:00Z" } } as EyeReportRow], features)[0]?.state === activeState));
-    // Clip display to the State viewport; original geometry and provenance remain intact.
+    const stateGeometry = outlines.features.find((f: any) => f.properties.state === activeState)?.geometry;
+    const env = environment.flatMap((f) => {
+      if (!visible[f.properties.kind]) return [];
+      if (f.geometry.type === "Point") return boundaryAt(f.geometry.coordinates[1], f.geometry.coordinates[0], features) ? [f] : [];
+      if (!stateGeometry) return [];
+      const clipped = intersection(f.geometry.coordinates, stateGeometry.coordinates);
+      return clipped.length ? [{ ...f, geometry: { type: "MultiPolygon" as const, coordinates: clipped } }] : [];
+    });
+    // Clip dust zones to the selected State; retain original geometry for overlap analysis.
     L.geoJSON({ type: "FeatureCollection", features: env } as any, {
       style: { color: token("eye-orange"), weight: 2, dashArray: "6 4", fillColor: token("eye-gold"), fillOpacity: 0.2 },
-      pointToLayer: (_, ll) => L.circleMarker(ll, { radius: 7, color: token("eye-paper"), weight: 2, fillColor: token("eye-teal"), fillOpacity: 1 }),
+      pointToLayer: (f, ll) => L.circleMarker(ll, { radius: 7, color: token("eye-paper"), weight: 2, fillColor: token(f.properties.kind === "water" ? "eye-blue" : "eye-teal"), fillOpacity: 1 }),
       onEachFeature: (f, layer) => {
         const popup = document.createElement("div");
         popup.append(text("strong", f.properties.name), text("p", `${f.properties.kind === "dust" ? "Dust-prone zone" : f.properties.kind === "water" ? "Water access" : "WASH point"} · ${f.properties.observed_at}`), text("p", `Source: ${f.properties.source}`));
@@ -100,7 +108,7 @@ export default function EyeReportMap({ rows, sex }: { rows: EyeReportRow[]; sex:
       const value = mapValue(p.report, metric, sex);
       const popup = document.createElement("div"); popup.className = "space-y-1 text-eye-ink";
       popup.append(text("strong", p.report.facility_name), text("p", `${p.report.report_date} · ${p.lga ?? "Unmatched LGA"}`), text("p", `${MAP_METRICS.find((m) => m.key === metric)?.label}: ${value === null ? "Not assessed" : metric === "outcome" ? `${value.toFixed(1)}%` : value.toLocaleString()}`), text("p", `${p.gps.lat.toFixed(6)}, ${p.gps.lng.toFixed(6)} · ±${Math.round(p.gps.accuracy)} m`));
-      const reporting = facilityReporting(p.report, points.map((point) => point.report), sex);
+      const reporting = facilityReporting(p.report, rows, sex);
       popup.append(text("p", `Reporting-day coverage: ${reporting.rate?.toFixed(1) ?? "—"}% (${reporting.days}/${reporting.span} calendar days in observed period)`), text("p", `Cataract screened: ${morbidityCount(p.report, "cataract", sex)} · TT screened: ${morbidityCount(p.report, "tt", sex)}`));
       const overlapping = dustOverlap(p.gps.lat, p.gps.lng, environment);
       if (overlapping.length) popup.append(text("p", `Dust-zone overlap: ${overlapping.map((f) => f.properties.name).join(", ")} · not a causal diagnosis`));
@@ -121,7 +129,7 @@ export default function EyeReportMap({ rows, sex }: { rows: EyeReportRow[]; sex:
     const b = lgaLayer.getBounds(); bounds.current = b;
     if (b.isValid() && fittedState.current !== activeState) { instance.fitBounds(b, { padding: [16, 16] }); fittedState.current = activeState; }
     return () => { instance.removeLayer(layers); };
-  }, [geo, outlines, activeState, located, metric, sex, visible, environment]);
+  }, [geo, outlines, activeState, located, metric, sex, visible, environment, rows]);
   const c = active ? normCsom(active.report.csom) : null;
   const tt = active ? totals(normSummary(active.report.summary)) : null;
   const outside = located.filter((p) => !p.state).length;
@@ -147,6 +155,7 @@ export default function EyeReportMap({ rows, sex }: { rows: EyeReportRow[]; sex:
         <div className="space-y-2 border-y py-3 text-xs">
           <p className="flex items-center gap-2 font-semibold text-eye-teal"><Wind className="h-4 w-4" /><Droplets className="h-4 w-4" />Environmental evidence</p>
           <p className="text-muted-foreground">{environment.length ? `${environment.length} sourced features · this session only` : "No environmental dataset loaded. Dust exposure and water access are not inferred from case counts."}</p>
+          <p className="text-muted-foreground">No validated blindness corridor model connected.</p>
           <input ref={fileInput} type="file" accept=".geojson,.json" className="hidden" aria-label="Environmental GeoJSON" onChange={async (event) => {
             const file = event.target.files?.[0]; if (!file) return;
             try { if (file.size > 5 * 1024 * 1024) throw new Error("Environmental file must be smaller than 5 MB."); setEnvironment(parseEnvironmentalEvidence(JSON.parse(await file.text())).features); setImportError(""); } catch (e) { setImportError(e instanceof Error ? e.message : "Could not read environmental evidence."); }
