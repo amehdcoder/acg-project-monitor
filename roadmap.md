@@ -1,5 +1,8 @@
 # Roadmap
 
+- [ ] Connect real DHIS2 measured tracker episodes to Visual Acuity Trajectory through explicit per-eye mappings; preserve missing observations and verify sync.
+- [ ] Send Daily Facility Report GPS as attributed DHIS2 event geometry alongside indicator exchange, without overwriting organisation-unit premises from capture locations; verify exchange.
+
 - [x] Add Environmental Risk & Blindness Corridor map with Jigawa boundaries, Cataract/TT screening rings, relative heatmap, attributed session-only environmental GeoJSON and reporting/GPS popups; 50 Eye tests pass and isolated import/toggle/popup flow verified. Live dashboard unavailable for selected project (report not enabled); real environmental data/validated corridor model not connected.
 
 - [x] Add offline-preserved GPS capture and filtered Eye Health State/LGA map; simulated GPS persists after offline reopening, spatially resolves Jigawa/Dutse, interactive point/indicator controls and phone/tablet/desktop fit checked. Actual hardware GPS and hosted report readback remain unverified.
