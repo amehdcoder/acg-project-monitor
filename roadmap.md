@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Add Environmental Risk & Blindness Corridor map with Jigawa boundaries, morbidity layers, verified environmental overlays and reporting/GPS popups; verify layer interaction.
+
 - [x] Add offline-preserved GPS capture and filtered Eye Health State/LGA map; simulated GPS persists after offline reopening, spatially resolves Jigawa/Dutse, interactive point/indicator controls and phone/tablet/desktop fit checked. Actual hardware GPS and hosted report readback remain unverified.
 - [x] Add Visual Acuity Trajectory baseline/30/90/180-day chart, facility/LGA/episode comparisons, descriptive recovery badges, validated offline tracker import and separately labelled DHIS2 pull benchmarks. All 46 Eye tests pass; unavailable/empty screens and layouts checked.
 - [ ] Verify real tracker import → hosted readback → trajectory chart and DHIS2 benchmark — preview Data API reports Eye tables missing from its schema cache; no real individual acuity feed or tracker mapping exists yet. Direct automated DHIS2 tracker ingestion requires the user's program/data-element mapping.
