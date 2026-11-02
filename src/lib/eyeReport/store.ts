@@ -50,6 +50,7 @@ export async function saveReportWithPatients(payload: ReportPayload, rows: Patie
   await patchEyeCache(cacheKey(payload.project_id), id, values);
   for (const p of patients) await patchEyeCache(patientCacheKey(payload.project_id), p.id, p);
   for (const p of prior) await patchEyeCache(patientCacheKey(payload.project_id), p.id, null);
+  window.dispatchEvent(new Event("eye-report-saved"));
   return { id, queued: result.queued };
 }
 
@@ -60,12 +61,14 @@ export async function saveReport(payload: ReportPayload, userId: string, editing
     ? await offlineMutate({ table: "eye_daily_reports", action: "update", id, values: { ...payload, id: undefined } as any })
     : await offlineMutate({ table: "eye_daily_reports", action: "insert", values });
   await patchEyeCache(cacheKey(payload.project_id), id, { ...values, created_by: userId });
+  window.dispatchEvent(new Event("eye-report-saved"));
   return { id, queued: res.queued };
 }
 
 export async function deleteReport(projectId: string, id: string) {
   await offlineMutate({ table: "eye_daily_reports", action: "delete", id });
   await cachePatchRows(cacheKey(projectId), id, null);
+  window.dispatchEvent(new Event("eye-report-saved"));
 }
 
 /** Account-free: store the finished report in the device queue and try to send it. */
@@ -124,6 +127,7 @@ export async function savePatients(rows: PatientPayload[], userId: string, repla
     queued = queued || res.queued;
     await patchEyeCache(patientCacheKey(p.project_id), id, values);
   }
+  window.dispatchEvent(new Event("eye-report-saved"));
   return { queued };
 }
 
