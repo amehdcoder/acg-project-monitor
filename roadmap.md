@@ -1,6 +1,6 @@
 # Roadmap
 
-- [ ] Add submission-derived cascading State/LGA selections to the WHO survey workbook, readable import-compatible headings, valid manual spreadsheet dates and an in-app calendar entry alternative; verify export/import and cascade behavior.
+- [x] Add project-report-derived cascading State/LGA choices across all dashboard periods, named Excel lists, readable legacy-compatible headings, validated spreadsheet dates and calendar-assisted entry/download. Twelve tests pass; isolated signed-in browser check verifies cascade reset, calendar, typed dates, filled Excel download/import and scorecard readback with no runtime errors. Native Excel calendar availability depends on spreadsheet version; calendar is provided in the app.
 
 - [x] Remove 57 residual BMZ screenings as requested; protected deletion tombstones prevent replay; retire old screening caches/cursors without clearing drafts/queues; 85 Eye tests pass. Live authenticated BMZ dashboard and offline reopening both show 0 screened / 0 disability / 0 reports, no runtime errors; database confirms 0 screenings and 57 replay guards.
 
