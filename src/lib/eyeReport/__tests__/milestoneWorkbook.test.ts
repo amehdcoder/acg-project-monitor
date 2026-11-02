@@ -1,9 +1,40 @@
 import { describe, expect, it } from "vitest";
-import { buildSurveyWorkbook, readSurveyWorkbook } from "../milestoneWorkbook";
+import { buildSurveyWorkbook, readSurveyWorkbook, surveyGeography } from "../milestoneWorkbook";
 import { routineMilestones } from "../routineMilestones";
 import { emptyCsom, type EyeReportRow } from "../definition";
 
 describe("WHO evidence workbook", () => {
+  const geography = [{ state: "Jigawa", lga: "Dutse" }, { state: "Jigawa", lga: "Hadejia" }, { state: "Kano", lga: "Dala" }, { state: "Jigawa", lga: "Dutse" }];
+  it("lists only received submission locations and cascades LGAs by State", async () => {
+    expect(surveyGeography(geography)).toEqual([{ state: "Jigawa", lgas: ["Dutse", "Hadejia"] }, { state: "Kano", lgas: ["Dala"] }]);
+    const wb = buildSurveyWorkbook("Jigawa", geography);
+    const ws = wb.getWorksheet("Survey evidence"), lists = wb.getWorksheet("Geography lists");
+    if (!ws || !lists) throw new Error("Missing sheets");
+    expect(ws.getCell("B2").dataValidation.formulae).toEqual(["SurveyStates"]);
+    expect(ws.getCell("C3").dataValidation.formulae?.[0]).toContain("MATCH(B3,SurveyStates,0)");
+    expect(lists.getCell("C3").value).toBe("Dutse");
+    expect(lists.getCell("D3").value).toBe("Dala");
+    const bytes = await wb.xlsx.writeBuffer();
+    const ExcelJS = (await import("exceljs")).default;
+    const restored = new ExcelJS.Workbook(); await restored.xlsx.load(bytes);
+    expect(restored.definedNames.getRanges("SurveyStates").ranges).toEqual(["'Geography lists'!$A$2:$A$3"]);
+    expect(restored.getWorksheet("Survey evidence")?.getCell("C2").dataValidation.formulae?.[0]).toContain("MATCH(B2,SurveyStates,0)");
+  });
+  it("does not offer invented States when there are no submissions", () => {
+    const wb = buildSurveyWorkbook("Jigawa");
+    expect(wb.getWorksheet("Survey evidence")?.getCell("B2").value).toBe("");
+    expect(wb.getWorksheet("Survey evidence")?.getCell("B2").dataValidation.formulae).toEqual(["SurveyEmpty"]);
+  });
+  it("imports Excel dates and legacy headings alongside new readable headings", async () => {
+    for (const legacy of [false, true]) {
+      const wb = buildSurveyWorkbook("Jigawa", geography);
+      const ws = wb.getWorksheet("Survey evidence"); if (!ws) throw new Error("Missing sheet");
+      if (legacy) ws.getRow(1).values = ["indicator", "state", "lga", "date", "value", "baseline", "baseline_date", "source"];
+      ws.getRow(2).values = ["ecsc", "Jigawa", "State", new Date("2026-10-01T00:00:00Z"), 45, 20, new Date("2020-01-01T00:00:00Z"), "Representative State survey"];
+      const result = await readSurveyWorkbook(await wb.xlsx.writeBuffer() as ArrayBuffer);
+      expect(result[0].date).toBe("2026-10-01"); expect(result[0].baseline_date).toBe("2020-01-01");
+    }
+  });
   it("round-trips measured State evidence without inventing values in the template", async () => {
     const wb = buildSurveyWorkbook("Jigawa");
     const ws = wb.getWorksheet("Survey evidence");
