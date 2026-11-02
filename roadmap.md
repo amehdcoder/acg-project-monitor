@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Remove the confirmed residual 57 BMZ screenings, prevent offline replay resurrection, and verify cached/live zero totals while preserving future standalone submissions.
+
 - [x] Cascade deleted daily reports to linked WG-SS screenings in PostgreSQL and user-scoped offline queue/cache overlays; preserve independent standalone rows; constraint confirmed and deletion/failure tests pass.
 - [x] Add routine service evidence to WHO cards, weighted measured follow-up outcome shares, colourful State survey Excel template and validated Excel/JSON imports; 83 Eye tests pass, isolated downloaded-workbook round-trip shows 83.3% complete and trend projection without runtime errors; preview build clean.
 - [ ] Confirm historical detached WG-SS attribution before any cleanup — 57 null-parent screenings and zero reports remain; earlier SET NULL deletions cannot be distinguished from genuine standalone screenings by current records. Do not erase them speculatively. Signed-in requesting account has no Eye dashboard launcher, so nonempty live report deletion/readback remains unverified.
