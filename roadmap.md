@@ -1,5 +1,8 @@
 # Roadmap
 
+- [ ] Cascade deleted daily reports to their linked WG-SS screenings online/offline and correct retained dashboard totals.
+- [ ] Populate WHO scorecard with honest routine report aggregates and add a colourful downloadable/importable survey workbook.
+
 - [x] Speed up Eye Health dashboard with immediate captured-user/project cache hydration, timestamp-keyset deltas, coalesced realtime refreshes, reconnect/focus recovery, periodic ID-only deletion reconciliation, pending-write overlay, deferred map/tracker work and retained refresh feedback; 76 Eye tests pass and signed-in warm reopening/request-failure checks verified; preview build clean.
 - [ ] Verify nonempty live Eye report change → realtime totals readback — current BMZ dashboard returns no reports across all years; no clinical data was fabricated. Nonempty cached totals, update events, missed deletion and account isolation verified in focused tests.
 
