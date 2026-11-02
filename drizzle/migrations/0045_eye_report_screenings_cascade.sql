@@ -1,0 +1,3 @@
+ALTER TABLE public.eye_daily_patients DROP CONSTRAINT eye_daily_patients_report_id_fkey;
+ALTER TABLE public.eye_daily_patients ADD CONSTRAINT eye_daily_patients_report_id_fkey FOREIGN KEY (report_id) REFERENCES public.eye_daily_reports(id) ON DELETE CASCADE;
+COMMENT ON CONSTRAINT eye_daily_patients_report_id_fkey ON public.eye_daily_patients IS 'Deleting a daily report deletes its linked WG-SS screenings; standalone screenings remain independent.';
