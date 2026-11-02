@@ -28,6 +28,15 @@ const openDb = (): Promise<IDBDatabase | null> => {
 
 export async function cacheSet(key: string, value: unknown): Promise<void> {
   const userKey = await scopedKey(key);
+  await setScoped(userKey, value);
+}
+
+/** Capture the authenticated scope before asynchronous dashboard work starts. */
+export async function cacheSetForUser(userId: string, key: string, value: unknown): Promise<void> {
+  await setScoped(`user:${userId}:${key}`, value);
+}
+
+async function setScoped(userKey: string, value: unknown): Promise<void> {
   const db = await openDb();
   if (!db) return;
   await new Promise<void>((resolve) => {
@@ -40,6 +49,14 @@ export async function cacheSet(key: string, value: unknown): Promise<void> {
 
 export async function cacheGet<T>(key: string): Promise<T | null> {
   const userKey = await scopedKey(key);
+  return getScoped<T>(userKey);
+}
+
+export async function cacheGetForUser<T>(userId: string, key: string): Promise<T | null> {
+  return getScoped<T>(`user:${userId}:${key}`);
+}
+
+async function getScoped<T>(userKey: string): Promise<T | null> {
   const db = await openDb();
   if (!db) return null;
   return new Promise((resolve) => {
@@ -58,20 +75,28 @@ export async function cachedRead<T>(
   key: string,
   fetcher: () => PromiseLike<{ data: T | null; error: unknown }>,
   timeoutMs = 12_000,
+  userId?: string,
 ): Promise<{ data: T | null; fromCache: boolean }> {
+  const readCache = () => userId ? cacheGetForUser<T>(userId, key) : cacheGet<T>(key);
   if (typeof navigator !== "undefined" && !navigator.onLine) {
-    return { data: await cacheGet<T>(key), fromCache: true };
+    return { data: await readCache(), fromCache: true };
   }
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const res = await Promise.race([
       Promise.resolve(fetcher()),
-      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), timeoutMs)),
+      new Promise<never>((_, rej) => { timer = setTimeout(() => rej(new Error("timeout")), timeoutMs); }),
     ]);
     if (res.error) throw res.error;
-    if (res.data !== null && res.data !== undefined) void cacheSet(key, res.data);
+    if (res.data !== null && res.data !== undefined) {
+      if (userId) await cacheSetForUser(userId, key, res.data);
+      else void cacheSet(key, res.data);
+    }
     return { data: res.data, fromCache: false };
   } catch {
-    return { data: await cacheGet<T>(key), fromCache: true };
+    return { data: await readCache(), fromCache: true };
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 

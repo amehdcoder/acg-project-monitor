@@ -1,5 +1,8 @@
 # Roadmap
 
+- [x] Speed up Eye Health dashboard with immediate captured-user/project cache hydration, timestamp-keyset deltas, coalesced realtime refreshes, reconnect/focus recovery, periodic ID-only deletion reconciliation, pending-write overlay, deferred map/tracker work and retained refresh feedback; 76 Eye tests pass and signed-in warm reopening/request-failure checks verified; preview build clean.
+- [ ] Verify nonempty live Eye report change → realtime totals readback — current BMZ dashboard returns no reports across all years; no clinical data was fabricated. Nonempty cached totals, update events, missed deletion and account isolation verified in focused tests.
+
 - [x] Repair header/banner Update controls with bounded single-flight checks, one safe navigation, worker activation, retryable failures and retained precaches/queues; 22 tests pass, signed-in current/offline checks and isolated release reload preserve draft/restore marker with no runtime errors; preview build clean.
 - [ ] Verify this update on a physically installed app after publication — requires publishing the changes and an installed-device check; preview cannot run production service workers.
 

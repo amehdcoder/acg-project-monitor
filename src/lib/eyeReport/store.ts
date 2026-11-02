@@ -50,6 +50,7 @@ export async function saveReportWithPatients(payload: ReportPayload, rows: Patie
   await patchEyeCache(cacheKey(payload.project_id), id, values);
   for (const p of patients) await patchEyeCache(patientCacheKey(payload.project_id), p.id, p);
   for (const p of prior) await patchEyeCache(patientCacheKey(payload.project_id), p.id, null);
+  window.dispatchEvent(new Event("eye-report-saved"));
   return { id, queued: result.queued };
 }
 
@@ -57,15 +58,18 @@ export async function saveReport(payload: ReportPayload, userId: string, editing
   const id = payload.id || crypto.randomUUID();
   const values = { ...payload, id, ...(editing ? {} : { created_by: userId }) };
   const res = editing
-    ? await offlineMutate({ table: "eye_daily_reports", action: "update", id, values: { ...payload, id: undefined } as any })
-    : await offlineMutate({ table: "eye_daily_reports", action: "insert", values });
+    ? await offlineMutate({ table: "eye_daily_reports", action: "update", id, values: { ...payload, id: undefined } as any, userId })
+    : await offlineMutate({ table: "eye_daily_reports", action: "insert", values, userId });
   await patchEyeCache(cacheKey(payload.project_id), id, { ...values, created_by: userId });
+  window.dispatchEvent(new Event("eye-report-saved"));
   return { id, queued: res.queued };
 }
 
 export async function deleteReport(projectId: string, id: string) {
-  await offlineMutate({ table: "eye_daily_reports", action: "delete", id });
+  const { data } = await supabase.auth.getSession();
+  await offlineMutate({ table: "eye_daily_reports", action: "delete", id, userId: data.session?.user.id });
   await cachePatchRows(cacheKey(projectId), id, null);
+  window.dispatchEvent(new Event("eye-report-saved"));
 }
 
 /** Account-free: store the finished report in the device queue and try to send it. */
@@ -113,17 +117,18 @@ export async function savePatients(rows: PatientPayload[], userId: string, repla
   if (replaceReportId) for (const r of cached.filter((x) => x.report_id === replaceReportId)) toRemove.set(r.id, r.project_id);
   for (const id of removeIds ?? []) { const r = cached.find((x) => x.id === id); if (r) toRemove.set(id, r.project_id); }
   for (const [id, pid] of toRemove) {
-    const res = await offlineMutate({ table: "eye_daily_patients", action: "delete", id });
+    const res = await offlineMutate({ table: "eye_daily_patients", action: "delete", id, userId });
     queued = queued || res.queued;
     await cachePatchRows(patientCacheKey(pid), id, null);
   }
   for (const p of rows) {
     const id = p.id || crypto.randomUUID();
     const values = { ...p, id, created_by: userId };
-    const res = await offlineMutate({ table: "eye_daily_patients", action: "insert", values });
+    const res = await offlineMutate({ table: "eye_daily_patients", action: "insert", values, userId });
     queued = queued || res.queued;
     await patchEyeCache(patientCacheKey(p.project_id), id, values);
   }
+  window.dispatchEvent(new Event("eye-report-saved"));
   return { queued };
 }
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowLeft, Download, Eye, Glasses, Scissors, Stethoscope, Accessibility, ScanEye, Plus, RefreshCw, FileSpreadsheet,
@@ -10,19 +10,20 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import hero from "@/assets/eye-report/hero.jpg";
 import {
   AGE_BANDS, MONTHS, aggregate, aggregatePatients, byMonth, normCsom, normSummary, pct, t, totals, vaTotal,
   type EyePatientRow, type EyeReportRow,
 } from "@/lib/eyeReport/definition";
-import { deleteReport, loadPatients, loadReports } from "@/lib/eyeReport/store";
+import { deleteReport } from "@/lib/eyeReport/store";
+import { useEyeDataset } from "@/lib/eyeReport/useEyeDataset";
 import { exportAggregated, exportDailyReport } from "@/lib/eyeReport/exportExcel";
 import EyeDailyReportForm, { type EyeFacility } from "./EyeDailyReportForm";
 import EyeFacilityTrend from "./EyeFacilityTrend";
 import EyeDhis2Exchange from "./EyeDhis2Exchange";
-import EyeReportMap from "./EyeReportMap";
-import VisualAcuityTrajectory from "./VisualAcuityTrajectory";
+import DeferredEyeSection from "./DeferredEyeSection";
+const EyeReportMap = lazy(() => import("./EyeReportMap"));
+const VisualAcuityTrajectory = lazy(() => import("./VisualAcuityTrajectory"));
 import WhoMilestoneScorecard from "./WhoMilestoneScorecard";
 import type { DhisOutcomeEvidence } from "@/lib/eyeReport/trajectory";
 
@@ -32,10 +33,13 @@ const C = { blue: "hsl(var(--eye-blue))", teal: "hsl(var(--eye-teal))", violet: 
 const Sel = (p: React.SelectHTMLAttributes<HTMLSelectElement>) => <select {...p} className="h-10 w-full rounded-md border bg-background px-2 text-sm" />;
 
 export default function EyeReportDashboard({ projectId, projectName, facilities, userId, canReport, canManage, onClose }: Props) {
-  const [rows, setRows] = useState<EyeReportRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [fromCache, setFromCache] = useState(false);
-  const [unavailable, setUnavailable] = useState(false);
+  const reportData = useEyeDataset<EyeReportRow>(userId, projectId, "eye_daily_reports");
+  const patientData = useEyeDataset<EyePatientRow>(userId, projectId, "eye_daily_patients");
+  const rows = reportData.rows, patients = patientData.rows;
+  const loading = reportData.loading || patientData.loading;
+  const refreshing = reportData.refreshing || patientData.refreshing;
+  const fromCache = reportData.fromCache || patientData.fromCache;
+  const unavailable = reportData.unavailable;
   const thisYear = new Date().getFullYear();
   const [year, setYear] = useState(String(thisYear));
   const [month, setMonth] = useState("all");
@@ -47,24 +51,11 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
   const [csomOnly, setCsomOnly] = useState(false);
   const [form, setForm] = useState<{ open: boolean; existing?: EyeReportRow | null; wgOnly?: boolean }>({ open: false });
   const [exporting, setExporting] = useState(false);
-  const [patients, setPatients] = useState<EyePatientRow[]>([]);
   const [dhisOutcomes, setDhisOutcomes] = useState<DhisOutcomeEvidence | null>(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
-    const [r, p] = await Promise.all([loadReports(projectId), loadPatients(projectId)]);
-    setRows(r.rows); setPatients(p.rows); setFromCache(r.fromCache || p.fromCache); setUnavailable(r.unavailable || p.unavailable); setLoading(false);
-  }, [projectId]);
-  useEffect(() => { void load(); }, [load]);
-  useEffect(() => {
-    const channel = supabase.channel(`eye-dashboard:${projectId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "eye_daily_reports", filter: `project_id=eq.${projectId}` }, () => void load())
-      .on("postgres_changes", { event: "*", schema: "public", table: "eye_daily_patients", filter: `project_id=eq.${projectId}` }, () => void load())
-      .subscribe();
-    const reconnect = () => void load();
-    window.addEventListener("online", reconnect);
-    return () => { void supabase.removeChannel(channel); window.removeEventListener("online", reconnect); };
-  }, [projectId, load]);
+    await Promise.all([reportData.refresh(true), patientData.refresh(true)]);
+  }, [reportData.refresh, patientData.refresh]);
 
   const years = useMemo(() => Array.from(new Set([String(thisYear), ...rows.map((r) => r.report_date.slice(0, 4))])).sort().reverse(), [rows, thisYear]);
   const lgas = useMemo(() => Array.from(new Set(rows.map((r) => r.lga).filter(Boolean) as string[])).sort(), [rows]);
@@ -84,9 +75,9 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
     return m;
   }, [patients]);
 
-  const agg = aggregate(filtered); const S = agg.summary; const T = totals(S); const c = agg.csom;
+  const agg = useMemo(() => aggregate(filtered), [filtered]); const S = agg.summary; const T = totals(S); const c = agg.csom;
   const pick = (x: { m: number; f: number }) => (sex === "all" ? t(x) : x[sex]);
-  const monthly = byMonth(yearRows).map((a, i) => { const tt = totals(a.summary); return { month: MONTHS[i].slice(0, 3), Consulted: pick(tt.consulted), Surgeries: pick(tt.surgeries), Glasses: pick(tt.glasses), Lenses: pick(tt.lenses) }; });
+  const monthly = useMemo(() => byMonth(yearRows).map((a, i) => { const tt = totals(a.summary); return { month: MONTHS[i].slice(0, 3), Consulted: pick(tt.consulted), Surgeries: pick(tt.surgeries), Glasses: pick(tt.glasses), Lenses: pick(tt.lenses) }; }), [yearRows, sex]);
   const ageSex = AGE_BANDS.map((b) => ({ band: b.label, Male: S.consult[b.key].m, Female: S.consult[b.key].f }));
   const outcomes = [{ name: "Good", value: c.discharge.presenting.good, fill: C.good }, { name: "Borderline", value: c.discharge.presenting.borderline, fill: C.gold }, { name: "Poor", value: c.discharge.presenting.poor, fill: C.rose }];
   const fuGood = pct(c.followup.presenting.good, vaTotal(c.followup.presenting));
@@ -116,7 +107,7 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
   };
   const remove = async (r: EyeReportRow) => {
     if (!confirm(`Delete the ${r.facility_name} report for ${r.report_date}?`)) return;
-    try { await deleteReport(projectId, r.id); setRows((x) => x.filter((y) => y.id !== r.id)); toast.success("Report deleted"); } catch (e) { toast.error(e instanceof Error ? e.message : "Delete failed"); }
+    try { await deleteReport(projectId, r.id); void load(); toast.success("Report deleted"); } catch (e) { toast.error(e instanceof Error ? e.message : "Delete failed"); }
   };
 
   if (form.open) return <EyeDailyReportForm projectId={projectId} projectName={projectName} facilities={facilities} mode={{ kind: "user", userId }} existing={form.existing} existingPatients={patients.filter((p) => p.report_id === form.existing?.id)} wgOnly={form.wgOnly} otherReports={rows} onClose={() => setForm({ open: false })} onSaved={() => void load()} />;
@@ -135,8 +126,8 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
             {canReport && <Button onClick={() => setForm({ open: true })} className="bg-eye-gold text-eye-ink hover:bg-eye-gold/90"><Plus className="mr-1 h-4 w-4" /> New daily report</Button>}
             {canReport && <Button onClick={() => setForm({ open: true, wgOnly: true })} variant="secondary"><Accessibility className="mr-1 h-4 w-4" /> WG-SS screening only</Button>}
             <Button onClick={doExport} disabled={exporting} variant="secondary">{exporting ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <FileSpreadsheet className="mr-1 h-4 w-4" />} Export Summary & CSOM</Button>
-            <Button onClick={() => void load()} variant="ghost" className="text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"><RefreshCw className={`mr-1 h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh</Button>
-            {fromCache && <span className="inline-flex items-center gap-1 rounded-full bg-eye-gold px-3 py-1 text-xs font-semibold text-eye-ink"><CloudOff className="h-3 w-3" /> Showing saved offline copy</span>}
+            <Button onClick={() => void load()} disabled={refreshing} variant="ghost" className="text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"><RefreshCw className={`mr-1 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} /> Refresh</Button>
+            <span role="status" className="inline-flex items-center gap-1 rounded-full bg-eye-gold px-3 py-1 text-xs font-semibold text-eye-ink">{fromCache ? <CloudOff className="h-3 w-3" /> : <Activity className="h-3 w-3" />}{refreshing ? "Updating · saved totals retained" : fromCache ? "Saved copy · awaiting connection" : reportData.checkedAt ? `Live · checked ${new Date(reportData.checkedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Loading reports"}</span>
           </div>
         </div>
       </header>
@@ -156,6 +147,7 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
 
       <main className="mx-auto max-w-7xl space-y-5 px-4 py-5">
         {unavailable && <p role="alert" className="border-l-4 border-destructive bg-card p-4 text-sm text-destructive">Submission totals could not be loaded. Reconnect and select Refresh; unavailable data is not a zero submission count.</p>}
+        {patientData.unavailable && <p role="alert" className="border-l-4 border-destructive bg-card p-4 text-sm text-destructive">WG-SS screenings could not be loaded. Consultation totals remain available; screening totals are unavailable, not zero.</p>}
         <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {kpis.map((k, i) => (
             <motion.div key={k.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }} className={`rounded-2xl bg-gradient-to-br ${k.cls} p-4 text-primary-foreground shadow-md`}>
@@ -168,8 +160,8 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
         </section>
 
         <WhoMilestoneScorecard rows={filtered} unavailable={unavailable} />
-        <EyeReportMap rows={filtered} sex={sex} projectId={projectId} unavailable={unavailable} />
-        <VisualAcuityTrajectory projectId={projectId} userId={userId} canReport={canReport} reports={filtered} period={{ year, month, from, to }} dhis={dhisOutcomes} />
+        <DeferredEyeSection label="Eye Health reporting map"><Suspense fallback={<p className="py-6 text-sm text-muted-foreground">Loading map…</p>}><EyeReportMap rows={filtered} sex={sex} projectId={projectId} unavailable={unavailable} /></Suspense></DeferredEyeSection>
+        <DeferredEyeSection label="Visual Acuity Trajectory"><Suspense fallback={<p className="py-6 text-sm text-muted-foreground">Loading measured outcomes…</p>}><VisualAcuityTrajectory projectId={projectId} userId={userId} canReport={canReport} reports={filtered} period={{ year, month, from, to }} dhis={dhisOutcomes} /></Suspense></DeferredEyeSection>
         <EyeFacilityTrend rows={rows} />
 
         <section className="grid gap-4 lg:grid-cols-3">
@@ -206,7 +198,7 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-eye-violet via-eye-blue to-eye-deep p-5 text-primary-foreground shadow-md">
             <Accessibility className="absolute -right-4 -top-4 h-28 w-28 opacity-15" />
             <h3 className="flex items-center gap-2 text-sm font-bold"><Accessibility className="h-4 w-4" /> Disability screening (WG-SS)</h3>
-            <p className="mt-3 text-3xl font-extrabold tabular-nums">{pAgg.screened}</p>
+            <p className="mt-3 text-3xl font-extrabold tabular-nums">{patientData.unavailable || patientData.loading ? "—" : pAgg.screened}</p>
             <p className="text-xs opacity-85">patients screened · {pAgg.days} days · {pAgg.facilities} facilities</p>
             <div className="mt-3 flex items-end gap-2">
               <p className="text-2xl font-extrabold text-eye-gold">{pct(pAgg.withDisability, pAgg.screened)}%</p>
