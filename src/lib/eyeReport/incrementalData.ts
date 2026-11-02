@@ -97,5 +97,5 @@ async function sync<T extends SyncRow>(userId: string, projectId: string, table:
     return { data: overlayPending(mergeRows(since ? latest ?? previous ?? [] : [], changes, ids), listQueued(), userId, projectId, table), error: null };
   }, 30_000, userId);
   if (!result.fromCache && nextMeta) await cacheSetForUser(userId, metaKey, nextMeta);
-  return { rows: result.data ?? [], fromCache: result.fromCache, unavailable: result.data === null, checkedAt: result.fromCache ? null : Date.now() };
+  return { rows: overlayPending(result.data ?? [], listQueued(), userId, projectId, table), fromCache: result.fromCache, unavailable: result.data === null, checkedAt: result.fromCache ? null : Date.now() };
 }

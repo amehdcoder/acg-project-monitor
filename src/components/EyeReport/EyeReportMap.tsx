@@ -49,14 +49,20 @@ export default function EyeReportMap({ rows, sex, projectId, unavailable = false
     finally { setLocationsLoading(false); }
   }, [projectId]);
   useEffect(() => {
-    setRegistry([]); setProjectWash([]); void refreshLocations();
+    let active = true;
+    setRegistry([]); setProjectWash([]);
+    if (projectId) void loadEnvironmentalLocations(projectId, true).then(saved => {
+      if (!active) return;
+      if (!saved.unavailable) { setRegistry(saved.facilities); setProjectWash(saved.wash); setWashUnlocated(saved.washUnlocated); setLocationsCached(true); setLocationsLoading(false); }
+      void refreshLocations();
+    });
     if (!projectId) return;
     const channel = supabase.channel(`eye-environment:${projectId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "health_facilities", filter: `project_id=eq.${projectId}` }, () => void refreshLocations())
       .on("postgres_changes", { event: "*", schema: "public", table: "community_wash_sources", filter: `project_id=eq.${projectId}` }, () => void refreshLocations()).subscribe();
     window.addEventListener("online", refreshLocations);
     const timer = window.setInterval(() => { if (navigator.onLine && document.visibilityState === "visible") void refreshLocations(); }, 60000);
-    return () => { void supabase.removeChannel(channel); window.removeEventListener("online", refreshLocations); window.clearInterval(timer); };
+    return () => { active = false; void supabase.removeChannel(channel); window.removeEventListener("online", refreshLocations); window.clearInterval(timer); };
   }, [projectId, refreshLocations]);
   const evidence = useMemo(() => [...environment, ...projectWash], [environment, projectWash]);
   const loadEnvironment = async () => {

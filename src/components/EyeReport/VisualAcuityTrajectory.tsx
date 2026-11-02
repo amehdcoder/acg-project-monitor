@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { aggregate, pct, vaTotal, type EyeReportRow } from "@/lib/eyeReport/definition";
 import { MILESTONES, meanMilestones, recoveryStatus, remoteGoodOutcome, type VisualTrajectory, type DhisOutcomeEvidence } from "@/lib/eyeReport/trajectory";
 import { importTrajectories, loadTrajectories } from "@/lib/eyeReport/trajectoryStore";
+import { savedTrajectories } from "@/lib/eyeReport/trajectoryStore";
+import { supabase } from "@/integrations/supabase/client";
 const colors = ["hsl(var(--eye-blue))","hsl(var(--eye-teal))","hsl(var(--eye-orange))","hsl(var(--eye-violet))","hsl(var(--eye-rose))","hsl(var(--eye-deep))"];
 const statusTone = { "Full Recovery":"bg-eye-mint text-eye-teal", "Partial Improvement":"bg-eye-gold/20 text-eye-ink", "Unchanged":"bg-muted text-muted-foreground", "Deteriorated":"bg-destructive/10 text-destructive", "Awaiting follow-up":"bg-eye-sky text-eye-blue" };
 interface Props {projectId:string;userId:string;canReport:boolean;reports:EyeReportRow[];period:{year:string;month:string;from:string;to:string};dhis:DhisOutcomeEvidence|null}
@@ -14,7 +16,14 @@ export default function VisualAcuityTrajectory({projectId,userId,canReport,repor
   const [lga,setLga]=useState("all"),[facility,setFacility]=useState("all"),[compare,setCompare]=useState<"cohort"|"facility"|"lga"|"episode">("cohort"),[episode,setEpisode]=useState("");
   const file=useRef<HTMLInputElement>(null);
   const load=useCallback(async()=>{setBusy(true);try {const r=await loadTrajectories(projectId);setRows(r.rows);setUnavailable(r.unavailable);} finally {setBusy(false);} },[projectId]);
-  useEffect(()=>{void load();const refresh=()=>void load();window.addEventListener("online",refresh);window.addEventListener("eye-tracker-synced",refresh);return()=>{window.removeEventListener("online",refresh);window.removeEventListener("eye-tracker-synced",refresh);};},[load]);
+  useEffect(()=>{
+    let active=true;let timer:ReturnType<typeof setTimeout>|undefined;
+    void savedTrajectories(projectId,userId).then(saved=>{if(active&&saved){setRows(saved);setUnavailable(false);}if(active)void load();});
+    const refresh=()=>{clearTimeout(timer);timer=setTimeout(()=>{if(active)void load();},350);};
+    const channel=supabase.channel(`eye-trajectory:${projectId}:${crypto.randomUUID()}`).on("postgres_changes",{event:"*",schema:"public",table:"eye_visual_trajectories",filter:`project_id=eq.${projectId}`},refresh).subscribe();
+    window.addEventListener("online",refresh);window.addEventListener("eye-tracker-synced",refresh);
+    return()=>{active=false;clearTimeout(timer);void supabase.removeChannel(channel);window.removeEventListener("online",refresh);window.removeEventListener("eye-tracker-synced",refresh);};
+  },[load,projectId,userId]);
   const periodMatch=(date:string)=>(period.year==="all"||date.startsWith(period.year))&&(period.month==="all"||Number(date.slice(5,7))===Number(period.month))&&(!period.from||date>=period.from)&&(!period.to||date<=period.to);
   const eligible=rows.filter((r)=>periodMatch(r.surgery_date));
   const lgas=[...new Set(eligible.map((r)=>r.lga))].sort();
