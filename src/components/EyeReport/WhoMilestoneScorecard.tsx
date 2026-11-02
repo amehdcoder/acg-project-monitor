@@ -5,16 +5,24 @@ import { Progress } from "@/components/ui/progress";
 import { MILESTONES, milestoneProgress, parseMilestones, type MilestoneObservation } from "@/lib/eyeReport/milestones";
 import { type EyeReportRow } from "@/lib/eyeReport/definition";
 import { routineMilestones } from "@/lib/eyeReport/routineMilestones";
+import { surveyGeography } from "@/lib/eyeReport/milestoneWorkbook";
+import SurveyEvidenceEntry from "./SurveyEvidenceEntry";
 
-export default function WhoMilestoneScorecard({ rows, unavailable }: { rows: EyeReportRow[]; unavailable: boolean }) {
+export default function WhoMilestoneScorecard({ rows, geographyRows = rows, unavailable }: { rows: EyeReportRow[]; geographyRows?: EyeReportRow[]; unavailable: boolean }) {
   const [evidence, setEvidence] = useState<MilestoneObservation[]>([]);
   const [state, setState] = useState("Jigawa");
   const [lga, setLga] = useState("State");
   const [error, setError] = useState("");
   const [download, setDownload] = useState<{ state: string; run: () => void } | null>(null);
   const file = useRef<HTMLInputElement>(null);
-  const states = [...new Set(["Jigawa", ...evidence.map((o)=>o.state), ...rows.map((o)=>o.state).filter((s):s is string=>!!s)])].sort();
-  const lgas = [...new Set([...evidence.filter((o)=>o.state===state).map((o)=>o.lga), ...rows.filter(o=>o.state===state).map(o=>o.lga)].filter((l): l is string=>!!l && l!=="State"))].sort();
+  const geography = useMemo(() => geographyRows.filter((r): r is EyeReportRow & { state: string } => !!r.state), [geographyRows]);
+  const submittedPlaces = useMemo(() => surveyGeography(geography), [geography]);
+  const states = [...new Set([...submittedPlaces.map(p => p.state), ...evidence.map(o => o.state)])].sort();
+  const lgas = [...new Set([...(submittedPlaces.find(p => p.state === state)?.lgas ?? []), ...evidence.filter(o => o.state === state).map(o => o.lga)].filter(l => l && l !== "State"))].sort();
+  useEffect(() => {
+    if (!states.includes(state)) { setState(states[0] ?? ""); setLga("State"); }
+    else if (lga !== "State" && !lgas.includes(lga)) setLga("State");
+  }, [states.join("|"), lgas.join("|"), state, lga]);
   const scoped = evidence.filter((o)=>o.state===state && o.lga===lga);
   const output = useMemo(()=>routineMilestones(rows.filter((o)=>o.state===state && (lga==="State" || o.lga===lga))),[rows,state,lga]);
   const routine = {
@@ -28,16 +36,16 @@ export default function WhoMilestoneScorecard({ rows, unavailable }: { rows: Eye
     let active = true;
     setDownload(null);
     void import("@/lib/eyeReport/milestoneWorkbook").then(async ({ prepareSurveyWorkbook, downloadSurveyWorkbook }) => {
-      const blob = await prepareSurveyWorkbook(state);
+      const blob = await prepareSurveyWorkbook(state, geography);
       if (active) setDownload({ state, run: () => downloadSurveyWorkbook(blob, state) });
     }).catch(() => { if (active) setError("Could not prepare the Excel template. Reopen the dashboard to retry."); });
     return () => { active = false; };
-  }, [state]);
+  }, [state, geography]);
   return <section className="border-y border-eye-teal/25 bg-card py-5" aria-label="WHO 2030 Roadmap Milestone Scorecard">
     <div className="flex flex-wrap items-start justify-between gap-3 px-4">
       <div><p className="flex items-center gap-2 text-xs font-bold uppercase text-eye-teal"><Globe2 className="h-4 w-4"/>2030 · Global commitments</p><h2 className="mt-1 text-xl font-bold text-eye-deep">WHO 2030 Roadmap Milestone Scorecard</h2><p className="mt-1 text-xs text-muted-foreground">{state} · {lga === "State" ? "State-representative evidence" : `${lga} LGA`} · Population survey evidence</p></div>
       <div className="flex max-w-full flex-wrap gap-2">
-        <select aria-label="Scorecard State" value={state} onChange={(e)=>{setState(e.target.value);setLga("State");}} className="h-10 max-w-full rounded-md border bg-background px-2 text-sm">{states.map((s)=><option key={s}>{s}</option>)}</select>
+        <select aria-label="Scorecard State" value={state} disabled={!states.length} onChange={(e)=>{setState(e.target.value);setLga("State");}} className="h-10 max-w-full rounded-md border bg-background px-2 text-sm">{!states.length && <option value="">No submissions yet</option>}{states.map((s)=><option key={s}>{s}</option>)}</select>
         <select aria-label="Scorecard LGA" value={lga} onChange={(e)=>setLga(e.target.value)} className="h-10 max-w-full rounded-md border bg-background px-2 text-sm"><option value="State">State estimate</option>{lgas.map((l)=><option key={l}>{l}</option>)}</select>
         <Button variant="outline" onClick={()=>file.current?.click()}><Upload className="mr-2 h-4 w-4"/>Import survey evidence</Button>
       </div>
@@ -45,6 +53,7 @@ export default function WhoMilestoneScorecard({ rows, unavailable }: { rows: Eye
     <div className="mx-4 mt-4 flex flex-wrap items-center justify-between gap-4 border-l-4 border-eye-gold bg-eye-sky px-4 py-4">
       <div className="flex min-w-0 items-center gap-3"><Download className="h-8 w-8 shrink-0 text-eye-teal"/><div><h3 className="text-base font-bold text-eye-deep">State survey evidence · Excel template</h3><p className="mt-1 text-xs text-muted-foreground">{state} · WHO 2030 roadmap · Target reference · Survey entry sheets</p></div></div>
       <Button aria-label="Download survey template" disabled={!download || download.state !== state} onClick={()=>download?.run()} className="bg-eye-teal text-primary-foreground hover:bg-eye-teal/90"><Download className="mr-2 h-4 w-4"/>{download?.state === state ? "Download Excel template (.xlsx)" : "Preparing Excel template…"}</Button>
+      <SurveyEvidenceEntry key={submittedPlaces.map(p => p.state + p.lgas.join(",")).join("|")} geography={geography} initialState={state} onApply={observations => { setEvidence(observations); setState(observations[0].state); setLga(observations[0].lga); setError(""); }} />
     </div>
     <input ref={file} type="file" accept=".json,.xlsx" className="hidden" aria-label="WHO survey evidence" onChange={async(e)=>{
       const f=e.target.files?.[0]; if(!f)return;
