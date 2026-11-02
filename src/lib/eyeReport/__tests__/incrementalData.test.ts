@@ -61,6 +61,14 @@ describe("Eye dashboard retained data", () => {
     await Promise.all([syncEyeRows("alice", "p", table), syncEyeRows("alice", "p", table)]);
     expect(mocks.queries).toHaveLength(1);
   });
+  it("keeps pending changes over a failed-network cache fallback", async () => {
+    const key = datasetKey(table, "p");
+    mocks.cache.set(`alice:${key}`, [row("a", 324)]);
+    mocks.queued = [{ kind: "op", user_id: "alice", payload: { table, action: "update", id: "a", values: { count: 400 } } }];
+    mocks.replies.push({ data: null, error: new Error("offline") });
+    const result = await syncEyeRows<any>("alice", "p", table);
+    expect(result.rows[0].count).toBe(400); expect(result.fromCache).toBe(true);
+  });
   it("keyset-pages timestamp ties without skipping a full first page", async () => {
     mocks.replies.push({ data: Array.from({ length: 1000 }, (_, i) => row(`id-${i}`)), error: null }, { data: [row("tail")], error: null });
     expect((await syncEyeRows("alice", "p", table)).rows).toHaveLength(1001);
