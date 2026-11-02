@@ -22,6 +22,22 @@ const table = "eye_daily_reports";
 const row = (id: string, count = 1) => ({ id, project_id: "p", report_date: "2026-11-02", updated_at: "2026-11-02T07:00:00Z", count });
 beforeEach(() => { mocks.cache.clear(); mocks.queries.length = 0; mocks.replies.length = 0; mocks.queued = []; });
 describe("Eye dashboard retained data", () => {
+  it("does not hydrate the obsolete 57-screening snapshot after cleanup", async () => {
+    mocks.cache.set("alice:eye-patients:p", Array.from({ length: 57 }, (_, i) => row(`old-${i}`)));
+    expect(await savedEyeRows("alice", "p", "eye_daily_patients")).toBeNull();
+    mocks.replies.push({ data: [], error: null });
+    expect((await syncEyeRows("alice", "p", "eye_daily_patients", true)).rows).toEqual([]);
+    expect(await savedEyeRows("alice", "p", "eye_daily_patients")).toEqual([]);
+  });
+  it("reconciles 57 deleted screenings to zero without dropping a new standalone submission", async () => {
+    const key = datasetKey("eye_daily_patients", "p");
+    mocks.cache.set(`alice:${key}`, Array.from({ length: 57 }, (_, i) => row(`old-${i}`)));
+    mocks.cache.set(`alice:${key}:sync-v1`, { cursor: "2026-11-02T07:00:00Z", reconciledAt: 0 });
+    mocks.replies.push({ data: [], error: null }, { data: [], error: null });
+    expect((await syncEyeRows("alice", "p", "eye_daily_patients", true)).rows).toEqual([]);
+    mocks.replies.push({ data: [{ ...row("new"), report_id: null }], error: null });
+    expect((await syncEyeRows<any>("alice", "p", "eye_daily_patients")).rows.map(r => r.id)).toEqual(["new"]);
+  });
   it("excludes linked WG-SS screenings during offline report deletion, preserving standalone and other reports", () => {
     const patients = [{ ...row("linked"), report_id: "deleted" }, { ...row("standalone"), report_id: null }, { ...row("other"), report_id: "kept" }];
     const items: any[] = [{ kind: "op", user_id: "alice", payload: { table, action: "delete", id: "deleted" } }];
