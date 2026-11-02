@@ -1,10 +1,10 @@
 # Roadmap
 
-- [ ] Remove the confirmed residual 57 BMZ screenings, prevent offline replay resurrection, and verify cached/live zero totals while preserving future standalone submissions.
+- [x] Remove 57 residual BMZ screenings as requested; protected deletion tombstones prevent replay; retire old screening caches/cursors without clearing drafts/queues; 85 Eye tests pass. Live authenticated BMZ dashboard and offline reopening both show 0 screened / 0 disability / 0 reports, no runtime errors; database confirms 0 screenings and 57 replay guards.
 
 - [x] Cascade deleted daily reports to linked WG-SS screenings in PostgreSQL and user-scoped offline queue/cache overlays; preserve independent standalone rows; constraint confirmed and deletion/failure tests pass.
 - [x] Add routine service evidence to WHO cards, weighted measured follow-up outcome shares, colourful State survey Excel template and validated Excel/JSON imports; 83 Eye tests pass, isolated downloaded-workbook round-trip shows 83.3% complete and trend projection without runtime errors; preview build clean.
-- [ ] Confirm historical detached WG-SS attribution before any cleanup — 57 null-parent screenings and zero reports remain; earlier SET NULL deletions cannot be distinguished from genuine standalone screenings by current records. Do not erase them speculatively. Signed-in requesting account has no Eye dashboard launcher, so nonempty live report deletion/readback remains unverified.
+- [x] Resolve residual WG-SS count after user confirmed no submissions: removed the existing 57 BMZ null-parent rows only, preserving future independent screenings; live/offline KPI verified zero.
 
 - [x] Speed up Eye Health dashboard with immediate captured-user/project cache hydration, timestamp-keyset deltas, coalesced realtime refreshes, reconnect/focus recovery, periodic ID-only deletion reconciliation, pending-write overlay, deferred map/tracker work and retained refresh feedback; 76 Eye tests pass and signed-in warm reopening/request-failure checks verified; preview build clean.
 - [ ] Verify nonempty live Eye report change → realtime totals readback — current BMZ dashboard returns no reports across all years; no clinical data was fabricated. Nonempty cached totals, update events, missed deletion and account isolation verified in focused tests.
