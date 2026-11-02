@@ -5669,6 +5669,24 @@ export type Database = {
           },
         ]
       }
+      eye_deleted_screenings: {
+        Row: {
+          deleted_at: string
+          id: string
+          project_id: string
+        }
+        Insert: {
+          deleted_at?: string
+          id: string
+          project_id: string
+        }
+        Update: {
+          deleted_at?: string
+          id?: string
+          project_id?: string
+        }
+        Relationships: []
+      }
       eye_report_access: {
         Row: {
           can_report: boolean
