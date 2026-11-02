@@ -10,7 +10,7 @@ import type { EyePatientRow, EyeReportRow } from "./definition";
 
 const db = supabase as unknown as { from: (t: string) => any; rpc: (f: string, a: any) => any }; // eslint-disable-line @typescript-eslint/no-explicit-any
 export const cacheKey = (projectId: string) => `eye-reports:${projectId}`;
-export const patientCacheKey = (projectId: string) => `eye-patients:${projectId}`;
+export const patientCacheKey = (projectId: string) => `eye-patients-v2:${projectId}`;
 
 async function readAll<T>(table: string, projectId: string) {
   const rows: T[] = [];

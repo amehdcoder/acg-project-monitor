@@ -39,7 +39,8 @@ export function overlayPending<T extends SyncRow>(rows: T[], items: QueuedItem[]
   return [...merged.values()].sort((a, b) => b.report_date.localeCompare(a.report_date) || a.id.localeCompare(b.id));
 }
 
-export const datasetKey = (table: EyeTable, projectId: string) => `${table === "eye_daily_reports" ? "eye-reports" : "eye-patients"}:${projectId}`;
+// Retire pre-cleanup screening snapshots and their cursors together. Never clear drafts or queues.
+export const datasetKey = (table: EyeTable, projectId: string) => `${table === "eye_daily_reports" ? "eye-reports" : "eye-patients-v2"}:${projectId}`;
 
 export async function savedEyeRows<T extends SyncRow>(userId: string, projectId: string, table: EyeTable) {
   const rows = await cacheGetForUser<T[]>(userId, datasetKey(table, projectId));
