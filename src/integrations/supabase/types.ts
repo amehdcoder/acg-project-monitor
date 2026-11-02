@@ -5813,6 +5813,80 @@ export type Database = {
           },
         ]
       }
+      eye_who_surveys: {
+        Row: {
+          baseline: number
+          baseline_date: string
+          baseline_denominator: number | null
+          baseline_numerator: number
+          created_at: string
+          created_by: string
+          date: string
+          denominator: number | null
+          id: string
+          indicator: string
+          lga: string
+          methodology: string
+          numerator: number
+          project_id: string
+          representative: boolean
+          source: string
+          state: string
+          updated_at: string
+          value: number
+        }
+        Insert: {
+          baseline: number
+          baseline_date: string
+          baseline_denominator?: number | null
+          baseline_numerator: number
+          created_at?: string
+          created_by?: string
+          date: string
+          denominator?: number | null
+          id?: string
+          indicator: string
+          lga: string
+          methodology: string
+          numerator: number
+          project_id: string
+          representative: boolean
+          source: string
+          state: string
+          updated_at?: string
+          value: number
+        }
+        Update: {
+          baseline?: number
+          baseline_date?: string
+          baseline_denominator?: number | null
+          baseline_numerator?: number
+          created_at?: string
+          created_by?: string
+          date?: string
+          denominator?: number | null
+          id?: string
+          indicator?: string
+          lga?: string
+          methodology?: string
+          numerator?: number
+          project_id?: string
+          representative?: boolean
+          source?: string
+          state?: string
+          updated_at?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eye_who_surveys_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       facility_commodity_stock: {
         Row: {
           category: string
