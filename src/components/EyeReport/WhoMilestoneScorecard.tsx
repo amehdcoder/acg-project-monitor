@@ -7,9 +7,14 @@ import { type EyeReportRow } from "@/lib/eyeReport/definition";
 import { routineMilestones } from "@/lib/eyeReport/routineMilestones";
 import { surveyGeography } from "@/lib/eyeReport/milestoneWorkbook";
 import SurveyEvidenceEntry from "./SurveyEvidenceEntry";
+import WhoTargetSurveyForm from "./WhoTargetSurveyForm";
+import { useSurveyEvidence } from "@/lib/eyeReport/useSurveyEvidence";
+import { mergeSurveyEvidence } from "@/lib/eyeReport/surveyEvidence";
 
-export default function WhoMilestoneScorecard({ rows, geographyRows = rows, unavailable }: { rows: EyeReportRow[]; geographyRows?: EyeReportRow[]; unavailable: boolean }) {
-  const [evidence, setEvidence] = useState<MilestoneObservation[]>([]);
+export default function WhoMilestoneScorecard({ rows, geographyRows = rows, unavailable, projectId, userId, canReport }: { rows: EyeReportRow[]; geographyRows?: EyeReportRow[]; unavailable: boolean; projectId: string; userId: string; canReport: boolean }) {
+  const [imported, setEvidence] = useState<MilestoneObservation[]>([]);
+  const surveys = useSurveyEvidence(projectId, userId);
+  const evidence = useMemo(() => mergeSurveyEvidence(surveys.rows, imported), [surveys.rows, imported]);
   const [state, setState] = useState("Jigawa");
   const [lga, setLga] = useState("State");
   const [error, setError] = useState("");
@@ -67,6 +72,8 @@ export default function WhoMilestoneScorecard({ rows, geographyRows = rows, unav
       } catch(err){setError(err instanceof Error?err.message:"Could not read survey evidence.");} e.target.value="";
     }}/>
     {error&&<p role="alert" className="px-4 pt-3 text-sm text-destructive">{error}</p>}
+    {surveys.unavailable && <p role="alert" className="px-4 pt-3 text-sm text-destructive">Saved survey evidence could not be loaded. Reconnect to check previously saved surveys.</p>}
+    <p className="px-4 pt-3 text-xs text-eye-teal">{surveys.rows.length} saved survey observations{surveys.fromCache ? " · Saved copy — awaiting connection" : " · Shared project evidence"}</p>
     <div className="mt-4 grid gap-3 px-4 sm:grid-cols-2 xl:grid-cols-3">{MILESTONES.map((m)=>{
       const p=milestoneProgress(m.key,scoped);
       const cls=p?.forecast==="On track"||p?.reached?"text-eye-teal bg-eye-mint":"text-eye-ink bg-eye-gold/15";
@@ -80,6 +87,7 @@ export default function WhoMilestoneScorecard({ rows, geographyRows = rows, unav
         <p className="mt-2 text-xs text-muted-foreground">{p?`Baseline ${p.last.baseline}${m.key==="backlog"?" people":"%"} · ${p.last.baseline_date} · Latest ${p.last.date}`:"Requires a dated survey baseline and matched population denominator; routine counts are not coverage."}</p>
         <div className="mt-3 flex gap-2 border-t pt-3 text-xs"><CalendarClock className="h-4 w-4 shrink-0 text-eye-blue"/><span>{p?.crossing?`Trend-based threshold: ${p.crossing} · ${p.annualChange?.toFixed(2)} ${m.key==="backlog"?"people":"pp"}/year`:p?.reached?"Threshold observed; not elimination certification.":"2030 forecast unavailable: ≥3 recent observations spanning ≥180 days required."}</span></div>
         {p&&<p className="mt-2 break-words text-[11px] text-muted-foreground">Evidence: {p.last.source}</p>}
+        {canReport && <WhoTargetSurveyForm indicator={m.key} projectId={projectId} userId={userId} geography={geography} initialState={state} initialLga={lga} saved={surveys.rows} onSaved={row => { setState(row.state); setLga(row.lga); void surveys.refresh(); }} />}
         <a href={m.source} target="_blank" rel="noreferrer" className="mt-auto pt-3 text-xs font-semibold text-eye-blue underline">WHO target definition ↗</a>
       </article>;
     })}</div>
@@ -89,6 +97,6 @@ export default function WhoMilestoneScorecard({ rows, geographyRows = rows, unav
       <p className="mt-2 text-xs text-eye-ink">{unavailable ? "Reports unavailable" : `${output.goodCount} good / ${output.measuredFollowup} measured presenting outcomes · ${output.poorFollowup === null ? "Poor outcome share unavailable" : `${output.poorFollowup.toFixed(1)}% poor`} · ${output.reports} reports · ${output.facilities} facilities`}</p>
       <p className="mt-1 text-xs text-muted-foreground">Recorded outcomes only; not eCSC, population coverage, a matched patient cohort or a 2030 elimination forecast.</p>
     </div>
-    <div className="mt-4 border-t px-4 pt-3 text-xs text-muted-foreground"><p className="font-semibold text-eye-deep">Routine service evidence · selected dashboard period</p><p className="mt-1">Daily report counts update with the dashboard. Population milestones require representative surveys; no coverage or backlog-clearance percentage is inferred from service counts.</p><p className="mt-2">Imported surveys remain in this session. Forecasts use a linear recent-survey trend, not a validated elimination model. WHO trachoma validation also requires sustained TF control and a system to identify and manage incident TT cases.</p></div>
+    <div className="mt-4 border-t px-4 pt-3 text-xs text-muted-foreground"><p className="font-semibold text-eye-deep">Routine service evidence · selected dashboard period</p><p className="mt-1">Daily report counts update with the dashboard. Population milestones require representative surveys; no coverage or backlog-clearance percentage is inferred from service counts.</p><p className="mt-2">Card surveys are saved to this project; offline saves await sync. Imported surveys remain in this session. Forecasts use a linear recent-survey trend, not a validated elimination model. WHO trachoma validation also requires sustained TF control and a system to identify and manage incident TT cases.</p></div>
   </section>;
 }
