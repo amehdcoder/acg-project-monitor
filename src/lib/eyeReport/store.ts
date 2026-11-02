@@ -2,7 +2,7 @@
 //  • Signed-in users: offlineMutate (direct when online, queued on the device otherwise).
 //  • Account-free devices: saved-form queue drained by project-collect (kind "eye_daily").
 import { supabase } from "@/integrations/supabase/client";
-import { cachedRead, cachePatchRows, cacheGet, cacheSet } from "@/lib/programmeModule/offlineReadCache";
+import { cachedRead, cachePatchRows, cacheGet, cacheSet, cacheGetForUser, cacheSetForUser } from "@/lib/programmeModule/offlineReadCache";
 import { offlineMutate, type OpPayload } from "@/lib/programmeModule/offlineWrite";
 import { saveSavedEntry, listAllSavedEntries } from "@/lib/savedForms";
 import { syncDeviceRecords } from "@/lib/deviceSync";
@@ -67,8 +67,18 @@ export async function saveReport(payload: ReportPayload, userId: string, editing
 
 export async function deleteReport(projectId: string, id: string) {
   const { data } = await supabase.auth.getSession();
-  await offlineMutate({ table: "eye_daily_reports", action: "delete", id, userId: data.session?.user.id });
-  await cachePatchRows(cacheKey(projectId), id, null);
+  const userId = data.session?.user.id;
+  if (!userId) throw new Error("Sign in before deleting a report.");
+  // The server cascades linked screenings; the queue overlay mirrors this offline.
+  await offlineMutate({ table: "eye_daily_reports", action: "delete", id, userId });
+  const [reports, patients] = await Promise.all([
+    cacheGetForUser<EyeReportRow[]>(userId, cacheKey(projectId)),
+    cacheGetForUser<EyePatientRow[]>(userId, patientCacheKey(projectId)),
+  ]);
+  await Promise.all([
+    reports === null ? Promise.resolve() : cacheSetForUser(userId, cacheKey(projectId), reports.filter(r => r.id !== id)),
+    patients === null ? Promise.resolve() : cacheSetForUser(userId, patientCacheKey(projectId), patients.filter(p => p.report_id !== id)),
+  ]);
   window.dispatchEvent(new Event("eye-report-saved"));
 }
 

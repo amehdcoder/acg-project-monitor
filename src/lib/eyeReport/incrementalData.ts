@@ -21,6 +21,10 @@ export function overlayPending<T extends SyncRow>(rows: T[], items: QueuedItem[]
   const merged = new Map(rows.map(r => [r.id, r]));
   const apply = (op: OpPayload) => {
     if (op.action === "batch") { for (const child of op.operations ?? []) apply(child); return; }
+    if (table === "eye_daily_patients" && op.table === "eye_daily_reports" && op.action === "delete" && op.id) {
+      for (const [id, row] of merged) if ((row as T & { report_id?: string | null }).report_id === op.id && row.project_id === projectId) merged.delete(id);
+      return;
+    }
     if (op.table !== table) return;
     if (op.action === "delete") { if (op.id) merged.delete(op.id); return; }
     for (const values of Array.isArray(op.values) ? op.values : [op.values]) {

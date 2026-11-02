@@ -106,7 +106,7 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
     catch { toast.error("Export failed"); } finally { setExporting(false); }
   };
   const remove = async (r: EyeReportRow) => {
-    if (!confirm(`Delete the ${r.facility_name} report for ${r.report_date}?`)) return;
+    if (!confirm(`Delete the ${r.facility_name} report for ${r.report_date} and its linked WG-SS screenings? Standalone screenings will be kept.`)) return;
     try { await deleteReport(projectId, r.id); void load(); toast.success("Report deleted"); } catch (e) { toast.error(e instanceof Error ? e.message : "Delete failed"); }
   };
 

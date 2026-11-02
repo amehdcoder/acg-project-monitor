@@ -22,6 +22,12 @@ const table = "eye_daily_reports";
 const row = (id: string, count = 1) => ({ id, project_id: "p", report_date: "2026-11-02", updated_at: "2026-11-02T07:00:00Z", count });
 beforeEach(() => { mocks.cache.clear(); mocks.queries.length = 0; mocks.replies.length = 0; mocks.queued = []; });
 describe("Eye dashboard retained data", () => {
+  it("excludes linked WG-SS screenings during offline report deletion, preserving standalone and other reports", () => {
+    const patients = [{ ...row("linked"), report_id: "deleted" }, { ...row("standalone"), report_id: null }, { ...row("other"), report_id: "kept" }];
+    const items: any[] = [{ kind: "op", user_id: "alice", payload: { table, action: "delete", id: "deleted" } }];
+    expect(overlayPending(patients, items, "alice", "p", "eye_daily_patients").map(p => p.id)).toEqual(["other", "standalone"]);
+    expect(overlayPending(patients, items, "bob", "p", "eye_daily_patients")).toHaveLength(3);
+  });
   it("hydrates the requesting account without a network request", async () => {
     mocks.cache.set(`alice:${datasetKey(table, "p")}`, [row("one", 324)]);
     expect(await savedEyeRows("alice", "p", table)).toEqual([row("one", 324)]);
