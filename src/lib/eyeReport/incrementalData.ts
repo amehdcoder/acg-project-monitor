@@ -32,7 +32,7 @@ export function overlayPending<T extends SyncRow>(rows: T[], items: QueuedItem[]
     }
   };
   for (const item of items) if (item.kind === "op" && item.user_id === userId) apply(item.payload as unknown as OpPayload);
-  return [...merged.values()];
+  return [...merged.values()].sort((a, b) => b.report_date.localeCompare(a.report_date) || a.id.localeCompare(b.id));
 }
 
 export const datasetKey = (table: EyeTable, projectId: string) => `${table === "eye_daily_reports" ? "eye-reports" : "eye-patients"}:${projectId}`;
