@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Add submission-derived cascading State/LGA selections to the WHO survey workbook, readable import-compatible headings, valid manual spreadsheet dates and an in-app calendar entry alternative; verify export/import and cascade behavior.
+
 - [x] Remove 57 residual BMZ screenings as requested; protected deletion tombstones prevent replay; retire old screening caches/cursors without clearing drafts/queues; 85 Eye tests pass. Live authenticated BMZ dashboard and offline reopening both show 0 screened / 0 disability / 0 reports, no runtime errors; database confirms 0 screenings and 57 replay guards.
 
 - [x] Cascade deleted daily reports to linked WG-SS screenings in PostgreSQL and user-scoped offline queue/cache overlays; preserve independent standalone rows; constraint confirmed and deletion/failure tests pass.
