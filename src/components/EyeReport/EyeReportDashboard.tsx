@@ -159,7 +159,7 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
           ))}
         </section>
 
-        <WhoMilestoneScorecard rows={filtered} unavailable={unavailable} />
+        <WhoMilestoneScorecard rows={filtered} geographyRows={rows} unavailable={unavailable} />
         <DeferredEyeSection label="Eye Health reporting map"><Suspense fallback={<p className="py-6 text-sm text-muted-foreground">Loading map…</p>}><EyeReportMap rows={filtered} sex={sex} projectId={projectId} unavailable={unavailable} /></Suspense></DeferredEyeSection>
         <DeferredEyeSection label="Visual Acuity Trajectory"><Suspense fallback={<p className="py-6 text-sm text-muted-foreground">Loading measured outcomes…</p>}><VisualAcuityTrajectory projectId={projectId} userId={userId} canReport={canReport} reports={filtered} period={{ year, month, from, to }} dhis={dhisOutcomes} /></Suspense></DeferredEyeSection>
         <EyeFacilityTrend rows={rows} />
