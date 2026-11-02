@@ -133,7 +133,8 @@ export async function readSurveyWorkbook(bytes: ArrayBuffer) {
     const r = Object.fromEntries(fields.map((f, i) => [f, value(row.getCell(i + 1))]));
     for (const field of ["date", "baseline_date"]) {
       if (typeof r[field] === "number" && Number.isFinite(r[field])) {
-        r[field] = new Date(Date.UTC(1899, 11, 30) + (r[field] as number) * 86400000).toISOString().slice(0, 10);
+        const epoch = wb.properties.date1904 ? Date.UTC(1904, 0, 1) : Date.UTC(1899, 11, 30);
+        r[field] = new Date(epoch + (r[field] as number) * 86400000).toISOString().slice(0, 10);
       }
     }
     // Pre-labelled blank entries are not evidence.

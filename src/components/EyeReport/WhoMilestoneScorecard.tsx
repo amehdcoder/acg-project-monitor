@@ -17,8 +17,12 @@ export default function WhoMilestoneScorecard({ rows, geographyRows = rows, unav
   const file = useRef<HTMLInputElement>(null);
   const geography = useMemo(() => geographyRows.filter((r): r is EyeReportRow & { state: string } => !!r.state), [geographyRows]);
   const submittedPlaces = useMemo(() => surveyGeography(geography), [geography]);
-  const states = [...new Set(["Jigawa", ...evidence.map((o)=>o.state), ...rows.map((o)=>o.state).filter((s):s is string=>!!s)])].sort();
-  const lgas = [...new Set([...evidence.filter((o)=>o.state===state).map((o)=>o.lga), ...rows.filter(o=>o.state===state).map(o=>o.lga)].filter((l): l is string=>!!l && l!=="State"))].sort();
+  const states = [...new Set([...submittedPlaces.map(p => p.state), ...evidence.map(o => o.state)])].sort();
+  const lgas = [...new Set([...(submittedPlaces.find(p => p.state === state)?.lgas ?? []), ...evidence.filter(o => o.state === state).map(o => o.lga)].filter(l => l && l !== "State"))].sort();
+  useEffect(() => {
+    if (!states.includes(state)) { setState(states[0] ?? ""); setLga("State"); }
+    else if (lga !== "State" && !lgas.includes(lga)) setLga("State");
+  }, [states.join("|"), lgas.join("|"), state, lga]);
   const scoped = evidence.filter((o)=>o.state===state && o.lga===lga);
   const output = useMemo(()=>routineMilestones(rows.filter((o)=>o.state===state && (lga==="State" || o.lga===lga))),[rows,state,lga]);
   const routine = {
@@ -41,7 +45,7 @@ export default function WhoMilestoneScorecard({ rows, geographyRows = rows, unav
     <div className="flex flex-wrap items-start justify-between gap-3 px-4">
       <div><p className="flex items-center gap-2 text-xs font-bold uppercase text-eye-teal"><Globe2 className="h-4 w-4"/>2030 · Global commitments</p><h2 className="mt-1 text-xl font-bold text-eye-deep">WHO 2030 Roadmap Milestone Scorecard</h2><p className="mt-1 text-xs text-muted-foreground">{state} · {lga === "State" ? "State-representative evidence" : `${lga} LGA`} · Population survey evidence</p></div>
       <div className="flex max-w-full flex-wrap gap-2">
-        <select aria-label="Scorecard State" value={state} onChange={(e)=>{setState(e.target.value);setLga("State");}} className="h-10 max-w-full rounded-md border bg-background px-2 text-sm">{states.map((s)=><option key={s}>{s}</option>)}</select>
+        <select aria-label="Scorecard State" value={state} disabled={!states.length} onChange={(e)=>{setState(e.target.value);setLga("State");}} className="h-10 max-w-full rounded-md border bg-background px-2 text-sm">{!states.length && <option value="">No submissions yet</option>}{states.map((s)=><option key={s}>{s}</option>)}</select>
         <select aria-label="Scorecard LGA" value={lga} onChange={(e)=>setLga(e.target.value)} className="h-10 max-w-full rounded-md border bg-background px-2 text-sm"><option value="State">State estimate</option>{lgas.map((l)=><option key={l}>{l}</option>)}</select>
         <Button variant="outline" onClick={()=>file.current?.click()}><Upload className="mr-2 h-4 w-4"/>Import survey evidence</Button>
       </div>
