@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { MILESTONES, parseMilestones, type MilestoneObservation } from "@/lib/eyeReport/milestones";
 import { surveyGeography, type SurveyGeography, prepareSurveyWorkbook, downloadSurveyWorkbook } from "@/lib/eyeReport/milestoneWorkbook";
 
-function SurveyDate({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+export function SurveyDate({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   const [open, setOpen] = useState(false);
   const selected = parse(value, "yyyy-MM-dd", new Date());
   return <label className="block space-y-1 text-sm font-medium">{label}<div className="flex gap-1">
