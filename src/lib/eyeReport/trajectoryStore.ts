@@ -1,8 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
-import { cachedRead, cachePatchRows, cacheGet, cacheSet } from "@/lib/programmeModule/offlineReadCache";
+import { cachedRead, cachePatchRows, cacheGet, cacheSet, cacheGetForUser } from "@/lib/programmeModule/offlineReadCache";
 import { offlineMutate } from "@/lib/programmeModule/offlineWrite";
 import { validateTrajectory, type VisualTrajectory } from "./trajectory";
 const key = (project: string) => `eye-trajectory:${project}`;
+export const savedTrajectories = (projectId: string, userId: string) => cacheGetForUser<VisualTrajectory[]>(userId, key(projectId));
 export async function loadTrajectories(projectId: string) {
   const result = await cachedRead<VisualTrajectory[]>(key(projectId), async () => {
     const rows: VisualTrajectory[] = [];

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowLeft, Download, Eye, Glasses, Scissors, Stethoscope, Accessibility, ScanEye, Plus, RefreshCw, FileSpreadsheet,
@@ -21,8 +21,9 @@ import { exportAggregated, exportDailyReport } from "@/lib/eyeReport/exportExcel
 import EyeDailyReportForm, { type EyeFacility } from "./EyeDailyReportForm";
 import EyeFacilityTrend from "./EyeFacilityTrend";
 import EyeDhis2Exchange from "./EyeDhis2Exchange";
-import EyeReportMap from "./EyeReportMap";
-import VisualAcuityTrajectory from "./VisualAcuityTrajectory";
+import DeferredEyeSection from "./DeferredEyeSection";
+const EyeReportMap = lazy(() => import("./EyeReportMap"));
+const VisualAcuityTrajectory = lazy(() => import("./VisualAcuityTrajectory"));
 import WhoMilestoneScorecard from "./WhoMilestoneScorecard";
 import type { DhisOutcomeEvidence } from "@/lib/eyeReport/trajectory";
 
@@ -146,6 +147,7 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
 
       <main className="mx-auto max-w-7xl space-y-5 px-4 py-5">
         {unavailable && <p role="alert" className="border-l-4 border-destructive bg-card p-4 text-sm text-destructive">Submission totals could not be loaded. Reconnect and select Refresh; unavailable data is not a zero submission count.</p>}
+        {patientData.unavailable && <p role="alert" className="border-l-4 border-destructive bg-card p-4 text-sm text-destructive">WG-SS screenings could not be loaded. Consultation totals remain available; screening totals are unavailable, not zero.</p>}
         <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {kpis.map((k, i) => (
             <motion.div key={k.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }} className={`rounded-2xl bg-gradient-to-br ${k.cls} p-4 text-primary-foreground shadow-md`}>
@@ -158,8 +160,8 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
         </section>
 
         <WhoMilestoneScorecard rows={filtered} unavailable={unavailable} />
-        <EyeReportMap rows={filtered} sex={sex} projectId={projectId} unavailable={unavailable} />
-        <VisualAcuityTrajectory projectId={projectId} userId={userId} canReport={canReport} reports={filtered} period={{ year, month, from, to }} dhis={dhisOutcomes} />
+        <DeferredEyeSection label="Eye Health reporting map"><Suspense fallback={<p className="py-6 text-sm text-muted-foreground">Loading map…</p>}><EyeReportMap rows={filtered} sex={sex} projectId={projectId} unavailable={unavailable} /></Suspense></DeferredEyeSection>
+        <DeferredEyeSection label="Visual Acuity Trajectory"><Suspense fallback={<p className="py-6 text-sm text-muted-foreground">Loading measured outcomes…</p>}><VisualAcuityTrajectory projectId={projectId} userId={userId} canReport={canReport} reports={filtered} period={{ year, month, from, to }} dhis={dhisOutcomes} /></Suspense></DeferredEyeSection>
         <EyeFacilityTrend rows={rows} />
 
         <section className="grid gap-4 lg:grid-cols-3">
@@ -196,7 +198,7 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-eye-violet via-eye-blue to-eye-deep p-5 text-primary-foreground shadow-md">
             <Accessibility className="absolute -right-4 -top-4 h-28 w-28 opacity-15" />
             <h3 className="flex items-center gap-2 text-sm font-bold"><Accessibility className="h-4 w-4" /> Disability screening (WG-SS)</h3>
-            <p className="mt-3 text-3xl font-extrabold tabular-nums">{pAgg.screened}</p>
+            <p className="mt-3 text-3xl font-extrabold tabular-nums">{patientData.unavailable || patientData.loading ? "—" : pAgg.screened}</p>
             <p className="text-xs opacity-85">patients screened · {pAgg.days} days · {pAgg.facilities} facilities</p>
             <div className="mt-3 flex items-end gap-2">
               <p className="text-2xl font-extrabold text-eye-gold">{pct(pAgg.withDisability, pAgg.screened)}%</p>
