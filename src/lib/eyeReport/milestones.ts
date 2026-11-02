@@ -1,5 +1,5 @@
 export const WHO_SOURCES = {
-  eye: "https://www.who.int/news/item/27-05-2021-new-world-health-assembly-resolution-on-eye-health",
+  eye: "https://www.who.int/activities/monitoring-and-surveillance-of-global-eye-care-targets",
   trachoma: "https://www.who.int/news-room/fact-sheets/detail/trachoma",
   roadmap: "https://www.who.int/publications/i/item/9789240010352",
 };
