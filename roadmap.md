@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Speed up Eye Health dashboard with immediate user/project-scoped saved data, incremental background refresh, realtime changes and reconnect recovery; verify warm reopening and update/deletion handling.
+
 - [x] Repair header/banner Update controls with bounded single-flight checks, one safe navigation, worker activation, retryable failures and retained precaches/queues; 22 tests pass, signed-in current/offline checks and isolated release reload preserve draft/restore marker with no runtime errors; preview build clean.
 - [ ] Verify this update on a physically installed app after publication — requires publishing the changes and an installed-device check; preview cannot run production service workers.
 
