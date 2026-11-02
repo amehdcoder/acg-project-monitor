@@ -16,7 +16,7 @@ function SurveyDate({ label, value, onChange }: { label: string; value: string; 
   return <label className="block space-y-1 text-sm font-medium">{label}<div className="flex gap-1">
     <Input aria-label={label} value={value} placeholder="YYYY-MM-DD" onChange={e => onChange(e.target.value)} />
     <Popover open={open} onOpenChange={setOpen}><PopoverTrigger asChild><Button variant="outline" size="icon" aria-label={`Choose ${label.toLowerCase()}`}><CalendarIcon className="h-4 w-4" /></Button></PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="end"><Calendar className="pointer-events-auto p-3" mode="single" selected={isValid(selected) ? selected : undefined} defaultMonth={isValid(selected) ? selected : undefined} captionLayout="dropdown-buttons" fromYear={1900} toYear={new Date().getFullYear()} disabled={{ after: new Date() }} onSelect={d => { if (d) onChange(format(d, "yyyy-MM-dd")); setOpen(false); }} initialFocus /></PopoverContent>
+      <PopoverContent className="w-auto p-0" align="end"><Calendar className="pointer-events-auto p-3" classNames={{ caption_label: "hidden", caption_dropdowns: "flex items-center justify-center gap-2 px-8", dropdown_month: "text-sm", dropdown_year: "text-sm", dropdown: "h-8 rounded border border-input bg-background px-1 text-foreground", vhidden: "sr-only" }} mode="single" selected={isValid(selected) ? selected : undefined} defaultMonth={isValid(selected) ? selected : undefined} captionLayout="dropdown-buttons" fromYear={1900} toYear={new Date().getFullYear()} disabled={{ after: new Date() }} onSelect={d => { if (d) onChange(format(d, "yyyy-MM-dd")); setOpen(false); }} initialFocus /></PopoverContent>
     </Popover>
   </div></label>;
 }
