@@ -5813,6 +5813,24 @@ export type Database = {
           },
         ]
       }
+      eye_who_deleted_surveys: {
+        Row: {
+          deleted_at: string
+          id: string
+          project_id: string
+        }
+        Insert: {
+          deleted_at?: string
+          id: string
+          project_id: string
+        }
+        Update: {
+          deleted_at?: string
+          id?: string
+          project_id?: string
+        }
+        Relationships: []
+      }
       eye_who_surveys: {
         Row: {
           baseline: number
@@ -14924,6 +14942,10 @@ export type Database = {
       decide_beneficiary_delete_request: {
         Args: { _approve: boolean; _note?: string; _request_id: string }
         Returns: undefined
+      }
+      delete_eye_who_surveys: {
+        Args: { _ids?: string[]; _project: string }
+        Returns: string[]
       }
       derive_facility_code: { Args: { _name: string }; Returns: string }
       donor_field_activity: {
