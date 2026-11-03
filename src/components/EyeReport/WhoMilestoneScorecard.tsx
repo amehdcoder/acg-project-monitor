@@ -10,10 +10,13 @@ import SurveyEvidenceEntry from "./SurveyEvidenceEntry";
 import WhoTargetSurveyForm from "./WhoTargetSurveyForm";
 import { useSurveyEvidence } from "@/lib/eyeReport/useSurveyEvidence";
 import { mergeSurveyEvidence } from "@/lib/eyeReport/surveyEvidence";
+import { useAuth } from "@/hooks/useAuth";
+import SurveyEvidenceManager from "./SurveyEvidenceManager";
 
 export default function WhoMilestoneScorecard({ rows, geographyRows = rows, unavailable, projectId, userId, canReport }: { rows: EyeReportRow[]; geographyRows?: EyeReportRow[]; unavailable: boolean; projectId: string; userId: string; canReport: boolean }) {
   const [imported, setEvidence] = useState<MilestoneObservation[]>([]);
   const surveys = useSurveyEvidence(projectId, userId);
+  const { role } = useAuth();
   const evidence = useMemo(() => mergeSurveyEvidence(surveys.rows, imported), [surveys.rows, imported]);
   const [state, setState] = useState("Jigawa");
   const [lga, setLga] = useState("State");
@@ -53,6 +56,8 @@ export default function WhoMilestoneScorecard({ rows, geographyRows = rows, unav
         <select aria-label="Scorecard State" value={state} disabled={!states.length} onChange={(e)=>{setState(e.target.value);setLga("State");}} className="h-10 max-w-full rounded-md border bg-background px-2 text-sm">{!states.length && <option value="">No submissions yet</option>}{states.map((s)=><option key={s}>{s}</option>)}</select>
         <select aria-label="Scorecard LGA" value={lga} onChange={(e)=>setLga(e.target.value)} className="h-10 max-w-full rounded-md border bg-background px-2 text-sm"><option value="State">State estimate</option>{lgas.map((l)=><option key={l}>{l}</option>)}</select>
         <Button variant="outline" onClick={()=>file.current?.click()}><Upload className="mr-2 h-4 w-4"/>Import survey evidence</Button>
+        {role === "super_admin" && <SurveyEvidenceManager rows={surveys.rows} projectId={projectId} userId={userId} onDeleted={ids => { surveys.remove(ids); void surveys.refresh(); }} />}
+        {role === "super_admin" && imported.length > 0 && <Button variant="outline" onClick={() => setEvidence([])}>Clear session evidence</Button>}
       </div>
     </div>
     <div className="mx-4 mt-4 flex flex-wrap items-center justify-between gap-4 border-l-4 border-eye-gold bg-eye-sky px-4 py-4">

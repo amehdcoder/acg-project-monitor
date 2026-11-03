@@ -7,11 +7,11 @@ export function useSurveyEvidence(projectId: string, userId: string) {
   const [data, setData] = useState<{ rows: SavedSurvey[]; unavailable: boolean; fromCache: boolean }>({ rows: [], unavailable: false, fromCache: false });
   const scope = `${userId}:${projectId}`;
   const active = useRef(scope); active.current = scope;
-  const flight = useRef<Promise<void> | null>(null);
+  const flight = useRef<{ scope: string; promise: Promise<void> } | null>(null);
   const refresh = useCallback(() => {
-    if (flight.current) return flight.current;
-    const promise = loadSurveys(projectId, userId).then(result => { if (active.current === scope) setData(result); }).finally(() => { if (flight.current === promise) flight.current = null; });
-    flight.current = promise; return promise;
+    if (flight.current?.scope === scope) return flight.current.promise;
+    const promise = loadSurveys(projectId, userId).then(result => { if (active.current === scope) setData(result); }).finally(() => { if (flight.current?.promise === promise) flight.current = null; });
+    flight.current = { scope, promise }; return promise;
   }, [projectId, userId, scope]);
   useEffect(() => {
     let alive = true;
@@ -24,5 +24,6 @@ export function useSurveyEvidence(projectId: string, userId: string) {
     const interval = setInterval(schedule, 60000);
     return () => { alive = false; if (active.current === scope) active.current = ""; clearTimeout(timer); clearInterval(interval); void supabase.removeChannel(channel); for (const event of ["online", "focus", "eye-survey-saved", "programme-module-queue"]) window.removeEventListener(event, schedule); };
   }, [projectId, userId, scope, refresh]);
-  return { ...data, refresh };
+  const remove = (ids: string[]) => setData(prior => ({ ...prior, rows: prior.rows.filter(r => !ids.includes(r.id)) }));
+  return { ...data, refresh, remove };
 }
