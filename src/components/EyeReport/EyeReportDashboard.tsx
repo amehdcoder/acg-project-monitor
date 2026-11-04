@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowLeft, Download, Eye, Glasses, Scissors, Stethoscope, Accessibility, ScanEye, Plus, RefreshCw, FileSpreadsheet,
-  CalendarRange, Building2, Pencil, Trash2, CloudOff, Loader2, Target, Activity,
+  CalendarRange, Building2, Pencil, Trash2, CloudOff, Loader2, Target, Activity, MapPinned,
 } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, LineChart, Line, PieChart, Pie, Cell,
@@ -22,6 +22,7 @@ import EyeDailyReportForm, { type EyeFacility } from "./EyeDailyReportForm";
 import EyeFacilityTrend from "./EyeFacilityTrend";
 import EyeDhis2Exchange from "./EyeDhis2Exchange";
 import DeferredEyeSection from "./DeferredEyeSection";
+import CollapsibleEyeSection from "./CollapsibleEyeSection";
 const EyeReportMap = lazy(() => import("./EyeReportMap"));
 const VisualAcuityTrajectory = lazy(() => import("./VisualAcuityTrajectory"));
 import WhoMilestoneScorecard from "./WhoMilestoneScorecard";
