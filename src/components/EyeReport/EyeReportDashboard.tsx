@@ -160,9 +160,15 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
           ))}
         </section>
 
-        <WhoMilestoneScorecard key={`${userId}:${projectId}`} rows={filtered} geographyRows={rows} unavailable={unavailable} projectId={projectId} userId={userId} canReport={canReport} />
-        <DeferredEyeSection label="Eye Health reporting map"><Suspense fallback={<p className="py-6 text-sm text-muted-foreground">Loading map…</p>}><EyeReportMap rows={filtered} sex={sex} projectId={projectId} unavailable={unavailable} /></Suspense></DeferredEyeSection>
-        <DeferredEyeSection label="Visual Acuity Trajectory"><Suspense fallback={<p className="py-6 text-sm text-muted-foreground">Loading measured outcomes…</p>}><VisualAcuityTrajectory projectId={projectId} userId={userId} canReport={canReport} reports={filtered} period={{ year, month, from, to }} dhis={dhisOutcomes} /></Suspense></DeferredEyeSection>
+        <CollapsibleEyeSection title="WHO 2030 Roadmap Milestone Scorecard" hint="Official elimination targets, routine evidence and survey forecasts" icon={Target}>
+          <WhoMilestoneScorecard key={`${userId}:${projectId}`} rows={filtered} geographyRows={rows} unavailable={unavailable} projectId={projectId} userId={userId} canReport={canReport} />
+        </CollapsibleEyeSection>
+        <CollapsibleEyeSection title="Environmental Risk & Blindness Corridor" hint="State map, dust-prone zones, WASH access and hotspot facilities" icon={MapPinned}>
+          <DeferredEyeSection label="Eye Health reporting map"><Suspense fallback={<p className="py-6 text-sm text-muted-foreground">Loading map…</p>}><EyeReportMap rows={filtered} sex={sex} projectId={projectId} unavailable={unavailable} /></Suspense></DeferredEyeSection>
+        </CollapsibleEyeSection>
+        <CollapsibleEyeSection title="Visual Acuity Trajectory" hint="Baseline to 180-day recovery paths from real tracker episodes" icon={Activity}>
+          <DeferredEyeSection label="Visual Acuity Trajectory"><Suspense fallback={<p className="py-6 text-sm text-muted-foreground">Loading measured outcomes…</p>}><VisualAcuityTrajectory projectId={projectId} userId={userId} canReport={canReport} reports={filtered} period={{ year, month, from, to }} dhis={dhisOutcomes} /></Suspense></DeferredEyeSection>
+        </CollapsibleEyeSection>
         <EyeFacilityTrend rows={rows} />
 
         <section className="grid gap-4 lg:grid-cols-3">
