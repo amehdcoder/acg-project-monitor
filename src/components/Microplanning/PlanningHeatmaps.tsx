@@ -9,7 +9,7 @@ import { Eye, Flame, Loader2, MapPinned, Minus, Plus } from "lucide-react";
 import { accessClass, BIVARIATE, categoryOf, DENSITY_COLORS, groupByState, normState, THEMES, type HeatEntry, type StateGroup } from "@/lib/microplanning/heatmaps";
 import { catchmentColor, classIndex, ESPEN_MAPS, NO_DATA, type EspenEntry } from "@/lib/microplanning/espenMaps";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, Layers } from "lucide-react";
+import { ChevronDown, Layers, Maximize2, Minimize2 } from "lucide-react";
 import { buildLandblocks, SETTLEMENT_RADIUS_KM } from "@/lib/microplanning/landblocks";
 
 type Feature = { type: "Feature"; properties: Record<string, string>; geometry: { type: string; coordinates: unknown } };
@@ -53,6 +53,20 @@ function StateMap({ group, lgas, espen }: { group: StateGroup; lgas: Feature[]; 
   const [range, setRange] = useState<[number, number]>([33, 112]);
   const [hideEmpty, setHideEmpty] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
+  const [fs, setFs] = useState(false);
+  useEffect(() => {
+    const onChange = () => { if (!document.fullscreenElement) setFs(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setFs(false); };
+    document.addEventListener("fullscreenchange", onChange); window.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("fullscreenchange", onChange); window.removeEventListener("keydown", onKey); };
+  }, []);
+  useEffect(() => { const t = setTimeout(() => map.current?.invalidateSize(), 120); return () => clearTimeout(t); }, [fs]);
+  const toggleFs = async () => {
+    if (fs) { setFs(false); if (document.fullscreenElement) await document.exitFullscreen().catch(() => {}); return; }
+    setFs(true);
+    // Native fullscreen where supported; the fixed overlay is the fallback (iOS / WebView).
+    await holder.current?.requestFullscreen?.().catch(() => {});
+  };
 
   useEffect(() => {
     const io = new IntersectionObserver(([e]) => e.isIntersecting && setVisible(true), { rootMargin: "300px" });
@@ -171,8 +185,8 @@ function StateMap({ group, lgas, espen }: { group: StateGroup; lgas: Feature[]; 
   );
 
   return (
-    <Card ref={holder} className="overflow-hidden border-border/40 shadow-sm">
-      <CardContent className="space-y-0 p-0">
+    <Card ref={holder} className={fs ? "fixed inset-0 z-[1000] flex flex-col overflow-hidden rounded-none border-0 bg-card" : "overflow-hidden border-border/40 shadow-sm"}>
+      <CardContent className={fs ? "flex min-h-0 flex-1 flex-col p-0" : "space-y-0 p-0"}>
         <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2">
           <MapPinned className="h-4 w-4 text-primary" />
           <span className="text-sm font-bold">{group.state} State</span>
@@ -185,17 +199,20 @@ function StateMap({ group, lgas, espen }: { group: StateGroup; lgas: Feature[]; 
             {wardState === "loading" && visible && <Loader2 className="ml-1 h-3 w-3 animate-spin" />}
             {wardState === "none" && <span className="ml-1">(ward lines unavailable)</span>}
           </span>
+          <button onClick={toggleFs} className="ml-1 inline-flex h-8 items-center gap-1 rounded-md border px-2 text-[11px] font-medium hover:bg-muted" aria-label={fs ? "Exit full screen" : "View full screen"}>
+            {fs ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}<span className="hidden sm:inline">{fs ? "Exit full screen" : "Full screen"}</span>
+          </button>
         </div>
-        <div className="relative h-[560px] w-full">
+        <div className={fs ? "relative min-h-0 w-full flex-1" : "relative h-[560px] w-full"}>
           <div ref={el} className="absolute inset-0" />
           {visible && (
-            <div className="absolute left-3 top-3 z-[500] w-72 rounded-md border bg-card shadow-lg">
+            <div className="absolute left-2 top-2 z-[500] w-[min(18rem,calc(100%-1rem))] rounded-md border bg-card shadow-lg">
               <div className="flex items-center justify-between border-b px-3 py-2">
                 <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider"><Eye className="h-3.5 w-3.5" /> Visualizations</span>
                 <button className="rounded p-0.5 hover:bg-muted" onClick={() => setPanelOpen((o) => !o)} aria-label={panelOpen ? "Collapse panel" : "Expand panel"}>{panelOpen ? <Minus className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}</button>
               </div>
               {panelOpen && (
-                <div className="max-h-[480px] space-y-3 overflow-auto px-3 py-2">
+                <div className={`${fs ? "max-h-[calc(100dvh-9rem)]" : "max-h-[480px]"} space-y-3 overflow-auto px-3 py-2`}>
                   {!espen && <div className="space-y-1.5" role="radiogroup">
                     {VIEWS.map((v) => (
                       <label key={v.id} className="flex cursor-pointer items-center gap-2 text-xs">
