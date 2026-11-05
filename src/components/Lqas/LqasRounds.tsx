@@ -17,7 +17,7 @@ import { buildLots, DISEASES, evaluationUnits, ROUND_EU_LEVELS, roundDesign, typ
 interface Round { id: string; disease: string; drug: string | null; eu_level: string; eu_key: string | null; eu_name: string; upper_threshold: number; lower_threshold: number; sample_n: number; decision_rule: number; verification_date: string | null; status: string; created_at: string }
 interface Lot { id: string; round_id: string; lot_name: string; lot_type: string; population: number; households: number; lat: number | null; lng: number | null; security_status: string; risk_flags: string[]; status: string; supervisor_id: string | null; lot_key: string; covered_count: number | null; sampled_count: number | null; mop_up_required: boolean; mop_up_due: string | null; result_at: string | null }
 
-const secTone: Record<string, string> = { Red: "bg-destructive text-destructive-foreground", Yellow: "bg-warning text-background", Green: "bg-success text-background" };
+const secTone: Record<string, string> = { Red: "bg-destructive text-destructive-foreground", Yellow: "bg-warning text-background", Green: "bg-primary text-primary-foreground" };
 
 export default function LqasRounds({ projectId, entries, previousFails, projectName, indicator }: { projectId: string; entries: RoundEntry[]; previousFails: Set<string>; projectName: string; indicator: string }) {
   const { user } = useAuth();
@@ -128,7 +128,7 @@ export default function LqasRounds({ projectId, entries, previousFails, projectN
                     </Select>
                   ) : peopleName(l.supervisor_id ?? null)}
                 </TableCell>
-                {!editable && <TableCell>{(() => { const x = l as Lot; return x.status === "PASS" ? <Badge className="bg-success text-background">PASS {x.covered_count}/{x.sampled_count}</Badge> : x.status === "FAIL" ? <Badge variant="destructive">MOP-UP {x.covered_count}/{x.sampled_count}</Badge> : <Badge variant="secondary">{x.status}</Badge>; })()}</TableCell>}
+                {!editable && <TableCell>{(() => { const x = l as Lot; return x.status === "PASS" ? <Badge className="bg-primary text-primary-foreground">PASS {x.covered_count}/{x.sampled_count}</Badge> : x.status === "FAIL" ? <Badge variant="destructive">MOP-UP {x.covered_count}/{x.sampled_count}</Badge> : <Badge variant="secondary">{x.status}</Badge>; })()}</TableCell>}
               </TableRow>
             );
           })}

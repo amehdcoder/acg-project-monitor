@@ -64,7 +64,7 @@ export default function LqasReports({ projectId }: { projectId: string }) {
           {chart.length ? (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chart}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" tick={{ fontSize: 11 }} /><YAxis allowDecimals={false} /><Tooltip /><Legend />
-                <Bar dataKey="Passed" stackId="a" fill="hsl(var(--success))" /><Bar dataKey="Mop-up" stackId="a" fill="hsl(var(--destructive))" /><Bar dataKey="Pending" stackId="a" fill="hsl(var(--muted-foreground))" />
+                <Bar dataKey="Passed" stackId="a" fill="hsl(var(--status-success))" /><Bar dataKey="Mop-up" stackId="a" fill="hsl(var(--destructive))" /><Bar dataKey="Pending" stackId="a" fill="hsl(var(--muted-foreground))" />
               </BarChart>
             </ResponsiveContainer>
           ) : <p className="text-sm text-muted-foreground">Save a round to see its report.</p>}
