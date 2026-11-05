@@ -47,6 +47,7 @@ import { FieldIntelligenceView } from "@/components/FieldIntelligence";
 import AdminSurveillanceView from "@/components/AdminSurveillanceView";
 import DataQualityView from "@/components/DataQualityView";
 import { MicroplanningView } from "@/components/Microplanning";
+import LqasView from "@/components/Lqas/LqasView";
 import IntegratedSupervisoryView from "@/components/IntegratedSupervisory/IntegratedSupervisoryView";
 import { QuizBuilder } from "@/components/QuizBuilder";
 import ChangeEnvironmentView from "@/components/ChangeEnvironmentView";
@@ -339,6 +340,7 @@ const Index = () => {
       case "surveillance": return guardedPage("surveillance", <AdminSurveillanceView />);
       case "data-quality": return guardedPage("data-quality", <DataQualityView />);
       case "microplanning": return guardedPage("microplanning", <MicroplanningView />);
+      case "lqas": return guardedPage("microplanning", <LqasView />);
       case "integrated-supervisory": return guardedPage("integrated-supervisory", <IntegratedSupervisoryView />);
       case "environment": return guardedPage("environment", <ChangeEnvironmentView />);
       case "quizzes": return isAdmin ? guardedPage("quizzes", <QuizBuilder />) : <QuizBuilder />;
