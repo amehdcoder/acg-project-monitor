@@ -7,6 +7,9 @@ import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Eye, Flame, Loader2, MapPinned, Minus, Plus } from "lucide-react";
 import { accessClass, BIVARIATE, categoryOf, DENSITY_COLORS, groupByState, normState, THEMES, type HeatEntry, type StateGroup } from "@/lib/microplanning/heatmaps";
+import { catchmentColor, classIndex, ESPEN_MAPS, NO_DATA, type EspenEntry } from "@/lib/microplanning/espenMaps";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown, Layers } from "lucide-react";
 import { buildLandblocks, SETTLEMENT_RADIUS_KM } from "@/lib/microplanning/landblocks";
 
 type Feature = { type: "Feature"; properties: Record<string, string>; geometry: { type: string; coordinates: unknown } };
@@ -37,7 +40,8 @@ function loadWards(state: string) {
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 const INK = "#1F2A36";
 
-function StateMap({ group, lgas }: { group: StateGroup; lgas: Feature[] }) {
+function StateMap({ group, lgas, espen }: { group: StateGroup; lgas: Feature[]; espen?: string }) {
+  const espenMap = espen ? ESPEN_MAPS.find((m) => m.id === espen) : undefined;
   const holder = useRef<HTMLDivElement>(null);
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
@@ -109,7 +113,9 @@ function StateMap({ group, lgas }: { group: StateGroup; lgas: Feature[] }) {
       const pop = Number(e.estimated_total_population) || 0;
       if (hideEmpty && pop <= 0) continue;
       let fill: string, label: string;
-      if (view === "population") { fill = DENSITY_COLORS[dClass(b.density)]; label = `${Math.round(b.density).toLocaleString()} pop/km²`; }
+      if (espen === "catchment") { fill = catchmentColor((e as EspenEntry).flhf_name); label = `Catchment: ${(e as EspenEntry).flhf_name || "FLHF not recorded"}`; }
+      else if (espenMap) { const v = espenMap.value(e as EspenEntry, b.areaKm2); fill = v == null ? NO_DATA : espenMap.colors[classIndex(espenMap, v)]; label = `${espenMap.legendTitle}: ${v == null ? "not recorded" : espenMap.fmt(v)}`; }
+      else if (view === "population") { fill = DENSITY_COLORS[dClass(b.density)]; label = `${Math.round(b.density).toLocaleString()} pop/km²`; }
       else if (view === "access_pop") {
         const a = accessClass(e);
         fill = a == null ? "#C3C9CF" : (b.density >= lo ? BIVARIATE.high : BIVARIATE.low)[a];
@@ -120,9 +126,27 @@ function StateMap({ group, lgas }: { group: StateGroup; lgas: Feature[] }) {
         .addTo(g);
     }
     for (const p of group.points) L.circleMarker([p.lat, p.lng], { pane: "blocks", radius: 1.8, stroke: false, fillColor: "#3D4650", fillOpacity: 0.75, interactive: false }).addTo(g);
-  }, [blocks, view, range, hideEmpty, group]);
+  }, [blocks, view, range, hideEmpty, group, espen, espenMap]);
 
-  const legend = view === "access_pop" ? (
+  const legend = espen === "catchment" ? (
+    <div className="space-y-1">
+      {[...new Set(group.points.map((p) => String((p.entry as EspenEntry).flhf_name ?? "").trim()))].sort().slice(0, 20).map((f) => {
+        const k = group.points.filter((p) => String((p.entry as EspenEntry).flhf_name ?? "").trim() === f).length;
+        return <div key={f || "none"} className="flex items-center gap-2 text-[11px]"><span className="h-4 w-6 rounded-sm" style={{ background: catchmentColor(f) }} /><span className="flex-1 truncate">{f || "Not recorded"}</span><b>{k}</b></div>;
+      })}
+    </div>
+  ) : espenMap ? (
+    <div className="space-y-1">
+      <div className="mb-1 text-[10px] font-semibold">{espenMap.legendTitle}</div>
+      {espenMap.colors.map((c, i) => {
+        const k = group.points.filter((p) => { const v = espenMap.value(p.entry as EspenEntry, 1); return v != null && classIndex(espenMap, v) === i; }).length;
+        const showCount = !/\/ km²/.test(espenMap.legendTitle);
+        return <div key={c} className="flex items-center gap-2 text-[11px]"><span className="h-4 w-6 rounded-sm" style={{ background: c }} /><span className="flex-1">{espenMap.labels[i]}</span>{showCount && <b>{k}</b>}</div>;
+      })}
+      <div className="flex items-center gap-2 text-[11px]"><span className="h-4 w-6 rounded-sm" style={{ background: NO_DATA }} /><span className="flex-1">Not recorded</span><b>{group.points.filter((p) => espenMap.value(p.entry as EspenEntry, 1) == null).length}</b></div>
+      <p className="pt-1 text-[9px] leading-snug text-muted-foreground">{espenMap.description}</p>
+    </div>
+  ) : view === "access_pop" ? (
     <div className="flex gap-2">
       <div className="flex flex-col justify-between py-1 text-[10px] text-muted-foreground"><span className="font-semibold text-foreground">Population</span><span>Low</span><span>High</span></div>
       <div>
@@ -172,15 +196,15 @@ function StateMap({ group, lgas }: { group: StateGroup; lgas: Feature[] }) {
               </div>
               {panelOpen && (
                 <div className="max-h-[480px] space-y-3 overflow-auto px-3 py-2">
-                  <div className="space-y-1.5" role="radiogroup">
+                  {!espen && <div className="space-y-1.5" role="radiogroup">
                     {VIEWS.map((v) => (
                       <label key={v.id} className="flex cursor-pointer items-center gap-2 text-xs">
                         <input type="radio" name={`viz-${group.state}`} className="accent-primary" checked={view === v.id} onChange={() => setView(v.id)} />{v.label}
                       </label>
                     ))}
-                  </div>
-                  <div className="border-t pt-2"><div className="mb-1.5 text-xs font-semibold">Legend</div>{legend}</div>
-                  {(view === "population" || view === "access_pop") && (
+                  </div>}
+                  <div className={espen ? "" : "border-t pt-2"}><div className="mb-1.5 text-xs font-semibold">Legend</div>{legend}</div>
+                  {!espen && (view === "population" || view === "access_pop") && (
                     <div className="border-t pt-2">
                       <div className="mb-1 text-xs font-semibold">Adjust Legend</div>
                       <div className="text-[10px] text-muted-foreground">Population Density (pop / km²)</div>
@@ -201,6 +225,10 @@ function StateMap({ group, lgas }: { group: StateGroup; lgas: Feature[] }) {
   );
 }
 const StateMapMemo = memo(StateMap);
+const EXTRA = [
+  { id: "catchment", title: "Health facility catchment areas", description: "Landblocks coloured by the FLHF each settlement reports to.", colors: ["#1F77B4", "#FF7F0E", "#2CA02C", "#D62728", "#9467BD"] },
+  ...ESPEN_MAPS.map((m) => ({ id: m.id, title: m.title, description: m.description, colors: m.colors })),
+];
 
 export default function PlanningHeatmaps({ entries }: { entries: HeatEntry[] }) {
   const [lgaFc, setLgaFc] = useState<FC | null>(null);
@@ -222,6 +250,23 @@ export default function PlanningHeatmaps({ entries }: { entries: HeatEntry[] }) 
       {!lgaFc && <div className="flex h-24 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>}
       {lgaFc && !groups.length && <p className="text-xs text-muted-foreground">No communities with State and GPS yet.</p>}
       {groups.map((g) => <StateMapMemo key={g.state} group={g} lgas={lgasByState.get(normState(g.state)) ?? []} />)}
+      {groups.length > 0 && (
+        <div className="space-y-2 pt-2">
+          <div className="flex items-center gap-2"><Layers className="h-4 w-4 text-primary" /><p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">ESPEN microplanner thematic maps · {EXTRA.length} maps</p></div>
+          {EXTRA.map((x) => (
+            <Collapsible key={x.id} className="rounded-lg border bg-card shadow-sm">
+              <CollapsibleTrigger className="group flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-muted/50">
+                <span className="flex h-6 w-10 overflow-hidden rounded-sm">{x.colors.map((c) => <span key={c} className="flex-1" style={{ background: c }} />)}</span>
+                <span className="flex-1"><span className="block text-sm font-semibold">{x.title}</span><span className="block text-[11px] text-muted-foreground">{x.description}</span></span>
+                <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-3 border-t p-3">
+                {groups.map((g) => <StateMapMemo key={g.state} group={g} lgas={lgasByState.get(normState(g.state)) ?? []} espen={x.id} />)}
+              </CollapsibleContent>
+            </Collapsible>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
