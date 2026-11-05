@@ -1,14 +1,24 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import "leaflet.heat";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Flame, Loader2, MapPinned } from "lucide-react";
-import { categoryOf, groupByState, HEAT_GRADIENT, normState, THEMES, WHO, type HeatEntry, type HeatTheme, type StateGroup } from "@/lib/microplanning/heatmaps";
+import { Slider } from "@/components/ui/slider";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Eye, Flame, Loader2, MapPinned, Minus, Plus } from "lucide-react";
+import { accessClass, BIVARIATE, categoryOf, DENSITY_COLORS, groupByState, normState, THEMES, type HeatEntry, type StateGroup } from "@/lib/microplanning/heatmaps";
+import { buildLandblocks, SETTLEMENT_RADIUS_KM } from "@/lib/microplanning/landblocks";
 
 type Feature = { type: "Feature"; properties: Record<string, string>; geometry: { type: string; coordinates: unknown } };
 type FC = { type: "FeatureCollection"; features: Feature[] };
+type View = "access_pop" | "accessibility" | "security" | "terrain" | "population";
+const VIEWS: { id: View; label: string }[] = [
+  { id: "access_pop", label: "Accessibility + Population" },
+  { id: "accessibility", label: "Accessibility" },
+  { id: "security", label: "Security clearance" },
+  { id: "terrain", label: "Terrain types" },
+  { id: "population", label: "Population density" },
+];
 
 let lgaPromise: Promise<FC> | null = null;
 const loadLgas = () => (lgaPromise ??= fetch("/nigeria-lga.geojson").then((r) => r.json()));
@@ -24,95 +34,25 @@ function loadWards(state: string) {
   return wardCache.get(key)!;
 }
 
-const THEME_ORDER: HeatTheme[] = ["accessibility", "security", "terrain", "population"];
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+const INK = "#1F2A36";
 
-const ThemeMap = memo(function ThemeMap({ group, theme, lgas, wards }: { group: StateGroup; theme: HeatTheme; lgas: Feature[]; wards: FC | null }) {
+function StateMap({ group, lgas }: { group: StateGroup; lgas: Feature[] }) {
+  const holder = useRef<HTMLDivElement>(null);
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
-  const data = useRef<L.LayerGroup | null>(null);
-  const bounds = useRef<L.LatLngBounds | null>(null);
-
-  useEffect(() => {
-    if (!el.current) return;
-    const m = L.map(el.current, { preferCanvas: true, zoomControl: true, attributionControl: true, scrollWheelZoom: false });
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap contributors · Wards © GRID3", maxZoom: 18, opacity: 0.55 }).addTo(m);
-    m.createPane("bounds"); m.getPane("bounds")!.style.zIndex = "450"; m.getPane("bounds")!.style.pointerEvents = "none";
-    const lgaLayer = L.geoJSON({ type: "FeatureCollection", features: lgas } as never, { pane: "bounds", style: { color: WHO.navy, weight: 1.8, fill: false, opacity: 0.9 } }).addTo(m);
-    L.geoJSON({ type: "FeatureCollection", features: lgas } as never, { pane: "bounds", style: { color: "#0B1F33", weight: 3.4, fill: false, opacity: 0.25 } }).addTo(m);
-    bounds.current = lgaLayer.getBounds().isValid() ? lgaLayer.getBounds() : null;
-    lgas.forEach((f) => {
-      const c = L.geoJSON(f as never).getBounds().getCenter();
-      L.marker(c, { pane: "bounds", interactive: false, icon: L.divIcon({ className: "", html: `<div style="font:600 9px system-ui;color:${WHO.navy};text-shadow:0 0 3px #fff,0 0 3px #fff;white-space:nowrap;transform:translate(-50%,-50%)">${esc(f.properties.lga)}</div>` }) }).addTo(m);
-    });
-    data.current = L.layerGroup().addTo(m);
-    if (bounds.current) m.fitBounds(bounds.current, { padding: [8, 8] }); else m.setView([9.1, 8.7], 6);
-    map.current = m;
-    const ro = new ResizeObserver(() => m.invalidateSize());
-    ro.observe(el.current);
-    return () => { ro.disconnect(); m.remove(); map.current = null; };
-  }, [lgas]);
-
-  useEffect(() => {
-    const m = map.current;
-    if (!m || !wards) return;
-    const layer = L.geoJSON(wards as never, { pane: "bounds", style: { color: WHO.blue, weight: 0.7, dashArray: "3 2", fill: false, opacity: 0.75 } }).addTo(m);
-    return () => { layer.remove(); };
-  }, [wards]);
-
-  useEffect(() => {
-    const m = map.current, g = data.current;
-    if (!m || !g) return;
-    g.clearLayers();
-    const maxPop = Math.max(1, ...group.points.map((p) => Number(p.entry.estimated_total_population) || 0));
-    const heat: [number, number, number][] = [];
-    for (const p of group.points) {
-      const cat = categoryOf(p.entry, theme);
-      const pop = Number(p.entry.estimated_total_population) || 0;
-      const w = theme === "population" ? Math.sqrt(pop / maxPop) : cat.weight;
-      if (w > 0) heat.push([p.lat, p.lng, w]);
-      const r = theme === "population" ? 3 + 9 * Math.sqrt(pop / maxPop) : 4;
-      L.circleMarker([p.lat, p.lng], { radius: r, color: "#ffffff", weight: 1, fillColor: cat.color, fillOpacity: 0.92 })
-        .bindPopup(`<div style="font:12px system-ui;min-width:180px"><b>${esc(p.entry.community_name || "Community")}</b><br/>${esc(p.entry.ward)} · ${esc(p.entry.lga)}<br/><span style="color:${cat.color};font-weight:700">● ${esc(cat.label)}</span><br/>Population: ${pop.toLocaleString()}<br/><span style="color:#666">GPS ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</span></div>`)
-        .addTo(g);
-    }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (heat.length) (L as any).heatLayer(heat, { radius: 22, blur: 18, minOpacity: 0.25, max: 1, gradient: HEAT_GRADIENT }).addTo(g);
-  }, [group, theme]);
-
-  const t = THEMES[theme];
-  const counts = useMemo(() => {
-    const c = new Map<string, number>();
-    group.points.forEach((p) => { const k = categoryOf(p.entry, theme).key; c.set(k, (c.get(k) ?? 0) + 1); });
-    return c;
-  }, [group, theme]);
-
-  return (
-    <div className="overflow-hidden rounded-xl border border-border/50 bg-card shadow-sm">
-      <div className="flex items-center justify-between bg-primary px-3 py-1.5 text-primary-foreground">
-        <span className="text-xs font-bold uppercase tracking-wide">{t.title}</span>
-        <span className="text-[10px] opacity-90">{t.heatNote}</span>
-      </div>
-      <div ref={el} className="h-72 w-full" />
-      <div className="flex flex-wrap gap-x-3 gap-y-1 px-3 py-2">
-        {t.categories.map((c) => (
-          <span key={c.key} className="flex items-center gap-1 text-[10px] text-muted-foreground">
-            <span className="inline-block h-2.5 w-2.5 rounded-full border border-border" style={{ background: c.color }} />{c.label} <b className="text-foreground">{counts.get(c.key) ?? 0}</b>
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-});
-
-function StateHeatmaps({ group, lgas }: { group: StateGroup; lgas: Feature[] }) {
-  const ref = useRef<HTMLDivElement>(null);
+  const blocksLayer = useRef<L.LayerGroup | null>(null);
   const [visible, setVisible] = useState(false);
   const [wards, setWards] = useState<FC | null>(null);
   const [wardState, setWardState] = useState<"loading" | "ok" | "none">("loading");
+  const [view, setView] = useState<View>("access_pop");
+  const [range, setRange] = useState<[number, number]>([33, 112]);
+  const [hideEmpty, setHideEmpty] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(true);
+
   useEffect(() => {
     const io = new IntersectionObserver(([e]) => e.isIntersecting && setVisible(true), { rootMargin: "300px" });
-    if (ref.current) io.observe(ref.current);
+    if (holder.current) io.observe(holder.current);
     return () => io.disconnect();
   }, []);
   useEffect(() => {
@@ -122,31 +62,145 @@ function StateHeatmaps({ group, lgas }: { group: StateGroup; lgas: Feature[] }) 
     return () => { live = false; };
   }, [visible, group.state]);
 
+  const blocks = useMemo(() => (visible ? buildLandblocks(group.points.map((p) => ({ lat: p.lat, lng: p.lng, pop: Number(p.entry.estimated_total_population) || 0 })), lgas.map((f) => f.geometry)) : []), [visible, group, lgas]);
+
+  // Base map, boundaries
+  useEffect(() => {
+    if (!visible || !el.current) return;
+    const m = L.map(el.current, { preferCanvas: true, zoomControl: false, scrollWheelZoom: false });
+    L.control.zoom({ position: "bottomright" }).addTo(m);
+    L.control.scale({ position: "bottomleft", imperial: false }).addTo(m);
+    const tiles = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap contributors · Wards © GRID3 · Landblocks: nearest-community areas", maxZoom: 18, className: "espen-light-tiles" }).addTo(m);
+    void tiles;
+    m.createPane("blocks"); m.getPane("blocks")!.style.zIndex = "420";
+    m.createPane("bounds"); m.getPane("bounds")!.style.zIndex = "460"; m.getPane("bounds")!.style.pointerEvents = "none";
+    const fc = { type: "FeatureCollection", features: lgas } as never;
+    L.geoJSON(fc, { pane: "bounds", style: { color: INK, weight: 4.5, fill: false, opacity: 0.85 } }).addTo(m); // outer State casing
+    const lgaLayer = L.geoJSON(fc, { pane: "bounds", style: { color: INK, weight: 1.8, fill: false, opacity: 1 } }).addTo(m);
+    lgas.forEach((f) => {
+      const c = L.geoJSON(f as never).getBounds().getCenter();
+      L.marker(c, { pane: "bounds", interactive: false, icon: L.divIcon({ className: "", html: `<div style="font:700 10px system-ui;letter-spacing:.02em;color:${INK};text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 3px #fff;white-space:nowrap;transform:translate(-50%,-50%)">${esc(f.properties.lga)}</div>` }) }).addTo(m);
+    });
+    blocksLayer.current = L.layerGroup().addTo(m);
+    const b = lgaLayer.getBounds();
+    if (b.isValid()) m.fitBounds(b, { padding: [10, 10] }); else m.setView([9.1, 8.7], 6);
+    map.current = m;
+    const ro = new ResizeObserver(() => m.invalidateSize());
+    ro.observe(el.current);
+    return () => { ro.disconnect(); m.remove(); map.current = null; };
+  }, [visible, lgas]);
+
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !wards) return;
+    const layer = L.geoJSON(wards as never, { pane: "bounds", style: { color: "#455A64", weight: 0.8, dashArray: "4 3", fill: false, opacity: 0.9 } }).addTo(m);
+    return () => { layer.remove(); };
+  }, [wards, visible]);
+
+  // Landblocks
+  useEffect(() => {
+    const g = blocksLayer.current;
+    if (!g) return;
+    g.clearLayers();
+    const [lo, hi] = range;
+    const dClass = (d: number) => (d >= hi ? 2 : d >= lo ? 1 : 0);
+    for (const b of blocks) {
+      const p = group.points[b.index], e = p.entry;
+      const pop = Number(e.estimated_total_population) || 0;
+      if (hideEmpty && pop <= 0) continue;
+      let fill: string, label: string;
+      if (view === "population") { fill = DENSITY_COLORS[dClass(b.density)]; label = `${Math.round(b.density).toLocaleString()} pop/km²`; }
+      else if (view === "access_pop") {
+        const a = accessClass(e);
+        fill = a == null ? "#C3C9CF" : (b.density >= lo ? BIVARIATE.high : BIVARIATE.low)[a];
+        label = `${categoryOf(e, "accessibility").label} · ${b.density >= lo ? "High" : "Low"} population`;
+      } else { const c = categoryOf(e, view); fill = c.color; label = c.label; }
+      L.geoJSON({ type: "MultiPolygon", coordinates: b.rings } as never, { pane: "blocks", style: { color: "#ffffff", weight: 0.6, fillColor: fill, fillOpacity: 0.82 } })
+        .bindPopup(`<div style="font:12px system-ui;min-width:200px"><div style="font-weight:700;font-size:13px">${esc(e.community_name || "Community")}</div><div style="color:#5b6670">${esc(e.ward)} · ${esc(e.lga)}</div><div style="margin:6px 0;padding:4px 6px;border-left:4px solid ${fill};background:#f5f6f7">${esc(label)}</div><table style="width:100%;font-size:11px"><tr><td>Population</td><td style="text-align:right"><b>${pop.toLocaleString()}</b></td></tr><tr><td>Landblock area</td><td style="text-align:right">${b.areaKm2.toFixed(1)} km²</td></tr><tr><td>Density</td><td style="text-align:right">${Math.round(b.density).toLocaleString()} /km²</td></tr><tr><td>Accessibility</td><td style="text-align:right">${esc(categoryOf(e, "accessibility").label)}</td></tr><tr><td>Security</td><td style="text-align:right">${esc(categoryOf(e, "security").label)}</td></tr><tr><td>Terrain</td><td style="text-align:right">${esc(categoryOf(e, "terrain").label)}</td></tr><tr><td>GPS</td><td style="text-align:right">${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</td></tr></table></div>`)
+        .addTo(g);
+    }
+    for (const p of group.points) L.circleMarker([p.lat, p.lng], { pane: "blocks", radius: 1.8, stroke: false, fillColor: "#3D4650", fillOpacity: 0.75, interactive: false }).addTo(g);
+  }, [blocks, view, range, hideEmpty, group]);
+
+  const legend = view === "access_pop" ? (
+    <div className="flex gap-2">
+      <div className="flex flex-col justify-between py-1 text-[10px] text-muted-foreground"><span className="font-semibold text-foreground">Population</span><span>Low</span><span>High</span></div>
+      <div>
+        <div className="mb-1 text-[10px] font-semibold">Accessibility</div>
+        <div className="grid grid-cols-3 gap-1 text-center text-[9px] text-muted-foreground"><span>Reachable</span><span>Hard / seasonal</span><span>Inaccessible</span>
+          {[...BIVARIATE.low, ...BIVARIATE.high].map((c, i) => <span key={i} className="h-6 w-full rounded-sm" style={{ background: c }} />)}</div>
+      </div>
+    </div>
+  ) : view === "population" ? (
+    <div>
+      <div className="mb-1 text-[10px] font-semibold">Population Density (pop / km²)</div>
+      <div className="grid grid-cols-3 gap-1 text-center text-[10px] text-muted-foreground"><span>0 – {range[0]}</span><span>{range[0]} – {range[1]}</span><span>{range[1]}+</span>
+        {DENSITY_COLORS.map((c) => <span key={c} className="h-7 rounded-sm" style={{ background: c }} />)}</div>
+    </div>
+  ) : (
+    <div className="space-y-1">
+      {THEMES[view].categories.map((c) => {
+        const n = group.points.filter((p) => categoryOf(p.entry, view).key === c.key).length;
+        return <div key={c.key} className="flex items-center gap-2 text-[11px]"><span className="h-4 w-6 rounded-sm" style={{ background: c.color }} /><span className="flex-1">{c.label}</span><b>{n}</b></div>;
+      })}
+    </div>
+  );
+
   return (
-    <Card ref={ref} className="border-border/40 shadow-sm">
-      <CardContent className="space-y-3 p-3">
-        <div className="flex flex-wrap items-center gap-2">
+    <Card ref={holder} className="overflow-hidden border-border/40 shadow-sm">
+      <CardContent className="space-y-0 p-0">
+        <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2">
           <MapPinned className="h-4 w-4 text-primary" />
           <span className="text-sm font-bold">{group.state} State</span>
-          <Badge variant="secondary">{group.points.length.toLocaleString()} communities mapped</Badge>
+          <Badge variant="secondary">{group.points.length.toLocaleString()} settlements mapped</Badge>
           {group.noGps > 0 && <Badge variant="outline">{group.noGps.toLocaleString()} without GPS</Badge>}
           {group.outside > 0 && <Badge variant="outline" className="border-destructive/50 text-destructive">{group.outside.toLocaleString()} GPS outside {group.state} — not plotted</Badge>}
           <span className="ml-auto flex items-center gap-1 text-[10px] text-muted-foreground">
-            <span className="inline-block h-0.5 w-4 bg-primary" /> LGA
-            <span className="ml-2 inline-block w-4 border-t border-dashed border-primary" /> Ward
+            <span className="inline-block h-1 w-5 bg-foreground" /> State / LGA
+            <span className="ml-2 inline-block w-5 border-t border-dashed border-muted-foreground" /> Ward
             {wardState === "loading" && visible && <Loader2 className="ml-1 h-3 w-3 animate-spin" />}
             {wardState === "none" && <span className="ml-1">(ward lines unavailable)</span>}
           </span>
         </div>
-        {visible ? (
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            {THEME_ORDER.map((t) => <ThemeMap key={t} group={group} theme={t} lgas={lgas} wards={wards} />)}
-          </div>
-        ) : <div className="h-72" />}
+        <div className="relative h-[560px] w-full">
+          <div ref={el} className="absolute inset-0" />
+          {visible && (
+            <div className="absolute left-3 top-3 z-[500] w-72 rounded-md border bg-card shadow-lg">
+              <div className="flex items-center justify-between border-b px-3 py-2">
+                <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider"><Eye className="h-3.5 w-3.5" /> Visualizations</span>
+                <button className="rounded p-0.5 hover:bg-muted" onClick={() => setPanelOpen((o) => !o)} aria-label={panelOpen ? "Collapse panel" : "Expand panel"}>{panelOpen ? <Minus className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}</button>
+              </div>
+              {panelOpen && (
+                <div className="max-h-[480px] space-y-3 overflow-auto px-3 py-2">
+                  <div className="space-y-1.5" role="radiogroup">
+                    {VIEWS.map((v) => (
+                      <label key={v.id} className="flex cursor-pointer items-center gap-2 text-xs">
+                        <input type="radio" name={`viz-${group.state}`} className="accent-primary" checked={view === v.id} onChange={() => setView(v.id)} />{v.label}
+                      </label>
+                    ))}
+                  </div>
+                  <div className="border-t pt-2"><div className="mb-1.5 text-xs font-semibold">Legend</div>{legend}</div>
+                  {(view === "population" || view === "access_pop") && (
+                    <div className="border-t pt-2">
+                      <div className="mb-1 text-xs font-semibold">Adjust Legend</div>
+                      <div className="text-[10px] text-muted-foreground">Population Density (pop / km²)</div>
+                      <div className="flex items-center gap-2 text-[10px]"><span>{range[0]}</span>
+                        <Slider min={1} max={500} step={1} value={range} onValueChange={(v) => setRange([Math.min(v[0], v[1] - 1), v[1]] as [number, number])} className="flex-1" /><span>{range[1]}</span></div>
+                    </div>
+                  )}
+                  <label className="flex items-center gap-2 border-t pt-2 text-xs"><Checkbox checked={hideEmpty} onCheckedChange={(c) => setHideEmpty(!!c)} /> Hide unpopulated landblocks</label>
+                  <p className="text-[9px] leading-snug text-muted-foreground">Each landblock is the area closest to a mapped settlement (max {SETTLEMENT_RADIUS_KM} km), clipped to the State boundary.</p>
+                </div>
+              )}
+            </div>
+          )}
+          {!visible && <div className="flex h-full items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>}
+        </div>
       </CardContent>
     </Card>
   );
 }
+const StateMapMemo = memo(StateMap);
 
 export default function PlanningHeatmaps({ entries }: { entries: HeatEntry[] }) {
   const [lgaFc, setLgaFc] = useState<FC | null>(null);
@@ -160,13 +214,14 @@ export default function PlanningHeatmaps({ entries }: { entries: HeatEntry[] }) 
 
   return (
     <div className="space-y-3">
+      <style>{`.espen-light-tiles{filter:grayscale(1) brightness(1.08) contrast(.82)}`}</style>
       <div className="flex items-center gap-2">
         <Flame className="h-4 w-4 text-destructive" />
         <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Planning heatmaps by State · live</p>
       </div>
       {!lgaFc && <div className="flex h-24 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>}
       {lgaFc && !groups.length && <p className="text-xs text-muted-foreground">No communities with State and GPS yet.</p>}
-      {groups.map((g) => <StateHeatmaps key={g.state} group={g} lgas={lgasByState.get(normState(g.state)) ?? []} />)}
+      {groups.map((g) => <StateMapMemo key={g.state} group={g} lgas={lgasByState.get(normState(g.state)) ?? []} />)}
     </div>
   );
 }
