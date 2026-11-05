@@ -57,7 +57,7 @@ function tallySheet(doc: jsPDF, eu: EuPlan, ctx: FormContext, secure: boolean) {
     startY: y, theme: "grid", styles: { fontSize: 8, cellPadding: 1.6, minCellHeight: 7 },
     headStyles: { fillColor: secure ? RED : WHO_BLUE },
     head: [["#", "Ward", "Community (sampling point)", "Respondent age", "Sex M/F", "Received? Y / N", "Reason if N (code)"]],
-    body: eu.sample.map((s) => [s.slot, s.ward, s.community + (s.insecure ? "  ⚠" : ""), "", "", "Y  /  N", ""]),
+    body: eu.sample.map((s) => [s.slot, s.ward, s.community + (s.insecure ? "  (!)" : ""), "", "", "Y  /  N", ""]),
     didParseCell: (d) => { if (d.section === "body" && eu.sample[d.row.index]?.insecure) d.cell.styles.fillColor = [253, 236, 234]; },
   });
   y = (doc as any).lastAutoTable.finalY + 4;
@@ -76,7 +76,7 @@ function tallySheet(doc: jsPDF, eu: EuPlan, ctx: FormContext, secure: boolean) {
     doc.setFont("helvetica", "normal"); doc.setTextColor(40, 40, 40);
     doc.text([
       "Do not record names, phone numbers or GPS. Keep this sheet folded and out of sight while moving.",
-      "If a sampling point (⚠) is inaccessible, replace it with the nearest accessible community in the same ward and note it below.",
+      "If a sampling point marked (!) is inaccessible, replace it with the nearest accessible community in the same ward and note it below.",
       "Collect only in daylight with local escort/community leader clearance. Abort if the situation changes.",
     ], 12, y + 10);
   }
@@ -118,13 +118,13 @@ export function buildPaperPack(plans: EuPlan[], ctx: FormContext, opts: { securi
 
 /** KoboCollect form for transcribing paper tally sheets. Submissions reach the
  * app through the existing Kobo webhook (form id contains "lqas"). */
-export function buildLqasXlsForm(ctx: FormContext, plans: EuPlan[]) {
+export function buildLqasXlsForm(ctx: FormContext) {
   const H = ["type", "name", "label", "required", "constraint", "constraint_message", "relevant", "calculation", "choice_filter", "appearance"];
   const row = (o: Record<string, string>) => H.map((h) => o[h] ?? "");
   const survey = [H,
     row({ type: "start", name: "start" }), row({ type: "end", name: "end" }),
     row({ type: "select_one level", name: "eu_level", label: "Evaluation Unit level", required: "yes" }),
-    row({ type: "select_one eu", name: "eu_name", label: "Evaluation Unit", required: "yes", choice_filter: "level=${eu_level}", appearance: "minimal" }),
+    row({ type: "text", name: "eu_name", label: "Evaluation Unit name (as printed on the paper form)", required: "yes" }),
     row({ type: "text", name: "state", label: "State", required: "yes" }),
     row({ type: "text", name: "lga", label: "LGA", required: "yes" }),
     row({ type: "text", name: "ward", label: "Ward" }),
@@ -144,7 +144,6 @@ export function buildLqasXlsForm(ctx: FormContext, plans: EuPlan[]) {
   ];
   const choices: string[][] = [["list_name", "name", "label", "level"]];
   EU_LEVELS.forEach((l) => choices.push(["level", l.id, l.label, ""]));
-  plans.forEach((p, i) => choices.push(["eu", p.name.replace(/[^A-Za-z0-9_]+/g, "_").slice(0, 60) + "_" + i, p.key, p.level]));
   choices.push(["yn", "yes", "Yes", ""], ["yn", "no", "No", ""]);
   ["Absent", "Refused", "Not aware", "Fear of side-effects", "Ineligible/sick", "Not visited", "Other"].forEach((r, i) => choices.push(["reason", String(i + 1), r, ""]));
   const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
