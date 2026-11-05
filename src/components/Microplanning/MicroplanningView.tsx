@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo, Fragment } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, useDeferredValue, Fragment } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -1559,8 +1559,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
     if (lensLockWard && uniqueWards[0] && filterWard !== uniqueWards[0]) setFilterWard(uniqueWards[0] as string);
   }, [lensLockState, lensLockLga, lensLockWard, uniqueStates, uniqueLgas, uniqueWards, filterState, filterLga, filterWard]);
 
-  const deferredDisplayEntries = useDeferredValue(displayEntries);
-  const filtered = useMemo(() => deferredDisplayEntries.filter(e => {
+  const filteredNow = useMemo(() => displayEntries.filter(e => {
     if (filterState !== "all" && e.state !== filterState) return false;
     if (filterLga !== "all" && e.lga !== filterLga) return false;
     if (filterWard !== "all" && e.ward !== filterWard) return false;
@@ -1593,6 +1592,8 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
     }
     return true;
   }), [displayEntries, filterState, filterLga, filterWard, filterAccessibility, filterSecurity, filterTerrain, filterKeyRatio, filterDisability, searchQuery]);
+  // Keep clicks and typing instant: heavy panels/maps re-render with the new list in the background.
+  const filtered = useDeferredValue(filteredNow);
 
   // Filter context used by the breadcrumb trail and the "export any level" button.
   const exportFilterContext = useMemo(() => ({
