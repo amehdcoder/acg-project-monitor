@@ -86,7 +86,7 @@ function extractGeo(obj: Record<string, unknown>): { lat: number | null; lng: nu
   return { lat: r.lat, lng: r.lng, geotagged: r.geotagged };
 }
 
-type FormKind = "microplan" | "coverage" | "reconciliation" | "seeclear" | "checklist";
+type FormKind = "lqas" | "microplan" | "coverage" | "reconciliation" | "seeclear" | "checklist";
 
 /* Published Integrated Supervisory Checklist form UIDs, cached briefly so the
    webhook can recognise checklist submissions without a DB hit per request. */
@@ -113,7 +113,7 @@ async function detectKind(
   qp: string | null,
 ): Promise<FormKind> {
   const hinted = (qp ?? "").toLowerCase();
-  if (["coverage", "reconciliation", "microplan", "seeclear", "checklist"].includes(hinted)) {
+  if (["lqas", "coverage", "reconciliation", "microplan", "seeclear", "checklist"].includes(hinted)) {
     return hinted as FormKind;
   }
   const xform = String(payload["_xform_id_string"] ?? "").toLowerCase();
@@ -121,6 +121,7 @@ async function detectKind(
   // wake the dashboard up — it is read live from Kobo, never mirrored here.
   if (xform && (await checklistFormUids()).has(xform)) return "checklist";
   if (xform.includes("checklist") || xform.includes("supervis")) return "checklist";
+  if (xform.includes("lqas") || "lqas_respondents" in payload) return "lqas";
   if (xform.includes("seeclear") || xform.includes("see_clear")) return "seeclear";
   if ("readiness_score" in payload && "equip_score" in payload) return "seeclear";
   if (xform.includes("recon")) return "reconciliation";
@@ -204,6 +205,36 @@ Deno.serve(async (req) => {
       // publish the realtime "something changed" signal, instantly.
       await emitSyncEvent("checklist_sync", projectId, koboUuid, null, formUid);
       return new Response(JSON.stringify({ ok: true, kind }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (kind === "lqas") {
+      if (!projectId) throw new Error("project_id query parameter is required for LQAS");
+      const reps = Array.isArray(payload["lqas_respondents"]) ? (payload["lqas_respondents"] as Array<Record<string, unknown>>) : [];
+      const yes = (r: Record<string, unknown>) => {
+        const v = String(pick(r, ["received", "lqas_respondents/received"]) ?? "").toLowerCase();
+        return v === "yes" || v === "1" || v === "true";
+      };
+      const sampled = reps.length || pickNum(payload, ["sampled"]) || 0;
+      const covered = reps.length ? reps.filter(yes).length : (pickNum(payload, ["covered"]) || 0);
+      if (sampled <= 0 || covered > sampled) throw new Error("Invalid LQAS counts");
+      const level = (pick(payload, ["eu_level"]) ?? "lga").toLowerCase();
+      const community = pick(payload, ["community_name", "admin/community_name"]);
+      const euName = pick(payload, ["eu_name"]) ?? ({ state, lga, ward, flhf: flhf, community } as Record<string, string | null>)[level] ?? "Unknown";
+      const row = {
+        idempotency_key: koboUuid, project_id: projectId, submitted_by: submitterUserId,
+        eu_level: ["state", "lga", "ward", "flhf", "community"].includes(level) ? level : "lga",
+        eu_name: euName, state, lga, ward, flhf_name: flhf, community_name: community,
+        team: pick(payload, ["team", "team_name"]), sampled, covered,
+        security_mode: String(pick(payload, ["security_mode"]) ?? "").toLowerCase() === "yes",
+        source: "kobo", payload, submitted_at: submittedAt, updated_at: new Date().toISOString(),
+      };
+      const { data, error } = await supabase.from("lqas_results")
+        .upsert(row, { onConflict: "idempotency_key,project_id" }).select("id");
+      if (error) throw error;
+      await emitSyncEvent("lqas_sync", projectId, koboUuid, data?.[0]?.id ?? null);
+      return new Response(JSON.stringify({ ok: true, kind, sampled, covered }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
