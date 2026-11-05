@@ -312,7 +312,13 @@ const ProgrammeModuleWorkspace = ({
   const navGroups = allNavGroups.map((group) => ({ ...group,
     items: group.items.map((item) => ({ ...item, show: item.show && (!isFocalPerson || FACILITY_WORKSPACE_VIEWS.has(item.key)) && pageAllowed(memberPerms, item.key) })),
   }));
-  const accessLoading = permissionsLoading || facilityAccessLoading;
+  // Background permission refreshes (focus, polling, reconnect) must not blank
+  // the workspace: once access resolves for this project, keep the screen,
+  // open record and scroll position mounted while fresh grants arrive.
+  const accessResolvedFor = useRef<string | null>(null);
+  const rawAccessLoading = permissionsLoading || facilityAccessLoading;
+  if (!rawAccessLoading && projectId) accessResolvedFor.current = projectId;
+  const accessLoading = rawAccessLoading && accessResolvedFor.current !== projectId;
   const canRecords = can("view_records") || can("view_dashboards");
   const canGuide = canRecords && pageAllowed(memberPerms, "guide");
   const canAssessments = pageAllowed(memberPerms, "assessments") && !isFocalPerson && Boolean(projectId) && !safeguardingOnly && (canConfigure || can("view_records") || canDash);
