@@ -139,4 +139,5 @@
 
 - [x] Admin device preview (Desktop/Android/iOS/Tablet) for Longitudinal Beneficiary Records with one-click scale-to-fit and device-native font sizing
 - [x] LQAS Global Standard phase 2: saved rounds and lots from the microplan, two-threshold decision rule, risk flags, supervisors.
-- [ ] LQAS phases 3–7 (field form, print pack per lot, Kobo sync into lots, dashboard/map, mop-up engine, reports) — awaiting user go-ahead per phase.
+- [x] LQAS round phone form + printed pack, Kobo results linked to lots, automatic mop-up, reports tab.
+- [ ] LQAS live Kobo submission test — waits on a real field submission from KoboCollect.

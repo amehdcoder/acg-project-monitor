@@ -8331,10 +8331,13 @@ export type Database = {
           lot_key: string
           lot_name: string
           lot_type: string
+          mop_up_due: string | null
           mop_up_required: boolean
           population: number
+          result_at: string | null
           risk_flags: string[]
           round_id: string
+          sampled_count: number | null
           security_status: string
           status: string
           supervisor_id: string | null
@@ -8350,10 +8353,13 @@ export type Database = {
           lot_key: string
           lot_name: string
           lot_type: string
+          mop_up_due?: string | null
           mop_up_required?: boolean
           population?: number
+          result_at?: string | null
           risk_flags?: string[]
           round_id: string
+          sampled_count?: number | null
           security_status?: string
           status?: string
           supervisor_id?: string | null
@@ -8369,10 +8375,13 @@ export type Database = {
           lot_key?: string
           lot_name?: string
           lot_type?: string
+          mop_up_due?: string | null
           mop_up_required?: boolean
           population?: number
+          result_at?: string | null
           risk_flags?: string[]
           round_id?: string
+          sampled_count?: number | null
           security_status?: string
           status?: string
           supervisor_id?: string | null
@@ -8398,8 +8407,10 @@ export type Database = {
           id: string
           idempotency_key: string
           lga: string | null
+          lot_id: string | null
           payload: Json
           project_id: string
+          round_id: string | null
           sampled: number
           security_mode: boolean
           source: string
@@ -8420,8 +8431,10 @@ export type Database = {
           id?: string
           idempotency_key: string
           lga?: string | null
+          lot_id?: string | null
           payload?: Json
           project_id: string
+          round_id?: string | null
           sampled: number
           security_mode?: boolean
           source?: string
@@ -8442,8 +8455,10 @@ export type Database = {
           id?: string
           idempotency_key?: string
           lga?: string | null
+          lot_id?: string | null
           payload?: Json
           project_id?: string
+          round_id?: string | null
           sampled?: number
           security_mode?: boolean
           source?: string
@@ -8454,7 +8469,22 @@ export type Database = {
           updated_at?: string
           ward?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "lqas_results_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "lqas_lots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lqas_results_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "lqas_rounds"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       lqas_rounds: {
         Row: {

@@ -358,6 +358,20 @@
       "when": 1793904070650,
       "tag": "0050_lqas_rounds_lots",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1793904575020,
+      "tag": "0051_lqas_lot_results_mopup",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1793904601058,
+      "tag": "0052_lqas_apply_lot_result_fix",
+      "breakpoints": true
     }
   ]
 }

@@ -9,15 +9,17 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Loader2, Plus, Target, Trash2 } from "lucide-react";
+import { CalendarClock, Download, FileSpreadsheet, Loader2, Plus, RotateCcw, ShieldAlert, Target, Trash2 } from "lucide-react";
+import { buildRoundPaperPack, buildRoundXlsForm, mopUpCommunities, mopUpWindow } from "@/lib/lqas/roundForms";
+import { downloadBlob } from "@/lib/lqas/forms";
 import { buildLots, DISEASES, evaluationUnits, ROUND_EU_LEVELS, roundDesign, type RoundEntry, type RoundEuLevel } from "@/lib/lqas/rounds";
 
-interface Round { id: string; disease: string; drug: string | null; eu_level: string; eu_name: string; upper_threshold: number; lower_threshold: number; sample_n: number; decision_rule: number; verification_date: string | null; status: string; created_at: string }
-interface Lot { id: string; round_id: string; lot_name: string; lot_type: string; population: number; households: number; lat: number | null; lng: number | null; security_status: string; risk_flags: string[]; status: string; supervisor_id: string | null }
+interface Round { id: string; disease: string; drug: string | null; eu_level: string; eu_key: string | null; eu_name: string; upper_threshold: number; lower_threshold: number; sample_n: number; decision_rule: number; verification_date: string | null; status: string; created_at: string }
+interface Lot { id: string; round_id: string; lot_name: string; lot_type: string; population: number; households: number; lat: number | null; lng: number | null; security_status: string; risk_flags: string[]; status: string; supervisor_id: string | null; lot_key: string; covered_count: number | null; sampled_count: number | null; mop_up_required: boolean; mop_up_due: string | null; result_at: string | null }
 
-const secTone: Record<string, string> = { Red: "bg-destructive text-destructive-foreground", Yellow: "bg-warning text-background", Green: "bg-success text-background" };
+const secTone: Record<string, string> = { Red: "bg-destructive text-destructive-foreground", Yellow: "bg-accent text-accent-foreground", Green: "bg-primary text-primary-foreground" };
 
-export default function LqasRounds({ projectId, entries, previousFails }: { projectId: string; entries: RoundEntry[]; previousFails: Set<string> }) {
+export default function LqasRounds({ projectId, entries, previousFails, projectName, indicator }: { projectId: string; entries: RoundEntry[]; previousFails: Set<string>; projectName: string; indicator: string }) {
   const { user } = useAuth();
   const [rounds, setRounds] = useState<Round[]>([]);
   const [lots, setLots] = useState<Lot[]>([]);
@@ -45,7 +47,15 @@ export default function LqasRounds({ projectId, entries, previousFails }: { proj
       setLots((l ?? []) as Lot[]);
     } else setLots([]);
   }, [projectId]);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    if (!projectId) return;
+    const ch = supabase.channel(`lqas-rounds-${projectId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "lqas_lots" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "lqas_rounds", filter: `project_id=eq.${projectId}` }, () => load())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [load, projectId]);
 
   useEffect(() => {
     if (!projectId) return;
@@ -118,7 +128,7 @@ export default function LqasRounds({ projectId, entries, previousFails }: { proj
                     </Select>
                   ) : peopleName(l.supervisor_id ?? null)}
                 </TableCell>
-                {!editable && <TableCell><Badge variant="secondary">{l.status}</Badge></TableCell>}
+                {!editable && <TableCell>{(() => { const x = l as Lot; return x.status === "PASS" ? <Badge className="bg-primary text-primary-foreground">PASS {x.covered_count}/{x.sampled_count}</Badge> : x.status === "FAIL" ? <Badge variant="destructive">MOP-UP {x.covered_count}/{x.sampled_count}</Badge> : <Badge variant="secondary">{x.status}</Badge>; })()}</TableCell>}
               </TableRow>
             );
           })}
@@ -183,7 +193,29 @@ export default function LqasRounds({ projectId, entries, previousFails }: { proj
                 <Badge className="ml-auto">{r.status}</Badge>
               </button>
               {open && <div className="space-y-2 border-t p-3">
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" onClick={() => downloadBlob(buildRoundXlsForm(r, rl, projectName, indicator), `LQAS_${r.eu_name}_phone_form.xlsx`)}><FileSpreadsheet className="mr-1 h-4 w-4" /> {r.sample_n}-household KoboCollect form</Button>
+                  <Button size="sm" variant="outline" onClick={() => downloadBlob(buildRoundPaperPack(r, entries, projectName, indicator).blob, `LQAS_${r.eu_name}_paper_pack.pdf`)}><Download className="mr-1 h-4 w-4" /> Printed pack (PDF)</Button>
+                  {rl.some((l) => l.security_status !== "Green") && <Button size="sm" variant="destructive" onClick={() => downloadBlob(buildRoundPaperPack(r, entries, projectName, indicator, true).blob, `LQAS_${r.eu_name}_security_pack.pdf`)}><ShieldAlert className="mr-1 h-4 w-4" /> Security-restricted pack</Button>}
+                </div>
+                <p className="text-xs text-muted-foreground">Upload the phone form to KoboToolbox and add the LQAS REST Service link below. Each submission links to its lot and sets PASS or MOP-UP automatically.</p>
                 <LotTable rows={rl} editable={false} />
+                {rl.filter((l) => l.status === "FAIL").map((l) => {
+                  const comm = mopUpCommunities(entries, r, l.lot_key);
+                  const w = mopUpWindow(l.result_at, l.mop_up_due);
+                  return (
+                    <div key={l.id} className="rounded-xl border-2 border-destructive/40 bg-destructive/5 p-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <RotateCcw className="h-4 w-4 text-destructive" />
+                        <span className="font-semibold">Mop-up: {l.lot_name}</span>
+                        <span className="text-sm">{l.covered_count}/{l.sampled_count} covered (pass mark {r.decision_rule})</span>
+                        <Badge variant="outline" className="ml-auto gap-1 border-destructive text-destructive"><CalendarClock className="h-3 w-3" /> Revisit {w.start ?? "now"} → {w.end ?? "within 7 days"}</Badge>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">Revisit every community in this lot within 7 days, then re-survey the lot with a fresh sample of {r.sample_n} households.</p>
+                      <div className="mt-2 flex flex-wrap gap-1">{comm.length ? comm.map((c) => <Badge key={c.ward + c.community} variant="outline" className={c.restricted ? "border-destructive text-destructive" : ""}>{c.community}{c.ward && c.ward !== l.lot_name ? ` · ${c.ward}` : ""} · {c.population.toLocaleString()}</Badge>) : <span className="text-xs">No communities listed in the microplan for this lot.</span>}</div>
+                    </div>
+                  );
+                })}
                 <Button variant="ghost" size="sm" className="text-destructive" onClick={() => remove(r.id)}><Trash2 className="mr-1 h-4 w-4" /> Delete round</Button>
               </div>}
             </div>

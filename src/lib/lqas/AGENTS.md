@@ -1,2 +1,3 @@
 - LQAS plans derive from microplan_entries (binomial decision rule, seeded PPS sampling); Kobo LQAS submissions (form id containing "lqas") land in lqas_results via kobo-webhook — why: one Kobo intake path and reproducible printed plans.
 - LQAS rounds/lots (lqas_rounds, lqas_lots) build lots one level below the evaluation unit from microplan_entries; risk flags use only recorded evidence (past FAIL results, security clearance, accessibility) — why: no invented predictions.
+- Round phone forms carry round_id + lot choice (L<uuid hex>); kobo-webhook links results to lots and a DB trigger sets PASS/FAIL, mop-up due (+7 days) and round status — why: decisions come from server data, not the browser.

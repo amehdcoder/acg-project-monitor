@@ -12,6 +12,8 @@ import { toast } from "sonner";
 import { ClipboardCheck, Download, FileSpreadsheet, Loader2, ShieldAlert, Target, Copy } from "lucide-react";
 import { aggregateCoverage, buildPlan, decisionRule, DEFAULT_SAMPLE, EU_LEVELS, euKey, lotDecision, type EuLevel, type PlanEntry } from "@/lib/lqas/lqas";
 import LqasRounds from "./LqasRounds";
+import LqasReports from "./LqasReports";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { RoundEntry } from "@/lib/lqas/rounds";
 import { buildLqasXlsForm, buildPaperPack, downloadBlob } from "@/lib/lqas/forms";
 
@@ -106,6 +108,10 @@ export default function LqasView() {
         </div>
       </div>
 
+      <Tabs defaultValue="plan">
+      <TabsList><TabsTrigger value="plan">Plan &amp; rounds</TabsTrigger><TabsTrigger value="reports">LQAS reports</TabsTrigger></TabsList>
+      <TabsContent value="reports" className="mt-4"><LqasReports projectId={projectId} /></TabsContent>
+      <TabsContent value="plan" className="mt-4 space-y-6">
       <Card>
         <CardHeader><CardTitle className="text-base">1 · Plan the survey</CardTitle></CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-5">
@@ -142,7 +148,7 @@ export default function LqasView() {
         ))}
       </div>
 
-      <LqasRounds projectId={projectId} entries={entries} previousFails={previousFails} />
+      <LqasRounds projectId={projectId} entries={entries} previousFails={previousFails} projectName={projectName} indicator={indicator} />
 
       <Card>
         <CardHeader><CardTitle className="text-base">2 · Download forms for the teams</CardTitle></CardHeader>
@@ -206,6 +212,8 @@ export default function LqasView() {
           </Table>
         </CardContent>
       </Card>
+      </TabsContent>
+      </Tabs>
     </div>
   );
 }
