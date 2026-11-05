@@ -11,6 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "sonner";
 import { ClipboardCheck, Download, FileSpreadsheet, Loader2, ShieldAlert, Target, Copy } from "lucide-react";
 import { aggregateCoverage, buildPlan, decisionRule, DEFAULT_SAMPLE, EU_LEVELS, euKey, lotDecision, type EuLevel, type PlanEntry } from "@/lib/lqas/lqas";
+import LqasRounds from "./LqasRounds";
+import type { RoundEntry } from "@/lib/lqas/rounds";
 import { buildLqasXlsForm, buildPaperPack, downloadBlob } from "@/lib/lqas/forms";
 
 interface ResultRow { id: string; eu_level: string; eu_name: string; state: string | null; lga: string | null; ward: string | null; flhf_name: string | null; community_name: string | null; sampled: number; covered: number; team: string | null; security_mode: boolean; submitted_at: string | null; created_at: string }
@@ -21,7 +23,7 @@ export default function LqasView() {
   const { user } = useAuth();
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [projectId, setProjectId] = useState("");
-  const [entries, setEntries] = useState<PlanEntry[]>([]);
+  const [entries, setEntries] = useState<RoundEntry[]>([]);
   const [results, setResults] = useState<ResultRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [level, setLevel] = useState<EuLevel>("lga");
@@ -42,13 +44,13 @@ export default function LqasView() {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const rows: PlanEntry[] = [];
+      const rows: RoundEntry[] = [];
       for (let from = 0; ; from += 1000) {
         const { data, error } = await supabase.from("microplan_entries")
-          .select("state, lga, ward, flhf_name, community_name, estimated_total_population, number_of_households, security_clearance")
+          .select("state, lga, ward, flhf_name, community_name, estimated_total_population, number_of_households, security_clearance, accessibility, community_latitude, community_longitude")
           .eq("project_id", projectId).order("id").range(from, from + 999);
         if (error || !data?.length) break;
-        rows.push(...(data as PlanEntry[]));
+        rows.push(...(data as RoundEntry[]));
         if (data.length < 1000) break;
       }
       if (!cancelled) { setEntries(rows); setLoading(false); }
@@ -87,6 +89,7 @@ export default function LqasView() {
     });
   }, [results, plans, level, stateFilter]);
   const agg = aggregateCoverage(lots, t);
+  const previousFails = useMemo(() => new Set(results.filter((r) => r.sampled > 0 && lotDecision(r.covered, r.sampled, t) === "mop_up").flatMap((r) => [r.eu_name, r.ward, r.community_name, r.lga].filter(Boolean).map((v) => String(v).trim().replace(/\s+/g, " ").toUpperCase()))), [results, t]);
   const insecure = plans.filter((p) => p.securityMode).length;
 
   const webhook = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/kobo-webhook?form_type=lqas&project_id=${projectId}${user ? `&submitted_by=${user.id}` : ""}`;
@@ -138,6 +141,8 @@ export default function LqasView() {
           </CardContent></Card>
         ))}
       </div>
+
+      <LqasRounds projectId={projectId} entries={entries} previousFails={previousFails} />
 
       <Card>
         <CardHeader><CardTitle className="text-base">2 · Download forms for the teams</CardTitle></CardHeader>
