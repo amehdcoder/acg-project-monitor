@@ -1,0 +1,1 @@
+- LQAS plans derive from microplan_entries (binomial decision rule, seeded PPS sampling); Kobo LQAS submissions (form id containing "lqas") land in lqas_results via kobo-webhook — why: one Kobo intake path and reproducible printed plans.
