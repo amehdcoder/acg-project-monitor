@@ -40,11 +40,9 @@ export function buildRoundXlsForm(round: RoundInfo, lots: LotInfo[], projectName
     row({ type: "select_one yn", name: "received", label: indicator, required: "yes" }),
     row({ type: "select_one reason", name: "reason", label: "Reason not covered", relevant: "${received} = 'no'", required: "yes" }),
     row({ type: "end_repeat", name: "lqas_respondents" }),
-    row({ type: "calculate", name: "covered", calculation: "count-selected(${received})" }),
+    row({ type: "calculate", name: "covered", calculation: "count(${lqas_respondents}[received = 'yes'])" }),
     row({ type: "note", name: "result", label: `Covered: \${covered} of ${n}. Pass mark: ${round.decision_rule}.` }),
   ];
-  // NB: count-selected on a repeat is not valid; covered is recomputed server-side from respondents.
-  survey[survey.length - 2] = row({ type: "calculate", name: "covered", calculation: "count(${lqas_respondents}[received = 'yes'])" });
   const choices: string[][] = [["list_name", "name", "label"]];
   lots.forEach((l) => choices.push(["lot", lotChoice(l.id), `${l.lot_name}${l.security_status !== "Green" ? ` (security ${l.security_status})` : ""}`]));
   choices.push(["yn", "yes", "Yes"], ["yn", "no", "No"]);
