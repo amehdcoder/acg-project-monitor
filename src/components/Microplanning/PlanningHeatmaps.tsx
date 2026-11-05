@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Card, CardContent } from "@/components/ui/card";
@@ -230,7 +230,15 @@ const EXTRA = [
   ...ESPEN_MAPS.map((m) => ({ id: m.id, title: m.title, description: m.description, colors: m.colors })),
 ];
 
-export default function PlanningHeatmaps({ entries }: { entries: HeatEntry[] }) {
+export default function PlanningHeatmaps({ entries: liveEntries }: { entries: HeatEntry[] }) {
+  // Only rebuild maps when mapped content actually changes, and never block the page while doing so.
+  const deferred = useDeferredValue(liveEntries);
+  const sigRef = useRef<{ sig: string; entries: HeatEntry[] }>({ sig: "", entries: [] });
+  const entries = useMemo(() => {
+    const sig = deferred.length + "|" + deferred.map((e) => JSON.stringify(e)).join("\u0001");
+    if (sig !== sigRef.current.sig) sigRef.current = { sig, entries: deferred };
+    return sigRef.current.entries;
+  }, [deferred]);
   const [lgaFc, setLgaFc] = useState<FC | null>(null);
   useEffect(() => { loadLgas().then(setLgaFc).catch(() => setLgaFc({ type: "FeatureCollection", features: [] })); }, []);
   const groups = useMemo(() => (lgaFc ? groupByState(entries, lgaFc.features as never) : []), [entries, lgaFc]);

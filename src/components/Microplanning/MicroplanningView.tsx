@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo, Fragment } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, useDeferredValue, Fragment } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -1559,7 +1559,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
     if (lensLockWard && uniqueWards[0] && filterWard !== uniqueWards[0]) setFilterWard(uniqueWards[0] as string);
   }, [lensLockState, lensLockLga, lensLockWard, uniqueStates, uniqueLgas, uniqueWards, filterState, filterLga, filterWard]);
 
-  const filtered = useMemo(() => displayEntries.filter(e => {
+  const filteredNow = useMemo(() => displayEntries.filter(e => {
     if (filterState !== "all" && e.state !== filterState) return false;
     if (filterLga !== "all" && e.lga !== filterLga) return false;
     if (filterWard !== "all" && e.ward !== filterWard) return false;
@@ -1592,6 +1592,8 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
     }
     return true;
   }), [displayEntries, filterState, filterLga, filterWard, filterAccessibility, filterSecurity, filterTerrain, filterKeyRatio, filterDisability, searchQuery]);
+  // Keep clicks and typing instant: heavy panels/maps re-render with the new list in the background.
+  const filtered = useDeferredValue(filteredNow);
 
   // Filter context used by the breadcrumb trail and the "export any level" button.
   const exportFilterContext = useMemo(() => ({
@@ -2569,11 +2571,11 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
               { label: "Geotagged", value: `${geotagged}/${filtered.length}`, icon: Globe, bg: geotaggedPct >= 70 ? "hsl(142, 60%, 35%)" : geotaggedPct >= 40 ? "hsl(45, 80%, 45%)" : "hsl(0, 65%, 48%)" },
             ].map(kpi => (
               <div key={kpi.label} className="rounded-xl p-3 text-white text-center shadow-md" style={{ background: kpi.bg }}>
-                <div className="flex items-center justify-center gap-1.5 mb-1">
+                <div className="flex items-center justify-center gap-1.5">
                   <kpi.icon className="h-3.5 w-3.5 opacity-80" />
                   <p className="text-[9px] font-bold uppercase tracking-wider opacity-90">{kpi.label}</p>
                 </div>
-                <p className="text-xl sm:text-2xl font-black tabular-nums leading-tight">{kpi.value}</p>
+                <p className="text-lg sm:text-xl font-black tabular-nums leading-none mt-0.5">{kpi.value}</p>
               </div>
             ))}
           </div>
@@ -2591,16 +2593,16 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
               { label: "Avg Dist. FLHF", value: `${avgDistKm} km` },
             ].map(kpi => (
               <Card key={kpi.label} className="border-border/40 shadow-sm">
-                <CardContent className="p-2.5 text-center">
+                <CardContent className="px-2 py-1.5 text-center">
                   <p className="text-[9px] text-muted-foreground font-medium uppercase tracking-wide">{kpi.label}</p>
-                  <p className="text-sm font-bold tabular-nums text-foreground mt-0.5">{kpi.value}</p>
+                  <p className="text-sm font-bold tabular-nums text-foreground leading-tight">{kpi.value}</p>
                 </CardContent>
               </Card>
             ))}
           </div>
 
           {/* Row 3: Breakdown panels — Accessibility, Security, Terrain, CDD (click to filter) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 items-start gap-2">
             {/* Accessibility */}
             <Card className="border-border/40 shadow-sm">
               <CardContent className="p-3">
