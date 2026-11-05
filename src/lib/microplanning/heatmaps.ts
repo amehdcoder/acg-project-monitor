@@ -23,33 +23,33 @@ export const THEMES: Record<HeatTheme, { title: string; field: keyof HeatEntry |
   accessibility: {
     title: "Accessibility", field: "accessibility", heatNote: "Heat = concentration of hard-to-reach communities",
     categories: [
-      { key: "accessible", label: "Accessible", color: WHO.green, weight: 0.1 },
-      { key: "seasonal", label: "Seasonal", color: WHO.amber, weight: 0.5 },
-      { key: "hard_to_reach", label: "Hard to reach", color: WHO.orange, weight: 0.8 },
-      { key: "inaccessible", label: "Inaccessible", color: WHO.red, weight: 1 },
-      { key: "unset", label: "Not recorded", color: WHO.grey, weight: 0 },
+      { key: "accessible", label: "Accessible", color: "#6DAA4F", weight: 0.1 },
+      { key: "seasonal", label: "Seasonal", color: "#E3C84A", weight: 0.5 },
+      { key: "hard_to_reach", label: "Hard to reach", color: "#E8888A", weight: 0.8 },
+      { key: "inaccessible", label: "Inaccessible", color: "#B71C1C", weight: 1 },
+      { key: "unset", label: "Not recorded", color: "#C3C9CF", weight: 0 },
     ],
   },
   security: {
     title: "Security clearance", field: "security_clearance", heatNote: "Heat = concentration of insecure communities",
     categories: [
-      { key: "cleared", label: "Cleared", color: WHO.green, weight: 0.1 },
-      { key: "partial", label: "Partially cleared", color: WHO.amber, weight: 0.6 },
-      { key: "not_cleared", label: "Not cleared", color: WHO.red, weight: 1 },
-      { key: "unknown", label: "Unknown", color: WHO.grey, weight: 0.35 },
+      { key: "cleared", label: "Cleared", color: "#6DAA4F", weight: 0.1 },
+      { key: "partial", label: "Partially cleared", color: "#E3C84A", weight: 0.6 },
+      { key: "not_cleared", label: "Not cleared", color: "#B71C1C", weight: 1 },
+      { key: "unknown", label: "Unknown", color: "#C3C9CF", weight: 0.35 },
     ],
   },
   terrain: {
     title: "Terrain types", field: "terrain_type", heatNote: "Heat = concentration of difficult terrain",
     categories: [
-      { key: "flat", label: "Flat", color: WHO.olive, weight: 0.1 },
-      { key: "desert", label: "Desert", color: WHO.amber, weight: 0.5 },
-      { key: "hilly", label: "Hilly", color: WHO.brown, weight: 0.6 },
-      { key: "forest", label: "Forest", color: WHO.green, weight: 0.7 },
-      { key: "riverine", label: "Riverine", color: WHO.blue, weight: 0.8 },
-      { key: "swampy", label: "Swampy", color: WHO.teal, weight: 0.9 },
-      { key: "mountainous", label: "Mountainous", color: WHO.red, weight: 1 },
-      { key: "unset", label: "Not recorded", color: WHO.grey, weight: 0 },
+      { key: "flat", label: "Flat", color: "#C9D88A", weight: 0.1 },
+      { key: "desert", label: "Desert", color: "#E8D29A", weight: 0.5 },
+      { key: "hilly", label: "Hilly", color: "#B08B5B", weight: 0.6 },
+      { key: "forest", label: "Forest", color: "#4E8F45", weight: 0.7 },
+      { key: "riverine", label: "Riverine", color: "#4A90C8", weight: 0.8 },
+      { key: "swampy", label: "Swampy", color: "#3FA7A0", weight: 0.9 },
+      { key: "mountainous", label: "Mountainous", color: "#7B4A2E", weight: 1 },
+      { key: "unset", label: "Not recorded", color: "#C3C9CF", weight: 0 },
     ],
   },
   population: {
@@ -131,4 +131,13 @@ export function groupByState(entries: HeatEntry[], lgaFeatures: { properties: { 
     g.points.push({ lat: p[0], lng: p[1], entry: e });
   }
   return [...groups.values()].filter((g) => g.points.length || g.noGps || g.outside).sort((a, b) => b.points.length - a.points.length);
+}
+
+// ESPEN/Crosscut population density classes (pop/km²) and bivariate palette.
+export const DENSITY_COLORS = ["#E8C4CB", "#E07A80", "#A6192E"];
+export const BIVARIATE = { low: ["#8CC56A", "#E3D46A", "#E8888A"], high: ["#2E7D32", "#B5A21E", "#B71C1C"] };
+/** 0 = reachable, 1 = seasonal / hard to reach, 2 = inaccessible, null = not recorded. */
+export function accessClass(e: HeatEntry): 0 | 1 | 2 | null {
+  const k = categoryOf(e, "accessibility").key;
+  return k === "accessible" ? 0 : k === "seasonal" || k === "hard_to_reach" ? 1 : k === "inaccessible" ? 2 : null;
 }
