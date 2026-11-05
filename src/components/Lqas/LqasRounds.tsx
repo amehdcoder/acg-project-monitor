@@ -15,7 +15,7 @@ import { buildLots, DISEASES, evaluationUnits, ROUND_EU_LEVELS, roundDesign, typ
 interface Round { id: string; disease: string; drug: string | null; eu_level: string; eu_name: string; upper_threshold: number; lower_threshold: number; sample_n: number; decision_rule: number; verification_date: string | null; status: string; created_at: string }
 interface Lot { id: string; round_id: string; lot_name: string; lot_type: string; population: number; households: number; lat: number | null; lng: number | null; security_status: string; risk_flags: string[]; status: string; supervisor_id: string | null }
 
-const secTone: Record<string, string> = { Red: "bg-destructive text-destructive-foreground", Yellow: "bg-warning text-warning-foreground", Green: "bg-success text-success-foreground" };
+const secTone: Record<string, string> = { Red: "bg-destructive text-destructive-foreground", Yellow: "bg-warning text-background", Green: "bg-success text-background" };
 
 export default function LqasRounds({ projectId, entries, previousFails }: { projectId: string; entries: RoundEntry[]; previousFails: Set<string> }) {
   const { user } = useAuth();
