@@ -106,8 +106,6 @@ export default function LqasView() {
         </div>
       </div>
 
-      <LqasRounds projectId={projectId} entries={entries} previousFails={previousFails} />
-
       <Card>
         <CardHeader><CardTitle className="text-base">1 · Plan the survey</CardTitle></CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-5">
@@ -143,6 +141,8 @@ export default function LqasView() {
           </CardContent></Card>
         ))}
       </div>
+
+      <LqasRounds projectId={projectId} entries={entries} previousFails={previousFails} />
 
       <Card>
         <CardHeader><CardTitle className="text-base">2 · Download forms for the teams</CardTitle></CardHeader>
