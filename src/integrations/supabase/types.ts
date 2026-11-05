@@ -8319,6 +8319,75 @@ export type Database = {
         }
         Relationships: []
       }
+      lqas_results: {
+        Row: {
+          community_name: string | null
+          covered: number
+          created_at: string
+          eu_level: string
+          eu_name: string
+          flhf_name: string | null
+          id: string
+          idempotency_key: string
+          lga: string | null
+          payload: Json
+          project_id: string
+          sampled: number
+          security_mode: boolean
+          source: string
+          state: string | null
+          submitted_at: string | null
+          submitted_by: string | null
+          team: string | null
+          updated_at: string
+          ward: string | null
+        }
+        Insert: {
+          community_name?: string | null
+          covered: number
+          created_at?: string
+          eu_level?: string
+          eu_name: string
+          flhf_name?: string | null
+          id?: string
+          idempotency_key: string
+          lga?: string | null
+          payload?: Json
+          project_id: string
+          sampled: number
+          security_mode?: boolean
+          source?: string
+          state?: string | null
+          submitted_at?: string | null
+          submitted_by?: string | null
+          team?: string | null
+          updated_at?: string
+          ward?: string | null
+        }
+        Update: {
+          community_name?: string | null
+          covered?: number
+          created_at?: string
+          eu_level?: string
+          eu_name?: string
+          flhf_name?: string | null
+          id?: string
+          idempotency_key?: string
+          lga?: string | null
+          payload?: Json
+          project_id?: string
+          sampled?: number
+          security_mode?: boolean
+          source?: string
+          state?: string | null
+          submitted_at?: string | null
+          submitted_by?: string | null
+          team?: string | null
+          updated_at?: string
+          ward?: string | null
+        }
+        Relationships: []
+      }
       mda_archived_submissions: {
         Row: {
           archived_at: string

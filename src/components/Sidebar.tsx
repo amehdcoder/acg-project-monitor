@@ -6,6 +6,7 @@ import {
   ArrowRightLeft, Stethoscope, Accessibility, HandMetal, Sparkles, Satellite,
   PanelLeftClose, PanelLeftOpen, History, ScanLine, Nfc,
   Share2, FlaskConical, Watch, Bluetooth, Boxes, SatelliteDish, Brush, Mail, TabletSmartphone,
+  ClipboardCheck,
 } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
@@ -123,6 +124,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     { id: "satellite-messenger", label: "Satellite Messenger", icon: SatelliteDish, adminOnly: false, showForUsers: true },
     { id: "offline-form-share", label: "Offline Form Share", icon: ArrowRightLeft, adminOnly: false, showForUsers: true },
     { id: "microplanning", label: "Geo Microplanning", icon: MapPin, adminOnly: true },
+    { id: "lqas", label: "LQAS Evaluation", icon: ClipboardCheck, adminOnly: true },
     { id: "integrated-supervisory", label: "Integrated Supervisory Checklist", icon: LayoutDashboard, adminOnly: true },
     { id: "kobo-hub", label: "Universal Kobo Analytics", icon: BarChart3, adminOnly: true, route: "/kobo-hub" },
     { id: "coverage-eval", label: "Coverage Evaluation 3D", icon: Boxes, adminOnly: false, showForUsers: true },
