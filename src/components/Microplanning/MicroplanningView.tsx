@@ -70,6 +70,7 @@ import jsPDF from "jspdf";
 import { exportMicroplanWorkbook } from "@/lib/microplanning/microplanTemplate";
 import GeoMedicineAllocationTable from "@/components/Microplanning/GeoMedicineAllocationTable";
 import GeoExclusionPanel from "@/components/Microplanning/GeoExclusionPanel";
+import PlanningHeatmaps from "@/components/Microplanning/PlanningHeatmaps";
 import { useGeoExclusions, rowExcluded } from "@/lib/microplanning/geoExclusions";
 
 import { parseMedicineUploadFile, exportMedicineUploadTemplate, parseAllocationPlanFile, exportAllocationPlanTemplate, type UploadedMedicineEntry } from "@/lib/microplanning/medicineUpload";
@@ -2811,6 +2812,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
               </CardContent>
             </Card>
           </div>
+          <PlanningHeatmaps entries={filtered as never} />
 
 
           {/* Drill-through breadcrumb trail */}
