@@ -252,7 +252,7 @@ export default function PlanningHeatmaps({ entries }: { entries: HeatEntry[] }) 
       {groups.map((g) => <StateMapMemo key={g.state} group={g} lgas={lgasByState.get(normState(g.state)) ?? []} />)}
       {groups.length > 0 && (
         <div className="space-y-2 pt-2">
-          <div className="flex items-center gap-2"><Layers className="h-4 w-4 text-primary" /><p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">ESPEN microplanner thematic maps · {EXTRA.length} maps · collapsed</p></div>
+          <div className="flex items-center gap-2"><Layers className="h-4 w-4 text-primary" /><p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">ESPEN microplanner thematic maps · {EXTRA.length} maps</p></div>
           {EXTRA.map((x) => (
             <Collapsible key={x.id} className="rounded-lg border bg-card shadow-sm">
               <CollapsibleTrigger className="group flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-muted/50">
