@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeConfig } from "@/lib/programmeModule/defaults";
 import type {
@@ -16,19 +16,22 @@ import { bindQueueAutoFlush, flushQueue, listQueued, pendingFor } from "@/lib/pr
 export const useProgrammeModules = (projectId?: string) => {
   const [modules, setModules] = useState<ProgrammeModuleRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const modulesFor = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     if (!projectId) { setModules([]); setLoading(false); return; }
-    setLoading(true);
+    // Only the first load for a project shows a loading state; later refreshes keep the screen.
+    if (modulesFor.current !== projectId) setLoading(true);
     const { data } = await cachedRead(`modules:${projectId}`, () => supabase
       .from("programme_modules")
       .select("*")
       .eq("project_id", projectId)
       .order("created_at", { ascending: true }));
-    setModules(((data as unknown as ProgrammeModuleRow[]) || []).map((m) => ({
+    if (data || modulesFor.current !== projectId) setModules(((data as unknown as ProgrammeModuleRow[]) || []).map((m) => ({
       ...m,
       config: normalizeConfig(m.config),
     })));
+    modulesFor.current = projectId;
     setLoading(false);
   }, [projectId]);
 
@@ -41,10 +44,12 @@ export const useProgrammeModules = (projectId?: string) => {
 export const useBeneficiaries = (moduleId?: string) => {
   const [rows, setRows] = useState<BeneficiaryRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const rowsFor = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     if (!moduleId) { setRows([]); setLoading(false); return; }
-    setLoading(true);
+    // Background refreshes keep saved rows on screen and merge only what changed.
+    if (rowsFor.current !== moduleId) setLoading(true);
     const { data } = await cachedRead(`beneficiaries:${moduleId}`, () => supabase
       .from("beneficiaries")
       .select("*")
@@ -60,7 +65,17 @@ export const useBeneficiaries = (moduleId?: string) => {
         id: p.submission_uuid as string,
         __pending: true,
       }));
-    setRows([...queued, ...server]);
+    if (!data && rowsFor.current === moduleId) { setLoading(false); return; }
+    const next = [...queued, ...server];
+    setRows((prev) => {
+      const before = new Map(prev.map((r) => [r.id, r]));
+      const merged = next.map((r) => {
+        const old = before.get(r.id);
+        return old && JSON.stringify(old) === JSON.stringify(r) ? old : r;
+      });
+      return merged.length === prev.length && merged.every((r, i) => r === prev[i]) ? prev : merged;
+    });
+    rowsFor.current = moduleId;
     setLoading(false);
   }, [moduleId]);
 

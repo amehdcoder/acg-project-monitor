@@ -1,6 +1,6 @@
 # Roadmap
 
-- [ ] Stabilize Longitudinal Beneficiary Records: retain user-scoped saved data during background updates, merge changed records, preserve open records and scroll, prevent unsolicited recovery reloads, and verify regressions and signed-in readback.
+- [x] Stabilize Longitudinal Beneficiary Records (live signed-in check pending while backend restarts): retain user-scoped saved data during background updates, merge changed records, preserve open records and scroll, prevent unsolicited recovery reloads, and verify regressions and signed-in readback.
 
 - [ ] Finish pending saved WHO survey forms and verify saving/readback; add server-authorized Super Admin individual deletion and clearing of scorecard survey evidence, with confirmation and refreshed progress.
 
