@@ -53,7 +53,7 @@ export function lotDecision(covered: number, sampled: number, target: number): L
 }
 
 export const euKey = (e: Pick<PlanEntry, "state" | "lga" | "ward" | "flhf_name" | "community_name">, level: EuLevel) => {
-  const parts = [e.state, e.lga, e.ward, e.flhf_name, e.community_name].map((v) => (v || "").trim());
+  const parts = [e.state, e.lga, e.ward, e.flhf_name, e.community_name].map((v) => (v || "").trim().replace(/\s+/g, " ").toUpperCase());
   const depth = { state: 1, lga: 2, ward: 3, flhf: 4, community: 5 }[level];
   return parts.slice(0, depth).join(" › ");
 };
