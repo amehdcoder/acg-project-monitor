@@ -165,7 +165,7 @@ function StateMap({ group, lgas }: { group: StateGroup; lgas: Feature[] }) {
         <div className="relative h-[560px] w-full">
           <div ref={el} className="absolute inset-0" />
           {visible && (
-            <div className="absolute left-3 top-3 z-[500] w-64 rounded-md border bg-card shadow-lg">
+            <div className="absolute left-3 top-3 z-[500] w-72 rounded-md border bg-card shadow-lg">
               <div className="flex items-center justify-between border-b px-3 py-2">
                 <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider"><Eye className="h-3.5 w-3.5" /> Visualizations</span>
                 <button className="rounded p-0.5 hover:bg-muted" onClick={() => setPanelOpen((o) => !o)} aria-label={panelOpen ? "Collapse panel" : "Expand panel"}>{panelOpen ? <Minus className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}</button>
