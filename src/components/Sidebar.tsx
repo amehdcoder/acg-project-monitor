@@ -6,6 +6,7 @@ import {
   ArrowRightLeft, Stethoscope, Accessibility, HandMetal, Sparkles, Satellite,
   PanelLeftClose, PanelLeftOpen, History, ScanLine, Nfc,
   Share2, FlaskConical, Watch, Bluetooth, Boxes, SatelliteDish, Brush, Mail, TabletSmartphone,
+  ClipboardCheck,
 } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
