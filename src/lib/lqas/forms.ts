@@ -66,7 +66,7 @@ function tallySheet(doc: jsPDF, eu: EuPlan, ctx: FormContext, secure: boolean) {
     startY: y, theme: "grid", styles: { fontSize: 9, cellPadding: 2 },
     head: [["Total Y (covered)", "Decision rule (d)", "Decision", "Reason codes"]],
     headStyles: { fillColor: WHO_DARK },
-    body: [["", String(d), `PASS if Y ≥ ${d}   ·   MOP-UP if Y < ${d}`, "1 Absent · 2 Refused · 3 Not aware · 4 Side-effects fear · 5 Ineligible/sick · 6 Not visited · 7 Other"]],
+    body: [["", String(d), `PASS if Y >= ${d}   ·   MOP-UP if Y < ${d}`, "1 Absent · 2 Refused · 3 Not aware · 4 Side-effects fear · 5 Ineligible/sick · 6 Not visited · 7 Other"]],
   });
   if (secure) {
     y = (doc as any).lastAutoTable.finalY + 4;
@@ -98,7 +98,7 @@ function summarySheet(doc: jsPDF, plans: EuPlan[], ctx: FormContext) {
   const d = decisionRule(ctx.sample, ctx.target);
   autoTable(doc, {
     startY: 28, theme: "grid", styles: { fontSize: 8, minCellHeight: 7 }, headStyles: { fillColor: GREEN },
-    head: [["Evaluation Unit", "LGA", "Communities", "Population", "Sampled", "Covered (Y)", `Pass (≥${d})`, "Mop-up?", "Security"]],
+    head: [["Evaluation Unit", "LGA", "Communities", "Population", "Sampled", "Covered (Y)", `Pass (>=${d})`, "Mop-up?", "Security"]],
     body: plans.map((p) => [p.name, p.lga, p.communities, p.population.toLocaleString(), ctx.sample, "", "", "", p.securityMode ? "Restricted" : "Cleared"]),
     didParseCell: (c) => { if (c.section === "body" && c.column.index === 8 && plans[c.row.index]?.securityMode) c.cell.styles.textColor = RED; },
   });
