@@ -222,7 +222,21 @@ Deno.serve(async (req) => {
       const level = (pick(payload, ["eu_level"]) ?? "lga").toLowerCase();
       const community = pick(payload, ["community_name", "admin/community_name"]);
       const euName = pick(payload, ["eu_name"]) ?? ({ state, lga, ward, flhf: flhf, community } as Record<string, string | null>)[level] ?? "Unknown";
+      // Round-specific phone forms carry round_id + lot choice (L<uuid hex>).
+      let roundId: string | null = null, lotId: string | null = null;
+      const rawRound = String(pick(payload, ["round_id", "lqas_round/round_id"]) ?? "").trim();
+      const rawLot = String(pick(payload, ["lot", "lqas_round/lot", "lot_id"]) ?? "").trim().replace(/^L/i, "");
+      const asUuid = (h: string) => /^[0-9a-f]{32}$/i.test(h) ? `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}` : h;
+      const UUID = /^[0-9a-f-]{36}$/i;
+      if (UUID.test(asUuid(rawRound)) && UUID.test(asUuid(rawLot))) {
+        const { data: lot } = await supabase.from("lqas_lots").select("id, round_id, lot_name, lqas_rounds!inner(project_id)")
+          .eq("id", asUuid(rawLot)).eq("round_id", asUuid(rawRound)).maybeSingle();
+        const lotProject = (lot as { lqas_rounds?: { project_id?: string } } | null)?.lqas_rounds?.project_id;
+        if (!lot || lotProject !== projectId) throw new Error("LQAS lot not found for this round and project");
+        roundId = lot.round_id; lotId = lot.id;
+      }
       const row = {
+        round_id: roundId, lot_id: lotId,
         idempotency_key: koboUuid, project_id: projectId, submitted_by: submitterUserId,
         eu_level: ["state", "lga", "ward", "flhf", "community"].includes(level) ? level : "lga",
         eu_name: euName, state, lga, ward, flhf_name: flhf, community_name: community,
