@@ -351,6 +351,13 @@
       "when": 1793903135692,
       "tag": "0049_lqas_results",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1793904070650,
+      "tag": "0050_lqas_rounds_lots",
+      "breakpoints": true
     }
   ]
 }

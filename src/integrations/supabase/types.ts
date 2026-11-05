@@ -8319,6 +8319,74 @@ export type Database = {
         }
         Relationships: []
       }
+      lqas_lots: {
+        Row: {
+          covered_count: number | null
+          created_at: string
+          data_source: string | null
+          households: number
+          id: string
+          lat: number | null
+          lng: number | null
+          lot_key: string
+          lot_name: string
+          lot_type: string
+          mop_up_required: boolean
+          population: number
+          risk_flags: string[]
+          round_id: string
+          security_status: string
+          status: string
+          supervisor_id: string | null
+        }
+        Insert: {
+          covered_count?: number | null
+          created_at?: string
+          data_source?: string | null
+          households?: number
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          lot_key: string
+          lot_name: string
+          lot_type: string
+          mop_up_required?: boolean
+          population?: number
+          risk_flags?: string[]
+          round_id: string
+          security_status?: string
+          status?: string
+          supervisor_id?: string | null
+        }
+        Update: {
+          covered_count?: number | null
+          created_at?: string
+          data_source?: string | null
+          households?: number
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          lot_key?: string
+          lot_name?: string
+          lot_type?: string
+          mop_up_required?: boolean
+          population?: number
+          risk_flags?: string[]
+          round_id?: string
+          security_status?: string
+          status?: string
+          supervisor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lqas_lots_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "lqas_rounds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lqas_results: {
         Row: {
           community_name: string | null
@@ -8385,6 +8453,60 @@ export type Database = {
           team?: string | null
           updated_at?: string
           ward?: string | null
+        }
+        Relationships: []
+      }
+      lqas_rounds: {
+        Row: {
+          created_at: string
+          created_by: string
+          decision_rule: number
+          disease: string
+          drug: string | null
+          eu_key: string
+          eu_level: string
+          eu_name: string
+          id: string
+          lower_threshold: number
+          project_id: string
+          sample_n: number
+          status: string
+          upper_threshold: number
+          verification_date: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string
+          decision_rule: number
+          disease: string
+          drug?: string | null
+          eu_key: string
+          eu_level: string
+          eu_name: string
+          id?: string
+          lower_threshold?: number
+          project_id: string
+          sample_n?: number
+          status?: string
+          upper_threshold?: number
+          verification_date?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          decision_rule?: number
+          disease?: string
+          drug?: string | null
+          eu_key?: string
+          eu_level?: string
+          eu_name?: string
+          id?: string
+          lower_threshold?: number
+          project_id?: string
+          sample_n?: number
+          status?: string
+          upper_threshold?: number
+          verification_date?: string | null
         }
         Relationships: []
       }
