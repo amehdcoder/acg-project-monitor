@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Stabilize Longitudinal Beneficiary Records: retain user-scoped saved data during background updates, merge changed records, preserve open records and scroll, prevent unsolicited recovery reloads, and verify regressions and signed-in readback.
+
 - [ ] Finish pending saved WHO survey forms and verify saving/readback; add server-authorized Super Admin individual deletion and clearing of scorecard survey evidence, with confirmation and refreshed progress.
 
 - [ ] Add indicator-specific WHO survey forms with validated measurements, project-scoped durable saving, cached reopening and refreshed scorecard progress; verify save/readback without inventing real survey evidence.
