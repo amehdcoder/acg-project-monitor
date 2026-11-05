@@ -13,8 +13,9 @@ describe("LQAS round tools", () => {
     ] as never[];
     const round = { id: "r", disease: "x", drug: null, eu_level: "lga", eu_key: "KANO › DALA", eu_name: "Dala", upper_threshold: 80, sample_n: 19, decision_rule: 13 };
     const key = "KANO › DALA › A";
-    const out = mopUpCommunities(e, { ...round, eu_key: null, eu_name: "" }, key);
-    expect(Array.isArray(out)).toBe(true);
+    const out = mopUpCommunities(e, round, key);
+    expect(out.map((c) => c.community)).toEqual(["Big", "Small"]);
+    expect(out[0].restricted).toBe(true);
   });
   it("computes pass rate from reported lots only", () => {
     const s = summariseRound([
