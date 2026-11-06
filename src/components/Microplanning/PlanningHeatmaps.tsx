@@ -61,6 +61,14 @@ function StateMap({ group, lgas, espen }: { group: StateGroup; lgas: Feature[]; 
     return () => { document.removeEventListener("fullscreenchange", onChange); window.removeEventListener("keydown", onKey); };
   }, []);
   useEffect(() => { const t = setTimeout(() => map.current?.invalidateSize(), 120); return () => clearTimeout(t); }, [fs]);
+  // Keep the map sized to its box on rotation / window resize (responsive full screen).
+  useEffect(() => {
+    if (!el.current || typeof ResizeObserver === "undefined") return;
+    let raf = 0;
+    const ro = new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => map.current?.invalidateSize()); });
+    ro.observe(el.current);
+    return () => { cancelAnimationFrame(raf); ro.disconnect(); };
+  }, [visible]);
   const toggleFs = async () => {
     if (fs) { setFs(false); if (document.fullscreenElement) await document.exitFullscreen().catch(() => {}); return; }
     setFs(true);
