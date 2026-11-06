@@ -13,6 +13,7 @@ import { ClipboardCheck, Download, FileSpreadsheet, Loader2, ShieldAlert, Target
 import { aggregateCoverage, buildPlan, decisionRule, DEFAULT_SAMPLE, EU_LEVELS, euKey, lotDecision, type EuLevel, type PlanEntry } from "@/lib/lqas/lqas";
 import LqasRounds from "./LqasRounds";
 import LqasReports from "./LqasReports";
+import LqasKoboCard from "./LqasKoboCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { RoundEntry } from "@/lib/lqas/rounds";
 import { buildLqasXlsForm, buildPaperPack, downloadBlob } from "@/lib/lqas/forms";
@@ -149,6 +150,8 @@ export default function LqasView() {
       </div>
 
       <LqasRounds projectId={projectId} entries={entries} previousFails={previousFails} projectName={projectName} indicator={indicator} />
+
+      {projectId && <LqasKoboCard projectId={projectId} projectName={projectName} ctx={ctx} webhook={webhook} />}
 
       <Card>
         <CardHeader><CardTitle className="text-base">2 · Download forms for the teams</CardTitle></CardHeader>
