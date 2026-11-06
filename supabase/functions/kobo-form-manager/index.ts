@@ -980,15 +980,20 @@ Deno.serve(async (req) => {
       // submissions stream in without manual REST Service setup.
       const forbid = await ensureAdmin();
       if (forbid) return forbid;
-      const { server_url, form_uid, api_token, project_id } = params;
+      const { server_url, form_uid, api_token, project_id, target } = params;
+      const isLqas = target === "lqas";
       if (!server_url || !form_uid || !api_token) {
         return j({ error: "Missing server_url/form_uid/api_token" }, 400);
       }
       const secret = await readActiveSecret();
       if (!secret) return j({ error: "No active webhook secret configured" }, 400);
-      const endpoint = `${SUPABASE_URL}/functions/v1/kobo-microplan-webhook${project_id ? `?project_id=${encodeURIComponent(project_id)}` : ""}`;
+      const hookFn = isLqas ? "kobo-webhook" : "kobo-microplan-webhook";
+      const qs = new URLSearchParams();
+      if (isLqas) qs.set("form_type", "lqas");
+      if (project_id) qs.set("project_id", String(project_id));
+      const endpoint = `${SUPABASE_URL}/functions/v1/${hookFn}${qs.toString() ? `?${qs}` : ""}`;
       const body = {
-        name: "Amehnities Microplanning Sync",
+        name: isLqas ? "Amehnities LQAS Sync" : "Amehnities Microplanning Sync",
         endpoint,
         active: true,
         subset_fields: [],
@@ -999,7 +1004,10 @@ Deno.serve(async (req) => {
       try {
         // List existing hooks so we update instead of duplicate.
         const existing = await koboFetch(server_url, `/api/v2/assets/${form_uid}/hooks/?format=json`, api_token);
-        const match = (existing?.results ?? []).find((h: any) => (h?.endpoint ?? "").includes("kobo-microplan-webhook"));
+        const match = (existing?.results ?? []).find((h: any) => {
+          const ep = String(h?.endpoint ?? "");
+          return isLqas ? ep.includes("/kobo-webhook") && ep.includes("form_type=lqas") : ep.includes("kobo-microplan-webhook");
+        });
         let hook: any;
         if (match?.uid) {
           hook = await koboFetch(server_url, `/api/v2/assets/${form_uid}/hooks/${match.uid}/`, api_token, {
