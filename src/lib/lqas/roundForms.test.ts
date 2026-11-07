@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { lotChoice, mopUpCommunities, summariseRound } from "./roundForms";
+import { buildRoundXlsForm, lotChoice, mopUpCommunities, snapshotPlans, summariseRound } from "./roundForms";
+import { buildPlan } from "./lqas";
+import * as XLSX from "xlsx";
 
 describe("LQAS round tools", () => {
   it("encodes lot ids as Kobo-safe choices", () => {
@@ -32,5 +34,17 @@ describe("LQAS round tools", () => {
   it("excludes incomplete and invalid observations from classified summaries", () => {
     const s = summariseRound([{ population: 100, status: "In Progress", covered_count: 18, sampled_count: 18 }, { population: 100, status: "PASS", covered_count: 20, sampled_count: 19 }]);
     expect(s.reported).toBe(0); expect(s.coverage).toBeNull();
+  });
+  it("retains frozen sampling points and the saved indicator in phone exports", async () => {
+    const plans = buildPlan([{ state: "Kano", lga: "Dala", ward: "A", flhf_name: "PHC", community_name: "Original", estimated_total_population: 100 }], "ward");
+    const round = { id: "12345678-aaaa-bbbb-cccc-1234567890ab", disease: "Trachoma", drug: null, eu_level: "lga", eu_key: "KANO › DALA", eu_name: "Dala", upper_threshold: 80, sample_n: 19, decision_rule: 13, indicator: "Saved medicine ingestion", sampling_snapshot: plans };
+    expect(snapshotPlans(round)?.[0].sample[0].community).toBe("Original");
+    const blob = buildRoundXlsForm(round, [{ id: "12345678-aaaa-bbbb-cccc-1234567890ab", lot_key: plans[0].key, lot_name: "A", security_status: "Green" }], "Project", "Changed question");
+    const wb = XLSX.read(await blob.arrayBuffer(), { type: "array" });
+    const rows = XLSX.utils.sheet_to_json<Record<string, string>>(wb.Sheets.survey);
+    expect(rows.find((r) => r.name === "received")?.label).toBe("Saved medicine ingestion");
+    expect(rows.find((r) => r.name === "lqas_respondents" && r.type === "begin_repeat")?.repeat_count).toBe("19");
+    expect(rows.find((r) => r.name === "planned_community")?.calculation).toContain("Original");
+    expect(rows.find((r) => r.name === "covered")?.calculation).toBe("count(${lqas_respondents}[received = 'yes'])");
   });
 });

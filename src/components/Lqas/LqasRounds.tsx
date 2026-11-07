@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { CalendarClock, Download, FileSpreadsheet, Loader2, Plus, RotateCcw, ShieldAlert, Target, Trash2 } from "lucide-react";
 import { buildRoundPaperPack, buildRoundXlsForm, mopUpCommunities, mopUpWindow } from "@/lib/lqas/roundForms";
 import { downloadBlob } from "@/lib/lqas/forms";
-import { buildLots, DISEASES, evaluationUnits, ROUND_EU_LEVELS, roundDesign, type RoundEntry, type RoundEuLevel } from "@/lib/lqas/rounds";
+import { buildLots, DISEASES, evaluationUnits, ROUND_EU_LEVELS, type RoundEntry, type RoundEuLevel } from "@/lib/lqas/rounds";
 import { assessDesign } from "@/lib/lqas/quality";
 import { buildPlan } from "@/lib/lqas/lqas";
 import { CHILD_OF } from "@/lib/lqas/roundForms";

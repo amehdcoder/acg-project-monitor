@@ -69,7 +69,7 @@ export function buildLots(entries: RoundEntry[], level: RoundEuLevel, eu: string
     const yellow = !red && rows.some((r) => INSECURE_CLEARANCE.has(String(r.security_clearance || "")));
     const flags: RiskFlag[] = [];
     const name = euName(key);
-    if (previousFails.has(name.toUpperCase())) flags.push("Previous FAIL");
+    if (previousFails.has(key) || previousFails.has(name.toUpperCase())) flags.push("Previous FAIL");
     if (red) flags.push("Security Red"); else if (yellow) flags.push("Security Yellow");
     if (rows.some((r) => HARD_TO_REACH.has(String(r.accessibility || "")))) flags.push("Hard-to-Reach");
     lots.push({

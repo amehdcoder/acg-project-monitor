@@ -10,12 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { ClipboardCheck, Download, FileSpreadsheet, Loader2, ShieldAlert, Target, Copy } from "lucide-react";
-import { aggregateCoverage, buildPlan, decisionRule, DEFAULT_SAMPLE, EU_LEVELS, euKey, lotDecision, type EuLevel, type PlanEntry } from "@/lib/lqas/lqas";
+import { buildPlan, decisionRule, DEFAULT_SAMPLE, EU_LEVELS, euKey, type EuLevel } from "@/lib/lqas/lqas";
 import LqasRounds from "./LqasRounds";
 import LqasReports from "./LqasReports";
 import LqasKoboCard from "./LqasKoboCard";
 import LqasStandards from "./LqasStandards";
-import { classifySample } from "@/lib/lqas/quality";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { RoundEntry } from "@/lib/lqas/rounds";
 import { buildLqasXlsForm, buildPaperPack, downloadBlob } from "@/lib/lqas/forms";
@@ -37,6 +36,7 @@ export default function LqasView() {
   const [indicator, setIndicator] = useState("Did this person swallow the medicine during the recent MDA?");
   const [entriesRevision, setEntriesRevision] = useState(0);
   const [resultPage, setResultPage] = useState(0);
+  const [previousFails, setPreviousFails] = useState(new Set<string>());
 
   useEffect(() => {
     supabase.from("projects").select("id, name").order("name").then(({ data }) => {
@@ -81,6 +81,8 @@ export default function LqasView() {
     if (!projectId) return;
     const { data } = await supabase.from("lqas_results").select("*").eq("project_id", projectId).order("created_at", { ascending: false }).limit(5000);
     if (data) setResults(data as ResultRow[]);
+    const { data: failed } = await supabase.from("lqas_lots").select("lot_key,lqas_rounds!inner(project_id)").eq("status", "FAIL").eq("lqas_rounds.project_id", projectId);
+    if (failed) setPreviousFails(new Set(failed.map((l) => l.lot_key)));
   }, [projectId]);
 
   useEffect(() => {
@@ -107,7 +109,6 @@ export default function LqasView() {
       return { ...r, key, population: popByKey.get(key) ?? 0 };
     });
   }, [results, plans, level, stateFilter]);
-  const previousFails = useMemo(() => new Set<string>(), []);
   const insecure = plans.filter((p) => p.securityMode).length;
   const frameMissing = plans.reduce((s, p) => s + p.frameMissing, 0);
   const download = (make: () => Blob, name: string) => { try { downloadBlob(make(), name); } catch (e) { toast.error((e as Error).message); } };
