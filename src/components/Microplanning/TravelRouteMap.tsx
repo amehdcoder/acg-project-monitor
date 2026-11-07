@@ -1,3 +1,4 @@
+import { renderBatches } from "@/lib/microplanning/renderBatches";
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -308,6 +309,7 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
     map.setView([9.06, 7.49], 6);
 
     return () => {
+      map.stop();
       map.remove();
       mapRef.current = null;
     };
@@ -380,7 +382,9 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
 
     if (!origin || !destination) {
       // Show ALL geotagged locations when no route selected
-      allLocations.forEach((loc) => {
+      const layer = routeLayerRef.current;
+      const map = mapRef.current;
+      const cancel = renderBatches(allLocations, (loc) => {
         const color = loc.type === "flhf" ? "#4285F4" : loc.type === "community" ? "#34A853" : "#FBBC05";
         const emoji = loc.type === "flhf" ? "🏥" : loc.type === "community" ? "🏘️" : "🏠";
         const label = loc.type === "flhf" ? "Health Facility" : loc.type === "community" ? "Community" : "Settlement";
@@ -407,14 +411,14 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
               ${loc.meta.population ? `<p style="font-size:11px;color:#5f6368;margin:2px 0 0;">Pop: ${loc.meta.population.toLocaleString()}</p>` : ""}
             </div>`
           )
-          .addTo(routeLayerRef.current!);
+          .addTo(layer);
+      }, () => {
+        if (allLocations.length > 0 && mapRef.current === map) {
+          const bounds = allLocations.map((l) => [l.lat, l.lng] as L.LatLngTuple);
+          map.fitBounds(bounds, { padding: [60, 60], maxZoom: 12, animate: false });
+        }
       });
-
-      if (allLocations.length > 0) {
-        const bounds = allLocations.map((l) => [l.lat, l.lng] as L.LatLngTuple);
-        mapRef.current.fitBounds(bounds, { padding: [60, 60], maxZoom: 12 });
-      }
-      return;
+      return cancel;
     }
 
     const map = mapRef.current;
@@ -652,7 +656,7 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
     placeholder: string,
   ) => {
     const selected = allLocations.find(l => l.id === value);
-    const filtered = filterLocs(locations, search);
+    const filtered = focused ? filterLocs(locations, search).slice(0, 50) : [];
     const flhfs = filtered.filter(l => l.type === "flhf");
     const comms = filtered.filter(l => l.type === "community");
     const setts = filtered.filter(l => l.type === "settlement");

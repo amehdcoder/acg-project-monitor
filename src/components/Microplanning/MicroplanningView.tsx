@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo, useDeferredValue, startTransition, Fragment } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, useDeferredValue, Fragment } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -2937,39 +2937,39 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
                 only see their own submitted entries (Planning list) and the form. */}
             {(isAdmin || lensEnabled) && (
               <div className="flex max-w-full border border-border rounded-lg overflow-x-auto">
-                {canOpenView("list") && (<Button variant={activeView === "list" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => startTransition(() => setActiveView("list"))}>
+                {canOpenView("list") && (<Button variant={activeView === "list" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("list")}>
                   <List className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline text-xs">Planning</span>
                 </Button>)}
-                {canOpenView("medicine") && (<Button variant={activeView === "medicine" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => startTransition(() => setActiveView("medicine"))}>
+                {canOpenView("medicine") && (<Button variant={activeView === "medicine" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("medicine")}>
                   <Pill className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline text-xs">Medicine</span>
                 </Button>)}
-                {canOpenView("coverage") && (<Button variant={activeView === "coverage" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => startTransition(() => setActiveView("coverage"))}>
+                {canOpenView("coverage") && (<Button variant={activeView === "coverage" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("coverage")}>
                   <Activity className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline text-xs">Coverage</span>
                 </Button>)}
-                {canOpenView("reconciliation") && (<Button variant={activeView === "reconciliation" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => startTransition(() => setActiveView("reconciliation"))}>
+                {canOpenView("reconciliation") && (<Button variant={activeView === "reconciliation" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("reconciliation")}>
                   <Heart className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline text-xs">Reconciliation</span>
                 </Button>)}
-                {canOpenView("gaps") && (<Button variant={activeView === "gaps" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => startTransition(() => setActiveView("gaps"))}>
+                {canOpenView("gaps") && (<Button variant={activeView === "gaps" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("gaps")}>
                   <Target className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline text-xs">Gaps</span>
                 </Button>)}
-                {canOpenView("map") && (<Button variant={activeView === "map" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => startTransition(() => setActiveView("map"))}>
+                {canOpenView("map") && (<Button variant={activeView === "map" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("map")}>
                   <MapIcon className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline text-xs">Map</span>
                 </Button>)}
-                {canOpenView("routes") && (<Button variant={activeView === "routes" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => startTransition(() => setActiveView("routes"))}>
+                {canOpenView("routes") && (<Button variant={activeView === "routes" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("routes")}>
                   <Navigation className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline text-xs">Routes</span>
                 </Button>)}
-                {canOpenView("historical") && (<Button variant={activeView === "historical" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => startTransition(() => setActiveView("historical"))}>
+                {canOpenView("historical") && (<Button variant={activeView === "historical" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("historical")}>
                   <HistoryIcon className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline text-xs">Historical</span>
                 </Button>)}
-                {canOpenView("summary") && (<Button variant={activeView === "summary" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => startTransition(() => setActiveView("summary"))}>
+                {canOpenView("summary") && (<Button variant={activeView === "summary" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("summary")}>
                   <LayersIcon className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline text-xs">Summary</span>
                 </Button>)}
