@@ -99,7 +99,8 @@ function LqasKoboDialog({ open, onClose, projectId, projectName, ctx, webhook }:
 
   const buildForm = async () => {
     if (formChoice === "general") return buildLqasXlsForm(ctx);
-    const round = rounds.find((r) => r.id === formChoice)!;
+    const round = rounds.find((r) => r.id === formChoice);
+    if (!round) throw new Error("Select an available round");
     const { data } = await supabase.from("lqas_lots").select("id, lot_key, lot_name, security_status").eq("round_id", round.id);
     return buildRoundXlsForm(round, (data ?? []) as LotInfo[], projectName, ctx.indicator);
   };
