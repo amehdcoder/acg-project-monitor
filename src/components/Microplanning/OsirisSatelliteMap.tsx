@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import maplibregl, { type GeoJSONSource, type Map as LibreMap } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { Maximize2, Minimize2, LocateFixed, RefreshCw, Layers, ExternalLink, Loader2, Satellite, X } from "lucide-react";
+import { Maximize2, Minimize2, LocateFixed, RefreshCw, Layers, ExternalLink, Loader2, Satellite, Navigation, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { categoryOf, normState } from "@/lib/microplanning/heatmaps";
 import { eventsInState, nearbyEvents, recordedNumber, statePoints, type Boundary, type IntelEntry, type IntelEvent, type IntelPoint } from "@/lib/microplanning/osiris";
 
+const StreetViewPanel = lazy(() => import("@/components/maps/GoogleStreetViewPanel"));
 type Dimension="security"|"accessibility"|"terrain"|"population";
 const themes: {id:Dimension;label:string}[]=[{id:"security",label:"Security clearance"},{id:"accessibility",label:"Accessibility"},{id:"terrain",label:"Terrain types"},{id:"population",label:"Recorded population"}];
 const empty={type:"FeatureCollection" as const,features:[]};
@@ -26,6 +27,8 @@ export default function OsirisSatelliteMap({entries,projectName}:{entries:IntelE
   const [revision,setRevision]=useState(0);
   const [search,setSearch]=useState("");
   const [constraintsOnly,setConstraintsOnly]=useState(false);
+  const [streetLocation,setStreetLocation]=useState<{lat:number;lng:number;title:string}|null>(null);
+  const camera=useRef<{center:[number,number];zoom:number;pitch:number;bearing:number}|null>(null);
   const root=useRef<HTMLDivElement>(null),holder=useRef<HTMLDivElement>(null),map=useRef<LibreMap|null>(null),pointIndex=useRef(new Map<string,IntelPoint>());
   useEffect(()=>{if(!states.includes(state)){setState(states[0]??"");setSelected(null);}},[states,state]);
   useEffect(()=>{
@@ -34,12 +37,13 @@ export default function OsirisSatelliteMap({entries,projectName}:{entries:IntelE
     return()=>abort.abort();
   },[]);
   useEffect(()=>{
+    if(streetLocation)return;
     let live=true,busy=false;
     const refresh=async()=>{if(busy||document.hidden||!navigator.onLine)return;busy=true;
       try{const {data,error}=await supabase.functions.invoke("osiris-context",{body:{}});if(!live)return;if(error||!data?.feeds)throw Error("Public feeds unavailable");const ok=data.feeds.filter((f:{ok:boolean})=>f.ok).length;if(!ok)throw Error("Public feeds unavailable");setEvents(data.events??[]);setFetchedAt(data.fetchedAt);setFeedStatus(`${ok}/${data.feeds.length} OSIRIS feeds available`);}catch{if(live)setFeedStatus("OSIRIS unavailable · previous context retained");}finally{busy=false;}
     };refresh();const timer=setInterval(refresh,300000);window.addEventListener("online",refresh);
     return()=>{live=false;clearInterval(timer);window.removeEventListener("online",refresh);};
-  },[revision]);
+  },[revision,streetLocation]);
   const shapes=useMemo(()=>boundaries.filter(b=>normState(b.properties.state)===normState(state)),[boundaries,state]);
   const localLgas=useMemo(()=>lgas.filter(b=>normState(b.properties.state)===normState(state)),[lgas,state]);
   const scoped=useMemo(()=>statePoints(entries,state,lgas),[entries,state,lgas]);
@@ -49,7 +53,8 @@ export default function OsirisSatelliteMap({entries,projectName}:{entries:IntelE
   const matches=useMemo(()=>search.trim()?plotted.filter(p=>[p.entry.community_name,p.entry.ward,p.entry.lga,p.entry.flhf_name].some(v=>String(v??'').toLowerCase().includes(search.trim().toLowerCase()))).slice(0,20):[],[plotted,search]);
   const focus=(p:IntelPoint)=>{setSelected(p);setSearch("");setTerrain(false);const m=map.current;if(m){m.setTerrain(null);m.jumpTo({center:[p.lng,p.lat],zoom:17,pitch:35});}};
   useEffect(()=>{
-    if(!holder.current)return;let m:LibreMap;
+    if(streetLocation||!holder.current)return;let m:LibreMap;
+    setReady(false);
     try{m=new maplibregl.Map({container:holder.current,style:{version:8,sources:{imagery:{type:"raster",tiles:["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],tileSize:256,maxzoom:19,attribution:"© Esri, Vantor, Earthstar Geographics, GIS User Community"},elevation:{type:"raster-dem",url:"https://tiles.mapterhorn.com/tilejson.json",encoding:"terrarium",tileSize:512,maxzoom:12,attribution:'<a href="https://mapterhorn.com/attribution">© Mapterhorn</a>'}},layers:[{id:"satellite",type:"raster",source:"imagery"}]},center:[8.7,9.1],zoom:5,pitch:45,maxZoom:20,maxPitch:70,canvasContextAttributes:{antialias:false},refreshExpiredTiles:false,renderWorldCopies:false});}
     catch{setError("3D rendering is unavailable on this device. Existing Geo maps remain available.");return;}
     map.current=m;const palette={blue:token('--chart-primary'),teal:token('--chart-secondary'),red:token('--status-danger'),amber:token('--status-warning'),green:token('--status-success'),neutral:token('--muted-foreground'),line:token('--primary-foreground')};
@@ -63,15 +68,16 @@ export default function OsirisSatelliteMap({entries,projectName}:{entries:IntelE
       m.addLayer({id:'clusters',type:'circle',source:'settlements',filter:['has','point_count'],paint:{'circle-color':palette.blue,'circle-radius':['step',['get','point_count'],16,100,21,1000,27],'circle-stroke-color':palette.line,'circle-stroke-width':2}});
       m.addLayer({id:'settlement-points',type:'circle',source:'settlements',filter:['!', ['has','point_count']],paint:{'circle-color':['match',['get','tone'],'red',palette.red,'amber',palette.amber,'green',palette.green,'teal',palette.teal,'blue',palette.blue,palette.neutral],'circle-radius':['interpolate',['linear'],['zoom'],5,4,12,7,18,10],'circle-stroke-color':palette.line,'circle-stroke-width':1.5}});
       m.addLayer({id:'context-points',type:'circle',source:'context',paint:{'circle-color':['match',['get','kind'],'fire',palette.amber,'weather',palette.teal,palette.red],'circle-radius':7,'circle-stroke-color':palette.line,'circle-stroke-width':2}});
-      m.setTerrain({source:'elevation',exaggeration:1});setReady(true);
+      if(camera.current)m.jumpTo(camera.current);
+      setReady(true);
     });
     m.on('click','settlement-points',e=>{const key=String(e.features?.[0].properties?.key??'');const p=pointIndex.current.get(key);if(p){setSelected(p);setTerrain(false);m.setTerrain(null);m.jumpTo({center:[p.lng,p.lat],zoom:17,pitch:35});}});
     m.on('click','clusters',async e=>{const f=e.features?.[0];if(!f||f.geometry.type!=='Point')return;const source=m.getSource('settlements') as GeoJSONSource;const z=await source.getClusterExpansionZoom(f.properties?.cluster_id);if(map.current===m)m.easeTo({center:f.geometry.coordinates as [number,number],zoom:z,duration:350});});
     m.on('click','context-points',e=>{const id=String(e.features?.[0].properties?.id??'');const el=document.createElement('div');el.className='text-sm';el.textContent=String(e.features?.[0].properties?.title??id);new maplibregl.Popup().setLngLat(e.lngLat).setDOMContent(el).addTo(m);});
     const canvas=m.getCanvas();const lost=(e:Event)=>{e.preventDefault();setError("3D graphics were interrupted. Close and reopen this panel to retry; other dashboard tools are unaffected.");};canvas.addEventListener('webglcontextlost',lost);
     const ro=new ResizeObserver(()=>{if(map.current===m)m.resize();});ro.observe(holder.current);
-    return()=>{ro.disconnect();canvas.removeEventListener('webglcontextlost',lost);map.current=null;m.remove();};
-  },[]);
+    return()=>{const c=m.getCenter();camera.current={center:[c.lng,c.lat],zoom:m.getZoom(),pitch:m.getPitch(),bearing:m.getBearing()};ro.disconnect();canvas.removeEventListener('webglcontextlost',lost);map.current=null;m.remove();};
+  },[streetLocation]);
   useEffect(()=>{
     const m=map.current;if(!m||!ready)return;
     const features=plotted.map(p=>{
@@ -86,7 +92,8 @@ export default function OsirisSatelliteMap({entries,projectName}:{entries:IntelE
   },[scoped,plotted,dimension,ready,shapes,localLgas]);
   useEffect(()=>{const m=map.current;if(!m||!ready)return;(m.getSource('context') as GeoJSONSource)?.setData({type:'FeatureCollection',features:(showEvents?localEvents:[]).map(e=>({type:'Feature',geometry:{type:'Point',coordinates:[e.lng,e.lat]},properties:e}))} as never);},[localEvents,showEvents,ready]);
   const fit=()=>{const m=map.current;if(!m||!ready)return;const b=boundsOf(shapes);if(!b.isEmpty())m.fitBounds(b,{padding:40,pitch:45,duration:0});};
-  useEffect(()=>{fit();setSelected(null);setSearch("");},[state,shapes,ready]);
+  useEffect(()=>{if(ready&&!camera.current){fit();setSelected(null);setSearch("");}},[state,shapes,ready]);
+  useEffect(()=>{camera.current=null;setSelected(null);setSearch("");fit();},[state]);
   useEffect(()=>{
     const m=map.current;if(!m||!ready)return;
     const update=()=>{const enabled=terrain&&m.getZoom()<15;if(Boolean(m.getTerrain())!==enabled)m.setTerrain(enabled?{source:'elevation',exaggeration:1}:null);};
@@ -95,14 +102,23 @@ export default function OsirisSatelliteMap({entries,projectName}:{entries:IntelE
   useEffect(()=>{const owned=root.current;const changed=()=>{if(!document.fullscreenElement)setFs(false);};const key=(e:KeyboardEvent)=>{if(e.key==='Escape')setFs(false);};document.addEventListener('fullscreenchange',changed);window.addEventListener('keydown',key);return()=>{document.removeEventListener('fullscreenchange',changed);window.removeEventListener('keydown',key);if(document.fullscreenElement===owned)document.exitFullscreen().catch(()=>{});};},[]);
   useEffect(()=>{const t=setTimeout(()=>map.current?.resize(),50);return()=>clearTimeout(t);},[fs]);
   const fullscreen=async()=>{if(fs){setFs(false);if(document.fullscreenElement===root.current)await document.exitFullscreen().catch(()=>{});}else{setFs(true);await root.current?.requestFullscreen?.().catch(()=>{});}};
+  const openStreetView=async()=>{
+    const c=map.current?.getCenter();
+    const location=selected?{lat:selected.lat,lng:selected.lng,title:String(selected.entry.community_name??'Settlement')}:c?{lat:c.lat,lng:c.lng,title:`${state} · Map centre`}:null;
+    if(!location)return;
+    if(document.fullscreenElement===root.current)await document.exitFullscreen().catch(()=>{});
+    setFs(false);setStreetLocation(location);
+  };
   const population=scoped.points.reduce((n,p)=>n+(recordedNumber(p.entry.estimated_total_population)??0),0);
   return <div ref={root} className={fs?'fixed inset-0 z-[1000] flex flex-col bg-background':'mt-3 space-y-0 border-y'}>
     <div className="flex flex-wrap items-center gap-2 border-b bg-background py-3 px-2"><Satellite className="h-4 w-4 text-primary"/><span className="text-sm font-semibold">{projectName??'Project'}</span><div className="w-40"><Select value={state} onValueChange={setState}><SelectTrigger aria-label="Intelligence State"><SelectValue/></SelectTrigger><SelectContent>{states.map(s=><SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div><div className="w-44"><Select value={dimension} onValueChange={v=>setDimension(v as Dimension)}><SelectTrigger aria-label="Planning dimension"><SelectValue/></SelectTrigger><SelectContent>{themes.map(t=><SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>)}</SelectContent></Select></div><div className="ml-auto flex gap-1"><Button variant="outline" size="icon" title="Fit State" aria-label="Fit State" onClick={fit}><LocateFixed className="h-4 w-4"/></Button><Button variant="outline" size="icon" title="Refresh OSIRIS context" aria-label="Refresh OSIRIS context" onClick={()=>setRevision(v=>v+1)}><RefreshCw className="h-4 w-4"/></Button><Button variant="outline" size="icon" title={fs?'Exit full screen':'Full screen'} aria-label={fs?'Exit satellite full screen':'Satellite full screen'} onClick={fullscreen}>{fs?<Minimize2 className="h-4 w-4"/>:<Maximize2 className="h-4 w-4"/>}</Button></div></div>
+    <div className="flex gap-1 border-b bg-background px-2 py-2" role="group" aria-label="Map view"><Button size="sm" variant={streetLocation?'outline':'secondary'} aria-pressed={!streetLocation} onClick={()=>setStreetLocation(null)}><Satellite className="mr-2 h-4 w-4"/>Satellite</Button><Button size="sm" variant={streetLocation?'secondary':'outline'} aria-pressed={Boolean(streetLocation)} disabled={!ready&&!streetLocation} onClick={openStreetView}><Navigation className="mr-2 h-4 w-4"/>Street View</Button></div>
     <div className="flex flex-wrap gap-2 border-b bg-background px-2 py-2 text-xs"><Badge variant="secondary">{scoped.points.length.toLocaleString()} GPS-verified records</Badge><Badge variant="outline">{population.toLocaleString()} recorded population</Badge><Badge variant="outline">{localEvents.length} State context events</Badge>{scoped.missing>0&&<Badge variant="outline">{scoped.missing} missing GPS</Badge>}{scoped.outside>0&&<Badge variant="outline">{scoped.outside} unverified / outside State</Badge>}<label className="flex items-center gap-2"><Checkbox checked={showEvents} onCheckedChange={v=>setShowEvents(v===true)}/>OSIRIS observations</label><label className="flex items-center gap-2"><Checkbox checked={terrain} onCheckedChange={v=>setTerrain(v===true)}/><Layers className="h-3 w-3"/>3D terrain</label></div>
     <div className="relative z-20 flex flex-wrap items-center gap-3 border-b bg-background px-2 py-2"><div className="relative w-full sm:w-72"><Input aria-label="Find planning settlement" placeholder="Find settlement, Ward or FLHF…" value={search} onChange={e=>setSearch(e.target.value)}/>{search.trim()&&<div className="absolute left-0 right-0 top-full z-30 max-h-64 overflow-auto border bg-card p-1 shadow-md">{matches.length?matches.map(p=><Button key={p.key} variant="ghost" className="h-auto w-full justify-start whitespace-normal text-left text-xs" onClick={()=>focus(p)}>{p.entry.community_name??'Settlement'} · {p.entry.ward}</Button>):<p className="p-2 text-xs text-muted-foreground">No mapped settlements match.</p>}</div>}</div><label className="flex items-center gap-2 text-xs"><Checkbox checked={constraintsOnly} onCheckedChange={v=>setConstraintsOnly(v===true)}/>Only recorded access / security constraints</label><span className="text-xs text-muted-foreground">{plotted.length.toLocaleString()} displayed</span></div>
-    <div className={fs?'relative min-h-0 flex-1':'relative h-[560px] min-h-80'}><div ref={holder} className="osiris-map-surface"/>{!ready&&!error&&<div className="absolute inset-0 flex items-center justify-center bg-background/80"><Loader2 className="h-6 w-6 animate-spin text-primary"/></div>}{error&&<div role="alert" className="absolute left-3 right-3 top-3 border bg-background p-3 text-sm">{error}</div>}
+    <div className={fs?'relative min-h-0 flex-1':'relative h-[560px] min-h-80'}><div ref={holder} className="osiris-map-surface"/>{!ready&&!error&&!streetLocation&&<div className="absolute inset-0 flex items-center justify-center bg-background/80"><Loader2 className="h-6 w-6 animate-spin text-primary"/></div>}{error&&<div role="alert" className="absolute left-3 right-3 top-3 border bg-background p-3 text-sm">{error}</div>}
       {selected&&<div className="absolute left-2 top-2 z-10 max-h-[70%] w-[min(20rem,calc(100%-1rem))] overflow-auto rounded-md border bg-card p-3 shadow-md"><div className="flex items-start gap-2"><h3 className="flex-1 break-words font-semibold">{selected.entry.community_name??'Settlement'}</h3><Button variant="ghost" size="icon" aria-label="Close settlement detail" className="h-7 w-7 shrink-0" onClick={()=>setSelected(null)}><X className="h-4 w-4"/></Button></div><p className="text-xs text-muted-foreground">{selected.entry.ward} · {selected.entry.lga}</p><dl className="mt-3 grid grid-cols-2 gap-2 text-xs"><dt>Population</dt><dd>{recordedNumber(selected.entry.estimated_total_population)?.toLocaleString()??'Not recorded'}</dd><dt>Households</dt><dd>{recordedNumber(selected.entry.number_of_households)?.toLocaleString()??'Not recorded'}</dd><dt>Security</dt><dd>{categoryOf(selected.entry,'security').label}</dd><dt>Access</dt><dd>{categoryOf(selected.entry,'accessibility').label}</dd><dt>Terrain</dt><dd>{categoryOf(selected.entry,'terrain').label}</dd><dt>FLHF</dt><dd className="break-words">{selected.entry.flhf_name??'Not recorded'}</dd><dt>GPS</dt><dd>{selected.lat.toFixed(5)}, {selected.lng.toFixed(5)}</dd></dl><h4 className="mt-3 border-t pt-2 text-xs font-semibold">Public observations within 10 km</h4>{nearby.length?nearby.slice(0,8).map(e=><div key={e.id} className="mt-2 text-xs"><p>{e.title}</p><p className="text-muted-foreground">{e.distance.toFixed(1)} km · {e.date??'Observation time unavailable'} · {e.provider}</p>{e.source&&<a href={e.source} target="_blank" rel="noopener noreferrer" className="text-primary underline">Source</a>}</div>):<p className="mt-2 text-xs text-muted-foreground">No returned observations nearby. This is not evidence that the location is safe.</p>}</div>}
     </div>
+    {streetLocation&&<Suspense fallback={<div role="status" className="flex items-center gap-2 p-3 text-sm"><Loader2 className="h-4 w-4 animate-spin"/>Opening Street View…<Button size="sm" variant="outline" onClick={()=>setStreetLocation(null)}>Cancel</Button></div>}><StreetViewPanel open onOpenChange={open=>{if(!open)setStreetLocation(null);}} lat={streetLocation.lat} lng={streetLocation.lng} title={`${streetLocation.title} · Street View`}/></Suspense>}
     <div className="space-y-2 bg-background px-3 py-3 text-xs"><div className="flex flex-wrap gap-3"><span>{feedStatus}{fetchedAt?` · fetched ${new Date(fetchedAt).toLocaleTimeString()}`:''}</span><a href="https://osirisai.live/docs" target="_blank" rel="noopener noreferrer" className="ml-auto inline-flex items-center gap-1 text-primary underline">OSIRIS sources<ExternalLink className="h-3 w-3"/></a></div><div className="flex flex-wrap gap-4"><span className="text-destructive">● Not cleared / inaccessible / high population</span><span className="text-status-warning">● Partial / constrained</span><span className="text-primary">● Cleared / reachable / population</span><span className="text-muted-foreground">● Unknown</span></div><p className="text-muted-foreground">Live dashboard records + periodically refreshed public context; observations are not security clearance or causal risk. Satellite imagery is a provider mosaic, not a live camera; dates and building-level detail vary. 3D represents elevation, not measured building heights; building-scale views use flat imagery for clarity. Recorded-entry totals can include repeated settlements.</p></div>
   </div>;
 }

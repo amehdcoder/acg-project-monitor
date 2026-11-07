@@ -1,3 +1,4 @@
 - OSIRIS satellite analysis accepts scoped real dashboard rows only, is lazy and unmounted when collapsed, clusters GPU points and releases its map/requests — why: private scope and existing dashboard responsiveness must survive external-feed or graphics failures.
 - OSIRIS public context is fetched by an authenticated fixed-endpoint function with bounded Nigeria filtering; no project records or GPS are sent upstream — why: connect public observations without exporting field data or exposing an arbitrary proxy.
 - State outline lines frame the camera; LGA polygon geometry verifies GPS and event containment; imagery mosaics and elevation never imply live cameras, measured buildings or security clearance — why: location evidence and provider limits must remain explicit.
+- OSIRIS Street View lazy-loads the shared panorama panel and releases the satellite renderer while open, restoring its camera on return — why: two graphics engines must not compete on field devices.
