@@ -1127,7 +1127,7 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
       <CardHeader className="pb-2 px-3 pt-3 space-y-2">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
-            <Map className="h-4 w-4 text-primary" />
+            <MapIcon className="h-4 w-4 text-primary" />
             Geo-enabled Microplan Map
             <Badge variant="outline" className="text-[9px] ml-1">{cascadedEntries.length} entries</Badge>
           </CardTitle>
