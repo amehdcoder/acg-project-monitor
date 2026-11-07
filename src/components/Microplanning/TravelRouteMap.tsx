@@ -290,6 +290,7 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
     }
 
     const map = L.map(mapContainerRef.current, {
+      preferCanvas: true,
       zoomControl: false,
       attributionControl: false,
     });
@@ -388,20 +389,9 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
         const color = loc.type === "flhf" ? "#4285F4" : loc.type === "community" ? "#34A853" : "#FBBC05";
         const emoji = loc.type === "flhf" ? "🏥" : loc.type === "community" ? "🏘️" : "🏠";
         const label = loc.type === "flhf" ? "Health Facility" : loc.type === "community" ? "Community" : "Settlement";
-        L.marker([loc.lat, loc.lng], {
-          icon: L.divIcon({
-            className: "",
-            html: `<div style="
-              display:flex;align-items:center;justify-content:center;
-              width:32px;height:32px;
-              background:${color};border-radius:50%;
-              border:3px solid white;
-              box-shadow:0 2px 8px rgba(0,0,0,0.3);
-              font-size:14px;
-            ">${emoji}</div>`,
-            iconSize: [32, 32],
-            iconAnchor: [16, 16],
-          }),
+        L.circleMarker([loc.lat, loc.lng], {
+          radius: loc.type === "flhf" ? 7 : 5,
+          fillColor: color, color, weight: 1, fillOpacity: 0.85,
         })
           .bindPopup(
             `<div style="font-family:system-ui;min-width:160px;">

@@ -1,3 +1,4 @@
+import { renderBatches } from "@/lib/microplanning/renderBatches";
 import { useTablePagination } from "@/hooks/useTablePagination";
 import DatasetPagination from "./DatasetPagination";
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
@@ -167,7 +168,7 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName }: CoverageVi
     if (!showMap || !mapContainerRef.current) return;
     if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
 
-    const map = L.map(mapContainerRef.current, { zoomControl: true, attributionControl: true });
+    const map = L.map(mapContainerRef.current, { zoomControl: true, attributionControl: true, preferCanvas: true });
     L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
       attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
       maxZoom: 19,
@@ -178,14 +179,15 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName }: CoverageVi
     const geoEntries = filtered.filter(e => e.community_latitude && e.community_longitude);
     if (geoEntries.length === 0) {
       map.setView([9.06, 7.49], 6);
-      return;
+      return () => { map.stop(); map.remove(); mapRef.current = null; };
     }
 
-    const bounds: L.LatLngTuple[] = [];
+    const bounds: L.LatLngTuple[] = geoEntries.flatMap(e => e.community_latitude != null && e.community_longitude != null ? [[e.community_latitude, e.community_longitude] as L.LatLngTuple] : []);
 
-    geoEntries.forEach(e => {
-      const lat = e.community_latitude!;
-      const lng = e.community_longitude!;
+    const cancel = renderBatches(geoEntries, e => {
+      const lat = e.community_latitude;
+      const lng = e.community_longitude;
+      if (lat == null || lng == null) return;
       bounds.push([lat, lng]);
 
       const target = getTargetPop(e);
@@ -261,8 +263,9 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName }: CoverageVi
       }
     });
     flhfMap.forEach((e, name) => {
-      const lat = e.flhf_latitude!;
-      const lng = e.flhf_longitude!;
+      const lat = e.flhf_latitude;
+      const lng = e.flhf_longitude;
+      if (lat == null || lng == null) return;
       bounds.push([lat, lng]);
       L.marker([lat, lng], {
         icon: L.divIcon({
@@ -275,11 +278,11 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName }: CoverageVi
     });
 
     if (bounds.length > 0) {
-      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13 });
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13, animate: false });
     }
 
-    return () => { map.remove(); mapRef.current = null; };
-  }, [showMap, filtered]);
+    return () => { cancel(); map.stop(); map.remove(); mapRef.current = null; };
+  }, [showMap, filtered, getTargetPop]);
 
   const getCoverageColor = (coverage: number) => {
     if (coverage >= 80) return "text-emerald-600 dark:text-emerald-400";

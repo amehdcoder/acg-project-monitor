@@ -6,7 +6,7 @@ export function renderBatches<T>(items: T[], draw: (item: T) => void, complete?:
   const step = () => {
     const started = performance.now();
     let count = 0;
-    while (!cancelled && index < items.length && count < 20 && performance.now() - started < 8) {
+    while (!cancelled && index < items.length && count < 5 && performance.now() - started < 8) {
       draw(items[index]);
       index++;
       count++;
