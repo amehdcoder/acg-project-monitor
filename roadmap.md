@@ -1,6 +1,6 @@
 # Roadmap
 
-- [ ] Refine Geo Microplanning presentation: command header, early tab navigation, restrained metric spectrum, consistent panels and mobile fit; retain data, permissions and fast tab switching.
+- [x] Refine Geo Microplanning presentation: clearer command header with grouped management actions, early permission-filtered tab navigation, restrained metric spectrum, consistent panels and semantic status accents. Live GIveWell desktop/390px phone/dark appearance and all seven tabs verified without runtime errors or horizontal overflow; four focused regression tests pass; preview build clean. Data and access rules unchanged.
 
 - [x] Fix all seven Geo dashboard tabs: bounded Coverage/Reconciliation/Historical/Gaps display with full-data totals/exports, deferred tab content, memoized planning maps/project table, linear map aggregation, cancellable drawing and safe map disposal. Live GIveWell 6,402-row desktop/phone rapid navigation passes without runtime errors; 99 tests pass (3 optional pyxform checks skipped); preview build clean. Map detail draws progressively, not all in one blocking frame.
 
