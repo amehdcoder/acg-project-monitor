@@ -27,7 +27,7 @@ const SwRegistrar = ({ onAvailable, registerSelf }: InnerProps) => {
     // The manager owns the only navigation; Workbox must not reload too.
     onNeedReload() {},
     onRegisteredSW(_swUrl, registration) {
-      if (!registration || signal.aborted) return;
+      if (!registration) return;
       removeFocusListener.current?.();
       const onFocus = () => registration.update().catch(() => {});
       window.addEventListener("focus", onFocus);
@@ -42,7 +42,7 @@ const SwRegistrar = ({ onAvailable, registerSelf }: InnerProps) => {
   useEffect(() => {
     registerSelf(async (signal) => {
       const registration = await navigator.serviceWorker.getRegistration();
-      if (!registration) return;
+      if (!registration || signal.aborted) return;
       await registration.update();
       if(signal.aborted)return;
       // A worker may still be downloading its revisioned offline shell.
