@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Refine Geo Microplanning presentation: command header, early tab navigation, restrained metric spectrum, consistent panels and mobile fit; retain data, permissions and fast tab switching.
+
 - [x] Fix all seven Geo dashboard tabs: bounded Coverage/Reconciliation/Historical/Gaps display with full-data totals/exports, deferred tab content, memoized planning maps/project table, linear map aggregation, cancellable drawing and safe map disposal. Live GIveWell 6,402-row desktop/phone rapid navigation passes without runtime errors; 99 tests pass (3 optional pyxform checks skipped); preview build clean. Map detail draws progressively, not all in one blocking frame.
 
 - [x] Add two collapsed interactive correlation heatmap views (population/households and operational constraints), Spearman/Pearson selection, coefficient/sample-size tooltips, paired scatter plots and Excel export. Missing values remain excluded and constant series or fewer than five pairs produce no coefficient. Fourteen analysis tests pass; live Accelerate nine-record readback, method/view switches, missing-evidence state, 36-row export and phone layout verified; preview build clean.

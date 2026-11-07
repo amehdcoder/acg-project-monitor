@@ -1,5 +1,44 @@
 /* Fonts loaded via index.html <link> tags */
 
+/* Geo workspace: restrained public-health command surface. */
+.geo-workspace {
+  --geo-blue: var(--chart-primary);
+  --geo-teal: var(--chart-secondary);
+  --geo-violet: var(--chart-accent);
+  --geo-amber: var(--chart-highlight);
+  --geo-red: var(--chart-danger);
+  --geo-shadow: 0 2px 8px hsl(var(--foreground) / .035);
+  letter-spacing: 0;
+}
+.geo-command { border-bottom: 1px solid hsl(var(--border)); padding: 8px 0 18px; }
+.geo-command-icon { background: hsl(var(--geo-teal) / .1); color: hsl(var(--geo-teal)); border: 1px solid hsl(var(--geo-teal) / .2); }
+.geo-navigation { padding: 12px 0; border-bottom: 1px solid hsl(var(--border)); }
+.geo-tabstrip { background: hsl(var(--muted) / .7); padding: 4px; border-radius: 8px; }
+.geo-tabstrip button { flex-shrink: 0; border-radius: 5px; height: 38px; transition: color .15s, background-color .15s; }
+.geo-tabstrip button[aria-pressed="true"] { background: hsl(var(--geo-teal)); color: hsl(var(--card)); box-shadow: var(--geo-shadow); }
+.geo-services > div { border-radius: 8px; border-color: hsl(var(--border)); box-shadow: none; background: hsl(var(--card)); padding: 14px; }
+.geo-metric { --geo-tone: var(--geo-blue); background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-top: 3px solid hsl(var(--geo-tone)); border-radius: 8px; padding: 12px; min-width: 0; box-shadow: var(--geo-shadow); }
+.geo-metric-icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; color: hsl(var(--geo-tone)); background: hsl(var(--geo-tone) / .09); }
+.geo-metric-blue { --geo-tone: var(--geo-blue); }
+.geo-metric-teal { --geo-tone: var(--geo-teal); }
+.geo-metric-violet { --geo-tone: var(--geo-violet); }
+.geo-metric-amber { --geo-tone: var(--geo-amber); }
+.geo-metric-red { --geo-tone: var(--geo-red); }
+.geo-secondary-metrics { background: hsl(var(--card)); border-top: 1px solid hsl(var(--border)); border-bottom: 1px solid hsl(var(--border)); }
+.geo-secondary-metrics > div { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.geo-secondary-metrics > div > div { padding: 10px 8px; }
+.geo-breakdowns > div { border-radius: 8px; box-shadow: none; }
+.geo-workspace table { font-size: 12px; }
+.geo-workspace th { letter-spacing: 0; }
+.geo-exportbar { border-top: 1px solid hsl(var(--border)); padding-top: 12px; }
+@media (max-width: 640px) {
+  .geo-command { padding-bottom: 12px; }
+  .geo-tabstrip { width: 100%; }
+  .geo-tabstrip button { height: 44px; }
+  .geo-metric { padding: 10px; }
+  .geo-navigation > div:first-child { flex-basis: 100%; }
+}
+
 .overview-hub { --overview-tone: var(--pc-blue); --overview-soft: var(--pc-blue-soft); }
 .overview-heading { background: linear-gradient(115deg, hsl(var(--health-ink)), hsl(var(--health-blue))); color: hsl(var(--primary-foreground)); border-radius: 16px; }
 .overview-brand-icon { display: grid; place-items: center; width: 52px; height: 52px; border: 2px solid hsl(var(--primary-foreground) / .5); border-radius: 50%; }
