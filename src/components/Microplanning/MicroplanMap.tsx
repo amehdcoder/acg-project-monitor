@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Map, ZoomIn, BarChart3, Maximize2, Minimize2, FileText, Loader2, Settings2, Focus, X, ChevronDown } from "lucide-react";
+import { Map as MapIcon, ZoomIn, BarChart3, Maximize2, Minimize2, FileText, Loader2, Settings2, Focus, X, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
