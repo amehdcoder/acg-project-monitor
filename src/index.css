@@ -1,4 +1,7 @@
 /* Fonts loaded via index.html <link> tags */
+.osiris-map-surface.maplibregl-map { position: absolute; inset: 0; width: 100%; height: 100%; }
+.osiris-map-surface canvas.maplibregl-canvas { max-width: none; }
+.osiris-map-surface .maplibregl-popup-content { background: hsl(var(--card)); color: hsl(var(--foreground)); }
 
 /* Geo workspace: restrained public-health command surface. */
 .geo-workspace {
