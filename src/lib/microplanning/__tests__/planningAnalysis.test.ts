@@ -30,4 +30,13 @@ describe("evidence-supported planning analyses", () => {
     const after = analysePlanning([{ id: "one", estimated_total_population: 140 }], target);
     expect(before.population).toBe(100); expect(after.population).toBe(140); expect(after.records).toBe(1);
   });
+  it("distinguishes incomplete contacts without claiming they are working", () => {
+    const a = analysePlanning([{ community_leader_name: "Leader", community_leader_phone: "  ", estimated_total_population: 100 }, { community_leader_phone: "123", estimated_total_population: 20 }], target);
+    expect(a.contacts[0].nameOnly).toBe(1); expect(a.contacts[0].phoneOnly).toBe(1); expect(a.contacts[0].both).toBe(0); expect(a.contacts[0].incompletePopulation).toBe(120);
+  });
+  it("preserves missing planning vintage and population source", () => {
+    const a = analysePlanning([{}, { year_of_microplanning: 2025, population_source: "Census", estimated_total_population: 100 }], target);
+    expect(a.provenance.find(p => p.source === "Not recorded")?.year).toBe("Not recorded");
+    expect(a.provenance.find(p => p.source === "Census")?.population).toBe(100);
+  });
 });
