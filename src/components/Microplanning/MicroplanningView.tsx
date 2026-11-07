@@ -71,6 +71,7 @@ import { exportMicroplanWorkbook } from "@/lib/microplanning/microplanTemplate";
 import GeoMedicineAllocationTable from "@/components/Microplanning/GeoMedicineAllocationTable";
 import GeoExclusionPanel from "@/components/Microplanning/GeoExclusionPanel";
 import PlanningHeatmaps from "@/components/Microplanning/PlanningHeatmaps";
+import PlanningAnalyses from "@/components/Microplanning/PlanningAnalyses";
 import { useGeoExclusions, rowExcluded } from "@/lib/microplanning/geoExclusions";
 
 import { parseMedicineUploadFile, exportMedicineUploadTemplate, parseAllocationPlanFile, exportAllocationPlanTemplate, type UploadedMedicineEntry } from "@/lib/microplanning/medicineUpload";
@@ -975,7 +976,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
     () => projects.find((project) => project.id === selectedProjectId)?.name,
     [projects, selectedProjectId],
   );
-  const { calcTargetPop } = useTargetPopFields(selectedProjectName);
+  const { calcTargetPop, label: targetPopulationLabel } = useTargetPopFields(selectedProjectName);
   // Project-wide settings: Owner / Super Admin changes apply to every user.
   const sharedProjectKey = projectKeyFor(selectedProjectName);
   const [medTargetPct, setMedTargetPct] = useSharedMicroplanSetting<number>(sharedProjectKey, "med_target_pct", 100, validNumber(0.01, 100));
@@ -2815,6 +2816,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
             </Card>
           </div>
           <PlanningHeatmaps entries={filtered as never} />
+          <PlanningAnalyses entries={filtered} calcTargetPop={calcTargetPop} targetLabel={targetPopulationLabel} />
 
 
           {/* Drill-through breadcrumb trail */}

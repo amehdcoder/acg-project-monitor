@@ -31,6 +31,12 @@ export function analysePlanning(rows: AnalysisEntry[], target: (row: AnalysisEnt
   const matrix = ACCESS.map(access => ({ access, cells: SECURITY.map(security => ({ security, records: 0, population: 0, target: 0, missingPopulation: 0 })) }));
   const distance = ["0–5 km", ">5–10 km", ">10–15 km", ">15 km", "Not available"].map(label => ({ label, records: 0, population: 0, target: 0, gps: 0 }));
   const facilities = new Map<string, { key: string; state: string; lga: string; ward: string; name: string; records: number; population: number; target: number; households: number; rosterMentions: number; noRoster: number; exposed: number; distanceTotal: number; distanceCount: number }>();
+  const contacts = [
+    { role: "Community leader", name: "community_leader_name", phone: "community_leader_phone" },
+    { role: "FLHF in-charge", name: "flhf_incharge_name", phone: "flhf_incharge_phone" },
+    { role: "CDD roster", name: "cdd_names", phone: "cdd_phone_numbers" },
+  ].map(role => ({ ...role, both: 0, nameOnly: 0, phoneOnly: 0, neither: 0, incompletePopulation: 0 }));
+  const provenance = new Map<string, { key: string; source: string; year: string; records: number; population: number }>();
   let population = 0, eligible = 0, exposedPopulation = 0, exposedRecords = 0, unknownConditions = 0;
   let missingPopulation = 0, missingTarget = 0, missingHouseholds = 0, missingGps = 0, unassigned = 0, noRoster = 0;
   const actions: { key: string; name: string; geography: string; population: number | null; target: number; reasons: string[]; distance: ReturnType<typeof planningDistance> }[] = [];
@@ -42,6 +48,16 @@ export function analysePlanning(rows: AnalysisEntry[], target: (row: AnalysisEnt
     const cell = matrix.find(m => m.access === a)?.cells.find(c => c.security === s);
     if (cell) { cell.records++; cell.population += pop ?? 0; cell.target += safeTarget; cell.missingPopulation += pop == null ? 1 : 0; }
     population += pop ?? 0; eligible += safeTarget;
+    for (const c of contacts) {
+      const hasName = Boolean(String(e[c.name] ?? "").trim()), hasPhone = Boolean(String(e[c.phone] ?? "").trim());
+      if (hasName && hasPhone) c.both++; else if (hasName) c.nameOnly++; else if (hasPhone) c.phoneOnly++; else c.neither++;
+      if (!hasName || !hasPhone) c.incompletePopulation += pop ?? 0;
+    }
+    const source = String(e.population_source ?? "").trim() || "Not recorded", y = measuredNumber(e.year_of_microplanning);
+    const year = y != null && Number.isInteger(y) && y >= 1900 && y <= 2100 ? String(y) : "Not recorded";
+    const provenanceKey = JSON.stringify([source.toUpperCase(), year]);
+    const pr = provenance.get(provenanceKey) ?? { key: provenanceKey, source, year, records: 0, population: 0 };
+    pr.records++; pr.population += pop ?? 0; provenance.set(provenanceKey, pr);
     if (exposed) { exposedRecords++; exposedPopulation += pop ?? 0; }
     if (a === "unknown" || s === "unknown") unknownConditions++;
     if (pop == null) missingPopulation++;
@@ -61,5 +77,5 @@ export function analysePlanning(rows: AnalysisEntry[], target: (row: AnalysisEnt
     const reasons = [exposed ? "Access / security constraint" : "", a === "unknown" || s === "unknown" ? "Verify access / security" : "", !name ? "Assign FLHF" : "", !count ? "Confirm CDD roster" : "", !entryPoint(e) ? "Capture GPS" : "", pop == null ? "Confirm population" : "", hh == null ? "Confirm households" : ""].filter(Boolean);
     if (reasons.length) actions.push({ key: e.id ?? String(i), name: String(e.community_name || e.settlement_name || "Unnamed record"), geography: geo.filter(Boolean).join(" · "), population: pop, target: safeTarget, reasons, distance: d });
   }
-  return { matrix, distance, facilities: [...facilities.values()].sort((a, b) => b.target - a.target), actions: actions.sort((a, b) => b.reasons.length - a.reasons.length || b.target - a.target), population, eligible, exposedPopulation, exposedRecords, unknownConditions, missingPopulation, missingTarget, missingHouseholds, missingGps, unassigned, noRoster, records: rows.length };
+  return { matrix, distance, contacts, provenance: [...provenance.values()].sort((a, b) => b.population - a.population), facilities: [...facilities.values()].sort((a, b) => b.target - a.target), actions: actions.sort((a, b) => b.reasons.length - a.reasons.length || b.target - a.target), population, eligible, exposedPopulation, exposedRecords, unknownConditions, missingPopulation, missingTarget, missingHouseholds, missingGps, unassigned, noRoster, records: rows.length };
 }
