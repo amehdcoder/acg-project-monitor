@@ -6,6 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { analysePlanning, analysisLabels, type AnalysisEntry } from "@/lib/microplanning/planningAnalysis";
+import CorrelationHeatmaps from "./CorrelationHeatmaps";
 
 const integer = (n: number) => Math.round(n).toLocaleString();
 function Section({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) {
@@ -35,6 +36,9 @@ function Content({ entries, calcTargetPop, targetLabel }: { entries: AnalysisEnt
       {[{ label: "Population in constrained locations", value: a.exposedPopulation, detail: `${a.exposedRecords} records · counted once`, tone: "text-destructive" }, { label: "Target population", value: a.eligible, detail: targetLabel, tone: "text-primary" }, { label: "FLHF assignment missing", value: a.unassigned, detail: "Recorded entries", tone: "text-accent-foreground" }, { label: "Access / security unknown", value: a.unknownConditions, detail: "Recorded entries", tone: "text-muted-foreground" }].map(k => <div key={k.label} className="min-w-0 border-l-2 border-primary/30 pl-3"><p className="text-xs text-muted-foreground">{k.label}</p><p className={`text-xl font-bold tabular-nums ${k.tone}`}>{integer(k.value)}</p><p className="text-xs text-muted-foreground break-words">{k.detail}</p></div>)}
     </div>
     <p className="py-3 text-xs text-muted-foreground">Recorded-entry sums, not unique residents or people treated. {a.missingPopulation} records lack population; {a.missingTarget} have no positive recorded target. Constraints do not establish treatment failure.</p>
+    <Section title="Correlation heatmaps · population & operational relationships" icon={<BarChart3 className="h-4 w-4" />}>
+      <CorrelationHeatmaps entries={entries} />
+    </Section>
     <Section title="Population exposure · accessibility × security" icon={<ShieldCheck className="h-4 w-4" />}>
       <GridTable headers={["Accessibility", ...a.matrix[0].cells.map(c => analysisLabels[c.security])]}>{a.matrix.map(m => <TableRow key={m.access}><TableCell className="font-medium whitespace-nowrap">{analysisLabels[m.access]}</TableCell>{m.cells.map(c => <TableCell key={c.security} className={m.access === "inaccessible" || c.security === "not_cleared" ? "bg-destructive/5" : c.security === "cleared" ? "bg-primary/5" : "bg-muted/30"}><p className="font-bold tabular-nums">{integer(c.population)}</p><p className="text-xs text-muted-foreground whitespace-nowrap">{a.population ? (100 * c.population / a.population).toFixed(1) : "—"}% of known population</p><p className="text-xs text-muted-foreground">{c.records} records · {integer(c.target)} target{c.missingPopulation ? ` · ${c.missingPopulation} population missing` : ""}</p></TableCell>)}</TableRow>)}</GridTable>
     </Section>
@@ -66,7 +70,7 @@ function Content({ entries, calcTargetPop, targetLabel }: { entries: AnalysisEnt
 function PlanningAnalyses(props: { entries: AnalysisEntry[]; calcTargetPop: (e: AnalysisEntry) => number; targetLabel: string }) {
   const [open, setOpen] = useState(false);
   return <section className="py-3" aria-label="ESPEN-aligned planning analyses"><Collapsible open={open} onOpenChange={setOpen}>
-    <CollapsibleTrigger asChild><Button variant="outline" className="h-auto min-h-14 w-full justify-start gap-3 px-3 py-3 text-left"><BarChart3 className="h-5 w-5 shrink-0 text-primary" /><span className="flex-1 whitespace-normal font-semibold">ESPEN-aligned planning analyses</span><Badge variant="secondary">6 analyses</Badge><ChevronDown className={`h-4 w-4 shrink-0 ${open ? "rotate-180" : ""}`} /></Button></CollapsibleTrigger>
+    <CollapsibleTrigger asChild><Button variant="outline" className="h-auto min-h-14 w-full justify-start gap-3 px-3 py-3 text-left"><BarChart3 className="h-5 w-5 shrink-0 text-primary" /><span className="flex-1 whitespace-normal font-semibold">ESPEN-aligned planning analyses</span><Badge variant="secondary">7 analyses</Badge><ChevronDown className={`h-4 w-4 shrink-0 ${open ? "rotate-180" : ""}`} /></Button></CollapsibleTrigger>
     <CollapsibleContent>{open && <Content {...props} />}</CollapsibleContent>
   </Collapsible><div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><a className="underline underline-offset-2" href="https://espen.afro.who.int/tools-resources/advanced-analytical-tools/espen-geospatial-microplanner" target="_blank" rel="noopener noreferrer">ESPEN Microplanner guidance</a><a className="underline underline-offset-2" href="https://www.who.int/publications/i/item/9789240049482" target="_blank" rel="noopener noreferrer">WHO microplanning manual</a></div></section>;
 }
