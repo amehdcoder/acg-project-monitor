@@ -25,4 +25,12 @@ describe("LQAS round tools", () => {
     ]);
     expect(s.reported).toBe(2); expect(s.passRate).toBe(0.5); expect(s.coverage).toBeCloseTo(13 / 19);
   });
+  it("withholds weighted summaries when a reported lot lacks population", () => {
+    const s = summariseRound([{ population: 0, status: "PASS", covered_count: 19, sampled_count: 19 }]);
+    expect(s.coverage).toBeNull(); expect(s.missingWeights).toBe(1);
+  });
+  it("excludes incomplete and invalid observations from classified summaries", () => {
+    const s = summariseRound([{ population: 100, status: "In Progress", covered_count: 18, sampled_count: 18 }, { population: 100, status: "PASS", covered_count: 20, sampled_count: 19 }]);
+    expect(s.reported).toBe(0); expect(s.coverage).toBeNull();
+  });
 });

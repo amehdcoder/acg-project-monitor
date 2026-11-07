@@ -216,9 +216,13 @@ Deno.serve(async (req) => {
         const v = String(pick(r, ["received", "lqas_respondents/received"]) ?? "").toLowerCase();
         return v === "yes" || v === "1" || v === "true";
       };
+      for (const respondent of reps) {
+        const answer = String(pick(respondent, ["received", "lqas_respondents/received"]) ?? "").toLowerCase();
+        if (!["yes", "no", "1", "0", "true", "false"].includes(answer)) throw new Error("Every LQAS respondent needs a valid covered / not covered answer");
+      }
       const sampled = reps.length || pickNum(payload, ["sampled"]) || 0;
       const covered = reps.length ? reps.filter(yes).length : (pickNum(payload, ["covered"]) || 0);
-      if (sampled <= 0 || covered > sampled) throw new Error("Invalid LQAS counts");
+      if (!Number.isInteger(sampled) || !Number.isInteger(covered) || sampled <= 0 || covered < 0 || covered > sampled) throw new Error("Invalid LQAS counts");
       const level = (pick(payload, ["eu_level"]) ?? "lga").toLowerCase();
       const community = pick(payload, ["community_name", "admin/community_name"]);
       const euName = pick(payload, ["eu_name"]) ?? ({ state, lga, ward, flhf: flhf, community } as Record<string, string | null>)[level] ?? "Unknown";
@@ -228,6 +232,7 @@ Deno.serve(async (req) => {
       const rawLot = String(pick(payload, ["lot", "lqas_round/lot", "lot_id"]) ?? "").trim().replace(/^L/i, "");
       const asUuid = (h: string) => /^[0-9a-f]{32}$/i.test(h) ? `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}` : h;
       const UUID = /^[0-9a-f-]{36}$/i;
+      if ((rawRound || rawLot) && (!UUID.test(asUuid(rawRound)) || !UUID.test(asUuid(rawLot)))) throw new Error("Both valid round and lot identifiers are required");
       if (UUID.test(asUuid(rawRound)) && UUID.test(asUuid(rawLot))) {
         const { data: lot } = await supabase.from("lqas_lots").select("id, round_id, lot_name, lqas_rounds!inner(project_id)")
           .eq("id", asUuid(rawLot)).eq("round_id", asUuid(rawRound)).maybeSingle();
@@ -237,6 +242,7 @@ Deno.serve(async (req) => {
       }
       const row = {
         round_id: roundId, lot_id: lotId,
+        collection_date: pick(payload, ["collection_date"]),
         idempotency_key: koboUuid, project_id: projectId, submitted_by: submitterUserId,
         eu_level: ["state", "lga", "ward", "flhf", "community"].includes(level) ? level : "lga",
         eu_name: euName, state, lga, ward, flhf_name: flhf, community_name: community,
