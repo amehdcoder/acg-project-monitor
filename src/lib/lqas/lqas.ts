@@ -1,8 +1,6 @@
 // LQAS (Lot Quality Assurance Sampling) planning and decision rules.
-// Follows WHO/ESPEN and Valadez practice: 19 respondents per lot
-// (supervision area / Evaluation Unit), binomial decision rule with
-// alpha <= 10% at the coverage target, coverage inferred per region by
-// population-weighted lot coverage with a 95% confidence interval.
+// Configurable small-sample binomial classification, not a universal WHO
+// disease-specific survey protocol or proof that a lot meets its target.
 
 export type EuLevel = "state" | "lga" | "ward" | "flhf" | "community";
 export const EU_LEVELS: { id: EuLevel; label: string }[] = [
@@ -77,6 +75,7 @@ export interface EuPlan {
   key: string; name: string; level: EuLevel; state: string; lga: string;
   population: number; households: number; communities: number;
   insecureCommunities: number; securityMode: boolean; sample: SamplePoint[];
+  frameMissing: number;
 }
 
 /** Group microplan rows into Evaluation Units and select n sampling points per
@@ -86,11 +85,13 @@ export function buildPlan(entries: PlanEntry[], level: EuLevel, n = DEFAULT_SAMP
   for (const e of entries) {
     if (!e.state || !e.lga) continue;
     const k = euKey(e, level);
-    (groups.get(k) ?? groups.set(k, []).get(k)!).push(e);
+    const group = groups.get(k) ?? [];
+    group.push(e); groups.set(k, group);
   }
   const plans: EuPlan[] = [];
   for (const [key, rows] of groups) {
-    const weight = (r: PlanEntry) => Math.max(1, Number(r.estimated_total_population) || Number(r.number_of_households) * 6 || 1);
+    const weight = (r: PlanEntry) => Math.max(0, Number(r.estimated_total_population) || 0);
+    const frameMissing = rows.filter((r) => !r.community_name?.trim() || weight(r) <= 0).length;
     const total = rows.reduce((s, r) => s + weight(r), 0);
     const rand = seededRandom(`${seed}|${key}`);
     const interval = total / n;
@@ -98,7 +99,7 @@ export function buildPlan(entries: PlanEntry[], level: EuLevel, n = DEFAULT_SAMP
     const sorted = [...rows].sort((a, b) => (a.ward + a.community_name).localeCompare(b.ward + b.community_name));
     const sample: SamplePoint[] = [];
     let cum = 0, idx = 0;
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < n && !frameMissing && total > 0; i++) {
       const target = start + i * interval;
       while (idx < sorted.length - 1 && cum + weight(sorted[idx]) <= target) { cum += weight(sorted[idx]); idx++; }
       const r = sorted[idx];
@@ -110,7 +111,7 @@ export function buildPlan(entries: PlanEntry[], level: EuLevel, n = DEFAULT_SAMP
       population: rows.reduce((s, r) => s + (Number(r.estimated_total_population) || 0), 0),
       households: rows.reduce((s, r) => s + (Number(r.number_of_households) || 0), 0),
       communities: rows.length, insecureCommunities: insecure,
-      securityMode: sample.some((p) => p.insecure), sample,
+      securityMode: insecure > 0, sample, frameMissing,
     });
   }
   return plans.sort((a, b) => a.key.localeCompare(b.key));

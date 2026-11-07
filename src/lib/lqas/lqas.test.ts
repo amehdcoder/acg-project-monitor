@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { decisionRule, lotDecision, buildPlan, aggregateCoverage } from "./lqas";
 
 describe("LQAS rules", () => {
-  it("uses the standard decision rule of 13 for n=19 at 80% target", () => {
+  it("computes the configured decision rule of 13 for n=19 at 80% upper threshold", () => {
     expect(decisionRule(19, 0.8)).toBe(13);
   });
   it("flags a lot with 12 of 19 covered for mop-up at 80%", () => {
@@ -25,5 +25,9 @@ describe("LQAS rules", () => {
     expect(r.passed).toBe(1);
     expect(r.mopUp).toBe(1);
     expect(r.coverage).toBeCloseTo(29 / 38, 5);
+  });
+  it("blocks PPS selection when recorded population weights are absent", () => {
+    const p = buildPlan([{ state: "Jigawa", lga: "Dutse", ward: "A", flhf_name: "F", community_name: "C", number_of_households: 100 }], "lga");
+    expect(p[0].frameMissing).toBe(1); expect(p[0].sample).toHaveLength(0);
   });
 });

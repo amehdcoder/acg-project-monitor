@@ -372,6 +372,20 @@
       "when": 1793904601058,
       "tag": "0052_lqas_apply_lot_result_fix",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1794046742980,
+      "tag": "0053_lqas_evidence_safety",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1794046921898,
+      "tag": "0054_lqas_round_design_guard",
+      "breakpoints": true
     }
   ]
 }

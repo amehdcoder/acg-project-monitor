@@ -2,18 +2,22 @@
 // choices are the saved lots (so submissions link straight to the lot), the
 // matching printed pack, and the mop-up plan after a failed lot.
 import * as XLSX from "xlsx";
-import { buildPlan, euKey, INSECURE_CLEARANCE, type EuLevel } from "./lqas";
+import { buildPlan, euKey, INSECURE_CLEARANCE, type EuLevel, type EuPlan } from "./lqas";
 import { buildPaperPack, type FormContext } from "./forms";
 import type { RoundEntry, RoundEuLevel } from "./rounds";
 
 export const CHILD_OF: Record<RoundEuLevel, EuLevel> = { state: "lga", lga: "ward", ward: "community", flhf: "community" };
 export const MOP_UP_DAYS = 7;
 
-export interface RoundInfo { id: string; disease: string; drug: string | null; eu_level: string; eu_key?: string | null; eu_name: string; upper_threshold: number; sample_n: number; decision_rule: number }
+export interface RoundInfo { id: string; disease: string; drug: string | null; eu_level: string; eu_key?: string | null; eu_name: string; upper_threshold: number; sample_n: number; decision_rule: number; indicator?: string | null; eligibility?: string | null; campaign_reference?: string | null; sampling_snapshot?: unknown }
 export interface LotInfo { id: string; lot_key: string; lot_name: string; security_status: string }
 
 /** Kobo choice name for a lot: XML-safe, decoded back to the UUID by the webhook. */
 export const lotChoice = (id: string) => `L${id.replace(/-/g, "")}`;
+
+export function snapshotPlans(round: RoundInfo): EuPlan[] | null {
+  return Array.isArray(round.sampling_snapshot) ? round.sampling_snapshot as EuPlan[] : null;
+}
 
 export function roundEntries(entries: RoundEntry[], round: RoundInfo) {
   const lvl = round.eu_level as RoundEuLevel;
@@ -28,25 +32,37 @@ export function buildRoundXlsForm(round: RoundInfo, lots: LotInfo[], projectName
     row({ type: "start", name: "start" }), row({ type: "end", name: "end" }),
     row({ type: "calculate", name: "round_id", calculation: `'${round.id}'` }),
     row({ type: "calculate", name: "eu_level", calculation: `'${CHILD_OF[round.eu_level as RoundEuLevel]}'` }),
-    row({ type: "note", name: "intro", label: `${round.disease} LQAS · ${round.eu_name}. Visit ${n} households, one eligible person each. PASS if ${round.decision_rule}+ covered.` }),
+    row({ type: "note", name: "intro", label: `${round.disease} LQAS · ${round.eu_name}. ${round.campaign_reference ?? "Use the approved campaign reference period"}. Eligibility: ${round.eligibility ?? "Use the programme-approved eligible population"}. Independently select one eligible person per household. Classification requires all ${n} observations.` }),
     row({ type: "select_one lot", name: "lot", label: "Lot (as printed on the tally sheet)", required: "yes", appearance: "minimal" }),
     row({ type: "calculate", name: "eu_name", calculation: "jr:choice-name(${lot}, '${lot}')" }),
     row({ type: "text", name: "team", label: "Team number", required: "yes" }),
     row({ type: "date", name: "collection_date", label: "Date of visit", required: "yes" }),
     row({ type: "select_one yn", name: "security_mode", label: "Collected under security-restricted protocol?", required: "yes" }),
+    row({ type: "select_one yn", name: "sampling_deviation", label: "Any changed sampling point, convenience substitution or departure from the approved random selection?", required: "yes" }),
+    row({ type: "text", name: "deviation_reason", label: "Describe the deviation for supervisor review", relevant: "${sampling_deviation} = 'yes'", required: "yes" }),
     row({ type: "begin_repeat", name: "lqas_respondents", label: "Household", repeat_count: String(n) }),
     row({ type: "calculate", name: "slot", calculation: "position(..)" }),
+    row({ type: "calculate", name: "planned_community", calculation: (snapshotPlans(round) ?? []).flatMap((p) => p.sample.map((s) => ({ key: p.key, slot: s.slot, community: s.community }))).reduceRight((expr, s) => {
+      const lot = lots.find((l) => l.lot_key === s.key);
+      return lot ? `if(\${lot} = '${lotChoice(lot.id)}' and \${slot} = ${s.slot}, '${s.community.replace(/'/g, "’")}', ${expr})` : expr;
+    }, "'Consult the signed paper sampling plan'") }),
+    row({ type: "note", name: "planned_point", label: "Planned sampling point: ${planned_community}" }),
     row({ type: "text", name: "community", label: "Household ${slot} of " + n + " — community / sampling point", required: "yes" }),
-    row({ type: "select_one yn", name: "received", label: indicator, required: "yes" }),
+    row({ type: "select_one yn", name: "eligible_confirmed", label: "Selected person meets the saved eligibility definition?", required: "yes", constraint: ". = 'yes'", constraint_message: "Do not count ineligible people as untreated. Apply the approved eligibility and nonresponse protocol." }),
+    row({ type: "integer", name: "age", label: "Age in completed years", required: "yes", constraint: ". >= 0 and . <= 120" }),
+    row({ type: "select_one sex", name: "sex", label: "Sex", required: "yes" }),
+    row({ type: "select_one yn", name: "received", label: round.indicator || indicator, required: "yes" }),
     row({ type: "select_one reason", name: "reason", label: "Reason not covered", relevant: "${received} = 'no'", required: "yes" }),
     row({ type: "end_repeat", name: "lqas_respondents" }),
+    row({ type: "calculate", name: "sampled", calculation: "count(${lqas_respondents})" }),
     row({ type: "calculate", name: "covered", calculation: "count(${lqas_respondents}[received = 'yes'])" }),
     row({ type: "note", name: "result", label: `Covered: \${covered} of ${n}. Pass mark: ${round.decision_rule}.` }),
   ];
   const choices: string[][] = [["list_name", "name", "label"]];
   lots.forEach((l) => choices.push(["lot", lotChoice(l.id), `${l.lot_name}${l.security_status !== "Green" ? ` (security ${l.security_status})` : ""}`]));
   choices.push(["yn", "yes", "Yes"], ["yn", "no", "No"]);
-  ["Absent", "Refused", "Not aware", "Fear of side-effects", "Ineligible/sick", "Not visited", "Other"].forEach((r, i) => choices.push(["reason", String(i + 1), r]));
+  choices.push(["sex", "male", "Male"], ["sex", "female", "Female"], ["sex", "not_recorded", "Not recorded"]);
+  ["Absent during campaign", "Declined medicine", "Not aware", "Fear of side-effects", "Eligible but sick at campaign", "Not visited by distributor", "Other"].forEach((r, i) => choices.push(["reason", String(i + 1), r]));
   const short = round.id.slice(0, 8);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(survey), "survey");
@@ -57,8 +73,9 @@ export function buildRoundXlsForm(round: RoundInfo, lots: LotInfo[], projectName
 
 export function buildRoundPaperPack(round: RoundInfo, entries: RoundEntry[], projectName: string, indicator: string, securityOnly = false) {
   const child = CHILD_OF[round.eu_level as RoundEuLevel];
-  const plans = buildPlan(roundEntries(entries, round), child, round.sample_n, round.id);
-  const ctx: FormContext = { projectName: `${projectName} · ${round.disease} · ${round.eu_name}`, level: child, target: round.upper_threshold / 100, sample: round.sample_n, indicator };
+  const plans = snapshotPlans(round) ?? buildPlan(roundEntries(entries, round), child, round.sample_n, round.id);
+  if (plans.some((p) => p.frameMissing || p.sample.length !== round.sample_n)) throw new Error("Complete community names and population weights before generating the sample.");
+  const ctx: FormContext = { projectName: `${projectName} · ${round.disease} · ${round.eu_name}`, level: child, target: round.upper_threshold / 100, sample: round.sample_n, indicator: round.indicator || indicator, roundId: round.id, eligibility: round.eligibility ?? undefined, campaignReference: round.campaign_reference ?? undefined };
   return { blob: buildPaperPack(plans, ctx, { securityOnly }), lots: plans.length, restricted: plans.filter((p) => p.securityMode).length };
 }
 
@@ -78,11 +95,12 @@ export function mopUpWindow(resultAt: string | null, due: string | null) {
   return { start, end };
 }
 
-export interface RoundSummary { lots: number; reported: number; passed: number; failed: number; passRate: number | null; coverage: number | null }
+export interface RoundSummary { lots: number; reported: number; passed: number; failed: number; passRate: number | null; coverage: number | null; representedPopulation: number; missingWeights: number }
 export function summariseRound(lots: { population: number; status: string; covered_count: number | null; sampled_count: number | null }[]): RoundSummary {
-  const rep = lots.filter((l) => (l.status === "PASS" || l.status === "FAIL") && (l.sampled_count ?? 0) > 0);
+  const rep = lots.filter((l) => (l.status === "PASS" || l.status === "FAIL") && Number.isInteger(l.sampled_count) && (l.sampled_count ?? 0) > 0 && l.covered_count != null && l.covered_count >= 0 && l.covered_count <= (l.sampled_count ?? 0));
   const passed = rep.filter((l) => l.status === "PASS").length;
-  const pop = rep.reduce((s, l) => s + (l.population || 1), 0);
-  const cov = rep.length ? rep.reduce((s, l) => s + (l.population || 1) * ((l.covered_count ?? 0) / (l.sampled_count || 1)), 0) / pop : null;
-  return { lots: lots.length, reported: rep.length, passed, failed: rep.length - passed, passRate: rep.length ? passed / rep.length : null, coverage: cov };
+  const pop = rep.reduce((s, l) => s + Math.max(0, l.population), 0);
+  const missingWeights = rep.filter((l) => !(l.population > 0)).length;
+  const cov = rep.length && !missingWeights && pop > 0 ? rep.reduce((s, l) => s + l.population * ((l.covered_count ?? 0) / (l.sampled_count || 1)), 0) / pop : null;
+  return { lots: lots.length, reported: rep.length, passed, failed: rep.length - passed, passRate: rep.length ? passed / rep.length : null, coverage: cov, representedPopulation: pop, missingWeights };
 }
