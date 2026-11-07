@@ -1,6 +1,6 @@
 # Roadmap
 
-- [ ] Add OSIRIS Street View toggle using the shared viewer, release satellite graphics while open, bound panorama loading and cancel stale work; verify navigation and phone fit without sandbox Google requests.
+- [x] Add OSIRIS Street View toggle using the lazy shared viewer, release satellite graphics and pause feed polling while open, retain camera on return, bound panorama loading and cancel stale work. Signed-in toggle availability, phone fit, collapse cleanup and Coverage navigation verified without runtime errors; seven regression tests pass and preview build is clean. Google panorama rendering and actual local imagery coverage require verification on the published domain; sandbox Google requests intentionally skipped.
 
 - [x] Add isolated collapsed OSIRIS 3D satellite planning analysis: authenticated public-feed adapter (no project records sent upstream), State auto-framing, corrected GPS verified against LGA polygons, clustered security/access/terrain/population layers, constraint filter, settlement search and real-record detail with 10km context, full screen and safe teardown. Live GIveWell 6,233 mapped records, all three public feeds, building roofs at Sauna Gabas, desktop/phone/fullscreen and return to Coverage verified without runtime errors; seven tests pass, preview build clean. State-scale terrain switches off for stable building-scale imagery. Public feed absence is not clearance; imagery is a dated provider mosaic, not live video or guaranteed building coverage.
 
