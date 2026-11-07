@@ -1,5 +1,7 @@
 # Architecture rules
 
+- Use scoped rows for planning analyses to preserve access.
+
 - Beneficiary portal mounts separately at `/beneficiary`; administrator-verified account links and limited RPCs expose only personal pathway data; submissions require staff approval before creating live services — why: self-reported activity never auto-certifies care or exposes other records.
 
 - Resolve category actions/pages from current project access profiles, retaining only personal programme scope; enforce write actions server-side and save Graduation through an authorized JSON gate RPC — why: category edits apply immediately and stale profile snapshots or zero-row writes cannot silently lose decisions.
