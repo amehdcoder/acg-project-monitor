@@ -1,0 +1,39 @@
+import { useMemo, useState } from "react";
+import { Download, Grid3X3 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ResponsiveContainer, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip } from "recharts";
+import { CORRELATION_GROUPS, correlationMatrix, type CorrelationMethod } from "@/lib/microplanning/correlations";
+import type { AnalysisEntry } from "@/lib/microplanning/planningAnalysis";
+
+function tone(v: number | null) {
+  if (v == null) return "bg-muted text-muted-foreground";
+  if (v > .7) return "bg-eye-teal text-primary-foreground";
+  if (v > .4) return "bg-eye-teal/70 text-primary-foreground";
+  if (v > .15) return "bg-eye-teal/20 text-foreground";
+  if (v < -.7) return "bg-destructive text-destructive-foreground";
+  if (v < -.4) return "bg-destructive/70 text-destructive-foreground";
+  if (v < -.15) return "bg-destructive/20 text-foreground";
+  return "bg-secondary text-secondary-foreground";
+}
+export default function CorrelationHeatmaps({ entries }: { entries: AnalysisEntry[] }) {
+  const [groupId, setGroupId] = useState("population"), [method, setMethod] = useState<CorrelationMethod>("spearman"), [selected, setSelected] = useState<[number, number]>([0, 1]);
+  const group = CORRELATION_GROUPS.find(g => g.id === groupId) ?? CORRELATION_GROUPS[0];
+  const matrix = useMemo(() => correlationMatrix(entries, group.metrics, method), [entries, group, method]);
+  const [i,j] = selected, result = matrix[i]?.[j], x = group.metrics[i], y = group.metrics[j];
+  const exportMatrix = async () => {
+    const XLSX = await import("xlsx"), wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(matrix.flatMap((row, a) => row.map((r,b) => ({ "Measure 1": group.metrics[a].label, "Measure 2": group.metrics[b].label, Method: method, Correlation: r.value, "Paired records": r.n, "Evidence limitation": r.reason ?? (r.n < 20 ? "Small sample; exploratory only" : "Descriptive association; not causal") })))), "Correlations");
+    XLSX.writeFile(wb, "Microplanning-correlations.xlsx");
+  };
+  return <div aria-label="Microplanning correlation heatmaps" className="space-y-4">
+    <div className="flex flex-wrap items-center gap-3"><Grid3X3 className="h-5 w-5 text-eye-teal" /><div className="flex-1"><h3 className="text-base font-bold">Relationships in recorded communities</h3><p className="text-xs text-muted-foreground">{entries.length.toLocaleString()} records in current scope · pairwise complete evidence</p></div><Button variant="outline" size="sm" onClick={exportMatrix}><Download className="mr-2 h-4 w-4" />Export correlations</Button></div>
+    <div className="grid gap-3 sm:grid-cols-2"><Select value={groupId} onValueChange={v => { setGroupId(v); setSelected([0,1]); }}><SelectTrigger aria-label="Correlation analysis"><SelectValue /></SelectTrigger><SelectContent>{CORRELATION_GROUPS.map(g => <SelectItem key={g.id} value={g.id}>{g.label}</SelectItem>)}</SelectContent></Select><Select value={method} onValueChange={v => setMethod(v as CorrelationMethod)}><SelectTrigger aria-label="Correlation method"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="spearman">Spearman · rank relationships</SelectItem><SelectItem value="pearson">Pearson · linear relationships</SelectItem></SelectContent></Select></div>
+    <div className="overflow-x-auto pb-2"><TooltipProvider delayDuration={150}><table className="w-full min-w-[680px] border-separate border-spacing-1 text-xs" aria-label={`${group.label} correlation matrix`}><thead><tr><th className="w-36 text-left font-medium text-muted-foreground">{method === "spearman" ? "Spearman ρ" : "Pearson r"}</th>{group.metrics.map(m => <th key={m.id} className="w-20 px-1 pb-2 text-center font-medium leading-snug">{m.label}</th>)}</tr></thead><tbody>{matrix.map((row,a) => <tr key={group.metrics[a].id}><th className="pr-2 text-left font-medium">{group.metrics[a].label}</th>{row.map((r,b) => <td key={group.metrics[b].id}><Tooltip><TooltipTrigger asChild><Button variant="ghost" aria-label={`${group.metrics[a].label} versus ${group.metrics[b].label}`} aria-pressed={a === i && b === j} onClick={() => setSelected([a,b])} className={`h-[68px] w-full flex-col gap-1 rounded-md px-1 ${tone(r.value)} ${a === i && b === j ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}`}><span className="text-base font-bold tabular-nums">{r.value == null ? "—" : r.value.toFixed(2)}</span><span className="text-[10px] font-normal">n = {r.n}</span></Button></TooltipTrigger><TooltipContent><p className="font-semibold">{group.metrics[a].label} × {group.metrics[b].label}</p><p>{r.reason ?? `${method === "spearman" ? "ρ" : "r"} = ${r.value?.toFixed(3)}`}</p><p>{r.n} complete paired records{r.n < 20 ? " · small sample" : ""}</p></TooltipContent></Tooltip></td>)}</tr>)}</tbody></table></TooltipProvider></div>
+    <div className="flex flex-wrap items-center gap-3 text-xs"><span className="font-semibold">Correlation</span>{[{ v: -1, label: "−1 opposite" },{ v: -.5, label: "−0.5" },{ v: 0, label: "0" },{ v: .5, label: "+0.5" },{ v: 1, label: "+1 together" },{ v: null, label: "Unavailable" }].map(l => <span key={l.label} className="flex items-center gap-1.5"><span className={`h-4 w-6 rounded-sm ${tone(l.v)}`} />{l.label}</span>)}</div>
+    {result && x && y && <div className="border-t pt-4"><div className="flex flex-wrap items-center gap-2"><h4 className="font-semibold">{x.label} × {y.label}</h4><Badge variant="outline">{result.n} paired records</Badge><Badge variant={result.n < 20 ? "secondary" : "outline"}>{result.n < 20 ? "Small sample · exploratory" : "Descriptive association"}</Badge></div>{result.reason ? <p className="mt-3 text-sm text-muted-foreground">{result.reason}. No correlation is reported.</p> : <><p className="mt-2 text-sm"><strong>{method === "spearman" ? "ρ" : "r"} = {result.value?.toFixed(3)}</strong> · {result.value != null && result.value > 0 ? "Positive" : result.value != null && result.value < 0 ? "Negative" : "No"} association</p><div className="mt-3 h-72 w-full"><ResponsiveContainer width="100%" height="100%"><ScatterChart margin={{ top: 12, right: 20, bottom: 35, left: 10 }}><CartesianGrid stroke="hsl(var(--border))" /><XAxis type="number" dataKey="x" name={x.label} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} label={{ value: x.label, position: "bottom", fill: "hsl(var(--foreground))", fontSize: 11 }} /><YAxis type="number" dataKey="y" name={y.label} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} width={70} /><ChartTooltip cursor={{ strokeDasharray: "3 3" }} /><Scatter data={result.points.slice(0,2000)} fill="hsl(var(--eye-teal))" /></ScatterChart></ResponsiveContainer></div>{result.points.length > 2000 && <p className="text-xs text-muted-foreground">Plot shows the first 2,000 pairs; coefficient uses all complete pairs.</p>}</>}</div>}
+    <div className="space-y-1 border-t pt-3 text-xs text-muted-foreground"><p>Minimum 5 pairs; constant measures are unavailable. Missing data is excluded, never replaced with zero. Small samples are exploratory; no significance or causal claims.</p><p>Age counts are components of total population: their relationships are partly mathematical. Repeated communities/campaigns are not independent observations. Pearson is sensitive to outliers; Spearman uses tied ranks.</p>{groupId === "operations" && <p>Access constraint = 1 for seasonal/hard-to-reach/inaccessible, 0 for accessible. Security constraint = 1 for partial/not cleared, 0 for cleared. Unknowns are excluded. CDD counts are names recorded, not verified staffing; distance is not travel time.</p>}</div>
+  </div>;
+}
