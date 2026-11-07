@@ -255,7 +255,7 @@ const EXTRA = [
   ...ESPEN_MAPS.map((m) => ({ id: m.id, title: m.title, description: m.description, colors: m.colors })),
 ];
 
-export default function PlanningHeatmaps({ entries: liveEntries }: { entries: HeatEntry[] }) {
+function PlanningHeatmaps({ entries: liveEntries }: { entries: HeatEntry[] }) {
   // Only rebuild maps when mapped content actually changes, and never block the page while doing so.
   const deferred = useDeferredValue(liveEntries);
   const sigRef = useRef<{ sig: string; entries: HeatEntry[] }>({ sig: "", entries: [] });
@@ -303,3 +303,5 @@ export default function PlanningHeatmaps({ entries: liveEntries }: { entries: He
     </div>
   );
 }
+
+export default memo(PlanningHeatmaps);

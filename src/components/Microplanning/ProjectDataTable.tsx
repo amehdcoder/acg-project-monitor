@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from "react";
+import { memo, Fragment, useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -228,4 +228,4 @@ const ProjectDataTable = ({ entries, projectName = "All projects", scopeLabel = 
   );
 };
 
-export default ProjectDataTable;
+export default memo(ProjectDataTable);

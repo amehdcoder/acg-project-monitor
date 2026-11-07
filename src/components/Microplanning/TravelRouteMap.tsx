@@ -1,3 +1,5 @@
+import { disposeMap } from "@/lib/microplanning/disposeMap";
+import { renderBatches } from "@/lib/microplanning/renderBatches";
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -308,7 +310,7 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
     map.setView([9.06, 7.49], 6);
 
     return () => {
-      map.remove();
+      disposeMap(map);
       mapRef.current = null;
     };
   }, []);
@@ -380,24 +382,15 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
 
     if (!origin || !destination) {
       // Show ALL geotagged locations when no route selected
-      allLocations.forEach((loc) => {
+      const layer = routeLayerRef.current;
+      const map = mapRef.current;
+      const cancel = renderBatches(allLocations, (loc) => {
         const color = loc.type === "flhf" ? "#4285F4" : loc.type === "community" ? "#34A853" : "#FBBC05";
         const emoji = loc.type === "flhf" ? "🏥" : loc.type === "community" ? "🏘️" : "🏠";
         const label = loc.type === "flhf" ? "Health Facility" : loc.type === "community" ? "Community" : "Settlement";
-        L.marker([loc.lat, loc.lng], {
-          icon: L.divIcon({
-            className: "",
-            html: `<div style="
-              display:flex;align-items:center;justify-content:center;
-              width:32px;height:32px;
-              background:${color};border-radius:50%;
-              border:3px solid white;
-              box-shadow:0 2px 8px rgba(0,0,0,0.3);
-              font-size:14px;
-            ">${emoji}</div>`,
-            iconSize: [32, 32],
-            iconAnchor: [16, 16],
-          }),
+        L.circleMarker([loc.lat, loc.lng], {
+          radius: loc.type === "flhf" ? 7 : 5,
+          fillColor: color, color, weight: 1, fillOpacity: 0.85,
         })
           .bindPopup(
             `<div style="font-family:system-ui;min-width:160px;">
@@ -407,14 +400,14 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
               ${loc.meta.population ? `<p style="font-size:11px;color:#5f6368;margin:2px 0 0;">Pop: ${loc.meta.population.toLocaleString()}</p>` : ""}
             </div>`
           )
-          .addTo(routeLayerRef.current!);
+          .addTo(layer);
+      }, () => {
+        if (allLocations.length > 0 && mapRef.current === map) {
+          const bounds = allLocations.map((l) => [l.lat, l.lng] as L.LatLngTuple);
+          map.fitBounds(bounds, { padding: [60, 60], maxZoom: 12, animate: false });
+        }
       });
-
-      if (allLocations.length > 0) {
-        const bounds = allLocations.map((l) => [l.lat, l.lng] as L.LatLngTuple);
-        mapRef.current.fitBounds(bounds, { padding: [60, 60], maxZoom: 12 });
-      }
-      return;
+      return cancel;
     }
 
     const map = mapRef.current;
@@ -652,7 +645,7 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
     placeholder: string,
   ) => {
     const selected = allLocations.find(l => l.id === value);
-    const filtered = filterLocs(locations, search);
+    const filtered = focused ? filterLocs(locations, search).slice(0, 50) : [];
     const flhfs = filtered.filter(l => l.type === "flhf");
     const comms = filtered.filter(l => l.type === "community");
     const setts = filtered.filter(l => l.type === "settlement");

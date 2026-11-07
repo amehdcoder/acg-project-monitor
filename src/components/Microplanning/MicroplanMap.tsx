@@ -1,3 +1,6 @@
+import { disposeMap } from "@/lib/microplanning/disposeMap";
+import L from "leaflet";
+import { renderBatches } from "@/lib/microplanning/renderBatches";
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { useTargetPopFields } from "@/hooks/useTargetPopFields";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Map, ZoomIn, BarChart3, Maximize2, Minimize2, FileText, Loader2, Settings2, Focus, X, ChevronDown } from "lucide-react";
+import { Map as MapIcon, ZoomIn, BarChart3, Maximize2, Minimize2, FileText, Loader2, Settings2, Focus, X, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
@@ -306,10 +309,12 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
       households: number; accessible: number; hardToReach: number;
     }> = {};
     const flhfList = [...new Set(cascadedEntries.map(e => e.flhf_name))].sort();
+    const colorIndices = new Map(flhfList.map((name, index) => [name, index]));
+    const communitySets = new Map<string, Set<string>>();
     cascadedEntries.forEach(e => {
       const key = e.flhf_name;
       if (!agg[key]) {
-        const idx = flhfList.indexOf(key);
+        const idx = colorIndices.get(key) ?? 0;
         agg[key] = {
           name: key, ward: e.ward, lga: e.lga, state: e.state,
           lat: e.flhf_latitude || 0, lng: e.flhf_longitude || 0,
@@ -324,7 +329,9 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
       a.households += (e as any).number_of_households || 0;
       a.avgDist += e.community_distance_to_flhf_km || 0;
       a.count++;
-      if (!a.communities.includes(e.community_name)) a.communities.push(e.community_name);
+      let communities = communitySets.get(key);
+      if (!communities) { communities = new Set(); communitySets.set(key, communities); }
+      if (!communities.has(e.community_name)) { communities.add(e.community_name); a.communities.push(e.community_name); }
       if (e.community_latitude && e.community_longitude) {
         a.points.push([e.community_latitude, e.community_longitude]);
       }
@@ -341,21 +348,22 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
 
   // Ward aggregation for choropleth
   const wardAggregates = useMemo(() => {
-    const agg: Record<string, { totalPop: number; avgDist: number; count: number; points: [number, number][]; gapScore: number }> = {};
+    const agg: Record<string, { totalPop: number; avgDist: number; count: number; points: [number, number][]; gapScore: number; htr: number; nc: number }> = {};
     cascadedEntries.forEach(e => {
-      if (!agg[e.ward]) agg[e.ward] = { totalPop: 0, avgDist: 0, count: 0, points: [], gapScore: 0 };
+      if (!agg[e.ward]) agg[e.ward] = { totalPop: 0, avgDist: 0, count: 0, points: [], gapScore: 0, htr: 0, nc: 0 };
       const w = agg[e.ward];
       w.totalPop += e.estimated_total_population || 0;
       w.avgDist += e.community_distance_to_flhf_km || 0;
       w.count++;
+      if (e.accessibility === "hard_to_reach" || e.accessibility === "inaccessible") w.htr++;
+      if (e.security_clearance === "not_cleared" || e.security_clearance === "partial") w.nc++;
       if (e.community_latitude && e.community_longitude) w.points.push([e.community_latitude, e.community_longitude]);
     });
     Object.entries(agg).forEach(([ward, w]) => {
       w.avgDist = w.count ? w.avgDist / w.count : 0;
       const distScore = Math.min(w.avgDist * 5, 40);
-      const we = cascadedEntries.filter(e => e.ward === ward);
-      const htr = we.filter(e => e.accessibility === "hard_to_reach" || e.accessibility === "inaccessible").length;
-      const nc = we.filter(e => e.security_clearance === "not_cleared" || e.security_clearance === "partial").length;
+      const htr = w.htr;
+      const nc = w.nc;
       w.gapScore = Math.min(distScore + (w.count ? (htr / w.count) * 30 : 0) + (w.count ? (nc / w.count) * 30 : 0), 100);
     });
     return agg;
@@ -400,7 +408,6 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
   // ─── Initialize Map ───
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
-    const L = (window as any).L;
     if (!L) return;
     const map = L.map(mapRef.current, { zoomControl: true, zoomSnap: 0.5 }).setView([9.0, 8.0], 6);
     mapInstanceRef.current = map;
@@ -409,12 +416,13 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
       attribution: "© OpenStreetMap",
       maxZoom: 18,
     }).addTo(map);
-    return () => { map.remove(); mapInstanceRef.current = null; };
+    const observer = new ResizeObserver(() => { if (mapInstanceRef.current === map) map.invalidateSize({ animate: false }); });
+    observer.observe(mapRef.current);
+    return () => { observer.disconnect(); disposeMap(map); mapInstanceRef.current = null; };
   }, []);
 
   // ─── Zoom to extent ───
   const zoomToExtent = useCallback(() => {
-    const L = (window as any).L;
     const map = mapInstanceRef.current;
     if (!L || !map) return;
     const bounds: [number, number][] = [];
@@ -424,7 +432,7 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
       if (e.settlement_latitude && e.settlement_longitude) bounds.push([e.settlement_latitude, e.settlement_longitude]);
     });
     if (bounds.length > 0) {
-      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13 });
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13, animate: false });
     }
   }, [cascadedEntries]);
 
@@ -457,7 +465,6 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
 
   // ─── Render All Layers ───
   useEffect(() => {
-    const L = (window as any).L;
     const map = mapInstanceRef.current;
     if (!L || !map) return;
 
@@ -562,7 +569,7 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
     }
 
     // ── Plot entries ──
-    cascadedEntries.forEach(entry => {
+    const cancel = renderBatches(cascadedEntries, entry => {
       const cLat = entry.community_latitude;
       const cLng = entry.community_longitude;
       const fLat = entry.flhf_latitude;
@@ -774,12 +781,12 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
         }
         bounds.push([sLat, sLng]);
       }
+    }, () => {
+      if (bounds.length > 0 && mapInstanceRef.current === map) {
+        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13, animate: false });
+      }
     });
-
-    // Fit to data extent
-    if (bounds.length > 0) {
-      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13 });
-    }
+    return cancel;
   }, [cascadedEntries, activeTheme, showBufferZones, showDistanceLines, showLabels, flhfAggregates, wardAggregates, maxPop]);
 
   // ─── Popup builders ───
@@ -1121,7 +1128,7 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
       <CardHeader className="pb-2 px-3 pt-3 space-y-2">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
-            <Map className="h-4 w-4 text-primary" />
+            <MapIcon className="h-4 w-4 text-primary" />
             Geo-enabled Microplan Map
             <Badge variant="outline" className="text-[9px] ml-1">{cascadedEntries.length} entries</Badge>
           </CardTitle>

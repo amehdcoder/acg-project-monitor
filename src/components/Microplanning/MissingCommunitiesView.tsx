@@ -1,3 +1,5 @@
+import { useTablePagination } from "@/hooks/useTablePagination";
+import DatasetPagination from "./DatasetPagination";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -160,9 +162,13 @@ const MissingCommunitiesView = ({ entries, projectId, isInScope, scopeRestricted
       }
     }
 
-    // Settlement-level expected for communities that DO have an entry
+    // Expand each community once, even when it has many captured settlements.
+    const expandedCommunities = new Set<string>();
     for (const e of entries) {
       if (!e.state || !e.lga || !e.ward || !e.community_name) continue;
+      const communityKey = gapKey(e.state, e.lga, e.ward, e.community_name);
+      if (expandedCommunities.has(communityKey)) continue;
+      expandedCommunities.add(communityKey);
       const wKey = gapKey(e.state, e.lga, e.ward, "", "");
       const flhf = topFlhf(wKey) || e.flhf_name || "";
       const expectedSetts = getSettlements(e.community_name);
@@ -214,15 +220,16 @@ const MissingCommunitiesView = ({ entries, projectId, isInScope, scopeRestricted
   }, [gaps, filterState, filterStatus, search]);
 
   // Group visible by state > lga > ward
+  const pagination = useTablePagination(visible, 20);
   const grouped = useMemo(() => {
     const m = new Map<string, Gap[]>();
-    for (const g of visible) {
+    for (const g of pagination.paginatedData) {
       const k = `${g.state} › ${g.lga} › ${g.ward}`;
       if (!m.has(k)) m.set(k, []);
       m.get(k)!.push(g);
     }
     return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [visible]);
+  }, [pagination.paginatedData]);
 
   const counts = useMemo(() => ({
     pending: gaps.filter((g) => g.status === "pending").length,
@@ -457,6 +464,7 @@ const MissingCommunitiesView = ({ entries, projectId, isInScope, scopeRestricted
           ))}
         </div>
       )}
+      {!loading && <DatasetPagination pagination={pagination} />}
     </div>
   );
 };

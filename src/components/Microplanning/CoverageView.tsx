@@ -1,3 +1,7 @@
+import { disposeMap } from "@/lib/microplanning/disposeMap";
+import { renderBatches } from "@/lib/microplanning/renderBatches";
+import { useTablePagination } from "@/hooks/useTablePagination";
+import DatasetPagination from "./DatasetPagination";
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -71,12 +75,12 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName }: CoverageVi
 
   const { calcTargetPop, label: targetPopLabel } = useTargetPopFields(projectName);
 
-  const getTargetPop = (e: CoverageEntry) => {
+  const getTargetPop = useCallback((e: CoverageEntry) => {
     const sum = calcTargetPop(e as any);
     if (sum > 0) return sum;
     // Fallback when none of the selected disaggregation fields have values
     return ((e.estimated_children_5_14 || 0) + (e.estimated_adults_15_plus || 0)) || (e.estimated_total_population || 0);
-  };
+  }, [calcTargetPop]);
 
   // Cascading filters
   const allLgas = useMemo(() => [...new Set(entries.map(e => e.lga))].sort(), [entries]);
@@ -91,6 +95,8 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName }: CoverageVi
     if (filterWard !== "all") e = e.filter(x => x.ward === filterWard);
     return e;
   }, [entries, filterLga, filterWard]);
+
+  const pagination = useTablePagination(filtered, 20);
 
   // Reset ward when LGA changes
   useEffect(() => { setFilterWard("all"); }, [filterLga]);
@@ -117,7 +123,7 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName }: CoverageVi
       communitiesMissed: missed.length,
       totalCommunities: filtered.length,
     };
-  }, [filtered]);
+  }, [filtered, getTargetPop]);
 
   const handleSave = async (id: string) => {
     const treatedVal = editedTreated[id];
@@ -174,14 +180,15 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName }: CoverageVi
     const geoEntries = filtered.filter(e => e.community_latitude && e.community_longitude);
     if (geoEntries.length === 0) {
       map.setView([9.06, 7.49], 6);
-      return;
+      return () => { disposeMap(map); mapRef.current = null; };
     }
 
-    const bounds: L.LatLngTuple[] = [];
+    const bounds: L.LatLngTuple[] = geoEntries.flatMap(e => e.community_latitude != null && e.community_longitude != null ? [[e.community_latitude, e.community_longitude] as L.LatLngTuple] : []);
 
-    geoEntries.forEach(e => {
-      const lat = e.community_latitude!;
-      const lng = e.community_longitude!;
+    const cancel = renderBatches(geoEntries, e => {
+      const lat = e.community_latitude;
+      const lng = e.community_longitude;
+      if (lat == null || lng == null) return;
       bounds.push([lat, lng]);
 
       const target = getTargetPop(e);
@@ -257,8 +264,9 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName }: CoverageVi
       }
     });
     flhfMap.forEach((e, name) => {
-      const lat = e.flhf_latitude!;
-      const lng = e.flhf_longitude!;
+      const lat = e.flhf_latitude;
+      const lng = e.flhf_longitude;
+      if (lat == null || lng == null) return;
       bounds.push([lat, lng]);
       L.marker([lat, lng], {
         icon: L.divIcon({
@@ -271,11 +279,11 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName }: CoverageVi
     });
 
     if (bounds.length > 0) {
-      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13 });
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13, animate: false });
     }
 
-    return () => { map.remove(); mapRef.current = null; };
-  }, [showMap, filtered]);
+    return () => { cancel(); disposeMap(map); mapRef.current = null; };
+  }, [showMap, filtered, getTargetPop]);
 
   const getCoverageColor = (coverage: number) => {
     if (coverage >= 80) return "text-emerald-600 dark:text-emerald-400";
@@ -452,7 +460,7 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName }: CoverageVi
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((e, i) => {
+                {pagination.paginatedData.map((e, i) => {
                   const target = getTargetPop(e);
                   const currentTreated = editedTreated[e.id] !== undefined ? Number(editedTreated[e.id]) || 0 : (e.total_treated || 0);
                   const coverage = target > 0 ? (currentTreated / target) * 100 : 0;
@@ -561,6 +569,7 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName }: CoverageVi
               )}
             </table>
           </div>
+          <DatasetPagination pagination={pagination} />
         </CardContent>
       </Card>
 
