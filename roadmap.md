@@ -1,6 +1,6 @@
 # Roadmap
 
-- [ ] Add selectable OSIRIS security/access/terrain/CDD legends, combined filters, counts and zoom-to-matches; validate rules and live controls.
+- [x] Add selectable OSIRIS security/access/terrain/CDD legends with multiple categories per group, intersections across groups, mapped counts, automatic zoom and explicit zoom/clear controls. Ten tests pass; signed-in real data filters 3 → 2 → 3 → 1, CDD intersection and clearing verified; phone fit, collapse cleanup and dashboard navigation pass without runtime errors. Preview build clean. Missing CDD names are labelled unrecorded, not confirmed absence.
 
 - [x] Add OSIRIS Street View toggle using the lazy shared viewer, release satellite graphics and pause feed polling while open, retain camera on return, bound panorama loading and cancel stale work. Signed-in toggle availability, phone fit, collapse cleanup and Coverage navigation verified without runtime errors; seven regression tests pass and preview build is clean. Google panorama rendering and actual local imagery coverage require verification on the published domain; sandbox Google requests intentionally skipped.
 
