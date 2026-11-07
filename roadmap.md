@@ -1,6 +1,6 @@
 # Roadmap
 
-- [ ] Add collapsed, interactive correlation heatmaps for measured Microplanning population and operational evidence; validate missing-data/constant-series handling and live desktop/mobile views.
+- [x] Add two collapsed interactive correlation heatmap views (population/households and operational constraints), Spearman/Pearson selection, coefficient/sample-size tooltips, paired scatter plots and Excel export. Missing values remain excluded and constant series or fewer than five pairs produce no coefficient. Fourteen analysis tests pass; live Accelerate nine-record readback, method/view switches, missing-evidence state, 36-row export and phone layout verified; preview build clean.
 
 - [x] Add six collapsed ESPEN-aligned analyses from filtered live Microplanning rows: population access/security exposure, recorded facility workload, distance profile, contact completeness, population sources/planning vintage, and downloadable settlement review. Sixteen tests pass; signed-in Accelerate readback, all sections, nine-record Excel review, phone fit and collapse/reopen verified without runtime errors; preview build clean. No inferred treatment outcomes, travel times or staffing shortages.
 
