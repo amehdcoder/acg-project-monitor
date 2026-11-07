@@ -72,6 +72,7 @@ import GeoMedicineAllocationTable from "@/components/Microplanning/GeoMedicineAl
 import GeoExclusionPanel from "@/components/Microplanning/GeoExclusionPanel";
 import PlanningHeatmaps from "@/components/Microplanning/PlanningHeatmaps";
 import PlanningAnalyses from "@/components/Microplanning/PlanningAnalyses";
+import OsirisPlanningAnalysis from "@/components/Microplanning/OsirisPlanningAnalysis";
 import { useGeoExclusions, rowExcluded } from "@/lib/microplanning/geoExclusions";
 
 import { parseMedicineUploadFile, exportMedicineUploadTemplate, parseAllocationPlanFile, exportAllocationPlanTemplate, type UploadedMedicineEntry } from "@/lib/microplanning/medicineUpload";
@@ -2864,6 +2865,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
           </div>
           <PlanningHeatmaps entries={filtered as never} />
           <PlanningAnalyses entries={filtered} calcTargetPop={calcTargetPop} targetLabel={targetPopulationLabel} />
+          <OsirisPlanningAnalysis entries={filtered} demo={isUsingDemoData} projectName={selectedProjectName} />
 
 
           {/* Drill-through breadcrumb trail */}
