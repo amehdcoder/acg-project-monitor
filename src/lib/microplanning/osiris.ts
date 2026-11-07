@@ -5,6 +5,7 @@ export type LegendGroup = "security" | "accessibility" | "terrain" | "cdd";
 export type LegendFilters = Record<LegendGroup, string[]>;
 export const emptyLegendFilters = (): LegendFilters => ({security:[], accessibility:[], terrain:[], cdd:[]});
 export function cddCategory(entry: IntelEntry): string {
+  if (/^(n\/?a|not recorded|unknown)$/i.test(String(entry.cdd_names??'').trim())) return "unrecorded";
   const names=String(entry.cdd_names??'').split(/[,;\n/]+|\band\b/i).map(s=>s.trim().toLowerCase()).filter(s=>s&&!/^(—|-|none|nil|n\/?a|0|no cdds?|not recorded|unknown)$/.test(s));
   return names.length ? "recorded" : "unrecorded";
 }
