@@ -12,7 +12,7 @@ export function renderBatches<T>(items: T[], draw: (item: T) => void, complete?:
       count++;
     }
     if (cancelled) return;
-    if (index < items.length) timer = setTimeout(step, 16);
+    if (index < items.length) timer = setTimeout(step, 0);
     else complete?.();
   };
   timer = setTimeout(step, 0);
