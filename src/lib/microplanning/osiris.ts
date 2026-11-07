@@ -1,6 +1,16 @@
-import { entryPoint, geometryContains, normState, type HeatEntry } from "./heatmaps";
+import { categoryOf, entryPoint, geometryContains, normState, type HeatEntry } from "./heatmaps";
 
-export interface IntelEntry extends HeatEntry { id?: string; flhf_name?: string | null }
+export interface IntelEntry extends HeatEntry { id?: string; flhf_name?: string | null; cdd_names?: string | null }
+export type LegendGroup = "security" | "accessibility" | "terrain" | "cdd";
+export type LegendFilters = Record<LegendGroup, string[]>;
+export const emptyLegendFilters = (): LegendFilters => ({security:[], accessibility:[], terrain:[], cdd:[]});
+export function cddCategory(entry: IntelEntry): string {
+  const names=String(entry.cdd_names??'').split(/[,;\n/]+|\band\b/i).map(s=>s.trim().toLowerCase()).filter(s=>s&&!/^(—|-|none|nil|n\/?a|0|no cdds?|not recorded|unknown)$/.test(s));
+  return names.length ? "recorded" : "unrecorded";
+}
+export function filterLegendPoints(points: IntelPoint[], filters: LegendFilters): IntelPoint[] {
+  return points.filter(p=>(Object.keys(filters) as LegendGroup[]).every(group=>!filters[group].length||filters[group].includes(group==='cdd'?cddCategory(p.entry):categoryOf(p.entry,group).key)));
+}
 export interface Boundary { type: "Feature"; properties: { state: string; lga?: string }; geometry: { type: string; coordinates: unknown } }
 export interface IntelEvent { id: string; lat: number; lng: number; title: string; kind: "fire" | "weather" | "event"; date: string | null; source: string | null; provider: string }
 export interface IntelPoint { key: string; lat: number; lng: number; entry: IntelEntry }
