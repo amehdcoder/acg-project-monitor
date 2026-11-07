@@ -10,17 +10,19 @@ const AMBER: [number, number, number] = [230, 145, 30];
 const RED: [number, number, number] = [196, 40, 40];
 const GREEN: [number, number, number] = [30, 140, 80];
 
-export interface FormContext { projectName: string; level: EuLevel; target: number; sample: number; indicator: string }
+export interface FormContext { projectName: string; level: EuLevel; target: number; sample: number; indicator: string; roundId?: string; eligibility?: string; campaignReference?: string }
 
 function header(doc: jsPDF, title: string, subtitle: string, ctx: FormContext, color = WHO_BLUE) {
   const w = doc.internal.pageSize.getWidth();
   doc.setFillColor(...color); doc.rect(0, 0, w, 22, "F");
   doc.setFillColor(...WHO_DARK); doc.rect(0, 22, w, 2, "F");
   doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(14);
-  doc.text(title, 10, 10);
+  doc.text(doc.splitTextToSize(title, w - 20), 10, 8);
   doc.setFont("helvetica", "normal"); doc.setFontSize(9);
-  doc.text(`${ctx.projectName} · ${subtitle}`, 10, 17);
-  doc.text(`LQAS · n=${ctx.sample} · target ${Math.round(ctx.target * 100)}% · d=${decisionRule(ctx.sample, ctx.target)}`, w - 10, 10, { align: "right" });
+  doc.setFontSize(7);
+  doc.text(`${ctx.projectName} · ${subtitle}`.slice(0, 125).replace(/›/g, "/"), 10, 20);
+  doc.setTextColor(...WHO_DARK);
+  doc.text(`n=${ctx.sample} · upper threshold ${Math.round(ctx.target * 100)}% · PASS >=${decisionRule(ctx.sample, ctx.target)}${ctx.roundId ? ` · Round ${ctx.roundId}` : ""}`, 10, 27);
   doc.setTextColor(30, 30, 30);
 }
 
@@ -49,10 +51,10 @@ function idBlock(doc: jsPDF, eu: EuPlan, ctx: FormContext, y: number) {
 /** Household tally sheet (one per EU) — 19 sampling points, one respondent each. */
 function tallySheet(doc: jsPDF, eu: EuPlan, ctx: FormContext, secure: boolean) {
   header(doc, secure ? "LQAS Household Tally Sheet — Security-Restricted Area" : "LQAS Household Tally Sheet", eu.key, ctx, secure ? RED : WHO_BLUE);
-  let y = idBlock(doc, eu, ctx, 28);
+  let y = idBlock(doc, eu, ctx, 31);
   doc.setFontSize(8.5);
-  doc.text(`Indicator: ${ctx.indicator}. Select a random household at each sampling point; ask about ONE eligible person. Tick Y if covered, N if not.`, 10, y, { maxWidth: 190 });
-  y += 8;
+  const intro = doc.splitTextToSize(`Indicator: ${ctx.indicator}. ${ctx.campaignReference ?? "Confirm campaign reference period"}. Eligibility: ${ctx.eligibility ?? "Programme-approved eligible people"}. Randomly select a household, then one eligible person. No convenience replacement. Record nonresponse separately.`, 190);
+  doc.text(intro, 10, y); y += intro.length * 4 + 2;
   autoTable(doc, {
     startY: y, theme: "grid", styles: { fontSize: 8, cellPadding: 1.6, minCellHeight: 7 },
     headStyles: { fillColor: secure ? RED : WHO_BLUE },
@@ -66,7 +68,7 @@ function tallySheet(doc: jsPDF, eu: EuPlan, ctx: FormContext, secure: boolean) {
     startY: y, theme: "grid", styles: { fontSize: 9, cellPadding: 2 },
     head: [["Total Y (covered)", "Decision rule (d)", "Decision", "Reason codes"]],
     headStyles: { fillColor: WHO_DARK },
-    body: [["", String(d), `PASS if Y >= ${d}   ·   MOP-UP if Y < ${d}`, "1 Absent · 2 Refused · 3 Not aware · 4 Side-effects fear · 5 Ineligible/sick · 6 Not visited · 7 Other"]],
+    body: [["", String(d), `Only classify a complete sample of ${ctx.sample}. PASS if Y >= ${d}; review / mop-up if lower. PASS does not prove target coverage.`, "1 Campaign absence · 2 Declined medicine · 3 Not aware · 4 Side-effects fear · 5 Eligible but sick · 6 Not visited · 7 Other"]],
   });
   if (secure) {
     y = (doc as any).lastAutoTable.finalY + 4;
@@ -76,8 +78,8 @@ function tallySheet(doc: jsPDF, eu: EuPlan, ctx: FormContext, secure: boolean) {
     doc.setFont("helvetica", "normal"); doc.setTextColor(40, 40, 40);
     doc.text([
       "Do not record names, phone numbers or GPS. Keep this sheet folded and out of sight while moving.",
-      "If a sampling point marked (!) is inaccessible, replace it with the nearest accessible community in the same ward and note it below.",
-      "Collect only in daylight with local escort/community leader clearance. Abort if the situation changes.",
+      "Never substitute the nearest accessible community. Log nonresponse; supervisor must approve randomized reserves under the survey protocol.",
+      "Security clearance is mandatory. Stop if unsafe; paper collection never authorizes entry. Incomplete or changed samples need review.",
     ], 12, y + 10);
   }
 }
@@ -105,6 +107,7 @@ function summarySheet(doc: jsPDF, plans: EuPlan[], ctx: FormContext) {
 }
 
 export function buildPaperPack(plans: EuPlan[], ctx: FormContext, opts: { securityOnly?: boolean } = {}) {
+  if (plans.some((p) => p.frameMissing || p.sample.length !== ctx.sample)) throw new Error("Sampling frame has missing community names or population weights.");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const list = opts.securityOnly ? plans.filter((p) => p.securityMode) : plans;
   summarySheet(doc, list, ctx);
@@ -119,7 +122,7 @@ export function buildPaperPack(plans: EuPlan[], ctx: FormContext, opts: { securi
 /** KoboCollect form for transcribing paper tally sheets. Submissions reach the
  * app through the existing Kobo webhook (form id contains "lqas"). */
 export function buildLqasXlsForm(ctx: FormContext) {
-  const H = ["type", "name", "label", "required", "constraint", "constraint_message", "relevant", "calculation", "choice_filter", "appearance"];
+  const H = ["type", "name", "label", "required", "constraint", "constraint_message", "relevant", "calculation", "choice_filter", "appearance", "repeat_count"];
   const row = (o: Record<string, string>) => H.map((h) => o[h] ?? "");
   const survey = [H,
     row({ type: "start", name: "start" }), row({ type: "end", name: "end" }),
@@ -133,13 +136,14 @@ export function buildLqasXlsForm(ctx: FormContext) {
     row({ type: "text", name: "team", label: "Team number", required: "yes" }),
     row({ type: "date", name: "collection_date", label: "Date on paper form", required: "yes" }),
     row({ type: "select_one yn", name: "security_mode", label: "Collected under security-restricted protocol?", required: "yes" }),
-    row({ type: "begin_repeat", name: "lqas_respondents", label: "Respondent (copy each row of the tally sheet)", appearance: "field-list" }),
+    row({ type: "select_one yn", name: "sampling_deviation", label: "Any departure from the approved probability sample?", required: "yes" }),
+    row({ type: "begin_repeat", name: "lqas_respondents", label: "Respondent (copy each row of the tally sheet)", appearance: "field-list", repeat_count: String(ctx.sample) }),
     row({ type: "integer", name: "slot", label: "Slot #", constraint: `. >= 1 and . <= ${ctx.sample}` }),
     row({ type: "select_one yn", name: "received", label: ctx.indicator, required: "yes" }),
     row({ type: "select_one reason", name: "reason", label: "Reason not covered", relevant: "${received} = 'no'" }),
     row({ type: "end_repeat", name: "lqas_respondents" }),
     row({ type: "calculate", name: "sampled", calculation: "count(${lqas_respondents})" }),
-    row({ type: "calculate", name: "covered", calculation: "count-selected(${received})" }),
+    row({ type: "calculate", name: "covered", calculation: "count(${lqas_respondents}[received = 'yes'])" }),
     row({ type: "note", name: "check", label: `Sampled: \${sampled}. Expected ${ctx.sample}.` }),
   ];
   const choices: string[][] = [["list_name", "name", "label", "level"]];
