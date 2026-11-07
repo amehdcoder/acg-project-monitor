@@ -219,7 +219,7 @@ export default function GoogleStreetViewPanel({
     window.addEventListener('keydown',onKey);
 
     // React to async auth failures that arrive after init().
-    const onAuthFail = () => { setUseMapillary(true); setIsLoading(false); };
+    const onAuthFail = () => { controller.abort(); setUseMapillary(true); setIsLoading(false); };
     window.addEventListener(GOOGLE_MAPS_AUTH_FAILED_EVENT, onAuthFail);
 
     return () => {
@@ -233,6 +233,13 @@ export default function GoogleStreetViewPanel({
       }
     };
   }, [open, init]);
+
+  useEffect(() => {
+    if (!useMapillary || !panoramaRef.current || !window.google?.maps) return;
+    panoramaRef.current.setVisible(false);
+    google.maps.event.clearInstanceListeners(panoramaRef.current);
+    panoramaRef.current = null;
+  }, [useMapillary]);
 
   useEffect(() => {
     if (panoramaRef.current && window.google?.maps) {
