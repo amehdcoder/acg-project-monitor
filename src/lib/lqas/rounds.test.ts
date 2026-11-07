@@ -20,7 +20,7 @@ describe("lots one level below the evaluation unit", () => {
     expect(lots.find((l) => l.lot_name === "KATARKO")!.population).toBe(200);
   });
   it("puts high-risk lots first with recorded flags", () => {
-    const lots = buildLots([row("Buni", "C"), row("Katarko", "A", { security_clearance: "not_cleared", accessibility: "hard_to_reach" })], "lga", eu, new Set(["KATARKO"]));
+    const lots = buildLots([row("Buni", "C"), row("Katarko", "A", { security_clearance: "not_cleared", accessibility: "hard_to_reach" })], "lga", eu, new Set(["YOBE › GUJBA › KATARKO"]));
     expect(lots[0].lot_name).toBe("KATARKO");
     expect(lots[0].security_status).toBe("Red");
     expect(lots[0].risk_flags).toEqual(["Previous FAIL", "Security Red", "Hard-to-Reach"]);

@@ -1,6 +1,6 @@
 # Roadmap
 
-- [ ] Strengthen LQAS Evaluation against official WHO guidance: explicit design risks and evidence limits, valid complete-sample decisions, unbiased field protocols and matching Kobo/paper tools, accurate round reporting, safe mop-up review, polished responsive controls; verify focused tests and signed-in readback. No fabricated surveys.
+- [x] Strengthen LQAS against WHO guidance: methods/reference tab, both design risks, frozen campaign/eligibility/question/PPS slots, server-linked exact-sample decisions with partial/deviation review and deletion recomputation, unbiased safety protocols, descriptive round evidence/export, responsive page. Twenty-four tests pass; both XLSForms convert with pyxform; printed tally inspected; signed-in GIveWell navigation/download/design guard verified without runtime errors, preview build clean. No real surveys fabricated; live round save and Kobo result readback await genuine field data and an approved protocol (existing live round count is zero).
 
 - [x] Refine Geo Microplanning presentation: clearer command header with grouped management actions, early permission-filtered tab navigation, restrained metric spectrum, consistent panels and semantic status accents. Live GIveWell desktop/390px phone/dark appearance and all seven tabs verified without runtime errors or horizontal overflow; four focused regression tests pass; preview build clean. Data and access rules unchanged.
 

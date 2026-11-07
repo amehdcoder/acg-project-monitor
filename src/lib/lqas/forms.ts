@@ -58,7 +58,7 @@ function tallySheet(doc: jsPDF, eu: EuPlan, ctx: FormContext, secure: boolean) {
   autoTable(doc, {
     startY: y, theme: "grid", styles: { fontSize: 8, cellPadding: 1.6, minCellHeight: 7 },
     headStyles: { fillColor: secure ? RED : WHO_BLUE },
-    head: [["#", "Ward", "Community (sampling point)", "Respondent age", "Sex M/F", "Received? Y / N", "Reason if N (code)"]],
+    head: [["#", "Ward", "Community (sampling point)", "Respondent age", "Sex M/F", "Swallowed? Y / N", "Reason if N (code)"]],
     body: eu.sample.map((s) => [s.slot, s.ward, s.community + (s.insecure ? "  (!)" : ""), "", "", "Y  /  N", ""]),
     didParseCell: (d) => { if (d.section === "body" && eu.sample[d.row.index]?.insecure) d.cell.styles.fillColor = [253, 236, 234]; },
   });
@@ -70,6 +70,8 @@ function tallySheet(doc: jsPDF, eu: EuPlan, ctx: FormContext, secure: boolean) {
     headStyles: { fillColor: WHO_DARK },
     body: [["", String(d), `Only classify a complete sample of ${ctx.sample}. PASS if Y >= ${d}; review / mop-up if lower. PASS does not prove target coverage.`, "1 Campaign absence · 2 Declined medicine · 3 Not aware · 4 Side-effects fear · 5 Eligible but sick · 6 Not visited · 7 Other"]],
   });
+  y = (doc as any).lastAutoTable.finalY + 3;
+  autoTable(doc, { startY: y, theme: "grid", styles: { fontSize: 8, cellPadding: 2 }, headStyles: { fillColor: WHO_DARK }, head: [["Eligibility checked for all people?", "Sampling deviation?", "Supervisor review / sign-off"]], body: [["Y / N", "Y / N — describe separately", ""]] });
   if (secure) {
     y = (doc as any).lastAutoTable.finalY + 4;
     doc.setFillColor(253, 236, 234); doc.rect(10, y, 190, 22, "F");
@@ -113,7 +115,7 @@ export function buildPaperPack(plans: EuPlan[], ctx: FormContext, opts: { securi
   summarySheet(doc, list, ctx);
   for (const eu of list) {
     doc.addPage(); tallySheet(doc, eu, ctx, opts.securityOnly || eu.securityMode);
-    if (eu.securityMode) { doc.addPage(); replacementLog(doc, eu, ctx); }
+    doc.addPage(); replacementLog(doc, eu, ctx);
   }
   footer(doc);
   return doc.output("blob");
