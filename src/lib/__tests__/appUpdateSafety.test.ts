@@ -110,6 +110,15 @@ describe("safe, responsive app updates", () => {
     expect((await mgr.checkForAppUpdate({ force: true })).updateAvailable).toBe(true);
   });
 
+  it("manual checks detect changed published assets even when a stale version manifest says current", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => response("development")));
+    const mgr = await import("@/lib/appUpdateManager");
+    const result = await mgr.checkForAppUpdate({ force: true });
+    expect(result.updateAvailable).toBe(true);
+    expect(result.source).toBe("html");
+    expect(replace).not.toHaveBeenCalled();
+  });
+
   it("changed page content with identical app assets does not trigger an update", async () => {
     vi.stubGlobal("fetch", vi.fn(async (url: string) => String(url).includes("version.json")
       ? { ok: false } as Response : response("next", '<h1>Changed content</h1><script src="/assets/index-current.js"></script>')));

@@ -26,6 +26,7 @@ const RELEASE_HIGHLIGHTS: ReleaseHighlight[] = [
 ];
 
 interface AppUpdateNotificationProps {
+  error?: string | null;
   open: boolean;
   isUpdating: boolean;
   onUpdate: () => void;
@@ -40,6 +41,7 @@ interface AppUpdateNotificationProps {
  */
 const AppUpdateNotification = ({
   open,
+  error,
   isUpdating,
   onUpdate,
   onDismiss,
@@ -54,7 +56,7 @@ const AppUpdateNotification = ({
         aria-live="polite"
       >
         <Sparkles className="h-4 w-4 shrink-0" />
-        <span className="text-sm font-semibold">A new update is available for Amehnities</span>
+        <span className="min-w-0 text-sm font-semibold">{error||"A new update is available for Amehnities"}</span>
         <Button
           onClick={onUpdate}
           variant="gold"
@@ -130,6 +132,7 @@ const AppUpdateNotification = ({
               </ul>
             </div>
 
+            {error&&<p role="alert" className="px-6 pb-4 text-sm text-destructive">{error}</p>}
             {/* Footer — CTA */}
             <div className="border-t border-border bg-muted/30 px-6 py-4">
               <Button

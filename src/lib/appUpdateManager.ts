@@ -27,7 +27,7 @@ let state: AppUpdateState = {
 };
 
 const listeners = new Set<() => void>();
-let swUpdater: (() => Promise<void>) | null = null;
+let swUpdater: ((signal: AbortSignal) => Promise<void>) | null = null;
 let checkPromise: Promise<AppUpdateState> | null = null;
 let applyPromise: Promise<boolean> | null = null;
 
@@ -174,7 +174,7 @@ export const markServiceWorkerUpdateAvailable = () => {
   void checkForAppUpdate({ force: true });
 };
 
-export const registerServiceWorkerUpdater = (fn: () => Promise<void>) => {
+export const registerServiceWorkerUpdater = (fn: (signal: AbortSignal) => Promise<void>) => {
   swUpdater = fn;
 };
 
@@ -189,6 +189,7 @@ const runUpdateCheck = async (opts: { force?: boolean; source?: "version" | "htm
   if (!opts.force && !isAutoUpdateEnabled()) return state;
   if (!opts.force && isPreviewHost) return state;
   setState({ status: "checking", error: null });
+  if(navigator.onLine===false){setState({status:"error",error:"Connect to the internet to check for updates. Your saved work is still available."});return state;}
 
   try {
     let source: "version" | "html" = "version";
@@ -219,6 +220,13 @@ const runUpdateCheck = async (opts: { force?: boolean; source?: "version" | "htm
     }
     if (!latestBuildId) throw new Error("Couldn't check for updates. Check your connection and try again.");
 
+    // A stale manifest must not conceal changed compiled assets on a manual check.
+    if(opts.force&&!isPreviewHost&&latestBuildId===currentBuildId){
+      const running=htmlBuildId(document.documentElement.outerHTML);
+      const latest=await fetchHtmlBuildId();
+      if(!latest)throw new Error("Couldn't verify the latest app. Please retry when your connection is stable.");
+      if(running&&latest!==running){source="html";currentBuildId=running;latestBuildId=latest;}
+    }
     const changed = latestBuildId !== currentBuildId;
     setState({
       status: changed ? "available" : "current",
@@ -290,6 +298,7 @@ export const hardReloadToLatest = (_opts: { force?: boolean } = {}): Promise<boo
 
 const applyLatest = async (): Promise<boolean> => {
   setState({ status: "updating", error: null });
+  const controller=new AbortController();
   try {
     // Even a manual/forced request must not strand an offline user. Validate
     // the actual HTML shell, not merely a reachable JSON/404 fallback page.
@@ -299,7 +308,7 @@ const applyLatest = async (): Promise<boolean> => {
     }
     prepareSilentFormRestoreForUpdate();
     if (swUpdater && !shouldSkipServiceWorker) {
-      await withTimeout(swUpdater(), 12000, "The update couldn't finish downloading. Please try again.");
+      await withTimeout(swUpdater(controller.signal), 12000, "The update couldn't finish downloading. Please try again.");
     }
     // Retain workers, precaches, reference data and all offline queues. Only
     // invalidate navigation runtime HTML after the new shell is reachable.
@@ -317,7 +326,7 @@ const applyLatest = async (): Promise<boolean> => {
   } catch (error) {
     setState({ status: "error", error: error instanceof Error ? error.message : "Couldn't apply the update. Please try again." });
     return false;
-  }
+  } finally {controller.abort();}
 };
 
 export const startAppUpdatePolling = () => {

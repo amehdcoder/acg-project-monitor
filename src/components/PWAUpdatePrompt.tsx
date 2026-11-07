@@ -16,7 +16,7 @@ import { hasActiveUserFormProgress } from "@/lib/formProgressPersistence";
 
 interface InnerProps {
   onAvailable: () => void;
-  registerSelf: (fn: () => Promise<void>) => void;
+  registerSelf: (fn: (signal: AbortSignal) => Promise<void>) => void;
 }
 
 const SwRegistrar = ({ onAvailable, registerSelf }: InnerProps) => {
@@ -40,34 +40,40 @@ const SwRegistrar = ({ onAvailable, registerSelf }: InnerProps) => {
   });
 
   useEffect(() => {
-    registerSelf(async () => {
+    registerSelf(async (signal) => {
       const registration = await navigator.serviceWorker.getRegistration();
-      if (!registration) return;
+      if (!registration || signal.aborted) return;
       await registration.update();
+      if(signal.aborted)return;
       // A worker may still be downloading its revisioned offline shell.
       const worker = registration.waiting || registration.installing;
       if (!worker) return;
       if (worker.state === "installing") {
         await new Promise<void>((resolve, reject) => {
           const timer = setTimeout(() => { cleanup(); reject(new Error("The update download timed out. Please retry.")); }, 8000);
-          const cleanup = () => { clearTimeout(timer); worker.removeEventListener("statechange", check); };
+          const cleanup = () => { clearTimeout(timer); worker.removeEventListener("statechange", check); signal.removeEventListener("abort",cancel); };
           const check = () => {
             if (worker.state === "installed") { cleanup(); resolve(); }
             if (worker.state === "redundant") { cleanup(); reject(new Error("The update download failed. Please retry.")); }
           };
+          const cancel=()=>{cleanup();reject(new Error("Update cancelled. Please retry."));};
+          signal.addEventListener("abort",cancel,{once:true});
           worker.addEventListener("statechange", check);
           check();
         });
       }
-      if (worker.state === "activated") return;
+      if (signal.aborted || worker.state === "activated") return;
       await new Promise<void>((resolve, reject) => {
         const timer = setTimeout(() => { cleanup(); reject(new Error("The update activation timed out. Please retry.")); }, 3000);
-        const cleanup = () => { clearTimeout(timer); worker.removeEventListener("statechange", check); };
+        const cleanup = () => { clearTimeout(timer); worker.removeEventListener("statechange", check); signal.removeEventListener("abort",cancel); };
         const check = () => {
           if (worker.state === "activated") { cleanup(); resolve(); }
           if (worker.state === "redundant") { cleanup(); reject(new Error("The update couldn't activate. Please retry.")); }
         };
+        const cancel=()=>{cleanup();reject(new Error("Update cancelled. Please retry."));};
+        signal.addEventListener("abort",cancel,{once:true});
         worker.addEventListener("statechange", check);
+        if(signal.aborted){cancel();return;}
         worker.postMessage({ type: "SKIP_WAITING" });
         check();
       });
@@ -153,7 +159,7 @@ const PWAUpdatePrompt = () => {
     setShowModal(false);
   };
 
-  const registerSelf = useCallback((fn: () => Promise<void>) => registerServiceWorkerUpdater(fn), []);
+  const registerSelf = useCallback((fn: (signal: AbortSignal) => Promise<void>) => registerServiceWorkerUpdater(fn), []);
 
   return (
     <>
@@ -161,6 +167,7 @@ const PWAUpdatePrompt = () => {
 
       {updateState.updateAvailable && !activeFormProgress && dismissedBuild !== updateState.latestBuildId && (
         <AppUpdateNotification
+          error={updateState.error}
           open={showModal}
           isUpdating={isUpdating || updateState.status === "updating"}
           onUpdate={handleUpdate}
