@@ -8398,6 +8398,7 @@ export type Database = {
       }
       lqas_results: {
         Row: {
+          collection_date: string | null
           community_name: string | null
           covered: number
           created_at: string
@@ -8422,6 +8423,7 @@ export type Database = {
           ward: string | null
         }
         Insert: {
+          collection_date?: string | null
           community_name?: string | null
           covered: number
           created_at?: string
@@ -8446,6 +8448,7 @@ export type Database = {
           ward?: string | null
         }
         Update: {
+          collection_date?: string | null
           community_name?: string | null
           covered?: number
           created_at?: string
@@ -8488,52 +8491,64 @@ export type Database = {
       }
       lqas_rounds: {
         Row: {
+          campaign_reference: string | null
           created_at: string
           created_by: string
           decision_rule: number
           disease: string
           drug: string | null
+          eligibility: string | null
           eu_key: string
           eu_level: string
           eu_name: string
           id: string
+          indicator: string | null
           lower_threshold: number
           project_id: string
           sample_n: number
+          sampling_snapshot: Json | null
           status: string
           upper_threshold: number
           verification_date: string | null
         }
         Insert: {
+          campaign_reference?: string | null
           created_at?: string
           created_by?: string
           decision_rule: number
           disease: string
           drug?: string | null
+          eligibility?: string | null
           eu_key: string
           eu_level: string
           eu_name: string
           id?: string
+          indicator?: string | null
           lower_threshold?: number
           project_id: string
           sample_n?: number
+          sampling_snapshot?: Json | null
           status?: string
           upper_threshold?: number
           verification_date?: string | null
         }
         Update: {
+          campaign_reference?: string | null
           created_at?: string
           created_by?: string
           decision_rule?: number
           disease?: string
           drug?: string | null
+          eligibility?: string | null
           eu_key?: string
           eu_level?: string
           eu_name?: string
           id?: string
+          indicator?: string | null
           lower_threshold?: number
           project_id?: string
           sample_n?: number
+          sampling_snapshot?: Json | null
           status?: string
           upper_threshold?: number
           verification_date?: string | null
