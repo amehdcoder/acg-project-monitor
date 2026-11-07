@@ -409,7 +409,7 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
     if (!L) return;
-    const map = L.map(mapRef.current, { zoomControl: true, zoomSnap: 0.5, preferCanvas: true }).setView([9.0, 8.0], 6);
+    const map = L.map(mapRef.current, { zoomControl: true, zoomSnap: 0.5 }).setView([9.0, 8.0], 6);
     mapInstanceRef.current = map;
     attachSv(map);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {

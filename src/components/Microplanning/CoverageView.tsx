@@ -169,7 +169,7 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName }: CoverageVi
     if (!showMap || !mapContainerRef.current) return;
     if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
 
-    const map = L.map(mapContainerRef.current, { zoomControl: true, attributionControl: true, preferCanvas: true });
+    const map = L.map(mapContainerRef.current, { zoomControl: true, attributionControl: true });
     L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
       attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
       maxZoom: 19,
