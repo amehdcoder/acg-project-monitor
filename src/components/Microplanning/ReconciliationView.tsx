@@ -1,3 +1,5 @@
+import { useTablePagination } from "@/hooks/useTablePagination";
+import DatasetPagination from "./DatasetPagination";
 import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -92,6 +94,8 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId }: R
     if (filterLga !== "all") r = r.filter(x => x.lga === filterLga);
     return r;
   }, [allocationRows, filterState, filterLga]);
+
+  const pagination = useTablePagination(filtered, 20);
 
   const getUsedFor = (row: AllocationRow) => {
     if (editedUsed[row.entryId] !== undefined) {
@@ -308,7 +312,7 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId }: R
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((row, i) => {
+                {pagination.paginatedData.map((row, i) => {
                   const used = getUsedFor(row);
                   const balance = row.medicineRequired - used;
                   const reversed = getReversedFor(row);
@@ -414,6 +418,7 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId }: R
               )}
             </table>
           </div>
+          <DatasetPagination pagination={pagination} />
         </CardContent>
       </Card>
     </div>

@@ -1,3 +1,5 @@
+import { useTablePagination } from "@/hooks/useTablePagination";
+import DatasetPagination from "./DatasetPagination";
 import { useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -298,6 +300,8 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
     });
   }, [rows, search, stateFilter]);
 
+  const pagination = useTablePagination(filtered, 20);
+
   // Resolve & geostatistically reconcile the best population estimate for a row.
   // 1. WorldPop LGA total (auto) → projected to the selected planning year →
   //    apportioned to the community by its share of the LGA current-year total
@@ -473,7 +477,7 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
                     </TableCell>
                   </TableRow>
                 )}
-                {filtered.map((r) => {
+                {pagination.paginatedData.map((r) => {
                   const b = baselines[r.key] || {};
                   const c = computeRow(r);
                   const rec = c.rec;
@@ -551,6 +555,7 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
               </TableBody>
             </Table>
           </div>
+          <DatasetPagination pagination={pagination} />
 
           <p className="text-[11px] text-muted-foreground">
             Tip: Paste WorldPop and GRID3 estimates for each row to strengthen the recommendation. Values are

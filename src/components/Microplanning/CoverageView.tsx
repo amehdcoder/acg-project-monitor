@@ -1,3 +1,5 @@
+import { useTablePagination } from "@/hooks/useTablePagination";
+import DatasetPagination from "./DatasetPagination";
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -71,12 +73,12 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName }: CoverageVi
 
   const { calcTargetPop, label: targetPopLabel } = useTargetPopFields(projectName);
 
-  const getTargetPop = (e: CoverageEntry) => {
+  const getTargetPop = useCallback((e: CoverageEntry) => {
     const sum = calcTargetPop(e as any);
     if (sum > 0) return sum;
     // Fallback when none of the selected disaggregation fields have values
     return ((e.estimated_children_5_14 || 0) + (e.estimated_adults_15_plus || 0)) || (e.estimated_total_population || 0);
-  };
+  }, [calcTargetPop]);
 
   // Cascading filters
   const allLgas = useMemo(() => [...new Set(entries.map(e => e.lga))].sort(), [entries]);
@@ -91,6 +93,8 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName }: CoverageVi
     if (filterWard !== "all") e = e.filter(x => x.ward === filterWard);
     return e;
   }, [entries, filterLga, filterWard]);
+
+  const pagination = useTablePagination(filtered, 20);
 
   // Reset ward when LGA changes
   useEffect(() => { setFilterWard("all"); }, [filterLga]);
@@ -117,7 +121,7 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName }: CoverageVi
       communitiesMissed: missed.length,
       totalCommunities: filtered.length,
     };
-  }, [filtered]);
+  }, [filtered, getTargetPop]);
 
   const handleSave = async (id: string) => {
     const treatedVal = editedTreated[id];
@@ -452,7 +456,7 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName }: CoverageVi
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((e, i) => {
+                {pagination.paginatedData.map((e, i) => {
                   const target = getTargetPop(e);
                   const currentTreated = editedTreated[e.id] !== undefined ? Number(editedTreated[e.id]) || 0 : (e.total_treated || 0);
                   const coverage = target > 0 ? (currentTreated / target) * 100 : 0;
@@ -561,6 +565,7 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName }: CoverageVi
               )}
             </table>
           </div>
+          <DatasetPagination pagination={pagination} />
         </CardContent>
       </Card>
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo, useDeferredValue, Fragment } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, useDeferredValue, startTransition, Fragment } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -884,6 +884,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
   const [filterKeyRatio, setFilterKeyRatio] = useState<string>("all"); // "cdd_from_community" | "cdd_external" | "hard_to_reach"
   const [filterDisability, setFilterDisability] = useState<string>("all"); // disability type key
   const [activeView, setActiveView] = useState<"list" | "medicine" | "coverage" | "reconciliation" | "gaps" | "map" | "routes" | "historical" | "summary">("list");
+  const renderedView = useDeferredValue(activeView);
   // Where the current drill-through started, so we can offer a one-click return.
   const [drillOrigin, setDrillOrigin] = useState<"disability" | "accessibility" | "security" | "terrain" | "keyRatio" | "summary" | null>(null);
   const backToDisaggregation = useCallback(() => {
@@ -1624,6 +1625,8 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
     if (filterDisability !== "all") c.push({ label: "Disability", value: DISABILITY_TYPES.find(d => d.key === filterDisability)?.label ?? filterDisability, onClear: () => setFilterDisability("all") });
     return c;
   }, [filterState, filterLga, filterWard, filterAccessibility, filterSecurity, filterTerrain, filterKeyRatio, filterDisability, lensLockState, lensLockLga, lensLockWard]);
+
+  const projectTableExclusions = useMemo(() => dashExcl.archived.map((a) => ({ level: a.level, state: a.state, lga: a.lga, ward: a.ward })), [dashExcl.archived]);
 
   // ===== COMPREHENSIVE KPI ENGINE — single pass over `filtered` (memoized) =====
   // Previously ~25 separate map/filter/reduce passes ran on EVERY render. With
@@ -2887,7 +2890,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
             projectName={projects.find((p) => p.id === selectedProjectId)?.name || "All projects"}
             scopeLabel={filterScopeLabel(exportFilterContext)}
             campaignLabel={(exportFilterContext as any).campaign}
-            exclusions={dashExcl.archived.map((a) => ({ level: a.level, state: a.state, lga: a.lga, ward: a.ward }))}
+            exclusions={projectTableExclusions}
           />
 
 
@@ -2933,40 +2936,40 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
             {/* Analytics/dashboard tabs are admin-only. Non-admin project members
                 only see their own submitted entries (Planning list) and the form. */}
             {(isAdmin || lensEnabled) && (
-              <div className="flex border border-border rounded-lg overflow-hidden">
-                {canOpenView("list") && (<Button variant={activeView === "list" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("list")}>
+              <div className="flex max-w-full border border-border rounded-lg overflow-x-auto">
+                {canOpenView("list") && (<Button variant={activeView === "list" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => startTransition(() => setActiveView("list"))}>
                   <List className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline text-xs">Planning</span>
                 </Button>)}
-                {canOpenView("medicine") && (<Button variant={activeView === "medicine" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("medicine")}>
+                {canOpenView("medicine") && (<Button variant={activeView === "medicine" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => startTransition(() => setActiveView("medicine"))}>
                   <Pill className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline text-xs">Medicine</span>
                 </Button>)}
-                {canOpenView("coverage") && (<Button variant={activeView === "coverage" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("coverage")}>
+                {canOpenView("coverage") && (<Button variant={activeView === "coverage" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => startTransition(() => setActiveView("coverage"))}>
                   <Activity className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline text-xs">Coverage</span>
                 </Button>)}
-                {canOpenView("reconciliation") && (<Button variant={activeView === "reconciliation" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("reconciliation")}>
+                {canOpenView("reconciliation") && (<Button variant={activeView === "reconciliation" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => startTransition(() => setActiveView("reconciliation"))}>
                   <Heart className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline text-xs">Reconciliation</span>
                 </Button>)}
-                {canOpenView("gaps") && (<Button variant={activeView === "gaps" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("gaps")}>
+                {canOpenView("gaps") && (<Button variant={activeView === "gaps" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => startTransition(() => setActiveView("gaps"))}>
                   <Target className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline text-xs">Gaps</span>
                 </Button>)}
-                {canOpenView("map") && (<Button variant={activeView === "map" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("map")}>
+                {canOpenView("map") && (<Button variant={activeView === "map" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => startTransition(() => setActiveView("map"))}>
                   <MapIcon className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline text-xs">Map</span>
                 </Button>)}
-                {canOpenView("routes") && (<Button variant={activeView === "routes" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("routes")}>
+                {canOpenView("routes") && (<Button variant={activeView === "routes" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => startTransition(() => setActiveView("routes"))}>
                   <Navigation className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline text-xs">Routes</span>
                 </Button>)}
-                {canOpenView("historical") && (<Button variant={activeView === "historical" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("historical")}>
+                {canOpenView("historical") && (<Button variant={activeView === "historical" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => startTransition(() => setActiveView("historical"))}>
                   <HistoryIcon className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline text-xs">Historical</span>
                 </Button>)}
-                {canOpenView("summary") && (<Button variant={activeView === "summary" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("summary")}>
+                {canOpenView("summary") && (<Button variant={activeView === "summary" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => startTransition(() => setActiveView("summary"))}>
                   <LayersIcon className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline text-xs">Summary</span>
                 </Button>)}
@@ -3051,7 +3054,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
           </div>
 
           {/* Map View */}
-          {activeView === "map" && (
+          {renderedView === "map" && (
             <MicroplanMap
               entries={filtered}
               projectName={selectedProjectName}
@@ -3064,7 +3067,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
           )}
 
           {/* List View — Planning table is admin (or lens-granted) only */}
-          {activeView === "list" && canOpenView("list") && (
+          {renderedView === "list" && canOpenView("list") && (
             <AdminListView
               entries={filtered}
               loading={loading}
@@ -3080,7 +3083,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
           )}
 
           {/* Medicine Allocation View */}
-          {activeView === "medicine" && (
+          {renderedView === "medicine" && (
             <>
             <GeoMedicineAllocationTable
               rows={medicineSourceEntries as any[]}
@@ -3681,12 +3684,12 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
           )}
 
           {/* Coverage View */}
-          {activeView === "coverage" && (
+          {renderedView === "coverage" && (
             <CoverageView entries={displayEntries} onRefresh={fetchEntries} projectId={selectedProjectId || null} projectName={selectedProjectName} />
           )}
 
           {/* Reconciliation View — Balance of medicine + reversal destination */}
-          {activeView === "reconciliation" && (
+          {renderedView === "reconciliation" && (
             <ReconciliationView
               entries={displayEntries as any}
               allocationRows={medicineAllocationData}
@@ -3696,7 +3699,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
           )}
 
           {/* Coverage Gaps — communities/settlements with no microplan entry */}
-          {activeView === "gaps" && (
+          {renderedView === "gaps" && (
             <MissingCommunitiesView
               entries={displayEntries as any}
               projectId={selectedProjectId || null}
@@ -3707,17 +3710,17 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
 
 
           {/* Travel Routes View */}
-          {activeView === "routes" && (
+          {renderedView === "routes" && (
             <TravelRouteMap entries={displayEntries} />
           )}
 
           {/* Historical Data Review — population trend vs WorldPop/GRID3 */}
-          {activeView === "historical" && (
+          {renderedView === "historical" && (
             <HistoricalDataReview entries={displayEntries as any} />
           )}
 
           {/* Summary — hierarchical LGA → Ward → Health Facility rollup */}
-          {activeView === "summary" && (
+          {renderedView === "summary" && (
             <MicroplanSummaryView
               entries={filtered as any}
               readOnly={lensReadOnly}
