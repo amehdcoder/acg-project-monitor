@@ -2461,21 +2461,21 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
   });
 
   return (
-    <div className="space-y-4 py-2">
+    <div className={entryOnly ? "space-y-4 py-2" : "geo-workspace space-y-4 py-2"}>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-1">
+      <div className="geo-command flex flex-col items-start justify-between gap-4">
         <div>
-          <h1 className="text-lg sm:text-xl font-extrabold text-foreground flex items-center gap-2 tracking-tight">
-            <div className="p-1.5 rounded-lg bg-primary/10">
-              <MapPin className="h-5 w-5 text-primary" />
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-3">
+            <div className="geo-command-icon p-2.5 rounded-lg">
+              <MapPin className="h-6 w-6" strokeWidth={1.6} />
             </div>
             {entryOnly ? "Microplan Entry Form" : "Geo-enabled Microplanning"}
           </h1>
-          <p className="text-xs text-muted-foreground mt-1 ml-10">
-            {entryOnly ? "Add new community-level microplanning entries" : "Community-level campaign planning with georeferenced data across all 36 states + FCT"}
+          <p className="text-xs text-muted-foreground mt-1.5 ml-14">
+            {entryOnly ? "Add new community-level microplanning entries" : `${selectedProjectName || "Project workspace"} · Nigeria · Programme planning`}
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap w-full">
           {!entryOnly && (
             <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
               <SelectTrigger className="w-[180px] h-9 text-xs border-primary/20 shadow-sm">
@@ -2488,35 +2488,79 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
               </SelectContent>
             </Select>
           )}
-          {!entryOnly && canManageAccess && (
-            <Button size="sm" variant="outline" onClick={openAccessManager} className="shadow-sm">
-              <UserPlus className="h-3.5 w-3.5 mr-1" /> Access
-            </Button>
-          )}
-          <Button size="sm" variant="outline" onClick={() => setShowDeleteRequestsPanel(true)} className="shadow-sm">
-            <ShieldCheck className="h-3.5 w-3.5 mr-1" />
-            {(isAdmin || isOwner) ? "Delete Requests" : "My Delete Requests"}
-          </Button>
-          <KoboSyncStatusChip projectId={selectedProjectId || null} onNewSuccess={fetchEntries} />
-          <TabSyncStatus projectId={selectedProjectId || null} table="microplan_entries" syncEventStatus="microplan_sync" onResync={fetchEntries} />
-          {isSuperAdmin && (
-            <Button size="sm" variant="outline" onClick={() => setShowKoboSettings(true)} className="shadow-sm">
-              <HistoryIcon className="h-3.5 w-3.5 mr-1" /> Kobo Sync
-            </Button>
-          )}
-          {!entryOnly && role === "super_admin" && (
-            <Button size="sm" variant="outline" disabled={!selectedProjectId} onClick={() => setShowPopulationSettings(true)}>
-              <Target className="h-3.5 w-3.5 mr-1" /> Population disaggregation
-            </Button>
-          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline" className="gap-1.5" title="Workspace settings">
+                <ShieldCheck className="h-3.5 w-3.5" /> Manage <ChevronDown className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuLabel>Workspace management</DropdownMenuLabel>
+              {!entryOnly && canManageAccess && <DropdownMenuItem onSelect={openAccessManager}><UserPlus className="h-4 w-4 mr-2" /> Access</DropdownMenuItem>}
+              <DropdownMenuItem onSelect={() => setShowDeleteRequestsPanel(true)}><ShieldCheck className="h-4 w-4 mr-2" /> {(isAdmin || isOwner) ? "Delete Requests" : "My Delete Requests"}</DropdownMenuItem>
+              {isSuperAdmin && <DropdownMenuItem onSelect={() => setShowKoboSettings(true)}><HistoryIcon className="h-4 w-4 mr-2" /> Kobo Sync</DropdownMenuItem>}
+              {!entryOnly && role === "super_admin" && <DropdownMenuItem disabled={!selectedProjectId} onSelect={() => setShowPopulationSettings(true)}><Target className="h-4 w-4 mr-2" /> Population disaggregation</DropdownMenuItem>}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button size="sm" onClick={() => { setEditingEntry(null); setShowForm(true); }} className="shadow-sm font-semibold">
             <Plus className="h-3.5 w-3.5 mr-1" /> Add Entry
           </Button>
+          <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto sm:ml-auto">
+            <KoboSyncStatusChip projectId={selectedProjectId || null} onNewSuccess={fetchEntries} />
+            <TabSyncStatus projectId={selectedProjectId || null} table="microplan_entries" syncEventStatus="microplan_sync" onResync={fetchEntries} />
+          </div>
         </div>
       </div>
 
       {!entryOnly && (
-        <div className="grid gap-3 md:grid-cols-[2fr_1fr]">
+        <div className="geo-navigation">
+            {/* Analytics/dashboard tabs are admin-only. Non-admin project members
+                only see their own submitted entries (Planning list) and the form. */}
+            {(isAdmin || lensEnabled) && (
+              <div className="geo-tabstrip flex max-w-full overflow-x-auto" aria-label="Microplanning views">
+                {canOpenView("list") && (<Button aria-pressed={activeView === "list"} title="Planning" variant={activeView === "list" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("list")}>
+                  <List className="h-3.5 w-3.5" />
+                  <span className="hidden md:inline text-xs">Planning</span>
+                </Button>)}
+                {canOpenView("medicine") && (<Button aria-pressed={activeView === "medicine"} title="Medicine" variant={activeView === "medicine" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("medicine")}>
+                  <Pill className="h-3.5 w-3.5" />
+                  <span className="hidden md:inline text-xs">Medicine</span>
+                </Button>)}
+                {canOpenView("coverage") && (<Button aria-pressed={activeView === "coverage"} title="Coverage" variant={activeView === "coverage" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("coverage")}>
+                  <Activity className="h-3.5 w-3.5" />
+                  <span className="hidden md:inline text-xs">Coverage</span>
+                </Button>)}
+                {canOpenView("reconciliation") && (<Button aria-pressed={activeView === "reconciliation"} title="Reconciliation" variant={activeView === "reconciliation" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("reconciliation")}>
+                  <Heart className="h-3.5 w-3.5" />
+                  <span className="hidden md:inline text-xs">Reconciliation</span>
+                </Button>)}
+                {canOpenView("gaps") && (<Button aria-pressed={activeView === "gaps"} title="Gaps" variant={activeView === "gaps" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("gaps")}>
+                  <Target className="h-3.5 w-3.5" />
+                  <span className="hidden md:inline text-xs">Gaps</span>
+                </Button>)}
+                {canOpenView("map") && (<Button aria-pressed={activeView === "map"} title="Map" variant={activeView === "map" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("map")}>
+                  <MapIcon className="h-3.5 w-3.5" />
+                  <span className="hidden md:inline text-xs">Map</span>
+                </Button>)}
+                {canOpenView("routes") && (<Button aria-pressed={activeView === "routes"} title="Routes" variant={activeView === "routes" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("routes")}>
+                  <Navigation className="h-3.5 w-3.5" />
+                  <span className="hidden md:inline text-xs">Routes</span>
+                </Button>)}
+                {canOpenView("historical") && (<Button aria-pressed={activeView === "historical"} title="Historical" variant={activeView === "historical" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("historical")}>
+                  <HistoryIcon className="h-3.5 w-3.5" />
+                  <span className="hidden md:inline text-xs">Historical</span>
+                </Button>)}
+                {canOpenView("summary") && (<Button aria-pressed={activeView === "summary"} title="Summary" variant={activeView === "summary" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("summary")}>
+                  <LayersIcon className="h-3.5 w-3.5" />
+                  <span className="hidden md:inline text-xs">Summary</span>
+                </Button>)}
+              </div>
+            )}
+        </div>
+      )}
+
+      {!entryOnly && (
+        <div className="geo-services grid gap-3 lg:grid-cols-[2fr_1fr]">
           <Dhis2MicroplanEngine
             projectId={selectedProjectId}
             projectName={projects.find(p => p.id === selectedProjectId)?.name ?? null}
@@ -2564,28 +2608,28 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
           })()}
 
           {/* ===== FIONET-STYLE KPI DASHBOARD ===== */}
-          {/* Row 1: Primary colored KPI blocks */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+          {/* Primary project metrics */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
             {[
-              { label: "Communities", value: filtered.length.toLocaleString(), icon: Building2, bg: "hsl(215, 70%, 32%)" },
-              { label: "Total Population", value: totalPop.toLocaleString(), icon: Users, bg: "hsl(215, 65%, 38%)" },
-              { label: "Target Population", value: targetPop.toLocaleString(), icon: Target, bg: "hsl(142, 60%, 35%)" },
-              { label: "Health Facilities", value: String(uniqueFLHFs), icon: Heart, bg: "hsl(262, 50%, 40%)" },
-              { label: "Households", value: totalHouseholds.toLocaleString(), icon: Home, bg: "hsl(25, 70%, 45%)" },
-              { label: "Geotagged", value: `${geotagged}/${filtered.length}`, icon: Globe, bg: geotaggedPct >= 70 ? "hsl(142, 60%, 35%)" : geotaggedPct >= 40 ? "hsl(45, 80%, 45%)" : "hsl(0, 65%, 48%)" },
+              { label: "Communities", value: filtered.length.toLocaleString(), icon: Building2, tone: "geo-metric-blue" },
+              { label: "Total Population", value: totalPop.toLocaleString(), icon: Users, tone: "geo-metric-blue" },
+              { label: "Target Population", value: targetPop.toLocaleString(), icon: Target, tone: "geo-metric-teal" },
+              { label: "Health Facilities", value: String(uniqueFLHFs), icon: Heart, tone: "geo-metric-violet" },
+              { label: "Households", value: totalHouseholds.toLocaleString(), icon: Home, tone: "geo-metric-amber" },
+              { label: "Geotagged", value: `${geotagged}/${filtered.length}`, icon: Globe, tone: geotaggedPct >= 70 ? "geo-metric-teal" : geotaggedPct >= 40 ? "geo-metric-amber" : "geo-metric-red" },
             ].map(kpi => (
-              <div key={kpi.label} className="rounded-xl p-3 text-white text-center shadow-md" style={{ background: kpi.bg }}>
-                <div className="flex items-center justify-center gap-1.5">
-                  <kpi.icon className="h-3.5 w-3.5 opacity-80" />
-                  <p className="text-[9px] font-bold uppercase tracking-wider opacity-90">{kpi.label}</p>
+              <div key={kpi.label} className={`geo-metric ${kpi.tone}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-[11px] font-medium text-muted-foreground pt-1">{kpi.label}</p>
+                  <span className="geo-metric-icon shrink-0"><kpi.icon className="h-4 w-4" strokeWidth={1.7} /></span>
                 </div>
-                <p className="text-lg sm:text-xl font-black tabular-nums leading-none mt-0.5">{kpi.value}</p>
+                <p className="text-xl font-bold tabular-nums text-foreground leading-tight mt-2 break-words">{kpi.value}</p>
               </div>
             ))}
           </div>
 
           {/* Row 2: Secondary KPI strip */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+          <div className="geo-secondary-metrics grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-0">
             {[
               { label: "States", value: uniqueStatesCount },
               { label: "LGAs", value: uniqueLGAsCount },
@@ -2606,13 +2650,13 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
           </div>
 
           {/* Row 3: Breakdown panels — Accessibility, Security, Terrain, CDD (click to filter) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 items-start gap-2">
+          <div className="geo-breakdowns grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 items-start gap-3">
             {/* Accessibility */}
             <Card className="border-border/40 shadow-sm">
               <CardContent className="p-3">
                 <div className="flex items-center justify-between mb-2.5">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(142, 60%, 35%)" }} />
+                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(var(--status-success))" }} />
                     <span id="disagg-accessibility">Accessibility</span>
                   </p>
                   {filterAccessibility !== "all" && (
@@ -2621,11 +2665,11 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
                 </div>
                 <div className="space-y-2">
                   {[
-                    { key: "accessible", label: "Accessible", count: accessStats.accessible, color: "hsl(142, 60%, 35%)" },
-                    { key: "hard_to_reach", label: "Hard to Reach", count: accessStats.hard_to_reach, color: "hsl(45, 80%, 50%)" },
-                    { key: "inaccessible", label: "Inaccessible", count: accessStats.inaccessible, color: "hsl(0, 70%, 50%)" },
-                    { key: "seasonal", label: "Seasonal", count: accessStats.seasonal, color: "hsl(262, 50%, 55%)" },
-                    { key: "unset", label: "Not Set", count: accessStats.unset, color: "hsl(220, 10%, 70%)" },
+                    { key: "accessible", label: "Accessible", count: accessStats.accessible, color: "hsl(var(--status-success))" },
+                    { key: "hard_to_reach", label: "Hard to Reach", count: accessStats.hard_to_reach, color: "hsl(var(--status-warning))" },
+                    { key: "inaccessible", label: "Inaccessible", count: accessStats.inaccessible, color: "hsl(var(--status-danger))" },
+                    { key: "seasonal", label: "Seasonal", count: accessStats.seasonal, color: "hsl(var(--chart-accent))" },
+                    { key: "unset", label: "Not Set", count: accessStats.unset, color: "hsl(var(--muted-foreground))" },
                   ].map(item => {
                     const active = filterAccessibility === item.key;
                     return (
@@ -2652,7 +2696,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
               <CardContent className="p-3">
                 <div className="flex items-center justify-between mb-2.5">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(215, 70%, 40%)" }} />
+                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(var(--chart-primary))" }} />
                     <span id="disagg-security">Security Clearance</span>
                   </p>
                   {filterSecurity !== "all" && (
@@ -2661,10 +2705,10 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
                 </div>
                 <div className="space-y-2">
                   {[
-                    { key: "cleared", label: "Cleared", count: securityStats.cleared, color: "hsl(142, 60%, 35%)" },
-                    { key: "partial", label: "Partial", count: securityStats.partial, color: "hsl(45, 80%, 50%)" },
-                    { key: "not_cleared", label: "Not Cleared", count: securityStats.not_cleared, color: "hsl(0, 70%, 50%)" },
-                    { key: "unknown", label: "Unknown", count: securityStats.unknown, color: "hsl(220, 10%, 70%)" },
+                    { key: "cleared", label: "Cleared", count: securityStats.cleared, color: "hsl(var(--status-success))" },
+                    { key: "partial", label: "Partial", count: securityStats.partial, color: "hsl(var(--status-warning))" },
+                    { key: "not_cleared", label: "Not Cleared", count: securityStats.not_cleared, color: "hsl(var(--status-danger))" },
+                    { key: "unknown", label: "Unknown", count: securityStats.unknown, color: "hsl(var(--muted-foreground))" },
                   ].map(item => {
                     const active = filterSecurity === item.key;
                     return (
@@ -2691,7 +2735,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
               <CardContent className="p-3">
                 <div className="flex items-center justify-between mb-2.5">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(25, 70%, 45%)" }} />
+                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(var(--chart-highlight))" }} />
                     <span id="disagg-terrain">Terrain Types</span>
                   </p>
                   {filterTerrain !== "all" && (
@@ -2725,7 +2769,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
               <CardContent className="p-3">
                 <div className="flex items-center justify-between mb-2.5">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(262, 55%, 52%)" }} />
+                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(var(--chart-accent))" }} />
                     <span id="disagg-disability">Disability Types</span>
                   </p>
                   {filterDisability !== "all" && (
@@ -2773,7 +2817,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
               <CardContent className="p-3">
                 <div className="flex items-center justify-between mb-2.5">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(262, 50%, 50%)" }} />
+                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(var(--chart-accent))" }} />
                     <span id="disagg-keyRatio">Key Ratios</span>
                   </p>
                   {filterKeyRatio !== "all" && (
@@ -2787,12 +2831,12 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
                   >
                     <div className="flex justify-between text-xs mb-1">
                       <span className="text-muted-foreground">CDD from Community</span>
-                      <span className="font-bold" style={{ color: cddPct >= 70 ? "hsl(142, 60%, 35%)" : cddPct >= 40 ? "hsl(45, 80%, 45%)" : "hsl(0, 65%, 48%)" }}>
+                      <span className="font-bold" style={{ color: cddPct >= 70 ? "hsl(var(--status-success))" : cddPct >= 40 ? "hsl(var(--status-warning))" : "hsl(var(--status-danger))" }}>
                         {cddPct.toFixed(0)}%
                       </span>
                     </div>
                     <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full rounded-full transition-all" style={{ width: `${cddPct}%`, background: cddPct >= 70 ? "hsl(142, 60%, 35%)" : cddPct >= 40 ? "hsl(45, 80%, 45%)" : "hsl(0, 65%, 48%)" }} />
+                      <div className="h-full rounded-full transition-all" style={{ width: `${cddPct}%`, background: cddPct >= 70 ? "hsl(var(--status-success))" : cddPct >= 40 ? "hsl(var(--status-warning))" : "hsl(var(--status-danger))" }} />
                     </div>
                     <p className="text-[9px] text-muted-foreground mt-0.5">{cddFromCommunity} of {filtered.length} communities</p>
                   </button>
@@ -2802,10 +2846,10 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
                   >
                     <div className="flex justify-between text-xs mb-1">
                       <span className="text-muted-foreground">Hard to Reach</span>
-                      <span className="font-bold" style={{ color: "hsl(45, 80%, 45%)" }}>{hardToReach}</span>
+                      <span className="font-bold" style={{ color: "hsl(var(--status-warning))" }}>{hardToReach}</span>
                     </div>
                     <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full rounded-full transition-all" style={{ width: `${filtered.length ? (hardToReach / filtered.length) * 100 : 0}%`, background: "hsl(45, 80%, 45%)" }} />
+                      <div className="h-full rounded-full transition-all" style={{ width: `${filtered.length ? (hardToReach / filtered.length) * 100 : 0}%`, background: "hsl(var(--status-warning))" }} />
                     </div>
                   </button>
                   <div className="p-1.5">
@@ -2896,8 +2940,8 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
 
 
 
-          {/* Filters & View Toggle */}
-          <div className="flex items-center gap-2 flex-wrap">
+          {/* Dataset filters */}
+          <div className="geo-navigation flex items-center gap-2 flex-wrap">
             <div className="relative flex-1 min-w-[180px]">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
               <Input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search communities, FLHF..." className="pl-8 h-8 text-xs" />
@@ -2933,48 +2977,6 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
                 <SelectItem value="seasonal">Seasonal</SelectItem>
               </SelectContent>
             </Select>
-            {/* Analytics/dashboard tabs are admin-only. Non-admin project members
-                only see their own submitted entries (Planning list) and the form. */}
-            {(isAdmin || lensEnabled) && (
-              <div className="flex max-w-full border border-border rounded-lg overflow-x-auto">
-                {canOpenView("list") && (<Button variant={activeView === "list" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("list")}>
-                  <List className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline text-xs">Planning</span>
-                </Button>)}
-                {canOpenView("medicine") && (<Button variant={activeView === "medicine" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("medicine")}>
-                  <Pill className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline text-xs">Medicine</span>
-                </Button>)}
-                {canOpenView("coverage") && (<Button variant={activeView === "coverage" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("coverage")}>
-                  <Activity className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline text-xs">Coverage</span>
-                </Button>)}
-                {canOpenView("reconciliation") && (<Button variant={activeView === "reconciliation" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("reconciliation")}>
-                  <Heart className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline text-xs">Reconciliation</span>
-                </Button>)}
-                {canOpenView("gaps") && (<Button variant={activeView === "gaps" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("gaps")}>
-                  <Target className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline text-xs">Gaps</span>
-                </Button>)}
-                {canOpenView("map") && (<Button variant={activeView === "map" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("map")}>
-                  <MapIcon className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline text-xs">Map</span>
-                </Button>)}
-                {canOpenView("routes") && (<Button variant={activeView === "routes" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("routes")}>
-                  <Navigation className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline text-xs">Routes</span>
-                </Button>)}
-                {canOpenView("historical") && (<Button variant={activeView === "historical" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("historical")}>
-                  <HistoryIcon className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline text-xs">Historical</span>
-                </Button>)}
-                {canOpenView("summary") && (<Button variant={activeView === "summary" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("summary")}>
-                  <LayersIcon className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline text-xs">Summary</span>
-                </Button>)}
-              </div>
-            )}
             {(isAdmin || (lensEnabled && lens?.can_export)) && (
               <MdaLensExportButton
                 title="Geo Microplanning — Scoped Export"
@@ -2997,7 +2999,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
           </div>
 
           {/* Export / Import bar */}
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="geo-exportbar flex items-center gap-2 flex-wrap">
             <Button size="sm" variant="outline" onClick={() => handleExportTemplate(false)}>
               <FileSpreadsheet className="h-3.5 w-3.5 mr-1" /> Download Blank Template
             </Button>
