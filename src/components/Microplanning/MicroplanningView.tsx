@@ -2463,7 +2463,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
   return (
     <div className={entryOnly ? "space-y-4 py-2" : "geo-workspace space-y-4 py-2"}>
       {/* Header */}
-      <div className="geo-command flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4">
+      <div className="geo-command flex flex-col items-start justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-3">
             <div className="geo-command-icon p-2.5 rounded-lg">
@@ -2475,7 +2475,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
             {entryOnly ? "Add new community-level microplanning entries" : `${selectedProjectName || "Project workspace"} · Nigeria · Programme planning`}
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap w-full">
           {!entryOnly && (
             <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
               <SelectTrigger className="w-[180px] h-9 text-xs border-primary/20 shadow-sm">
@@ -2488,30 +2488,27 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
               </SelectContent>
             </Select>
           )}
-          {!entryOnly && canManageAccess && (
-            <Button size="sm" variant="outline" onClick={openAccessManager} className="shadow-sm">
-              <UserPlus className="h-3.5 w-3.5 mr-1" /> Access
-            </Button>
-          )}
-          <Button size="sm" variant="outline" onClick={() => setShowDeleteRequestsPanel(true)} className="shadow-sm">
-            <ShieldCheck className="h-3.5 w-3.5 mr-1" />
-            {(isAdmin || isOwner) ? "Delete Requests" : "My Delete Requests"}
-          </Button>
-          <KoboSyncStatusChip projectId={selectedProjectId || null} onNewSuccess={fetchEntries} />
-          <TabSyncStatus projectId={selectedProjectId || null} table="microplan_entries" syncEventStatus="microplan_sync" onResync={fetchEntries} />
-          {isSuperAdmin && (
-            <Button size="sm" variant="outline" onClick={() => setShowKoboSettings(true)} className="shadow-sm">
-              <HistoryIcon className="h-3.5 w-3.5 mr-1" /> Kobo Sync
-            </Button>
-          )}
-          {!entryOnly && role === "super_admin" && (
-            <Button size="sm" variant="outline" disabled={!selectedProjectId} onClick={() => setShowPopulationSettings(true)}>
-              <Target className="h-3.5 w-3.5 mr-1" /> Population disaggregation
-            </Button>
-          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline" className="gap-1.5" title="Workspace settings">
+                <ShieldCheck className="h-3.5 w-3.5" /> Manage <ChevronDown className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuLabel>Workspace management</DropdownMenuLabel>
+              {!entryOnly && canManageAccess && <DropdownMenuItem onSelect={openAccessManager}><UserPlus className="h-4 w-4 mr-2" /> Access</DropdownMenuItem>}
+              <DropdownMenuItem onSelect={() => setShowDeleteRequestsPanel(true)}><ShieldCheck className="h-4 w-4 mr-2" /> {(isAdmin || isOwner) ? "Delete Requests" : "My Delete Requests"}</DropdownMenuItem>
+              {isSuperAdmin && <DropdownMenuItem onSelect={() => setShowKoboSettings(true)}><HistoryIcon className="h-4 w-4 mr-2" /> Kobo Sync</DropdownMenuItem>}
+              {!entryOnly && role === "super_admin" && <DropdownMenuItem disabled={!selectedProjectId} onSelect={() => setShowPopulationSettings(true)}><Target className="h-4 w-4 mr-2" /> Population disaggregation</DropdownMenuItem>}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button size="sm" onClick={() => { setEditingEntry(null); setShowForm(true); }} className="shadow-sm font-semibold">
             <Plus className="h-3.5 w-3.5 mr-1" /> Add Entry
           </Button>
+          <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto sm:ml-auto">
+            <KoboSyncStatusChip projectId={selectedProjectId || null} onNewSuccess={fetchEntries} />
+            <TabSyncStatus projectId={selectedProjectId || null} table="microplan_entries" syncEventStatus="microplan_sync" onResync={fetchEntries} />
+          </div>
         </div>
       </div>
 
@@ -2659,7 +2656,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
               <CardContent className="p-3">
                 <div className="flex items-center justify-between mb-2.5">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(142, 60%, 35%)" }} />
+                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(var(--status-success))" }} />
                     <span id="disagg-accessibility">Accessibility</span>
                   </p>
                   {filterAccessibility !== "all" && (
@@ -2668,11 +2665,11 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
                 </div>
                 <div className="space-y-2">
                   {[
-                    { key: "accessible", label: "Accessible", count: accessStats.accessible, color: "hsl(142, 60%, 35%)" },
-                    { key: "hard_to_reach", label: "Hard to Reach", count: accessStats.hard_to_reach, color: "hsl(45, 80%, 50%)" },
-                    { key: "inaccessible", label: "Inaccessible", count: accessStats.inaccessible, color: "hsl(0, 70%, 50%)" },
-                    { key: "seasonal", label: "Seasonal", count: accessStats.seasonal, color: "hsl(262, 50%, 55%)" },
-                    { key: "unset", label: "Not Set", count: accessStats.unset, color: "hsl(220, 10%, 70%)" },
+                    { key: "accessible", label: "Accessible", count: accessStats.accessible, color: "hsl(var(--status-success))" },
+                    { key: "hard_to_reach", label: "Hard to Reach", count: accessStats.hard_to_reach, color: "hsl(var(--status-warning))" },
+                    { key: "inaccessible", label: "Inaccessible", count: accessStats.inaccessible, color: "hsl(var(--status-danger))" },
+                    { key: "seasonal", label: "Seasonal", count: accessStats.seasonal, color: "hsl(var(--chart-accent))" },
+                    { key: "unset", label: "Not Set", count: accessStats.unset, color: "hsl(var(--muted-foreground))" },
                   ].map(item => {
                     const active = filterAccessibility === item.key;
                     return (
@@ -2699,7 +2696,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
               <CardContent className="p-3">
                 <div className="flex items-center justify-between mb-2.5">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(215, 70%, 40%)" }} />
+                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(var(--chart-primary))" }} />
                     <span id="disagg-security">Security Clearance</span>
                   </p>
                   {filterSecurity !== "all" && (
@@ -2708,10 +2705,10 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
                 </div>
                 <div className="space-y-2">
                   {[
-                    { key: "cleared", label: "Cleared", count: securityStats.cleared, color: "hsl(142, 60%, 35%)" },
-                    { key: "partial", label: "Partial", count: securityStats.partial, color: "hsl(45, 80%, 50%)" },
-                    { key: "not_cleared", label: "Not Cleared", count: securityStats.not_cleared, color: "hsl(0, 70%, 50%)" },
-                    { key: "unknown", label: "Unknown", count: securityStats.unknown, color: "hsl(220, 10%, 70%)" },
+                    { key: "cleared", label: "Cleared", count: securityStats.cleared, color: "hsl(var(--status-success))" },
+                    { key: "partial", label: "Partial", count: securityStats.partial, color: "hsl(var(--status-warning))" },
+                    { key: "not_cleared", label: "Not Cleared", count: securityStats.not_cleared, color: "hsl(var(--status-danger))" },
+                    { key: "unknown", label: "Unknown", count: securityStats.unknown, color: "hsl(var(--muted-foreground))" },
                   ].map(item => {
                     const active = filterSecurity === item.key;
                     return (
@@ -2738,7 +2735,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
               <CardContent className="p-3">
                 <div className="flex items-center justify-between mb-2.5">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(25, 70%, 45%)" }} />
+                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(var(--chart-highlight))" }} />
                     <span id="disagg-terrain">Terrain Types</span>
                   </p>
                   {filterTerrain !== "all" && (
@@ -2772,7 +2769,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
               <CardContent className="p-3">
                 <div className="flex items-center justify-between mb-2.5">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(262, 55%, 52%)" }} />
+                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(var(--chart-accent))" }} />
                     <span id="disagg-disability">Disability Types</span>
                   </p>
                   {filterDisability !== "all" && (
@@ -2820,7 +2817,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
               <CardContent className="p-3">
                 <div className="flex items-center justify-between mb-2.5">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(262, 50%, 50%)" }} />
+                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(var(--chart-accent))" }} />
                     <span id="disagg-keyRatio">Key Ratios</span>
                   </p>
                   {filterKeyRatio !== "all" && (
@@ -2834,12 +2831,12 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
                   >
                     <div className="flex justify-between text-xs mb-1">
                       <span className="text-muted-foreground">CDD from Community</span>
-                      <span className="font-bold" style={{ color: cddPct >= 70 ? "hsl(142, 60%, 35%)" : cddPct >= 40 ? "hsl(45, 80%, 45%)" : "hsl(0, 65%, 48%)" }}>
+                      <span className="font-bold" style={{ color: cddPct >= 70 ? "hsl(var(--status-success))" : cddPct >= 40 ? "hsl(var(--status-warning))" : "hsl(var(--status-danger))" }}>
                         {cddPct.toFixed(0)}%
                       </span>
                     </div>
                     <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full rounded-full transition-all" style={{ width: `${cddPct}%`, background: cddPct >= 70 ? "hsl(142, 60%, 35%)" : cddPct >= 40 ? "hsl(45, 80%, 45%)" : "hsl(0, 65%, 48%)" }} />
+                      <div className="h-full rounded-full transition-all" style={{ width: `${cddPct}%`, background: cddPct >= 70 ? "hsl(var(--status-success))" : cddPct >= 40 ? "hsl(var(--status-warning))" : "hsl(var(--status-danger))" }} />
                     </div>
                     <p className="text-[9px] text-muted-foreground mt-0.5">{cddFromCommunity} of {filtered.length} communities</p>
                   </button>
@@ -2849,10 +2846,10 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
                   >
                     <div className="flex justify-between text-xs mb-1">
                       <span className="text-muted-foreground">Hard to Reach</span>
-                      <span className="font-bold" style={{ color: "hsl(45, 80%, 45%)" }}>{hardToReach}</span>
+                      <span className="font-bold" style={{ color: "hsl(var(--status-warning))" }}>{hardToReach}</span>
                     </div>
                     <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full rounded-full transition-all" style={{ width: `${filtered.length ? (hardToReach / filtered.length) * 100 : 0}%`, background: "hsl(45, 80%, 45%)" }} />
+                      <div className="h-full rounded-full transition-all" style={{ width: `${filtered.length ? (hardToReach / filtered.length) * 100 : 0}%`, background: "hsl(var(--status-warning))" }} />
                     </div>
                   </button>
                   <div className="p-1.5">
