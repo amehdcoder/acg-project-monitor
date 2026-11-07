@@ -1,8 +1,8 @@
 import { binomCdf, decisionRule } from "./lqas";
 
 export const WHO_LQAS_SOURCES = [
-  { label: "WHO · Preventive chemotherapy coverage surveys", url: "https://www.who.int/publications/i/item/9789241517369" },
-  { label: "WHO · Monitoring drug coverage for preventive chemotherapy", url: "https://www.who.int/publications/i/item/9789241595806" },
+  { label: "WHO · Preventive chemotherapy coverage surveys (2019)", url: "https://www.who.int/publications/i/item/9789241516464" },
+  { label: "WHO · Lymphatic filariasis monitoring manual (2025)", url: "https://espen.afro.who.int/sites/default/files/content/document/New%20LF%20M%26%20E%20Manual-eng.pdf" },
 ];
 
 export function assessDesign(n: number, upper: number, lower: number) {

@@ -14,11 +14,13 @@ import { aggregateCoverage, buildPlan, decisionRule, DEFAULT_SAMPLE, EU_LEVELS, 
 import LqasRounds from "./LqasRounds";
 import LqasReports from "./LqasReports";
 import LqasKoboCard from "./LqasKoboCard";
+import LqasStandards from "./LqasStandards";
+import { classifySample } from "@/lib/lqas/quality";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { RoundEntry } from "@/lib/lqas/rounds";
 import { buildLqasXlsForm, buildPaperPack, downloadBlob } from "@/lib/lqas/forms";
 
-interface ResultRow { id: string; eu_level: string; eu_name: string; state: string | null; lga: string | null; ward: string | null; flhf_name: string | null; community_name: string | null; sampled: number; covered: number; team: string | null; security_mode: boolean; submitted_at: string | null; created_at: string }
+interface ResultRow { id: string; round_id: string | null; lot_id: string | null; payload: unknown; eu_level: string; eu_name: string; state: string | null; lga: string | null; ward: string | null; flhf_name: string | null; community_name: string | null; sampled: number; covered: number; team: string | null; security_mode: boolean; submitted_at: string | null; created_at: string }
 
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
 
@@ -33,6 +35,8 @@ export default function LqasView() {
   const [target, setTarget] = useState(80);
   const [stateFilter, setStateFilter] = useState("all");
   const [indicator, setIndicator] = useState("Did this person swallow the medicine during the recent MDA?");
+  const [entriesRevision, setEntriesRevision] = useState(0);
+  const [resultPage, setResultPage] = useState(0);
 
   useEffect(() => {
     supabase.from("projects").select("id, name").order("name").then(({ data }) => {
@@ -52,19 +56,31 @@ export default function LqasView() {
         const { data, error } = await supabase.from("microplan_entries")
           .select("state, lga, ward, flhf_name, community_name, estimated_total_population, number_of_households, security_clearance, accessibility, community_latitude, community_longitude")
           .eq("project_id", projectId).order("id").range(from, from + 999);
-        if (error || !data?.length) break;
+        if (cancelled) return;
+        if (error) { if (!cancelled) { toast.error("Microplanning data could not be refreshed. Previous data is retained."); setLoading(false); } return; }
+        if (!data?.length) break;
         rows.push(...(data as RoundEntry[]));
         if (data.length < 1000) break;
       }
       if (!cancelled) { setEntries(rows); setLoading(false); }
     })();
     return () => { cancelled = true; };
+  }, [projectId, entriesRevision]);
+
+  useEffect(() => {
+    setEntries([]); setResults([]); setStateFilter("all"); setResultPage(0);
+    if (!projectId) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const refresh = () => { clearTimeout(timer); timer = setTimeout(() => setEntriesRevision((v) => v + 1), 800); };
+    const ch = supabase.channel(`lqas-frame-${projectId}`).on("postgres_changes", { event: "*", schema: "public", table: "microplan_entries", filter: `project_id=eq.${projectId}` }, refresh).subscribe();
+    window.addEventListener("online", refresh);
+    return () => { clearTimeout(timer); window.removeEventListener("online", refresh); supabase.removeChannel(ch); };
   }, [projectId]);
 
   const loadResults = useCallback(async () => {
     if (!projectId) return;
     const { data } = await supabase.from("lqas_results").select("*").eq("project_id", projectId).order("created_at", { ascending: false }).limit(5000);
-    setResults((data ?? []) as ResultRow[]);
+    if (data) setResults(data as ResultRow[]);
   }, [projectId]);
 
   useEffect(() => {
@@ -86,31 +102,33 @@ export default function LqasView() {
 
   const lots = useMemo(() => {
     const popByKey = new Map(plans.map((p) => [p.key, p.population]));
-    return results.filter((r) => r.eu_level === level && (stateFilter === "all" || r.state === stateFilter)).map((r) => {
+    return results.filter((r) => !r.round_id && r.eu_level === level && (stateFilter === "all" || r.state === stateFilter)).map((r) => {
       const key = euKey({ state: r.state ?? "", lga: r.lga ?? "", ward: r.ward ?? "", flhf_name: r.flhf_name ?? "", community_name: r.community_name ?? "" }, level);
       return { ...r, key, population: popByKey.get(key) ?? 0 };
     });
   }, [results, plans, level, stateFilter]);
-  const agg = aggregateCoverage(lots, t);
-  const previousFails = useMemo(() => new Set(results.filter((r) => r.sampled > 0 && lotDecision(r.covered, r.sampled, t) === "mop_up").flatMap((r) => [r.eu_name, r.ward, r.community_name, r.lga].filter(Boolean).map((v) => String(v).trim().replace(/\s+/g, " ").toUpperCase()))), [results, t]);
+  const previousFails = useMemo(() => new Set<string>(), []);
   const insecure = plans.filter((p) => p.securityMode).length;
+  const frameMissing = plans.reduce((s, p) => s + p.frameMissing, 0);
+  const download = (make: () => Blob, name: string) => { try { downloadBlob(make(), name); } catch (e) { toast.error((e as Error).message); } };
 
   const webhook = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/kobo-webhook?form_type=lqas&project_id=${projectId}${user ? `&submitted_by=${user.id}` : ""}`;
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
-      <div className="rounded-2xl bg-gradient-to-r from-primary to-accent p-6 text-primary-foreground shadow-lg">
+    <div className="geo-workspace space-y-5 p-4 md:p-6">
+      <div className="geo-command">
         <div className="flex flex-wrap items-center gap-3">
-          <ClipboardCheck className="h-8 w-8" />
+          <div className="geo-command-icon rounded-lg p-3"><ClipboardCheck className="h-6 w-6" /></div>
           <div>
             <h1 className="text-2xl font-bold">LQAS Coverage Evaluation</h1>
-            <p className="text-sm opacity-90">Plan lots from Geo Microplanning, print paper forms, enter in KoboCollect and get mop-up decisions live.</p>
+            <p className="text-sm text-muted-foreground">{projectName} · Survey planning &amp; operational lot classification</p>
           </div>
         </div>
       </div>
 
       <Tabs defaultValue="plan">
-      <TabsList><TabsTrigger value="plan">Plan &amp; rounds</TabsTrigger><TabsTrigger value="reports">LQAS reports</TabsTrigger></TabsList>
+      <TabsList className="h-auto flex flex-wrap justify-start gap-1"><TabsTrigger value="plan">Plan &amp; rounds</TabsTrigger><TabsTrigger value="reports">LQAS reports</TabsTrigger><TabsTrigger value="standards">WHO guidance</TabsTrigger></TabsList>
+      <TabsContent value="standards"><LqasStandards /></TabsContent>
       <TabsContent value="reports" className="mt-4"><LqasReports projectId={projectId} /></TabsContent>
       <TabsContent value="plan" className="mt-4 space-y-6">
       <Card>
@@ -138,7 +156,7 @@ export default function LqasView() {
       <div className="grid gap-4 md:grid-cols-4">
         {[
           { label: "Evaluation Units", value: plans.length.toLocaleString() },
-          { label: "Households to sample", value: (plans.length * DEFAULT_SAMPLE).toLocaleString() },
+          { label: "Eligible-person sample slots", value: plans.reduce((s, p) => s + p.sample.length, 0).toLocaleString() },
           { label: "Security-restricted lots", value: insecure.toLocaleString(), warn: insecure > 0 },
           { label: "Communities in plan", value: scoped.length.toLocaleString() },
         ].map((k) => (
@@ -148,6 +166,7 @@ export default function LqasView() {
           </CardContent></Card>
         ))}
       </div>
+      <div className={`border-l-4 p-3 text-sm ${frameMissing ? "border-destructive bg-destructive/5" : "border-primary bg-primary/5"}`}><strong>{frameMissing ? `${frameMissing} entries need sampling-frame corrections` : "Probability sampling frame"}</strong><p className="mt-1 text-xs text-muted-foreground">Recorded population weights only · fixed round samples · one randomly selected eligible person per household. A 19-person design is configurable, not a universal WHO protocol.</p></div>
 
       <LqasRounds projectId={projectId} entries={entries} previousFails={previousFails} projectName={projectName} indicator={indicator} />
 
@@ -156,8 +175,8 @@ export default function LqasView() {
       <Card>
         <CardHeader><CardTitle className="text-base">2 · Download forms for the teams</CardTitle></CardHeader>
         <CardContent className="flex flex-wrap gap-3">
-          <Button disabled={!plans.length} onClick={() => downloadBlob(buildPaperPack(plans, ctx), `LQAS_paper_forms_${level}.pdf`)}><Download className="mr-2 h-4 w-4" />All paper forms (PDF)</Button>
-          <Button variant="destructive" disabled={!insecure} onClick={() => downloadBlob(buildPaperPack(plans, ctx, { securityOnly: true }), `LQAS_security_restricted_${level}.pdf`)}><ShieldAlert className="mr-2 h-4 w-4" />Security-restricted area pack</Button>
+          <Button disabled={!plans.length || frameMissing > 0} onClick={() => download(() => buildPaperPack(plans, ctx), `LQAS_paper_forms_${level}.pdf`)}><Download className="mr-2 h-4 w-4" />All paper forms (PDF)</Button>
+          <Button variant="destructive" disabled={!insecure || frameMissing > 0} onClick={() => download(() => buildPaperPack(plans, ctx, { securityOnly: true }), `LQAS_security_restricted_${level}.pdf`)}><ShieldAlert className="mr-2 h-4 w-4" />Security-restricted area pack</Button>
           <Button variant="outline" onClick={() => downloadBlob(buildLqasXlsForm(ctx), `LQAS_KoboCollect_form.xlsx`)}><FileSpreadsheet className="mr-2 h-4 w-4" />KoboCollect form (XLSForm)</Button>
           <div className="w-full rounded-lg border bg-muted/40 p-3 text-xs">
             <div className="mb-1 font-semibold">Kobo REST Service link (paste in KoboToolbox → Settings → REST Services):</div>
@@ -169,34 +188,29 @@ export default function LqasView() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">3 · Results &amp; mop-up decisions</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">3 · Unlinked submission review</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-4">
-            <div className="rounded-xl bg-primary/10 p-4"><div className="text-xs text-muted-foreground">Inferred coverage</div><div className="text-2xl font-bold text-primary">{agg.lots ? pct(agg.coverage) : "—"}</div><div className="text-xs">{agg.lots ? `95% CI ${pct(agg.lower)}–${pct(agg.upper)}` : "No lots reported"}</div></div>
-            <div className="rounded-xl bg-muted p-4"><div className="text-xs text-muted-foreground">Lots reported</div><div className="text-2xl font-bold">{agg.lots} / {plans.length}</div></div>
-            <div className="rounded-xl bg-accent/20 p-4"><div className="text-xs text-muted-foreground">Passed</div><div className="text-2xl font-bold">{agg.passed}</div></div>
-            <div className="rounded-xl bg-destructive/10 p-4"><div className="text-xs text-muted-foreground">Mop-up required</div><div className="text-2xl font-bold text-destructive">{agg.mopUp}</div></div>
-          </div>
+          <p className="text-sm text-muted-foreground">{lots.length} unlinked submissions. Historical submissions are not pooled across campaigns. Authoritative saved-design decisions appear in LQAS reports; unlinked records require supervisor review.</p>
           <div className="max-h-[480px] overflow-auto rounded-lg border">
             <Table>
               <TableHeader><TableRow><TableHead>Evaluation Unit</TableHead><TableHead>LGA</TableHead><TableHead>Team</TableHead><TableHead>Covered / sampled</TableHead><TableHead>Coverage</TableHead><TableHead>Decision</TableHead></TableRow></TableHeader>
               <TableBody>
                 {lots.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Results appear here as soon as teams submit in KoboCollect.</TableCell></TableRow>}
-                {lots.map((r) => {
-                  const dec = lotDecision(r.covered, r.sampled, t);
+                {lots.slice(resultPage * 20, (resultPage + 1) * 20).map((r) => {
                   return (
                     <TableRow key={r.id}>
                       <TableCell className="font-medium">{r.eu_name}{r.security_mode && <Badge variant="outline" className="ml-2 border-destructive text-destructive">Restricted</Badge>}</TableCell>
                       <TableCell>{r.lga}</TableCell><TableCell>{r.team}</TableCell>
                       <TableCell>{r.covered} / {r.sampled}</TableCell><TableCell>{pct(r.covered / r.sampled)}</TableCell>
-                      <TableCell>{dec === "pass" ? <Badge className="bg-primary">Pass</Badge> : <Badge variant="destructive">Mop-up</Badge>}</TableCell>
+                      <TableCell><Badge variant="outline">Unlinked · review</Badge></TableCell>
                     </TableRow>
                   );
                 })}
               </TableBody>
             </Table>
           </div>
-          <p className="text-xs text-muted-foreground">Method: WHO/ESPEN LQAS — {DEFAULT_SAMPLE} respondents per lot, decision rule from the binomial distribution (≤10% risk of wrongly failing a lot at target). Area coverage is the population-weighted average of lots.</p>
+          {lots.length > 20 && <div className="flex items-center justify-end gap-3"><Button variant="outline" size="sm" disabled={resultPage === 0} onClick={() => setResultPage((p) => p - 1)}>Previous</Button><span className="text-xs">Page {resultPage + 1} / {Math.ceil(lots.length / 20)}</span><Button variant="outline" size="sm" disabled={(resultPage + 1) * 20 >= lots.length} onClick={() => setResultPage((p) => p + 1)}>Next</Button></div>}
+          <p className="text-xs text-muted-foreground">Sample proportions are not certified population coverage. No confidence interval is asserted without the approved survey’s selection weights and clustering information.</p>
         </CardContent>
       </Card>
 
