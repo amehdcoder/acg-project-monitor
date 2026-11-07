@@ -1,3 +1,4 @@
+import { disposeMap } from "@/lib/microplanning/disposeMap";
 import { renderBatches } from "@/lib/microplanning/renderBatches";
 import { useTablePagination } from "@/hooks/useTablePagination";
 import DatasetPagination from "./DatasetPagination";
@@ -179,7 +180,7 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName }: CoverageVi
     const geoEntries = filtered.filter(e => e.community_latitude && e.community_longitude);
     if (geoEntries.length === 0) {
       map.setView([9.06, 7.49], 6);
-      return () => { map.stop(); map.remove(); mapRef.current = null; };
+      return () => { disposeMap(map); mapRef.current = null; };
     }
 
     const bounds: L.LatLngTuple[] = geoEntries.flatMap(e => e.community_latitude != null && e.community_longitude != null ? [[e.community_latitude, e.community_longitude] as L.LatLngTuple] : []);
@@ -281,7 +282,7 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName }: CoverageVi
       map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13, animate: false });
     }
 
-    return () => { cancel(); map.stop(); map.remove(); mapRef.current = null; };
+    return () => { cancel(); disposeMap(map); mapRef.current = null; };
   }, [showMap, filtered, getTargetPop]);
 
   const getCoverageColor = (coverage: number) => {

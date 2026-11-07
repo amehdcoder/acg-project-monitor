@@ -1,3 +1,4 @@
+import { disposeMap } from "@/lib/microplanning/disposeMap";
 import { renderBatches } from "@/lib/microplanning/renderBatches";
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -310,8 +311,7 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
     map.setView([9.06, 7.49], 6);
 
     return () => {
-      map.stop();
-      map.remove();
+      disposeMap(map);
       mapRef.current = null;
     };
   }, []);

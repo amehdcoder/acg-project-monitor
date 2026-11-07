@@ -1,3 +1,4 @@
+import { disposeMap } from "@/lib/microplanning/disposeMap";
 import L from "leaflet";
 import { renderBatches } from "@/lib/microplanning/renderBatches";
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
@@ -417,7 +418,7 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
     }).addTo(map);
     const observer = new ResizeObserver(() => { if (mapInstanceRef.current === map) map.invalidateSize({ animate: false }); });
     observer.observe(mapRef.current);
-    return () => { observer.disconnect(); map.stop(); map.remove(); mapInstanceRef.current = null; };
+    return () => { observer.disconnect(); disposeMap(map); mapInstanceRef.current = null; };
   }, []);
 
   // ─── Zoom to extent ───
