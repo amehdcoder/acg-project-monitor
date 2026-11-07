@@ -59,11 +59,12 @@ export function buildLots(entries: RoundEntry[], level: RoundEuLevel, eu: string
   for (const e of entries) {
     if (!e.state || !e.lga || euKey(e, level) !== eu) continue;
     const k = euKey(e, child);
-    (groups.get(k) ?? groups.set(k, []).get(k)!).push(e);
+    const group = groups.get(k) ?? [];
+    group.push(e); groups.set(k, group);
   }
   const lots: LotDraft[] = [];
   for (const [key, rows] of groups) {
-    const located = rows.filter((r) => Number.isFinite(Number(r.community_latitude)) && Number.isFinite(Number(r.community_longitude)) && r.community_latitude != null);
+    const located = rows.filter((r) => r.community_latitude != null && r.community_longitude != null && Number.isFinite(Number(r.community_latitude)) && Number.isFinite(Number(r.community_longitude)) && Number(r.community_latitude) >= 4 && Number(r.community_latitude) <= 14 && Number(r.community_longitude) >= 2 && Number(r.community_longitude) <= 15);
     const red = rows.some((r) => SECURITY_RED.has(String(r.security_clearance || "")));
     const yellow = !red && rows.some((r) => INSECURE_CLEARANCE.has(String(r.security_clearance || "")));
     const flags: RiskFlag[] = [];
