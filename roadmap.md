@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Add collapsed, interactive correlation heatmaps for measured Microplanning population and operational evidence; validate missing-data/constant-series handling and live desktop/mobile views.
+
 - [x] Add six collapsed ESPEN-aligned analyses from filtered live Microplanning rows: population access/security exposure, recorded facility workload, distance profile, contact completeness, population sources/planning vintage, and downloadable settlement review. Sixteen tests pass; signed-in Accelerate readback, all sections, nine-record Excel review, phone fit and collapse/reopen verified without runtime errors; preview build clean. No inferred treatment outcomes, travel times or staffing shortages.
 
 - [x] Stabilize Longitudinal Beneficiary Records (live signed-in check pending while backend restarts): retain user-scoped saved data during background updates, merge changed records, preserve open records and scroll, prevent unsolicited recovery reloads, and verify regressions and signed-in readback.
