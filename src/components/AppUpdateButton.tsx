@@ -47,6 +47,7 @@ const AppUpdateButton = () => {
       const next = await checkForAppUpdate({ force: true });
       if (next.status === "error") throw new Error(next.error || "Couldn't check for updates. Please try again.");
       if (!next.updateAvailable) {
+        setStatusText("Up to date");
         toast.success("You're on the latest version", { id: toastId });
         return;
       }
@@ -56,11 +57,11 @@ const AppUpdateButton = () => {
       if (!applied) throw new Error(getAppUpdateState().error || "Couldn't update. Please try again.");
       toast.dismiss(toastId);
     } catch (error) {
+      setStatusText("Retry update");
       toast.error(error instanceof Error ? error.message : "Couldn't update. Please try again.", { id: toastId });
     } finally {
       clickInFlight.current = false;
       setInstalling(false);
-      setStatusText(null);
     }
   };
 
@@ -93,7 +94,7 @@ const AppUpdateButton = () => {
       {/* Always render a readable label so the control is fully visible on
           every screen width — including small Android and iPhone widths. */}
       <span>
-        {isBusy ? busyLabel : "Update"}
+        {isBusy ? busyLabel : statusText || "Update"}
       </span>
     </Button>
   );
