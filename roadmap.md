@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Strengthen offline launch and password sign-in for previously verified accounts, retain user-scoped saved work and queues, verify offline authentication and reconnect behavior; disclose first-use and live-service internet requirements.
+
 - [x] Fix manual Update stale-manifest checks (failing regression reproduced, now passing), cancellation after worker timeout, visible current/retry button feedback and inline update errors. All 23 update tests pass; signed-in online/current and offline/retry checked with visible feedback and enabled retry; preview build clean. A physically installed app's published-release activation still requires a deployed device check.
 
 - [x] Add selectable OSIRIS security/access/terrain/CDD legends with multiple categories per group, intersections across groups, mapped counts, automatic zoom and explicit zoom/clear controls. Ten tests pass; signed-in real data filters 3 → 2 → 3 → 1, CDD intersection and clearing verified; phone fit, collapse cleanup and dashboard navigation pass without runtime errors. Preview build clean. Missing CDD names are labelled unrecorded, not confirmed absence.
