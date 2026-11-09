@@ -93,12 +93,10 @@ const readLocalCredential = async (email: string): Promise<OfflineAuthCredential
 };
 
 const writeLocalCredential = async (credential: OfflineAuthCredential): Promise<void> => {
-  try {
-    const sealed = await sealRecord(credential as any, ["email", "user_id", "lastUpdated"]);
-    localStorage.setItem(legacyKey(credential.email), JSON.stringify(sealed));
-  } catch {
-    // IndexedDB remains the primary durable store.
-  }
+  // Let the caller distinguish a durable write from storage being unavailable.
+  // IndexedDB and local fallback are independently settled there.
+  const sealed = await sealRecord(credential as any, ["email", "user_id", "lastUpdated"]);
+  localStorage.setItem(legacyKey(credential.email), JSON.stringify(sealed));
 };
 
 export const saveOfflineCredential = async (args: {

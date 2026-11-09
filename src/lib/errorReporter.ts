@@ -176,27 +176,13 @@ export const downloadReport = (r: ErrorReport) => {
 };
 
 /**
- * Reliable "refresh to latest": clears caches + service workers + version flags
- * and hard-reloads with a cache-buster. Safe to call from any recovery UI.
+ * Recovery shares the bounded update manager. Never destroy the only offline
+ * shell or detach messaging workers when the network is unavailable.
  */
 export const refreshToLatest = async () => {
-  prepareSilentFormRestoreForUpdate();
-  try { localStorage.removeItem("app_last_applied_build_id"); } catch {}
-  try { localStorage.removeItem("app_last_applied_at"); } catch {}
-  try { sessionStorage.removeItem("app_html_build_id_v1"); } catch {}
-  try {
-    if ("caches" in window) {
-      const names = await caches.keys();
-      await Promise.all(names.map((n) => caches.delete(n)));
-    }
-  } catch {}
-  try {
-    const regs = await navigator.serviceWorker?.getRegistrations();
-    await Promise.all((regs || []).map((r) => r.unregister()));
-  } catch {}
-  const url = new URL(window.location.href);
-  url.searchParams.set("__app_update", String(Date.now()));
-  window.location.replace(url.toString());
+  if (!navigator.onLine) return false;
+  const { hardReloadToLatest } = await import("@/lib/appUpdateManager");
+  return hardReloadToLatest();
 };
 
 export const installGlobalErrorReporter = () => {
