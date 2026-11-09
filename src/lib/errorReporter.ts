@@ -7,7 +7,6 @@
  * exposes helpers for the root error boundary to display & copy a diagnostic
  * payload that field teams can share with support.
  */
-import { prepareSilentFormRestoreForUpdate } from "@/lib/formProgressPersistence";
 
 const REPORTS_KEY = "app_error_reports_v1";
 const BREADCRUMBS_KEY = "app_error_breadcrumbs_v1";
