@@ -125,6 +125,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // SIGNED_OUT event (e.g. a token refresh that failed on a poor network) is
   // treated as spurious so we never bounce a working field user to /auth.
   const userSignOutRef = useRef(false);
+  const activeUserRef = useRef<User | null>(null);
+  const offlineUnlockedRef = useRef(false);
+  const authGenerationRef = useRef(0);
   const [isOfflineMode, setIsOfflineMode] = useState(!navigator.onLine);
 
   // --- Offline Crypto Helpers ---
@@ -172,6 +175,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     setSession(null);
+    userSignOutRef.current = false;
+    activeUserRef.current = cache.user;
+    offlineUnlockedRef.current = true;
     setUser(cache.user);
     setProfile(cache.profile);
     setRole((cache.role as AppRole | null) ?? null);
@@ -519,6 +525,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // refresh/profile read from holding the entire app on the boot spinner.
     const bootStoredSession = getStoredAuthSession();
     if (bootStoredSession?.user) {
+      activeUserRef.current = bootStoredSession.user;
       offlineAuthLog("Boot: hydrating React auth context from locally persisted session BEFORE any network request", {
         userId: bootStoredSession.user.id,
         email: bootStoredSession.user.email,
@@ -552,6 +559,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // leave the user staring at the boot spinner. Keep this short so the app
     // paints quickly even on weak field connectivity.
     const bootWatchdog = setTimeout(() => {
+      if (userSignOutRef.current || offlineUnlockedRef.current) return;
       const stored = getStoredAuthSession();
       if (stored?.user) {
         setSession(stored);
@@ -570,6 +578,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       (event, currentSession) => {
         // Skip the initial INITIAL_SESSION if we already handled getSession
         if (event === "INITIAL_SESSION" && initialSessionHandled) return;
+        if (userSignOutRef.current) return;
+        if (!currentSession && offlineUnlockedRef.current) return;
 
         // A live session arrived — this device is genuinely signed in, so clear
         // any stale "user pressed sign out" intent from a previous cycle.
@@ -615,6 +625,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
+        activeUserRef.current = currentSession?.user ?? null;
+        if (currentSession?.user) offlineUnlockedRef.current = false;
 
         if (currentSession?.user) {
           // Defer to avoid deadlocks in auth callback. After the initial load,
@@ -634,11 +646,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     );
 
     const recoverFromCachedCredential = async (reason: string) => {
+      const active = activeUserRef.current;
+      const generation = authGenerationRef.current;
+      if (!active || userSignOutRef.current) return false;
       try {
-        const latest = await getLatestOfflineCredential();
-        if (latest?.user) {
-          await hydrateOfflineCredential(latest, reason);
-          return true;
+        const cache = active.email ? await getOfflineCredential(active.email) : null;
+        if (cache?.user.id === active.id && generation === authGenerationRef.current && !userSignOutRef.current) {
+          const result = await hydrateOfflineCredential(cache, reason);
+          return !result.error;
         }
       } catch (e) {
         console.warn("Cached credential recovery failed:", e);
@@ -655,23 +670,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       "initial_session_timeout",
     ).then(async ({ data: { session: existingSession } }) => {
       initialSessionHandled = true;
+      if (userSignOutRef.current || offlineUnlockedRef.current) return;
+      if (!existingSession && activeUserRef.current) {
+        await recoverFromCachedCredential("persisted_session_unavailable");
+        setLoading(false);
+        setProfileLoading(false);
+        return;
+      }
       setSession(existingSession);
       setUser(existingSession?.user ?? null);
+      activeUserRef.current = existingSession?.user ?? null;
       if (existingSession?.user) {
         await fetchProfile(existingSession.user.id);
-      } else if (!navigator.onLine) {
-        // ── ODK / KoboCollect-style offline auto-login ────────────────
-        // No live Supabase session AND we're offline → hydrate from the
-        // most recently cached account so the app boots logged-in.
-        // Sync to the server will still require re-auth when online.
-        offlineAuthLog("Boot: no live session and device offline — auto-login from most recent cached credential");
-        try {
-          await recoverFromCachedCredential("auto_login_offline_boot");
-        } catch (e) {
-          offlineAuthLog("Boot: offline auto-login failed", e);
-        }
-
-        setProfileLoading(false);
       } else {
         setProfileLoading(false);
       }
@@ -680,6 +690,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // event refreshes the profile in the background without blinking.
       initialLoadDoneRef.current = true;
     }).catch(async (e) => {
+      if (userSignOutRef.current || offlineUnlockedRef.current) return;
       // getSession itself failed or timed out (network/storage/refresh error).
       // Don't hang the boot. If this device has a saved active profile, hydrate
       // it so field users can continue working under poor connectivity.
@@ -722,22 +733,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // the encrypted device credential + spurious-sign-out guard keep the user in.
     let refreshing = false;
     const refreshSessionWithRetry = async (attempts = 4) => {
-      if (refreshing || !navigator.onLine) {
+      if (refreshing || !navigator.onLine || userSignOutRef.current || !activeUserRef.current) {
         if (!navigator.onLine) {
           offlineAuthLog("Token refresh paused/queued — device offline; will retry when connectivity returns");
         }
         return;
       }
       refreshing = true;
+      const generation = authGenerationRef.current;
       offlineAuthLog("Token refresh: starting with exponential backoff", { attempts });
       try {
         for (let i = 0; i < attempts; i++) {
           try {
-            const { data, error } = await supabase.auth.refreshSession();
+            const { data, error } = await withTimeout(supabase.auth.refreshSession(), 8000, "refresh_timeout");
+            if (generation !== authGenerationRef.current || userSignOutRef.current) return;
             if (!error && data?.session) {
               offlineAuthLog("Token refresh succeeded — live session restored", { attempt: i + 1 });
               setSession(data.session);
               setUser(data.session.user ?? null);
+              activeUserRef.current = data.session.user ?? null;
+              offlineUnlockedRef.current = false;
               userSignOutRef.current = false;
               return;
             }
@@ -815,6 +830,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
   const signInImpl = async (email: string, password: string) => {
+    email = email.trim().toLowerCase();
     const tryOfflineSignIn = async (reason: string) => {
       void logOfflineAuditEvent("offline_login_attempt", { email, details: { reason } });
       // Device-side brute-force guard: block while locked out.
@@ -879,6 +895,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     if (!error && data.user) {
+      userSignOutRef.current = false;
+      activeUserRef.current = data.user;
+      offlineUnlockedRef.current = false;
       // Keep sign-in fast: auth success should navigate immediately. Profile /
       // role hydration is also handled by the auth listener; this short best-
       // effort read is only for deactivation enforcement and offline cache
@@ -1043,8 +1062,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Mark this as an explicit, user-initiated sign-out so the auth listener
     // does NOT treat the resulting SIGNED_OUT as a spurious network drop.
     userSignOutRef.current = true;
-    // 1. Clear Supabase session
-    await supabase.auth.signOut();
+    authGenerationRef.current += 1;
+    activeUserRef.current = null;
+    offlineUnlockedRef.current = false;
+    // Lock the UI immediately, even when the remote auth service is unreachable.
+    setUser(null);
+    setSession(null);
+    setProfile(null);
+    setRole(null);
+    setLoading(false);
+    setProfileLoading(false);
+    const projectRef = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+    if (projectRef) localStorage.removeItem(`sb-${projectRef}-auth-token`);
+    try {
+      await withTimeout(supabase.auth.signOut({ scope: navigator.onLine ? "global" : "local" }), 3000, "sign_out_timeout");
+    } catch {
+      // The local lock must not depend on remote token revocation.
+    }
     
     // 2. Clear volatile UI/session caches only. Offline credentials, cached
     // forms, drafts, and queued submissions are encrypted device data and must

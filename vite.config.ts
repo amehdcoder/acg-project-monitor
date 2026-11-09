@@ -61,6 +61,8 @@ export default defineConfig(({ mode }) => {
     react(),
     appVersionPlugin(buildId),
     VitePWA({
+      strategies: "generateSW",
+      filename: "sw.js",
 
       // App updates are coordinated by appUpdateManager so active form sessions
       // can be draft-snapshotted/restored instead of being interrupted by the SW.
@@ -109,7 +111,7 @@ export default defineConfig(({ mode }) => {
         // navigation handler below (it always wins for navigations when the
         // network is reachable), plus skipWaiting + cleanupOutdatedCaches and the
         // in-app update manager — so users never get stuck on a stale shell.
-        globPatterns: ["**/*.{js,css,ico,png,jpg,jpeg,svg,woff2,html}"],
+        globPatterns: ["**/*.{js,css,ico,png,jpg,jpeg,svg,webp,woff,woff2,html}", "data/grid3/manifest.json", "data/grid3/*/index.json"],
         maximumFileSizeToCacheInBytes: 16 * 1024 * 1024, // 16 MiB
         navigateFallbackDenylist: [/^\/~oauth/],
         // Do NOT let a freshly published service worker take over on its own.
@@ -122,7 +124,9 @@ export default defineConfig(({ mode }) => {
         skipWaiting: false,
         clientsClaim: false,
         cleanupOutdatedCaches: true,
-        navigateFallback: "index.html",
+        // The explicit NetworkFirst route below owns all HTML navigations;
+        // a precache NavigationRoute would otherwise win with cache-first HTML.
+        navigateFallback: null,
         runtimeCaching: [
           {
             // GRID3 supervision location shards (per-state FLHF & settlements).

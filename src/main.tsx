@@ -33,6 +33,7 @@ import { installAfterHoursInterceptor } from "./lib/afterHours/interceptor";
 import { requestPersistentStorage } from "./lib/storagePersistence";
 import "./index.css";
 import { isPublicFeedbackLocation } from "./lib/publicFeedback";
+import { shouldSkipServiceWorker } from "./lib/appUpdateManager";
 
 const publicFeedbackBoot = isPublicFeedbackLocation(window.location);
 
@@ -127,32 +128,15 @@ window.addEventListener("unhandledrejection", (e) => {
   try { recordError("unhandledrejection", e.reason instanceof Error ? e.reason : new Error(msg), {}); } catch {}
 });
 
-// Standard security check for iframe / Lovable preview execution.
-// A registered service worker inside the Lovable preview iframe is the
-// #1 cause of the "Lovable proxy error" overlay — it intercepts fetches
-// the sandbox proxy expects to handle itself. Unregister aggressively
-// AND nuke any caches it left behind, so a stale SW from a previously
-// published build can never resurrect itself in the preview.
-const isInIframe = (() => {
-  try { return window.self !== window.top; } catch (e) { return true; }
-})();
-
-const isPreviewHostname =
-  typeof window !== "undefined" &&
-  (window.location.hostname.includes("id-preview--") ||
-    window.location.hostname.includes("internal-preview--") ||
-    window.location.hostname.includes("lovableproject.com") ||
-    window.location.hostname.includes("lovable.dev"));
-
-if (isInIframe || isPreviewHostname) {
+// Preview cleanup only detaches the app-shell worker. Messaging workers,
+// saved shell caches, user drafts and queues must never be destroyed here.
+if (shouldSkipServiceWorker) {
   (async () => {
     try {
       const regs = await navigator.serviceWorker?.getRegistrations();
-      await Promise.all((regs || []).map((r) => r.unregister()));
-    } catch {}
-    try {
-      const keys = await caches.keys();
-      await Promise.all(keys.map((k) => caches.delete(k)));
+      await Promise.all((regs || []).filter((r) =>
+        [r.active, r.waiting, r.installing].some((w) => w && new URL(w.scriptURL).pathname === "/sw.js")
+      ).map((r) => r.unregister()));
     } catch {}
   })();
 }
