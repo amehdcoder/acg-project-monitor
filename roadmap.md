@@ -1,6 +1,7 @@
 # Roadmap
 
-- [ ] Strengthen offline launch and password sign-in for previously verified accounts, retain user-scoped saved work and queues, verify offline authentication and reconnect behavior; disclose first-use and live-service internet requirements.
+- [x] Strengthen offline launch and password sign-in for prepared accounts; cancel late password completions after sign-out. All 35 offline/auth/saved-form tests pass. Published login shell reopens without network; real-account isolated-browser password rejection, offline unlock and reconnect retain Forms. Browser cache preparation was isolated, not a change to the account's server password. First-use and live external services require internet.
+- [ ] Verify the updated release on a physically installed device after publication; browser offline reopening is verified, but device-specific storage eviction and installation behavior require that device.
 
 - [x] Fix manual Update stale-manifest checks (failing regression reproduced, now passing), cancellation after worker timeout, visible current/retry button feedback and inline update errors. All 23 update tests pass; signed-in online/current and offline/retry checked with visible feedback and enabled retry; preview build clean. A physically installed app's published-release activation still requires a deployed device check.
 
