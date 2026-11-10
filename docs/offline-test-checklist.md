@@ -5,6 +5,7 @@ collection with the internet fully disabled**, and that queued work syncs
 correctly and **exactly once** when connectivity returns.
 
 Automated coverage for these flows lives in:
+- `src/hooks/useAuth.offline.test.tsx` — password unlock, prepared-account isolation, sign-out and late-verification cancellation.
 - `src/lib/offlineSmoke.test.ts` — offline draft → ready → sent lifecycle + flaky reconnect.
 - `src/lib/savedFormAutoSync.test.ts` — exactly-once sync stress test.
 - `src/lib/savedFormMerge.test.ts` — multi-device conflict detection & deterministic merge.
@@ -21,6 +22,13 @@ Run with: `bunx vitest run src/lib/offlineSmoke.test.ts src/lib/savedFormAutoSyn
 Always do a first **online** load once so the PWA shell, forms, and cascade
 lists are cached before going offline.
 
+Use the published app for offline reopening: the editor preview intentionally
+does not register an app-shell service worker. Prepare password access by signing
+in online with email and password on the same device. First-time verification,
+live imagery, external integrations and sending queued submissions need internet.
+Offline password unlock is local access, not a fresh server session; after an
+explicit sign-out, online sending may require signing in online again.
+
 ---
 
 ## 1. App load (offline)
@@ -32,6 +40,9 @@ lists are cached before going offline.
 - [ ] Enter valid credentials used at least once while online.
 - [ ] Login completes from the offline auth cache (no long hang).
 - [ ] `login_duration` metric recorded (see `window.__amehnitiesMetrics`).
+- [ ] Incorrect passwords and unprepared accounts remain locked.
+- [ ] Sign out while password verification is running; a late result must not reopen the account.
+- [ ] Sign out and reopen offline; the account stays locked until its password is entered.
 
 ## 3. Project / form loading (offline)
 - [ ] Forms page lists the user's assigned projects and forms.
