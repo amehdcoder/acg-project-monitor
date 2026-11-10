@@ -831,6 +831,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signInImpl = async (email: string, password: string) => {
     email = email.trim().toLowerCase();
+    const generation = ++authGenerationRef.current;
+    const cancelled = () => generation !== authGenerationRef.current;
+    const cancellation = () => ({ error: new Error("Sign-in cancelled. Please try again.") });
     const tryOfflineSignIn = async (reason: string) => {
       void logOfflineAuditEvent("offline_login_attempt", { email, details: { reason } });
       // Device-side brute-force guard: block while locked out.
@@ -846,6 +849,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return { error: new Error("No offline credentials found on this device. Login online once on this same device, then offline login will remain available after sign-out.") };
       }
       const passwordOk = await verifyOfflineCredentialPassword(password, cache);
+      if (cancelled()) return cancellation();
       if (!passwordOk) {
         const status = await registerOfflineFailure(email);
         logOfflineEvent("login_failed", { mode: "offline", email, reason: "invalid_password" });
@@ -883,6 +887,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (err: any) {
       error = err;
     }
+    if (cancelled()) return cancellation();
 
     if (error && isLikelyNetworkAuthError(error)) {
       offlineAuthLog("Sign-in: backend unreachable (network exception, not a 401/403) — falling back to encrypted offline credential, NOT failing login", { error: String(error?.message || error) });

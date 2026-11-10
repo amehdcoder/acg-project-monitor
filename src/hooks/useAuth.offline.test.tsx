@@ -7,16 +7,18 @@ const mocks = vi.hoisted(() => ({
   credential: { email: "field@example.org", user_id: "field-user", user: { id: "field-user", email: "field@example.org" }, profile: { is_active: true, approval_status: "approved" }, role: "user", passwordHash: "verified" },
   signOut: vi.fn(async () => ({ error: null })),
   getSession: vi.fn(async () => ({ data: { session: null } })),
+  verifyPassword: vi.fn(async (password: string) => password === "correct-password"),
+  refreshSession: vi.fn(),
 }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { auth: {
   onAuthStateChange: (cb: typeof mocks.callback) => { mocks.callback = cb; return { data: { subscription: { unsubscribe() {} } } }; },
-  getSession: mocks.getSession, signOut: mocks.signOut,
+  getSession: mocks.getSession, signOut: mocks.signOut, refreshSession: mocks.refreshSession,
 }, functions: { invoke: vi.fn() } } }));
 vi.mock("@/lib/offlineAuthCache", () => ({
   getLatestOfflineCredential: async () => mocks.credential,
   getOfflineCredential: async (email: string) => email === mocks.credential.email ? mocks.credential : null,
   listOfflineCredentials: async () => [mocks.credential],
-  verifyOfflineCredentialPassword: async (password: string) => password === "correct-password",
+  verifyOfflineCredentialPassword: mocks.verifyPassword,
   refreshOfflineCredentialSnapshot: vi.fn(), removeOfflineCredential: vi.fn(), saveOfflineCredential: vi.fn(),
 }));
 vi.mock("@/lib/offlineAuthThrottle", () => ({ checkOfflineLock: async () => ({ locked: false }), registerOfflineFailure: async () => ({ locked: false }), clearOfflineFailures: vi.fn() }));
@@ -101,6 +103,20 @@ describe("offline account access", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     await act(async () => { mocks.callback?.("SIGNED_OUT", null); });
     await new Promise(resolve => setTimeout(resolve, 20));
+    expect(result.current.user).toBeNull();
+  });
+  it("sign-out cancels an offline password check that is still running", async () => {
+    let finish: ((value: boolean) => void) | undefined;
+    mocks.verifyPassword.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const { result } = renderHook(useAuth, { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    let pending: Promise<{ error: Error | null }> | undefined;
+    act(() => { pending = result.current.signIn("field@example.org", "correct-password"); });
+    await waitFor(() => expect(finish).toBeTypeOf("function"));
+    await act(async () => { await result.current.signOut(); });
+    let response: { error: Error | null } | undefined;
+    await act(async () => { finish?.(true); response = await pending; });
+    expect(response?.error).toBeInstanceOf(Error);
     expect(result.current.user).toBeNull();
   });
 });
