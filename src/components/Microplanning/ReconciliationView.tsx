@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
+import { offlineMutate } from "@/lib/programmeModule/offlineWrite";
+import { reconciliationUsage, validActualUsage } from "@/lib/microplanning/reconciliationUsage";
 import { toast } from "@/hooks/use-toast";
 import { Save, PackageCheck, AlertTriangle, RotateCcw, Pill, Download } from "lucide-react";
 import * as XLSX from "xlsx";
@@ -29,6 +30,7 @@ export interface AllocationRow {
   medicineRequired: number;
   medicineUsed: number;
   unallocated?: boolean;
+  savedAllocation?: boolean;
 }
 
 export interface MicroplanEntry {
@@ -50,6 +52,8 @@ interface ReconciliationViewProps {
   allocationRows: AllocationRow[];
   onRefresh: () => void;
   projectId?: string | null;
+  readOnly?: boolean;
+  onSaved?: (id: string, patch: Record<string, unknown>) => void;
 }
 
 const REVERSAL_OPTIONS = [
@@ -61,7 +65,7 @@ const REVERSAL_OPTIONS = [
   { value: "Other", label: "Other" },
 ];
 
-const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId }: ReconciliationViewProps) => {
+const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId, readOnly = false, onSaved }: ReconciliationViewProps) => {
   useRealtimeReconciliationEntries(projectId ?? null, onRefresh);
   // local edits
   const [editedUsed, setEditedUsed] = useState<Record<string, string>>({});
@@ -107,7 +111,7 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId }: R
       return Number.isFinite(n) ? n : 0;
     }
     const live = entryById.get(row.entryId)?.medicine_used;
-    return live != null ? Number(live) : row.medicineUsed;
+    return reconciliationUsage(row.medicineRequired, live, !!row.savedAllocation, row.medicineUsed);
   };
 
   const getReversedFor = (row: AllocationRow) =>
@@ -131,11 +135,24 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId }: R
     editedOther[id] !== undefined;
 
   const handleSave = async (row: AllocationRow) => {
+    if (readOnly) return;
+    if (editedUsed[row.entryId] !== undefined && !validActualUsage(editedUsed[row.entryId])) {
+      toast({ title: "Enter a valid usage", description: "Actual usage must be a whole number of zero or more.", variant: "destructive" });
+      return;
+    }
     setSavingId(row.entryId);
     const patch: Record<string, any> = {};
     if (editedUsed[row.entryId] !== undefined) {
       const v = editedUsed[row.entryId];
-      patch.medicine_used = v === "" ? null : Number(v);
+      patch.medicine_used = Number(v);
+      // Keep imported medicine detail consistent with the edited aggregate.
+      const returns = entryById.get(row.entryId)?.medicine_returns;
+      if (returns?.length === 1) patch.medicine_returns = [{ ...returns[0], used: Number(v) }];
+      if (returns && returns.length > 1 && returns.reduce((sum, item) => sum + item.used, 0) !== Number(v)) {
+        toast({ title: "Multiple medicines recorded", description: "Update the individual medicine quantities through Coverage Excel so their total matches actual usage.", variant: "destructive" });
+        setSavingId(null);
+        return;
+      }
     }
     if (editedReversed[row.entryId] !== undefined) {
       patch.medicine_reversed_to = editedReversed[row.entryId] || null;
@@ -143,20 +160,19 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId }: R
     if (editedOther[row.entryId] !== undefined) {
       patch.medicine_reversed_other = editedOther[row.entryId] || null;
     }
-    const { error } = await supabase
-      .from("microplan_entries")
-      .update(patch as any)
-      .eq("id", row.entryId);
-    if (error) {
-      toast({ title: "Error saving", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "✅ Reconciliation saved" });
+    try {
+      const result = await offlineMutate({ table: "microplan_entries", action: "update", id: row.entryId, values: patch });
+      onSaved?.(row.entryId, patch);
+      toast({ title: result.queued ? "Saved on this device · pending sync" : "Reconciliation saved" });
       setEditedUsed(prev => { const n = { ...prev }; delete n[row.entryId]; return n; });
       setEditedReversed(prev => { const n = { ...prev }; delete n[row.entryId]; return n; });
       setEditedOther(prev => { const n = { ...prev }; delete n[row.entryId]; return n; });
       onRefresh();
+    } catch (error) {
+      toast({ title: "Error saving", description: error instanceof Error ? error.message : "Please try again.", variant: "destructive" });
+    } finally {
+      setSavingId(null);
     }
-    setSavingId(null);
   };
 
   const exportExcel = () => {
@@ -171,6 +187,7 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId }: R
         Community: r.community, Settlement: r.settlement,
         "Allocated": r.medicineRequired,
         "Quantity Used": used,
+        "Usage basis": entryById.get(r.entryId)?.medicine_used != null || editedUsed[r.entryId] !== undefined ? "Actual" : r.savedAllocation ? "Allocation default — unconfirmed" : "Not recorded",
         "Returned / Damaged": accountedReturns(r),
         "Balance of Medicine": balance,
         "Reversed To": reversed === "Other" && other ? `Other: ${other}` : reversed,
@@ -345,11 +362,14 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId }: R
                         <Input
                           type="number"
                           min={0}
-                          value={editedUsed[row.entryId] !== undefined ? editedUsed[row.entryId] : (entryById.get(row.entryId)?.medicine_used ?? "")}
+                          aria-label={`Actual usage for ${row.community}`}
+                          disabled={readOnly || savingId === row.entryId}
+                          value={editedUsed[row.entryId] !== undefined ? editedUsed[row.entryId] : getUsedFor(row)}
                           onChange={(ev) => setEditedUsed(prev => ({ ...prev, [row.entryId]: ev.target.value }))}
                           className="h-7 text-xs text-right tabular-nums w-full"
                           placeholder="0"
                         />
+                        {entryById.get(row.entryId)?.medicine_used == null && editedUsed[row.entryId] === undefined && row.savedAllocation && <span className="text-[10px] text-muted-foreground">Allocation default · unconfirmed</span>}
                       </td>
                       <td className="px-3 py-2 border-r border-border/20 text-right">
                         <span className={`font-bold tabular-nums ${balanceColor}`}>
@@ -362,6 +382,7 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId }: R
                       </td>
                       <td className="px-2 py-1 border-r border-border/20">
                         <Select
+                          disabled={readOnly || savingId === row.entryId}
                           value={reversed || undefined}
                           onValueChange={(v) => setEditedReversed(prev => ({ ...prev, [row.entryId]: v }))}
                         >
@@ -376,6 +397,7 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId }: R
                         </Select>
                         {reversed === "Other" && (
                           <Input
+                            disabled={readOnly || savingId === row.entryId}
                             value={getOtherFor(row)}
                             onChange={(ev) => setEditedOther(prev => ({ ...prev, [row.entryId]: ev.target.value }))}
                             placeholder="Specify…"
@@ -384,12 +406,17 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId }: R
                         )}
                       </td>
                       <td className="px-2 py-1 text-center">
-                        {isDirty(row.entryId) && (
+                        {(isDirty(row.entryId) || (row.savedAllocation && entryById.get(row.entryId)?.medicine_used == null)) && !readOnly && (
                           <Button
                             size="icon"
                             variant="ghost"
                             className="h-6 w-6"
-                            onClick={() => handleSave(row)}
+                            aria-label={`Save actual usage for ${row.community}`}
+                            title="Save actual usage"
+                            onClick={() => {
+                              if (!isDirty(row.entryId)) setEditedUsed(prev => ({ ...prev, [row.entryId]: String(getUsedFor(row)) }));
+                              else void handleSave(row);
+                            }}
                             disabled={savingId === row.entryId}
                           >
                             <Save className="h-3 w-3 text-primary" />
