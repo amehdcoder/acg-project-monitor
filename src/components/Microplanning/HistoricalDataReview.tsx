@@ -269,7 +269,7 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
       });
     });
     return out.sort((a, b) => (Math.abs(b.pctChange ?? 0) - Math.abs(a.pctChange ?? 0)));
-  }, [entries]);
+  }), [entries]);
 
   // Keep ref in sync for use inside async importFile callback.
   rowsRef.current = rows;
