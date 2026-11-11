@@ -1079,4 +1079,4 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
   );
 };
 
-export default TravelRouteMap;
+export default memo(TravelRouteMap);

@@ -425,4 +425,4 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId }: R
   );
 };
 
-export default ReconciliationView;
+export default memo(ReconciliationView);

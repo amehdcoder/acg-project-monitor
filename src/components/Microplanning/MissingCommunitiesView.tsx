@@ -469,4 +469,4 @@ const MissingCommunitiesView = ({ entries, projectId, isInScope, scopeRestricted
   );
 };
 
-export default MissingCommunitiesView;
+export default memo(MissingCommunitiesView);

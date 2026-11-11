@@ -1473,4 +1473,4 @@ function hexToRgb(hex: string) {
   } : { r: 0, g: 0, b: 0 };
 }
 
-export default MicroplanMap;
+export default memo(MicroplanMap);

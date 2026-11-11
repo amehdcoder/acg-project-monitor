@@ -434,4 +434,4 @@ const MicroplanSummaryView = ({ entries, readOnly = false, onRefresh }: Props) =
   );
 };
 
-export default MicroplanSummaryView;
+export default memo(MicroplanSummaryView);

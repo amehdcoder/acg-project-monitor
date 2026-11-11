@@ -587,4 +587,4 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName }: CoverageVi
   );
 };
 
-export default CoverageView;
+export default memo(CoverageView);

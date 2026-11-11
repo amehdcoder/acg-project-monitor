@@ -569,4 +569,4 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
   );
 };
 
-export default HistoricalDataReview;
+export default memo(HistoricalDataReview);
