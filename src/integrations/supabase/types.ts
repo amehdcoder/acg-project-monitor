@@ -9312,6 +9312,7 @@ export type Database = {
           is_custom_location: boolean
           kobo_submission_id: string | null
           lga: string
+          medicine_returns: Json | null
           medicine_reversed_other: string | null
           medicine_reversed_to: string | null
           medicine_used: number | null
@@ -9392,6 +9393,7 @@ export type Database = {
           is_custom_location?: boolean
           kobo_submission_id?: string | null
           lga: string
+          medicine_returns?: Json | null
           medicine_reversed_other?: string | null
           medicine_reversed_to?: string | null
           medicine_used?: number | null
@@ -9472,6 +9474,7 @@ export type Database = {
           is_custom_location?: boolean
           kobo_submission_id?: string | null
           lga?: string
+          medicine_returns?: Json | null
           medicine_reversed_other?: string | null
           medicine_reversed_to?: string | null
           medicine_used?: number | null
@@ -9596,10 +9599,12 @@ export type Database = {
         Row: {
           amount: number
           campaign_type: string | null
+          community_snapshot: Json | null
           created_at: string
           created_by: string
           flhf: string | null
           id: string
+          jrsm_target: number | null
           lga: string
           medicine_name: string | null
           notes: string | null
@@ -9613,10 +9618,12 @@ export type Database = {
         Insert: {
           amount?: number
           campaign_type?: string | null
+          community_snapshot?: Json | null
           created_at?: string
           created_by: string
           flhf?: string | null
           id?: string
+          jrsm_target?: number | null
           lga: string
           medicine_name?: string | null
           notes?: string | null
@@ -9630,10 +9637,12 @@ export type Database = {
         Update: {
           amount?: number
           campaign_type?: string | null
+          community_snapshot?: Json | null
           created_at?: string
           created_by?: string
           flhf?: string | null
           id?: string
+          jrsm_target?: number | null
           lga?: string
           medicine_name?: string | null
           notes?: string | null
