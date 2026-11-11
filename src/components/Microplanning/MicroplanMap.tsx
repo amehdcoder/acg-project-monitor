@@ -222,6 +222,8 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
   const [showSummaryPanel, setShowSummaryPanel] = useState(true);
   const [mapExpanded, setMapExpanded] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [viewportRevision, setViewportRevision] = useState(0);
+  const framedEntriesRef = useRef<MicroplanEntry[] | null>(null);
   const [exportingPDF, setExportingPDF] = useState(false);
   const fullscreenRef = useRef<HTMLDivElement>(null);
 
@@ -412,6 +414,9 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
     if (!L) return;
     const map = L.map(mapRef.current, { preferCanvas: true, zoomControl: true, zoomSnap: 0.5 }).setView([9.0, 8.0], 6);
     mapInstanceRef.current = map;
+    map.on("moveend", () => {
+      if (mapInstanceRef.current === map) setViewportRevision(value => value + 1);
+    });
     attachSv(map);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "© OpenStreetMap",
@@ -475,6 +480,18 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
 
     const bounds: [number, number][] = [];
     const flhfDrawn = new Set<string>();
+    // Preserve every location at overview scale using light interactive paths.
+    // Rich labels/lines render only for the visible neighbourhood at detail zoom.
+    const largeDataset = cascadedEntries.length > 1000;
+    const detailed = !largeDataset || map.getZoom() >= 13;
+    const visibleBounds = map.getBounds().pad(0.25);
+    const plotEntries = largeDataset && detailed
+      ? cascadedEntries.filter(entry => [
+          [entry.community_latitude, entry.community_longitude],
+          [entry.settlement_latitude, entry.settlement_longitude],
+          [entry.flhf_latitude, entry.flhf_longitude],
+        ].some(([lat, lng]) => lat && lng && visibleBounds.contains([lat, lng])))
+      : cascadedEntries;
 
     // ── Collect points per FLHF for catchment polygons ──
     const flhfPolygons: Record<string, [number, number][]> = {};
@@ -575,7 +592,7 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
     }
 
     // ── Plot entries ──
-    const cancel = renderBatches(cascadedEntries, entry => {
+    const cancel = renderBatches(plotEntries, entry => {
       const cLat = entry.community_latitude;
       const cLng = entry.community_longitude;
       const fLat = entry.flhf_latitude;
@@ -604,7 +621,12 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
       // Community marker
       if (cLat && cLng) {
         const popLabel = entry.estimated_total_population ? entry.estimated_total_population.toLocaleString() : "";
-        if (activeTheme === "terrain" && mEmoji) {
+        if (!detailed) {
+          L.circleMarker([cLat, cLng], {
+            radius: Math.min(radius, 8), fillColor: mColor, color: mColor,
+            weight: 1, fillOpacity: 0.8,
+          }).addTo(group).bindPopup(() => buildPopup(entry));
+        } else if (activeTheme === "terrain" && mEmoji) {
           L.marker([cLat, cLng], {
             icon: L.divIcon({
               className: "mp-terrain",
@@ -652,7 +674,7 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
         bounds.push([cLat, cLng]);
 
         // ── Beautiful distance lines ──
-        if (showDistanceLines && fLat && fLng) {
+        if (detailed && showDistanceLines && fLat && fLng) {
           const dk = entry.community_distance_to_flhf_km;
           const lc = activeTheme === "distance" ? getDistanceColor(dk) : (activeTheme === "flhf_catchment" && flhfAgg ? flhfAgg.color : "#3B82F6");
 
@@ -757,7 +779,11 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
         if (activeTheme === "distance") sC = getDistanceColor(entry.settlement_distance_to_flhf_km);
         if (activeTheme === "accessibility" && entry.accessibility) sC = ACCESS_COLORS[entry.accessibility]?.color || sC;
         if (activeTheme === "flhf_catchment" && flhfAgg) sC = flhfAgg.color;
-        L.marker([sLat, sLng], {
+        if (!detailed) {
+          L.circleMarker([sLat, sLng], {
+            radius: 4, fillColor: sC, color: sC, weight: 1, fillOpacity: 0.8,
+          }).addTo(group).bindPopup(() => buildPopup(entry, "settlement"));
+        } else L.marker([sLat, sLng], {
           icon: L.divIcon({
             className: "settle-icon",
             html: `<div style="
@@ -776,7 +802,7 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
           }),
           zIndexOffset: 300,
         }).addTo(group).bindPopup(buildPopup(entry, "settlement"));
-        if (showLabels && entry.settlement_name) {
+        if (detailed && showLabels && entry.settlement_name) {
           L.marker([sLat, sLng], {
             icon: L.divIcon({
               className: "settle-lbl",
@@ -788,12 +814,20 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
         bounds.push([sLat, sLng]);
       }
     }, () => {
-      if (bounds.length > 0 && mapInstanceRef.current === map) {
-        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13, animate: false });
-      }
+      // User pans/zooms must not be undone by a drawing completion.
     });
+    if (framedEntriesRef.current !== cascadedEntries) {
+      framedEntriesRef.current = cascadedEntries;
+      const allBounds: [number, number][] = [];
+      for (const entry of cascadedEntries) {
+        if (entry.community_latitude && entry.community_longitude) allBounds.push([entry.community_latitude, entry.community_longitude]);
+        if (entry.settlement_latitude && entry.settlement_longitude) allBounds.push([entry.settlement_latitude, entry.settlement_longitude]);
+        if (entry.flhf_latitude && entry.flhf_longitude) allBounds.push([entry.flhf_latitude, entry.flhf_longitude]);
+      }
+      if (allBounds.length) map.fitBounds(allBounds, { padding: [40, 40], maxZoom: 13, animate: false });
+    }
     return cancel;
-  }, [cascadedEntries, activeTheme, showBufferZones, showDistanceLines, showLabels, flhfAggregates, wardAggregates, maxPop]);
+  }, [cascadedEntries, activeTheme, showBufferZones, showDistanceLines, showLabels, flhfAggregates, wardAggregates, maxPop, viewportRevision]);
 
   // ─── Popup builders ───
   const buildPopup = (e: MicroplanEntry, type: "community" | "settlement" = "community") => {

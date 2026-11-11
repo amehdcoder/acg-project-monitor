@@ -12,7 +12,9 @@ export function renderBatches<T>(items: T[], draw: (item: T) => void, complete?:
       count++;
     }
     if (cancelled) return;
-    if (index < items.length) timer = setTimeout(step, 0);
+    // Leave a full input/render opportunity between batches. Zero-delay loops
+    // can monopolize rendering as thousands of map nodes accumulate.
+    if (index < items.length) timer = setTimeout(step, 16);
     else complete?.();
   };
   timer = setTimeout(step, 0);
