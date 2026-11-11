@@ -1,5 +1,7 @@
 # Roadmap
 
+- [x] Add optional independent male/female Trachoma counts for children aged 1–9 to the shared entry form and offline/device intake without changing population totals. Fourteen validation/target tests pass; signed-in form shows male 70 and female 80 while Trachoma total remains 10; desktop/phone checked without runtime errors. Added columns and deployed device intake; live submission readback not exercised.
+
 - [x] Add offline-persisted, input-fresh community risk rankings and score-range filters; default Reconciliation usage from saved allocation without overwriting reported actuals, with offline edits and community balances. Twenty-three focused tests pass; real GIveWell ranking/range filtering verified. Live medicine save/readback awaits a project with a populated community allocation; reconnect interrupted the first browser check by signing out, without changes to authentication.
 
 - [x] Add WHO-inspired Coverage Excel exchange with scoped fuzzy matching, persistent review/addition, cumulative coverage and medicine-use writes, and administrator-managed allocation snapshots. GIveWell workbook downloaded and 6,412 formulas recalculated without errors; temporary import saved 80 treated / 20 HHs / 15 treated HHs / 160 medicine units and read back in Reconciliation with returned/damaged counts. Fourteen tests pass; preview build clean. Saved matrix allocation reload and physical-device offline replay need further end-to-end verification.

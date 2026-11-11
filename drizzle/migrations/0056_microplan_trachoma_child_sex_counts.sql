@@ -1,0 +1,3 @@
+ALTER TABLE public.microplan_entries ADD COLUMN IF NOT EXISTS trachoma_1_9_male integer CHECK (trachoma_1_9_male BETWEEN 0 AND 100000000), ADD COLUMN IF NOT EXISTS trachoma_1_9_female integer CHECK (trachoma_1_9_female BETWEEN 0 AND 100000000);
+COMMENT ON COLUMN public.microplan_entries.trachoma_1_9_male IS 'Optional independent male children aged 1-9 count; excluded from additive Trachoma age and target population totals.';
+COMMENT ON COLUMN public.microplan_entries.trachoma_1_9_female IS 'Optional independent female children aged 1-9 count; excluded from additive Trachoma age and target population totals.';
