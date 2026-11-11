@@ -93,5 +93,8 @@ export const useMicroplanScope = (bypass: boolean): MicroplanScope => {
 
   const designations = useMemo(() => [...new Set(rows.map(r => r.designation))], [rows]);
 
-  return { loading, hasNoRestriction, isInScope, designations };
+  return useMemo(
+    () => ({ loading, hasNoRestriction, isInScope, designations }),
+    [loading, hasNoRestriction, isInScope, designations],
+  );
 };

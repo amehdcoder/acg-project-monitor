@@ -113,7 +113,7 @@ const MicroplanSummaryView = ({ entries, readOnly = false, onRefresh }: Props) =
     );
   }, [entries, query]);
 
-  const tree = useMemo(() => {
+  const tree = useMemo(() => deriveOnce(rows, "summary-tree-v1", () => {
     const lgas = new Map<string, { agg: Agg; wards: Map<string, { agg: Agg; flhfs: Map<string, Agg> }> }>();
     const overall = blank("Overall");
     for (const e of rows) {
@@ -139,13 +139,13 @@ const MicroplanSummaryView = ({ entries, readOnly = false, onRefresh }: Props) =
       }))
       .sort((a, b) => b.agg.population - a.agg.population);
     return { overall, list };
-  }, [rows]);
+  }), [rows]);
 
   // Shared blank-excluding composite counting — identical to the Planning
   // dashboard KPIs and the Excel export summary sheet.
-  const geoCounts = useMemo(() => countGeography(rows as any[]), [rows]);
+  const geoCounts = useMemo(() => deriveOnce(rows, "summary-geography-v1", () => countGeography(rows as any[])), [rows]);
 
-  const missing = useMemo(() => rows.filter((e) => rowNeedsGeocoding(e as MicroplanGeoRow)), [rows]);
+  const missing = useMemo(() => deriveOnce(rows, "summary-missing-gps-v1", () => rows.filter((e) => rowNeedsGeocoding(e as MicroplanGeoRow))), [rows]);
 
   const runResolve = useCallback(async () => {
     setResolving(true);

@@ -1,5 +1,6 @@
 import { useTablePagination } from "@/hooks/useTablePagination";
 import DatasetPagination from "./DatasetPagination";
+import { deriveOnce } from "@/lib/microplanning/derivedCache";
 import { useEffect, useMemo, useState, useCallback, memo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -107,7 +108,7 @@ const MissingCommunitiesView = ({ entries, projectId, isInScope, scopeRestricted
   }, [persisted]);
 
   // Map of present (already-captured) communities + settlements, and ward metadata
-  const present = useMemo(() => {
+  const present = useMemo(() => deriveOnce(entries, "gap-present-index-v1", () => {
     const communities = new Set<string>();
     const settlements = new Set<string>();
     const wards = new Map<string, { state: string; lga: string; ward: string; flhf: Map<string, number>; creators: Set<string> }>();
@@ -129,7 +130,7 @@ const MissingCommunitiesView = ({ entries, projectId, isInScope, scopeRestricted
       }
     }
     return { communities, settlements, wards, presentCommByWard };
-  }, [entries]);
+  }), [entries]);
 
   const topFlhf = (wKey: string) => {
     const w = present.wards.get(wKey);

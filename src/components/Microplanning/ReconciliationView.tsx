@@ -1,5 +1,6 @@
 import { useTablePagination } from "@/hooks/useTablePagination";
 import DatasetPagination from "./DatasetPagination";
+import { deriveOnce } from "@/lib/microplanning/derivedCache";
 import { useState, useMemo, useEffect, memo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -68,11 +69,11 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId }: R
   const [filterLga, setFilterLga] = useState<string>("all");
 
   // Build a lookup of entry data by id (need medicine_used + reversal info)
-  const entryById = useMemo(() => {
+  const entryById = useMemo(() => deriveOnce(entries, "reconciliation-entry-index-v1", () => {
     const m = new Map<string, MicroplanEntry>();
     entries.forEach(e => m.set(e.id, e));
     return m;
-  }, [entries]);
+  }), [entries]);
 
   const states = useMemo(
     () => [...new Set(allocationRows.map(r => r.state))].sort(),
