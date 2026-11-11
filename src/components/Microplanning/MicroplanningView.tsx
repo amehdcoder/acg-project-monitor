@@ -33,6 +33,8 @@ import TravelRouteMap from "./TravelRouteMap";
 import HistoricalDataReview from "./HistoricalDataReview";
 import MicroplanSummaryView from "./MicroplanSummaryView";
 import CommunityRiskBadge from "./CommunityRiskBadge";
+import TrachomaChildrenKpi from "./TrachomaChildrenKpi";
+import { isTrachomaTarget } from "@/lib/microplanning/trachomaChildren";
 import CommunityRiskRanking from "./CommunityRiskRanking";
 import { useCommunityRiskCache } from "@/hooks/useCommunityRiskCache";
 import GpsResolveCell from "./GpsResolveCell";
@@ -989,7 +991,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
     () => projects.find((project) => project.id === selectedProjectId)?.name,
     [projects, selectedProjectId],
   );
-  const { calcTargetPop, label: targetPopulationLabel } = useTargetPopFields(selectedProjectName);
+  const { fields: targetPopulationFields, calcTargetPop, label: targetPopulationLabel } = useTargetPopFields(selectedProjectName);
   // Project-wide settings: Owner / Super Admin changes apply to every user.
   const sharedProjectKey = projectKeyFor(selectedProjectName);
   const [medTargetPct, setMedTargetPct] = useSharedMicroplanSetting<number>(sharedProjectKey, "med_target_pct", 100, validNumber(0.01, 100));
@@ -2677,6 +2679,8 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
               </div>
             ))}
           </div>
+
+          {isTrachomaTarget(targetPopulationFields) && <TrachomaChildrenKpi entries={filtered} />}
 
           {/* Row 2: Secondary KPI strip */}
           <div className="geo-secondary-metrics grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-0">
