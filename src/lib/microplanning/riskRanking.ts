@@ -4,7 +4,7 @@ export type RiskResult = ReturnType<typeof communityRisk>;
 export interface CachedRisk { signature: string; risk: RiskResult }
 export type RiskCache = Record<string, CachedRisk>;
 export function riskSignature(entry: CommunityRiskInput): string {
-  return JSON.stringify([entry.security_clearance ?? null, entry.accessibility ?? null, entry.cdd_names ?? null]);
+  return JSON.stringify(["cdd-gap-v2", entry.security_clearance ?? null, entry.accessibility ?? null, entry.cdd_names ?? null]);
 }
 export function refreshRiskCache(entries: (CommunityRiskInput & { id: string })[], previous: RiskCache = {}): RiskCache {
   return Object.fromEntries(entries.map(entry => {
