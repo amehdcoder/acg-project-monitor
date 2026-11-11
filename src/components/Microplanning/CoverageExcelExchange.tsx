@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { offlineMutate } from "@/lib/programmeModule/offlineWrite";
-import { alignStock, canAlignStock, stockTotal, createCoverageMatcher, coveragePatch, validateCoverageRow, type ExchangeEntry, type ExchangeRow, type MatchResult } from "@/lib/microplanning/coverageExchange";
+import { normalizePlace, alignStock, canAlignStock, stockTotal, createCoverageMatcher, coveragePatch, validateCoverageRow, type ExchangeEntry, type ExchangeRow, type MatchResult } from "@/lib/microplanning/coverageExchange";
 import type { WorkbookAllocation } from "@/lib/microplanning/coverageWorkbook";
 import { cacheGetForUser, cacheSetForUser } from "@/lib/programmeModule/offlineReadCache";
 
@@ -31,7 +31,7 @@ export default function CoverageExcelExchange({entries,allocations,projectId,pro
     const {parseCoverageWorkbook}=await import("@/lib/microplanning/coverageWorkbook");const parsed=await parseCoverageWorkbook(file);const match=createCoverageMatcher(entries);const claimed=new Set<string>();const identities=new Set<string>();const review:ReviewRow[]=[];
     for(let i=0;i<parsed.length;i++){
       const data=parsed[i];const result=match(data);let choice=result.id??"";
-      const identity=[data.state,data.lga,data.ward,data.community,data.settlement].map(s=>s.toLowerCase().trim()).join("|");
+      const identity=[data.state,data.lga,data.ward,data.community,data.settlement].map(normalizePlace).join("|");
       if((choice&&claimed.has(choice))||identities.has(identity)){data.errors.push("Duplicate community/settlement in this workbook. Correct the workbook or skip this row.");choice="";}
       if(choice)claimed.add(choice);identities.add(identity);
       review.push({data,match:result,choice,newId:crypto.randomUUID()});

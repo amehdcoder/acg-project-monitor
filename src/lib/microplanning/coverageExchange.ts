@@ -82,6 +82,7 @@ export function validateCoverageRow(row: ExchangeRow) {
   if (row.population !== undefined && row.treated !== undefined && row.treated > row.population) errors.push("Total Treated cannot exceed Total Population.");
   if (row.year !== undefined && (!Number.isSafeInteger(row.year) || row.year < 1900 || row.year > 2100)) errors.push("Year of Microplanning must be a whole year between 1900 and 2100.");
   if (row.stock) {
+    if (row.medicines.length || row.medicineUsed !== undefined) errors.push("Use either the five quantity columns or the legacy medicine columns, not both.");
     for (const [key, label] of [["received", "Quantity Received"], ["used", "Quantity Used"], ["lost", "Quantity Lost"], ["expired", "Quantity Expired"], ["returned", "Quantity Returned to FLHF"]] as const) {
       if (!validQuantity(row.stock[key])) errors.push(`${label} must be supplied as a non-negative whole number (use 0 for none).`);
     }
@@ -100,6 +101,7 @@ export function coveragePatch(row: ExchangeRow, existing?: ExchangeEntry): Recor
   const errors = validateCoverageRow(row);
   if (row.treatedHouseholds !== undefined && row.treatedHouseholds > (row.households ?? existing?.total_households_reported ?? Infinity)) errors.push("Treated HHs exceed the saved Total HHs.");
   if (row.households !== undefined && (row.treatedHouseholds ?? existing?.total_households_treated ?? 0) > row.households) errors.push("Total HHs are below saved Treated HHs.");
+  if (row.treated !== undefined && existing?.estimated_total_population != null && existing.estimated_total_population > 0 && row.treated > existing.estimated_total_population) errors.push("Total Treated exceeds the saved Total Population.");
   if (errors.length) throw new Error(errors.join(" "));
   const patch: Record<string, unknown> = {};
   if (row.treated !== undefined) patch.total_treated = row.treated;
