@@ -31,6 +31,7 @@ import MissingCommunitiesView from "./MissingCommunitiesView";
 import TravelRouteMap from "./TravelRouteMap";
 import HistoricalDataReview from "./HistoricalDataReview";
 import MicroplanSummaryView from "./MicroplanSummaryView";
+import CommunityRiskBadge from "./CommunityRiskBadge";
 import GpsResolveCell from "./GpsResolveCell";
 import DrillBreadcrumb from "./DrillBreadcrumb";
 import { exportFilteredMicroplan, filterScopeLabel } from "@/lib/microplanning/filteredExport";
@@ -692,6 +693,7 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                   </span>
 
                   {entry.accessibility && <span className="capitalize">{entry.accessibility.replace(/_/g, " ")}</span>}
+                  <span className="col-span-2"><CommunityRiskBadge entry={entry} /></span>
                   <span className="col-span-2"><GpsResolveCell entry={entry} readOnly={readOnly} onResolved={onGpsResolved} compact /></span>
                 </div>
               </CardContent>
@@ -748,6 +750,7 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                   </button>
                 </TableHead>
                 <TableHead className="text-xs">Access</TableHead>
+                <TableHead className="text-xs">Security risk</TableHead>
                 <TableHead className="text-xs">GPS</TableHead>
                 <TableHead className="text-xs w-[80px]">Actions</TableHead>
               </TableRow>
@@ -755,11 +758,11 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={readOnly ? 11 : 12} className="text-center text-muted-foreground py-8">Loading...</TableCell>
+                  <TableCell colSpan={readOnly ? 12 : 13} className="text-center text-muted-foreground py-8">Loading...</TableCell>
                 </TableRow>
               ) : pagination.paginatedData.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={readOnly ? 11 : 12} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={readOnly ? 12 : 13} className="text-center text-muted-foreground py-8">
                     No entries yet. Click 'Add Entry' to start microplanning.
                   </TableCell>
                 </TableRow>
@@ -770,7 +773,7 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                 const isGroupStart = !!meta && (!prevEntry || !dupMeta.has(prevEntry.id) || duplicateKey(prevEntry) !== duplicateKey(entry));
                 return (
                 <Fragment key={entry.id}>
-                {isGroupStart && meta && <GroupHeader group={meta.group} colSpan={readOnly ? 11 : 12} />}
+                {isGroupStart && meta && <GroupHeader group={meta.group} colSpan={readOnly ? 12 : 13} />}
 
                 <TableRow className={`text-xs ${pwdTotalFor(entry) >= PWD_FLAG ? "bg-purple-50/60 dark:bg-purple-950/20 border-l-2 border-l-purple-500" : meta ? "bg-amber-50/30 dark:bg-amber-950/10" : ""}`} data-state={selected.has(entry.id) ? "selected" : undefined}>
 
@@ -812,6 +815,7 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                       </Badge>
                     )}
                   </TableCell>
+                  <TableCell><CommunityRiskBadge entry={entry} /></TableCell>
                   <TableCell>
                     <GpsResolveCell entry={entry} readOnly={readOnly} onResolved={onGpsResolved} />
                   </TableCell>

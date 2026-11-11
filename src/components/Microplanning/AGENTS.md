@@ -1,2 +1,3 @@
 - Keep scope helpers stable and cache only pure models by immutable scoped inputs; defer user filters only within the same access source — why: tab switches must not repeat project-wide calculations or retain revoked data.
 - Keep maps unmounted off-tab, yield between drawing batches, use lightweight overview paths and viewport-bound detail, and drain layer groups before renderer disposal — why: rapid navigation must cancel map work without hidden resource accumulation.
+- Derive community risk locally from current scoped rows through the shared tested scoring helper; unknown factors produce ranges, not confirmed scores — why: offline and realtime views must agree without inventing security clearance or CDD absence.
