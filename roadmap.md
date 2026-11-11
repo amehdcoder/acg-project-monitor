@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Add per-community security planning risk from security, accessibility and explicit CDD gaps; flag unknown inputs and verify real-project desktop/phone views.
+
 - [x] Improve all nine Geo Microplanning tabs: stable access-scoped source identities, cached Summary/Reconciliation/Gaps models, immediate access guards, yielding map batches and viewport-bound detail. Live GIveWell desktop/phone rapid navigation verified; map detail remains progressive rather than blocking navigation.
 
 - [x] Strengthen offline launch and password sign-in for prepared accounts; cancel late password completions after sign-out. All 35 offline/auth/saved-form tests pass. Published login shell reopens without network; real-account isolated-browser password rejection, offline unlock and reconnect retain Forms. Browser cache preparation was isolated, not a change to the account's server password. First-use and live external services require internet.

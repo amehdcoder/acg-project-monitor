@@ -815,6 +815,7 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                       </Badge>
                     )}
                   </TableCell>
+                  <TableCell><CommunityRiskBadge entry={entry} /></TableCell>
                   <TableCell>
                     <GpsResolveCell entry={entry} readOnly={readOnly} onResolved={onGpsResolved} />
                   </TableCell>
