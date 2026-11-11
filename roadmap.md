@@ -1,5 +1,7 @@
 # Roadmap
 
+- [x] Add a Trachoma-target-only children 1–9 KPI with independent male/female totals and completeness from filtered scoped entries. Nine tests pass; desktop/phone visibility verified using an isolated local selection, without altering saved project settings. Existing live rows contain no child sex counts, so populated totals are covered by tests rather than fabricated records.
+
 - [x] Add optional independent male/female Trachoma counts for children aged 1–9 to the shared entry form and offline/device intake without changing population totals. Fourteen validation/target tests pass; signed-in form shows male 70 and female 80 while Trachoma total remains 10; desktop/phone checked without runtime errors. Added columns and deployed device intake; live submission readback not exercised.
 
 - [x] Add offline-persisted, input-fresh community risk rankings and score-range filters; default Reconciliation usage from saved allocation without overwriting reported actuals, with offline edits and community balances. Twenty-three focused tests pass; real GIveWell ranking/range filtering verified. Live medicine save/readback awaits a project with a populated community allocation; reconnect interrupted the first browser check by signing out, without changes to authentication.
