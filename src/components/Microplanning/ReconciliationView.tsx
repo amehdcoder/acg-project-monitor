@@ -380,7 +380,7 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId, rea
                           min={0}
                           aria-label={`Actual usage for ${row.community}`}
                           disabled={readOnly || savingId === row.entryId || (entryById.get(row.entryId)?.medicine_returns?.length ?? 0) > 1}
-                          value={getUsedFor(row)}
+                          value={editedUsed[row.entryId] ?? getUsedFor(row)}
                           onChange={(ev) => setEditedUsed(prev => ({ ...prev, [row.entryId]: ev.target.value }))}
                           className="h-7 text-xs text-right tabular-nums w-full"
                           placeholder="0"

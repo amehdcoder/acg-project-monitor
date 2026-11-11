@@ -1929,7 +1929,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
     base.forEach(r=>{const old=merged.get(r.entryId);merged.set(r.entryId,{...r,medicineRequired:(old?.medicineRequired||0)+(r.medicineRequired||0)});});
     // Reported use must remain visible even when the community has no allocation.
     displayEntries.forEach(e=>{if(!merged.has(e.id)&&((e as any).medicine_used!=null||(e as any).medicine_returns?.length))merged.set(e.id,{entryId:e.id,state:e.state,lga:e.lga,ward:e.ward,flhf:e.flhf_name,community:e.community_name,settlement:e.settlement_name||"—",medicineRequired:0,medicineUsed:(e as any).medicine_used||0,unallocated:true});});
-    return [...merged.values()].map(row => ({ ...row, savedAllocation: snapshots.length > 0 && !row.unallocated }));
+    return [...merged.values()].map(row => ({ ...row, savedAllocation: (snapshots.length > 0 || savedAllocations.some(allocation => allocation.lga === row.lga && (!allocation.ward || allocation.ward === row.ward) && (!allocation.flhf || allocation.flhf === row.flhf))) && !row.unallocated }));
   }, [savedAllocations,displayEntries,medicineAllocationData]);
 
   // Render the per-community allocation preview in pages of 100 so even a
