@@ -114,7 +114,7 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
   const dest2Ref = useRef<HTMLDivElement>(null);
 
   // Build unique location options from entries
-  const allLocations = useMemo(() => {
+  const allLocations = useMemo(() => deriveOnce(entries, "route-locations-v1", () => {
     const locMap = new Map<string, LocationOption>();
 
     entries.forEach((e) => {

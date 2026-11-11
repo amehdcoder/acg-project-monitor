@@ -232,7 +232,7 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
     }
   };
 
-  const rows: RowData[] = useMemo(() => {
+  const rows: RowData[] = useMemo(() => deriveOnce(entries, "historical-rows-v1", () => {
     const groups = new Map<string, Entry[]>();
     entries.forEach((e) => {
       if (!e.estimated_total_population || !e.year_of_microplanning) return;

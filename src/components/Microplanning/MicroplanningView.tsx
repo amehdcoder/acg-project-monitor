@@ -305,7 +305,10 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
   );
 
   // Duplicate intelligence: same State/LGA/Ward/FLHF/Community/Settlement.
-  const dupAnalysis = useMemo(() => analyzeDuplicates(entries as any[]), [entries]);
+  const dupAnalysis = useMemo(
+    () => deriveOnce(entries, "duplicate-analysis-v1", () => analyzeDuplicates(entries as any[])),
+    [entries],
+  );
   const visibleEntries = useMemo(() => {
     let base = showOnlyDuplicates
       ? entries.filter((e: any) =>

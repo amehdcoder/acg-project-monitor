@@ -102,29 +102,39 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName }: CoverageVi
   // Reset ward when LGA changes
   useEffect(() => { setFilterWard("all"); }, [filterLga]);
 
-  // KPIs
-  const kpis = useMemo(() => {
-    const totalTarget = filtered.reduce((s, e) => s + getTargetPop(e), 0);
-    const totalTreated = filtered.reduce((s, e) => s + (e.total_treated || 0), 0);
-    const totalMedicineUsed = filtered.reduce((s, e) => s + (e.medicine_used || 0), 0);
-    const withCoverage = filtered.filter(e => e.total_treated != null && e.total_treated > 0);
-    const missed = filtered.filter(e => !e.total_treated || e.total_treated === 0);
-    const geotagged = filtered.filter(e => e.community_latitude && e.community_longitude);
-    const coveredGeo = withCoverage.filter(e => e.community_latitude && e.community_longitude);
-    const geoCoverage = geotagged.length > 0 ? (coveredGeo.length / geotagged.length) * 100 : 0;
-    const therapeuticCoverage = totalTarget > 0 ? (totalTreated / totalTarget) * 100 : 0;
-
+  // One-pass, remount-safe KPI derivation. Realtime replacements invalidate it
+  // automatically because the parent supplies a new filtered array identity.
+  const kpis = useMemo(() => deriveOnce(filtered, `coverage-kpis-v1:${targetPopLabel}`, () => {
+    let totalTarget = 0;
+    let totalTreated = 0;
+    let totalMedicineUsed = 0;
+    let communitiesCovered = 0;
+    let communitiesMissed = 0;
+    let geotagged = 0;
+    let coveredGeo = 0;
+    for (const e of filtered) {
+      totalTarget += getTargetPop(e);
+      totalTreated += e.total_treated || 0;
+      totalMedicineUsed += e.medicine_used || 0;
+      const covered = e.total_treated != null && e.total_treated > 0;
+      if (covered) communitiesCovered++;
+      else communitiesMissed++;
+      if (e.community_latitude && e.community_longitude) {
+        geotagged++;
+        if (covered) coveredGeo++;
+      }
+    }
     return {
       totalTarget,
       totalTreated,
       totalMedicineUsed,
-      therapeuticCoverage,
-      geoCoverage,
-      communitiesCovered: withCoverage.length,
-      communitiesMissed: missed.length,
+      therapeuticCoverage: totalTarget > 0 ? (totalTreated / totalTarget) * 100 : 0,
+      geoCoverage: geotagged > 0 ? (coveredGeo / geotagged) * 100 : 0,
+      communitiesCovered,
+      communitiesMissed,
       totalCommunities: filtered.length,
     };
-  }, [filtered, getTargetPop]);
+  }), [filtered, getTargetPop, targetPopLabel]);
 
   const handleSave = async (id: string) => {
     const treatedVal = editedTreated[id];
