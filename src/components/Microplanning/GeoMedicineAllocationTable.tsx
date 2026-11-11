@@ -10,7 +10,8 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { offlineMutate } from "@/lib/programmeModule/offlineWrite";
-import { cachedRead } from "@/lib/programmeModule/offlineReadCache";
+import { cachedRead, cacheSet } from "@/lib/programmeModule/offlineReadCache";
+import { listQueued } from "@/lib/programmeModule/offlineQueue";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,12 +73,13 @@ export default function GeoMedicineAllocationTable({
   useEffect(() => {
     let current = true;
     void cachedRead<any[]>(`microplan-matrix:${scopeId}`, () => supabase.from("microplan_medicine_allocations").select("*").eq("project_id", scopeId).eq("lga", "__geo_matrix__").order("updated_at", {ascending:false}).limit(1)).then(({data}) => {
-      if (!current || !data?.[0]) return;
-      const row=data[0];setSavedId(row.id);
+      if (!current) return;
+      const pending=listQueued().filter(q=>q.kind==="op"&&q.user_id===user?.id&&q.payload.table==="microplan_medicine_allocations").map(q=>q.payload.values as any).filter(v=>v?.project_id===scopeId&&v?.lga==="__geo_matrix__").at(-1);
+      const row=pending||data?.[0];if(!row)return;setSavedId(row.id);
       try { const cfg=JSON.parse(row.notes||"{}");setLgaTotals(cfg.lgaTotals||{});setWardTotals(cfg.wardTotals||{});setMedicine(cfg.medicine||row.medicine_name);setUnit(cfg.unit||"Units");setBufferPct(cfg.bufferPct??10);setRounding(cfg.rounding||DEFAULT_ROUNDING); } catch { /* Legacy notes are not matrix settings. */ }
     });
     return () => { current=false; };
-  }, [scopeId]);
+  }, [scopeId,user?.id]);
 
   const excl = useGeoExclusions(`medicine.${scopeId}`);
 
@@ -240,7 +242,7 @@ export default function GeoMedicineAllocationTable({
 
   const clearAll = async () => {
     if (!isAdmin || readOnly || !window.confirm("Remove this saved medicine allocation? Coverage and recorded medicine use will remain unchanged.")) return;
-    try { if(savedId) { if(!navigator.onLine)throw new Error("Connect to remove a saved allocation.");const {error}=await supabase.from("microplan_medicine_allocations").delete().eq("id",savedId).select("id");if(error)throw error; }setLgaTotals({});setWardTotals({});setSavedId(undefined);onSaved?.(); } catch(e) {toast({title:"Removal failed",description:String(e),variant:"destructive"});}
+    try { if(savedId) { if(!navigator.onLine)throw new Error("Connect to remove a saved allocation.");const {data,error}=await supabase.from("microplan_medicine_allocations").delete().eq("id",savedId).select("id");if(error)throw error;if(!data?.length)throw new Error("Allocation was not removed. Check administrator access."); }setLgaTotals({});setWardTotals({});setSavedId(undefined);await cacheSet(`microplan-matrix:${scopeId}`,[]);onSaved?.(); } catch(e) {toast({title:"Removal failed",description:String(e),variant:"destructive"});}
   };
   const savePlan = async () => {
     if(!user?.id||!isAdmin||readOnly||errors.length||result.totals.allocation<=0)return;
@@ -252,7 +254,7 @@ export default function GeoMedicineAllocationTable({
       if(snapshot.some(r=>!r.entryId||!/^[0-9a-f-]{36}$/i.test(r.entryId)))throw new Error("Adopt uploaded population into the project microplan before saving an allocation.");
       const id=savedId||crypto.randomUUID();
       const values={id,project_id:scopeId,lga:"__geo_matrix__",amount:result.totals.allocation,medicine_name:medicine,created_by:user.id,updated_by:user.id,notes:JSON.stringify({lgaTotals,wardTotals,medicine,unit,bufferPct,rounding}),community_snapshot:snapshot};
-      const saved=await offlineMutate({table:"microplan_medicine_allocations",action:savedId?"update":"insert",id:savedId,values,userId:user.id});setSavedId(id);onSaved?.();toast({title:"Latest allocation saved",description:saved.queued?"Saved on this device; it will sync when connected.":"Retained for Coverage and Reconciliation until an administrator updates or removes it."});
+      const saved=await offlineMutate({table:"microplan_medicine_allocations",action:savedId?"update":"insert",id:savedId,values,userId:user.id});await cacheSet(`microplan-matrix:${scopeId}`,[values]);setSavedId(id);onSaved?.();toast({title:"Latest allocation saved",description:saved.queued?"Saved on this device; it will sync when connected.":"Retained for Coverage and Reconciliation until an administrator updates or removes it."});
     }catch(e){toast({title:"Allocation could not be saved",description:e instanceof Error?e.message:String(e),variant:"destructive"});}finally{setSavingPlan(false);}
   };
 

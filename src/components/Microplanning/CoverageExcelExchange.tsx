@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Download, Upload, FileSpreadsheet, CheckCircle2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { offlineMutate } from "@/lib/programmeModule/offlineWrite";
 import { createCoverageMatcher, coveragePatch, validateCoverageRow, type ExchangeEntry, type ExchangeRow, type MatchResult } from "@/lib/microplanning/coverageExchange";
 import type { WorkbookAllocation } from "@/lib/microplanning/coverageWorkbook";
+import { cacheGetForUser, cacheSetForUser } from "@/lib/programmeModule/offlineReadCache";
 
 interface ReviewRow { data: ExchangeRow; match: MatchResult; choice: string; saved?: boolean; error?: string; newId: string }
 interface Props { entries: ExchangeEntry[]; allocations: WorkbookAllocation[]; projectId?: string | null; projectName?: string | null; target: (e: ExchangeEntry)=>number; onRefresh: ()=>void; readOnly?: boolean }
@@ -17,6 +18,9 @@ export default function CoverageExcelExchange({entries,allocations,projectId,pro
   const {user}=useAuth();const input=useRef<HTMLInputElement>(null);
   const [rows,setRows]=useState<ReviewRow[]>([]);const [open,setOpen]=useState(false);const [busy,setBusy]=useState(false);const [exporting,setExporting]=useState(false);const [page,setPage]=useState(0);const [query,setQuery]=useState("");const [issuesOnly,setIssuesOnly]=useState(false);
   const byId=useMemo(()=>new Map(entries.map(e=>[e.id,e])),[entries]);
+  const [hydrated,setHydrated]=useState(false);
+  useEffect(()=>{if(!user?.id||!projectId)return;let active=true;void cacheGetForUser<ReviewRow[]>(user.id,`coverage-import:${projectId}`).then(saved=>{if(active){if(saved)setRows(saved);setHydrated(true);}});return()=>{active=false;};},[user?.id,projectId]);
+  useEffect(()=>{if(hydrated&&user?.id&&projectId)void cacheSetForUser(user.id,`coverage-import:${projectId}`,rows);},[hydrated,rows,user?.id,projectId]);
   const visible=useMemo(()=>rows.map((r,i)=>({r,i})).filter(({r})=>(!issuesOnly||!r.match.id||r.error||r.data.errors.length)&&`${r.data.community} ${r.data.lga} ${r.data.ward}`.toLowerCase().includes(query.toLowerCase())),[rows,issuesOnly,query]);
   const pending=rows.filter(r=>!r.saved&&r.choice!=="skip");const unresolved=pending.filter(r=>!r.choice||r.data.errors.length);
   const change=(i:number,patch:Partial<ReviewRow>)=>setRows(prev=>prev.map((r,n)=>n===i?{...r,...patch}:r));
@@ -45,7 +49,7 @@ export default function CoverageExcelExchange({entries,allocations,projectId,pro
         const patch=coveragePatch(r.data,existing);if(!Object.keys(patch).length)throw new Error("No coverage or medicine quantities supplied.");
         const values:Record<string,unknown>={...patch,project_id:projectId,created_by:user.id,updated_by:user.id};
         if(existing)values.created_by=(existing as ExchangeEntry&{created_by?:string}).created_by;
-        else Object.assign(values,{id:r.newId,state:r.data.state,lga:r.data.lga,ward:r.data.ward,flhf_name:r.data.flhf||"Unspecified FLHF",community_name:r.data.community,settlement_name:r.data.settlement||null,estimated_total_population:r.data.population??null,source_of_population_data:"Coverage Excel import",notes:"Community added after Coverage Excel reconciliation; population and GPS require verification.",status:"draft"});
+        else Object.assign(values,{id:r.newId,state:r.data.state,lga:r.data.lga,ward:r.data.ward,flhf_name:r.data.flhf||"Unspecified FLHF",community_name:r.data.community,settlement_name:r.data.settlement||null,estimated_total_population:r.data.population??null,population_source:"Coverage Excel import",notes:"Community added after Coverage Excel reconciliation; population and GPS require verification.",status:"draft"});
         const result=await offlineMutate({table:"microplan_entries",action:existing?"update":"insert",id:existing?.id,values,userId:user.id});saved++;if(result.queued)queued++;change(i,{saved:true,error:undefined});
       }catch(e){change(i,{error:e instanceof Error?e.message:String(e)});}
       if(i%20===0)await new Promise(resolve=>setTimeout(resolve,0));

@@ -56,7 +56,7 @@ export async function parseCoverageWorkbook(file: File): Promise<ExchangeRow[]> 
   const head=cells[headerIndex].map(String);const out: ExchangeRow[]=[];
   for(let i=headerIndex+1;i<cells.length;i++){
     const values=cells[i];const get=(key:string)=>values[head.indexOf(key)]??"";const text=(key:string)=>String(get(key)).trim();
-    if(!text("Community")&&!text("Entry ID")&&!["Total Treated","Total HHs","Treated HHs","Medicine Used (units)"].some(k=>get(k)!==""))continue;
+    if(!["Total Treated","Total HHs","Treated HHs","Medicine Used (units)","Used 1","Returned 1","Damaged 1","Used 2","Returned 2","Damaged 2","Used 3","Returned 3","Damaged 3"].some(k=>get(k)!==""))continue;
     const errors:string[]=[];const num=(key:string):number|undefined=>{const v=get(key);if(v==="")return undefined;const n=typeof v==="number"?v:Number(String(v).replace(/,/g,""));if(!Number.isFinite(n)){errors.push(`${key} is not a number.`);return undefined;}return n;};
     const medicines:MedicineReturn[]=[];
     for(let slot=1;slot<=3;slot++){const name=text(`Medicine ${slot}`),unit=text(`Unit ${slot}`),used=num(`Used ${slot}`),returned=num(`Returned ${slot}`),damaged=num(`Damaged ${slot}`);if(name||unit||used!==undefined||returned!==undefined||damaged!==undefined){if(used===undefined)errors.push(`Used ${slot} is required for a reported medicine.`);medicines.push({name,unit,used:used??0,returned:returned??0,damaged:damaged??0});}}
