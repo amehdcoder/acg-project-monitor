@@ -33,6 +33,8 @@ import TravelRouteMap from "./TravelRouteMap";
 import HistoricalDataReview from "./HistoricalDataReview";
 import MicroplanSummaryView from "./MicroplanSummaryView";
 import CommunityRiskBadge from "./CommunityRiskBadge";
+import CommunityRiskRanking from "./CommunityRiskRanking";
+import { useCommunityRiskCache } from "@/hooks/useCommunityRiskCache";
 import GpsResolveCell from "./GpsResolveCell";
 import DrillBreadcrumb from "./DrillBreadcrumb";
 import { exportFilteredMicroplan, filterScopeLabel } from "@/lib/microplanning/filteredExport";
@@ -1049,11 +1051,11 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
     if (!microplanEntriesCache.has(key)) setLoading(true);
     const pending = listQueued().filter(q => q.kind === "op" && q.payload.table === "microplan_entries" && q.user_id === user?.id).flatMap(q => {
       const values = q.payload.values as any;
-      return values?.project_id === selectedProjectId && values?.created_by === user?.id ? [{ ...values, id: values.id || q.payload.id }] : [];
+      return values && (values.project_id === selectedProjectId || (!values.project_id && q.payload.id)) ? [{ ...values, id: q.payload.id || values.id }] : [];
     });
     if (!navigator.onLine) {
       const cached = await cacheGet<any[]>(`microplan-entries:${key}`) || [];
-      const merged = new Map(cached.map(r => [r.id,r])); pending.forEach(r => merged.set(r.id, {...merged.get(r.id), ...r}));
+      const merged = new Map(cached.map(r => [r.id,r])); pending.forEach(r => { if (merged.has(r.id) || (r.project_id === selectedProjectId && r.created_by === user?.id)) merged.set(r.id, {...merged.get(r.id), ...r}); });
       setEntries([...merged.values()]); setLoading(false); return;
     }
     try {
@@ -1078,7 +1080,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
         }
       });
       if (reqId !== entriesReqRef.current) return;
-      const merged = new Map((data || []).map(r => [r.id,r])); pending.forEach(r => merged.set(r.id, {...merged.get(r.id), ...r}));
+      const merged = new Map((data || []).map(r => [r.id,r])); pending.forEach(r => { if (merged.has(r.id) || (r.project_id === selectedProjectId && r.created_by === user?.id)) merged.set(r.id, {...merged.get(r.id), ...r}); });
       const rows = [...merged.values()];
       microplanEntriesCache.set(key, rows);
       await cacheSet(`microplan-entries:${key}`, rows);
@@ -1269,7 +1271,10 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
         payload.id = result.id;
         toast({ title: result.queued ? "Saved on this device · pending sync" : existingMatch ? "Entry added (duplicate kept separate)" : "Entry added" });
       }
-      await cacheSet(`microplan-entries:${user?.id}|${selectedProjectId}|${entryOnly ? "own" : "all"}`, [payload, ...entries.filter(r => r.id !== payload.id)]);
+      const savedRows = [{ ...entries.find(r => r.id === payload.id), ...payload }, ...entries.filter(r => r.id !== payload.id)];
+      microplanEntriesCache.set(entriesKey, savedRows);
+      setEntries(savedRows);
+      await cacheSet(`microplan-entries:${entriesKey}`, savedRows);
       setShowForm(false);
       setEditingEntry(null);
       fetchEntries();
@@ -1538,6 +1543,16 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
     return scopedEntries;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scopedEntries, dashExcl.archived]);
+
+  const communityRisks = useCommunityRiskCache(displayEntries, user?.id, selectedProjectId || undefined);
+
+  const applyReconciliationPatch = (id: string, patch: Record<string, unknown>) => {
+    setEntries(previous => {
+      const rows = previous.map(entry => entry.id === id ? { ...entry, ...patch } : entry);
+      microplanEntriesCache.set(entriesKey, rows);
+      return rows;
+    });
+  };
 
 
 
@@ -1914,7 +1929,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
     base.forEach(r=>{const old=merged.get(r.entryId);merged.set(r.entryId,{...r,medicineRequired:(old?.medicineRequired||0)+(r.medicineRequired||0)});});
     // Reported use must remain visible even when the community has no allocation.
     displayEntries.forEach(e=>{if(!merged.has(e.id)&&((e as any).medicine_used!=null||(e as any).medicine_returns?.length))merged.set(e.id,{entryId:e.id,state:e.state,lga:e.lga,ward:e.ward,flhf:e.flhf_name,community:e.community_name,settlement:e.settlement_name||"—",medicineRequired:0,medicineUsed:(e as any).medicine_used||0,unallocated:true});});
-    return [...merged.values()];
+    return [...merged.values()].map(row => ({ ...row, savedAllocation: snapshots.length > 0 && !row.unallocated }));
   }, [savedAllocations,displayEntries,medicineAllocationData]);
 
   // Render the per-community allocation preview in pages of 100 so even a
@@ -2897,6 +2912,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
               </CardContent>
             </Card>
           </div>
+          <CommunityRiskRanking entries={filtered} risks={communityRisks} />
           <PlanningHeatmaps entries={filtered as never} />
           <PlanningAnalyses entries={filtered} calcTargetPop={calcTargetPop} targetLabel={targetPopulationLabel} />
           <OsirisPlanningAnalysis entries={filtered} demo={isUsingDemoData} projectName={selectedProjectName} />
@@ -3735,6 +3751,8 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
               allocationRows={reconciliationRows}
               onRefresh={fetchEntries}
               projectId={selectedProjectId || null}
+              readOnly={lensReadOnly}
+              onSaved={applyReconciliationPatch}
             />
           )}
 
