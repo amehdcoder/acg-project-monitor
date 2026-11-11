@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import { targetPopulation, validTargetSelection } from "../targetPopulation";
 
 describe("Target Population disaggregation", () => {
+  it("excludes independent children 1–9 sex counts from Trachoma target totals", () => {
+    expect(targetPopulation({ trachoma_0_5_months: 1, trachoma_6m_6y: 2, trachoma_7_14y: 3, trachoma_15_plus: 4, trachoma_1_9_male: 70, trachoma_1_9_female: 80 }, ["trachoma_0_5m", "trachoma_6m_6y", "trachoma_7_14y", "trachoma_15_plus"])).toBe(10);
+  });
   it("sums selected standard ages exactly", () => {
     expect(targetPopulation({ estimated_children_0_4: 10, estimated_children_5_14: 30, estimated_adults_15_plus: 60 }, ["children_5_14", "adults_15_plus"])).toBe(90);
   });
