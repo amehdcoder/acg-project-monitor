@@ -1,5 +1,7 @@
 # Roadmap
 
+- [x] Simplify Coverage Excel to five medicine quantities with validation and explicit received-only alignment. Twenty-four tests pass; signed-in GIveWell download/upload/alignment/save and Reconciliation export read back received 200 / used 160 / lost 5 / expired 5 / returned 30 with zero balance. Desktop/phone checked; missing stock storage repaired, temporary records removed. Saved allocations unchanged.
+
 - [x] Add a Trachoma-target-only children 1–9 KPI with independent male/female totals and completeness from filtered scoped entries. Nine tests pass; desktop/phone visibility verified using an isolated local selection, without altering saved project settings. Existing live rows contain no child sex counts, so populated totals are covered by tests rather than fabricated records.
 
 - [x] Add optional independent male/female Trachoma counts for children aged 1–9 to the shared entry form and offline/device intake without changing population totals. Fourteen validation/target tests pass; signed-in form shows male 70 and female 80 while Trachoma total remains 10; desktop/phone checked without runtime errors. Added columns and deployed device intake; live submission readback not exercised.

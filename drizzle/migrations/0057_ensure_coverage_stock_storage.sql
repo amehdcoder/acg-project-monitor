@@ -1,0 +1,2 @@
+ALTER TABLE public.microplan_entries ADD COLUMN IF NOT EXISTS medicine_returns jsonb;
+COMMENT ON COLUMN public.microplan_entries.medicine_returns IS 'Reported stock quantities received, used, lost, expired and returned to FLHF; legacy medicine detail retained. Coverage imports never overwrite saved allocations.';
