@@ -9343,6 +9343,8 @@ export type Database = {
           total_households_treated: number | null
           total_treated: number | null
           trachoma_0_5_months: number | null
+          trachoma_1_9_female: number | null
+          trachoma_1_9_male: number | null
           trachoma_15_plus: number | null
           trachoma_6m_6y: number | null
           trachoma_7_14y: number | null
@@ -9424,6 +9426,8 @@ export type Database = {
           total_households_treated?: number | null
           total_treated?: number | null
           trachoma_0_5_months?: number | null
+          trachoma_1_9_female?: number | null
+          trachoma_1_9_male?: number | null
           trachoma_15_plus?: number | null
           trachoma_6m_6y?: number | null
           trachoma_7_14y?: number | null
@@ -9505,6 +9509,8 @@ export type Database = {
           total_households_treated?: number | null
           total_treated?: number | null
           trachoma_0_5_months?: number | null
+          trachoma_1_9_female?: number | null
+          trachoma_1_9_male?: number | null
           trachoma_15_plus?: number | null
           trachoma_6m_6y?: number | null
           trachoma_7_14y?: number | null

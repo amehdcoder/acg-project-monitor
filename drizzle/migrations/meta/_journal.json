@@ -393,6 +393,13 @@
       "when": 1794406846780,
       "tag": "0055_microplan_coverage_exchange_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1794409014240,
+      "tag": "0056_microplan_trachoma_child_sex_counts",
+      "breakpoints": true
     }
   ]
 }
