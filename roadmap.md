@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Add WHO-style Coverage Excel export/import with scoped fuzzy matching, unresolved-community review/addition, durable coverage and medicine-use writes, and retained administrator-managed allocation snapshots; verify round-trip and cross-tab readback.
+
 - [x] Add per-community security planning risk from security, accessibility and explicit CDD gaps; unknown inputs show ranges. Verified GIveWell desktop/phone breakdowns without runtime errors; all eight scoring/table tests pass.
 
 - [x] Improve all nine Geo Microplanning tabs: stable access-scoped source identities, cached Summary/Reconciliation/Gaps models, immediate access guards, yielding map batches and viewport-bound detail. Live GIveWell desktop/phone rapid navigation verified; map detail remains progressive rather than blocking navigation.
