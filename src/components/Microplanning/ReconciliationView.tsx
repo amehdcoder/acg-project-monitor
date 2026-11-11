@@ -15,6 +15,7 @@ import { downloadReconciliationXlsForm } from "@/lib/microplanning/generateRecon
 import useRealtimeReconciliationEntries from "@/hooks/useRealtimeReconciliationEntries";
 import { TabSyncStatus } from "./TabSyncStatus";
 import KoboAllocationOverridePanel from "./KoboAllocationOverridePanel";
+import type { MedicineReturn } from "@/lib/microplanning/coverageExchange";
 
 
 export interface AllocationRow {
@@ -27,6 +28,7 @@ export interface AllocationRow {
   settlement: string;
   medicineRequired: number;
   medicineUsed: number;
+  unallocated?: boolean;
 }
 
 export interface MicroplanEntry {
@@ -40,6 +42,7 @@ export interface MicroplanEntry {
   medicine_used?: number | null;
   medicine_reversed_to?: string | null;
   medicine_reversed_other?: string | null;
+  medicine_returns?: MedicineReturn[] | null;
 }
 
 interface ReconciliationViewProps {
@@ -113,10 +116,12 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId }: R
   const getOtherFor = (row: AllocationRow) =>
     editedOther[row.entryId] ?? entryById.get(row.entryId)?.medicine_reversed_other ?? "";
 
+  const accountedReturns = (row: AllocationRow) => (entryById.get(row.entryId)?.medicine_returns || []).reduce((s,m)=>s+m.returned+m.damaged,0);
+
   const totals = useMemo(() => {
     const allocated = filtered.reduce((s, r) => s + r.medicineRequired, 0);
     const used = filtered.reduce((s, r) => s + getUsedFor(r), 0);
-    const balance = allocated - used;
+    const balance = allocated - used - filtered.reduce((s,r)=>s+accountedReturns(r),0);
     return { allocated, used, balance };
   }, [filtered, editedUsed, entryById]);
 
@@ -158,7 +163,7 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId }: R
     if (filtered.length === 0) return;
     const data = filtered.map(r => {
       const used = getUsedFor(r);
-      const balance = r.medicineRequired - used;
+      const balance = r.medicineRequired - used - accountedReturns(r);
       const reversed = getReversedFor(r);
       const other = getOtherFor(r);
       return {
@@ -166,6 +171,7 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId }: R
         Community: r.community, Settlement: r.settlement,
         "Allocated": r.medicineRequired,
         "Quantity Used": used,
+        "Returned / Damaged": accountedReturns(r),
         "Balance of Medicine": balance,
         "Reversed To": reversed === "Other" && other ? `Other: ${other}` : reversed,
       };
@@ -315,7 +321,7 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId }: R
               <tbody>
                 {pagination.paginatedData.map((row, i) => {
                   const used = getUsedFor(row);
-                  const balance = row.medicineRequired - used;
+                  const balance = row.medicineRequired - used - accountedReturns(row);
                   const reversed = getReversedFor(row);
                   const balanceColor =
                     balance < 0 ? "text-red-600 dark:text-red-400"
@@ -330,7 +336,7 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId }: R
                       <td className="px-3 py-2 border-r border-border/20">{row.lga}</td>
                       <td className="px-3 py-2 border-r border-border/20">{row.ward}</td>
                       <td className="px-3 py-2 border-r border-border/20">{row.flhf}</td>
-                      <td className="px-3 py-2 border-r border-border/20 font-medium">{row.community}</td>
+                      <td className="px-3 py-2 border-r border-border/20 font-medium">{row.community}{row.unallocated&&<Badge variant="destructive" className="ml-1">Unallocated</Badge>}</td>
                       <td className="px-3 py-2 border-r border-border/20 text-muted-foreground">{row.settlement}</td>
                       <td className="px-3 py-2 border-r border-border/20 text-right tabular-nums">
                         {row.medicineRequired.toLocaleString()}
@@ -349,6 +355,7 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId }: R
                         <span className={`font-bold tabular-nums ${balanceColor}`}>
                           {balance.toLocaleString()}
                         </span>
+                        {(entryById.get(row.entryId)?.medicine_returns||[]).map((m,i)=><div key={i} className="text-xs text-muted-foreground">{m.name}: {m.used} {m.unit} used · {m.returned} returned · {m.damaged} damaged</div>)}
                         {balance < 0 && (
                           <Badge variant="outline" className="ml-1 text-[8px] border-red-300 text-red-600 px-1">OVER</Badge>
                         )}

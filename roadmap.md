@@ -1,5 +1,7 @@
 # Roadmap
 
+- [x] Add WHO-inspired Coverage Excel exchange with scoped fuzzy matching, persistent review/addition, cumulative coverage and medicine-use writes, and administrator-managed allocation snapshots. GIveWell workbook downloaded and 6,412 formulas recalculated without errors; temporary import saved 80 treated / 20 HHs / 15 treated HHs / 160 medicine units and read back in Reconciliation with returned/damaged counts. Fourteen tests pass; preview build clean. Saved matrix allocation reload and physical-device offline replay need further end-to-end verification.
+
 - [x] Add per-community security planning risk from security, accessibility and explicit CDD gaps; unknown inputs show ranges. Verified GIveWell desktop/phone breakdowns without runtime errors; all eight scoring/table tests pass.
 
 - [x] Improve all nine Geo Microplanning tabs: stable access-scoped source identities, cached Summary/Reconciliation/Gaps models, immediate access guards, yielding map batches and viewport-bound detail. Live GIveWell desktop/phone rapid navigation verified; map detail remains progressive rather than blocking navigation.

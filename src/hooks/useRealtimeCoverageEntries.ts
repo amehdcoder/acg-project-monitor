@@ -15,7 +15,7 @@ export function useRealtimeCoverageEntries(
   useEffect(() => {
     if (!projectId) return;
     const channel = supabase
-      .channel(`microplan_coverage_${projectId}`)
+      .channel(`microplan_coverage_${projectId}_${crypto.randomUUID()}`)
       .on(
         "postgres_changes",
         {

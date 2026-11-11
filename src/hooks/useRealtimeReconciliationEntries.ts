@@ -13,7 +13,7 @@ export function useRealtimeReconciliationEntries(
   useEffect(() => {
     if (!projectId) return;
     const channel = supabase
-      .channel(`microplan_reconciliation_${projectId}`)
+      .channel(`microplan_reconciliation_${projectId}_${crypto.randomUUID()}`)
       .on(
         "postgres_changes",
         {

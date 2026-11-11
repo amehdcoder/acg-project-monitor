@@ -20,6 +20,9 @@ import { useTargetPopFields } from "@/hooks/useTargetPopFields";
 import { useLeafletStreetView } from "@/components/maps/LeafletStreetView";
 import useRealtimeCoverageEntries from "@/hooks/useRealtimeCoverageEntries";
 import { TabSyncStatus } from "./TabSyncStatus";
+import CoverageExcelExchange from "./CoverageExcelExchange";
+import type { WorkbookAllocation } from "@/lib/microplanning/coverageWorkbook";
+import type { MedicineReturn } from "@/lib/microplanning/coverageExchange";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isPersistedId = (id: string) => UUID_RE.test(id);
@@ -49,6 +52,7 @@ interface CoverageEntry {
   campaign_type: string | null;
   total_households_reported?: number | null;
   total_households_treated?: number | null;
+  medicine_returns?: MedicineReturn[] | null;
 }
 
 
@@ -57,9 +61,11 @@ interface CoverageViewProps {
   onRefresh: () => void;
   projectId?: string | null;
   projectName?: string | null;
+  allocationRows?: WorkbookAllocation[];
+  readOnly?: boolean;
 }
 
-const CoverageView = ({ entries, onRefresh, projectId, projectName }: CoverageViewProps) => {
+const CoverageView = ({ entries, onRefresh, projectId, projectName, allocationRows = [], readOnly }: CoverageViewProps) => {
   useRealtimeCoverageEntries(projectId ?? null, onRefresh);
   const [editedTreated, setEditedTreated] = useState<Record<string, string>>({});
   const [editedUsed, setEditedUsed] = useState<Record<string, string>>({});
@@ -328,6 +334,7 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName }: CoverageVi
           Download Coverage XLSForm
         </Button>
       </div>
+      <CoverageExcelExchange key={projectId} entries={entries} allocations={allocationRows} projectId={projectId} projectName={projectName} target={getTargetPop} onRefresh={onRefresh} readOnly={readOnly}/>
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="border-border/50 bg-gradient-to-br from-blue-50 to-background dark:from-blue-950/20">

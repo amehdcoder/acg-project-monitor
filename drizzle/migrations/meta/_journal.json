@@ -386,6 +386,13 @@
       "when": 1794046921898,
       "tag": "0054_lqas_round_design_guard",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1794406846780,
+      "tag": "0055_microplan_coverage_exchange_fields",
+      "breakpoints": true
     }
   ]
 }
