@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import CoverageView from "./CoverageView";
 import ReconciliationView from "./ReconciliationView";
+vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({user:{id:"test-user"},isAdmin:true}) }));
 
 vi.mock("@/hooks/useTargetPopFields", () => ({ useTargetPopFields: () => ({ calcTargetPop: () => 10, label: "Target" }) }));
 vi.mock("@/hooks/useRealtimeCoverageEntries", () => ({ default: () => {} }));

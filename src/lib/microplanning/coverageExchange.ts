@@ -45,7 +45,7 @@ export function createCoverageMatcher(entries: ExchangeEntry[]) {
     const first = ranked[0];
     if (!first) return {status: "unmatched", score: 0, candidates: []};
     const unique = first.score - (ranked[1]?.score ?? 0) >= .08;
-    const status = first.score === 1 && unique ? "exact" : first.score >= .92 && unique ? "fuzzy" : "review";
+    const status = first.score === 1 && unique ? "exact" : first.score >= .90 && unique ? "fuzzy" : "review";
     return {status, id: status === "review" ? undefined : first.id, score: first.score, candidates: ranked};
   };
 }
