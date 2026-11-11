@@ -1602,12 +1602,10 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
     return true;
   }), [displayEntries, filterState, filterLga, filterWard, filterAccessibility, filterSecurity, filterTerrain, filterKeyRatio, filterDisability, searchQuery]);
   // Keep clicks and typing instant: heavy panels/maps re-render with the new list in the background.
-  const deferredFiltered = useDeferredValue(filteredNow);
+  const filterSnapshot = useMemo(() => ({ source: displayEntries, rows: filteredNow }), [displayEntries, filteredNow]);
+  const deferredFiltered = useDeferredValue(filterSnapshot);
   // Only defer user filters within the same current access-scoped source.
-  const filteredSourceRef = useRef(displayEntries);
-  const accessSourceChanged = filteredSourceRef.current !== displayEntries;
-  const filtered = accessSourceChanged ? filteredNow : deferredFiltered;
-  useEffect(() => { filteredSourceRef.current = displayEntries; }, [displayEntries]);
+  const filtered = deferredFiltered.source === displayEntries ? deferredFiltered.rows : filteredNow;
 
   // Filter context used by the breadcrumb trail and the "export any level" button.
   const exportFilterContext = useMemo(() => ({

@@ -29,4 +29,16 @@ describe("cancellable map rendering", () => {
     expect(draw).toHaveBeenCalledTimes(before);
     expect(done).not.toHaveBeenCalled();
   });
+  it("leaves an input opportunity between drawing batches", () => {
+    vi.useFakeTimers();
+    const draw = vi.fn();
+    const cancel = renderBatches(Array.from({ length: 100 }, (_, i) => i), draw);
+    vi.advanceTimersByTime(0);
+    const firstBatch = draw.mock.calls.length;
+    vi.advanceTimersByTime(15);
+    expect(draw).toHaveBeenCalledTimes(firstBatch);
+    vi.advanceTimersByTime(1);
+    expect(draw.mock.calls.length).toBeGreaterThan(firstBatch);
+    cancel();
+  });
 });
