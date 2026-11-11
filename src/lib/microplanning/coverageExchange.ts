@@ -7,13 +7,34 @@ export interface ExchangeEntry {
   estimated_total_population?: number | null;
   year_of_microplanning?: number | null;
 }
-export interface MedicineReturn { name: string; unit: string; used: number; returned: number; damaged: number }
+export interface MedicineReturn { name: string; unit: string; used: number; returned: number; damaged: number; received?: number; lost?: number; expired?: number }
+export interface MedicineStock { received?: number; used?: number; lost?: number; expired?: number; returned?: number }
 export interface ExchangeRow {
   row: number; entryId: string; state: string; lga: string; ward: string; flhf: string;
   community: string; settlement: string; treated?: number; households?: number;
   treatedHouseholds?: number; medicineUsed?: number; medicines: MedicineReturn[];
   population?: number; errors: string[];
-  year?: number;
+  year?: number; stock?: MedicineStock;
+}
+const validQuantity = (n: unknown): n is number => typeof n === "number" && Number.isSafeInteger(n) && n >= 0 && n <= 2147483647;
+export function stockTotal(stock: MedicineStock): number | undefined {
+  const quantities = [stock.used, stock.lost, stock.expired, stock.returned];
+  if (!quantities.every(validQuantity)) return undefined;
+  const total = quantities.reduce<number>((sum, n) => sum + (n ?? 0), 0);
+  return validQuantity(total) ? total : undefined;
+}
+export function canAlignStock(row: ExchangeRow) {
+  return !!row.stock && stockTotal(row.stock) !== undefined && row.stock.received !== stockTotal(row.stock);
+}
+export function alignStock(row: ExchangeRow): ExchangeRow {
+  if (!row.stock) return row;
+  const received = stockTotal(row.stock);
+  if (received === undefined) return row;
+  return { ...row, stock: { ...row.stock, received } };
+}
+export function medicineAccounted(m: MedicineReturn) { return m.returned + (m.lost !== undefined || m.expired !== undefined ? (m.lost ?? 0) + (m.expired ?? 0) : m.damaged); }
+export function medicineReceived(medicines: MedicineReturn[]): number | undefined {
+  return medicines.length && medicines.every(m => m.received !== undefined) ? medicines.reduce((sum, m) => sum + (m.received ?? 0), 0) : undefined;
 }
 export interface MatchResult { status: "exact" | "fuzzy" | "review" | "unmatched"; id?: string; score: number; candidates: { id: string; score: number }[] }
 export const normalizePlace = (value: unknown) => String(value ?? "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\b(ward|district)\b/g, "").replace(/[^a-z0-9]/g, "");
@@ -58,6 +79,16 @@ export function validateCoverageRow(row: ExchangeRow) {
     if (n !== undefined && (!Number.isSafeInteger(n) || n < 0 || n > 2147483647)) errors.push(`${label} must be a non-negative whole number.`);
   }
   if (row.households !== undefined && row.treatedHouseholds !== undefined && row.treatedHouseholds > row.households) errors.push("Treated HHs cannot exceed Total HHs.");
+  if (row.population !== undefined && row.treated !== undefined && row.treated > row.population) errors.push("Total Treated cannot exceed Total Population.");
+  if (row.year !== undefined && (!Number.isSafeInteger(row.year) || row.year < 1900 || row.year > 2100)) errors.push("Year of Microplanning must be a whole year between 1900 and 2100.");
+  if (row.stock) {
+    for (const [key, label] of [["received", "Quantity Received"], ["used", "Quantity Used"], ["lost", "Quantity Lost"], ["expired", "Quantity Expired"], ["returned", "Quantity Returned to FLHF"]] as const) {
+      if (!validQuantity(row.stock[key])) errors.push(`${label} must be supplied as a non-negative whole number (use 0 for none).`);
+    }
+    const total = stockTotal(row.stock);
+    if (total === undefined && [row.stock.used,row.stock.lost,row.stock.expired,row.stock.returned].every(validQuantity)) errors.push("The combined medicine quantities exceed the supported whole-number limit.");
+    if (total !== undefined && row.stock.received !== total) errors.push("Quantity Received must equal Quantity Used + Quantity Lost + Quantity Expired + Quantity Returned to FLHF.");
+  }
   row.medicines.forEach(m => {
     if (!m.name || !m.unit) errors.push("Medicine name and dispensing unit are required.");
     if ([m.used,m.returned,m.damaged].some(n => !Number.isSafeInteger(n) || n < 0 || n > 2147483647)) errors.push("Medicine quantities must be non-negative whole numbers.");
@@ -76,6 +107,11 @@ export function coveragePatch(row: ExchangeRow, existing?: ExchangeEntry): Recor
   if (row.treatedHouseholds !== undefined) patch.total_households_treated = row.treatedHouseholds;
   if (row.medicineUsed !== undefined || row.medicines.length) patch.medicine_used = row.medicineUsed ?? row.medicines.reduce((s,m) => s+m.used,0);
   if (row.medicines.length) patch.medicine_returns = row.medicines;
+  if (row.stock) {
+    patch.medicine_used = row.stock.used;
+    patch.medicine_returns = [{ name: "Reported medicine quantities", unit: "units", received: row.stock.received, used: row.stock.used, lost: row.stock.lost, expired: row.stock.expired, returned: row.stock.returned, damaged: (row.stock.lost ?? 0) + (row.stock.expired ?? 0) }];
+    patch.medicine_reversed_to = "FLHF";
+  }
   return patch;
 }
 export interface SavedAllocation { id: string; lga: string; ward?: string | null; flhf?: string | null; amount: number; jrsm_target?: number | null; medicine_name?: string | null; year?: number; community_snapshot?: unknown }
