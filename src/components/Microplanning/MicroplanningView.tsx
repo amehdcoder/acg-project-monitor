@@ -889,7 +889,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
   const [filterKeyRatio, setFilterKeyRatio] = useState<string>("all"); // "cdd_from_community" | "cdd_external" | "hard_to_reach"
   const [filterDisability, setFilterDisability] = useState<string>("all"); // disability type key
   const [activeView, setActiveView] = useState<"list" | "medicine" | "coverage" | "reconciliation" | "gaps" | "map" | "routes" | "historical" | "summary">("list");
-  const renderedView = useDeferredValue(activeView);
+  const deferredView = useDeferredValue(activeView);
   // Where the current drill-through started, so we can offer a one-click return.
   const [drillOrigin, setDrillOrigin] = useState<"disability" | "accessibility" | "security" | "terrain" | "keyRatio" | "summary" | null>(null);
   const backToDisaggregation = useCallback(() => {
@@ -1136,6 +1136,8 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
     },
     [isAdmin, lensEnabled, canOpenMicroplanTab],
   );
+  // Deferred navigation must never retain a panel after its access is removed.
+  const renderedView = canOpenView(deferredView) ? deferredView : "none";
   useEffect(() => {
     if (!canOpenView(activeView)) {
       const next = MICROPLAN_TABS.find((t) => canOpenView(t.id))?.id ?? "none";
@@ -1600,7 +1602,12 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
     return true;
   }), [displayEntries, filterState, filterLga, filterWard, filterAccessibility, filterSecurity, filterTerrain, filterKeyRatio, filterDisability, searchQuery]);
   // Keep clicks and typing instant: heavy panels/maps re-render with the new list in the background.
-  const filtered = useDeferredValue(filteredNow);
+  const deferredFiltered = useDeferredValue(filteredNow);
+  // Only defer user filters within the same current access-scoped source.
+  const filteredSourceRef = useRef(displayEntries);
+  const accessSourceChanged = filteredSourceRef.current !== displayEntries;
+  const filtered = accessSourceChanged ? filteredNow : deferredFiltered;
+  useEffect(() => { filteredSourceRef.current = displayEntries; }, [displayEntries]);
 
   // Filter context used by the breadcrumb trail and the "export any level" button.
   const exportFilterContext = useMemo(() => ({

@@ -292,6 +292,7 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
     }
 
     const map = L.map(mapContainerRef.current, {
+      preferCanvas: true,
       zoomControl: false,
       attributionControl: false,
     });

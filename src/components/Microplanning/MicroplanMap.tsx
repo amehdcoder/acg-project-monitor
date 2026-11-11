@@ -410,7 +410,7 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
     if (!L) return;
-    const map = L.map(mapRef.current, { zoomControl: true, zoomSnap: 0.5 }).setView([9.0, 8.0], 6);
+    const map = L.map(mapRef.current, { preferCanvas: true, zoomControl: true, zoomSnap: 0.5 }).setView([9.0, 8.0], 6);
     mapInstanceRef.current = map;
     attachSv(map);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -479,6 +479,7 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
     // ── Collect points per FLHF for catchment polygons ──
     const flhfPolygons: Record<string, [number, number][]> = {};
     const wardPolygons: Record<string, [number, number][]> = {};
+    const facilityCoordinates = new Map<string, Set<string>>();
     cascadedEntries.forEach(e => {
       if (e.community_latitude && e.community_longitude) {
         const key = e.flhf_name;
@@ -486,7 +487,11 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
         flhfPolygons[key].push([e.community_latitude, e.community_longitude]);
         if (e.flhf_latitude && e.flhf_longitude) {
           const fPt: [number, number] = [e.flhf_latitude, e.flhf_longitude];
-          if (!flhfPolygons[key].some(p => p[0] === fPt[0] && p[1] === fPt[1])) {
+          let coordinates = facilityCoordinates.get(key);
+          if (!coordinates) { coordinates = new Set(); facilityCoordinates.set(key, coordinates); }
+          const coordinateKey = `${fPt[0]}|${fPt[1]}`;
+          if (!coordinates.has(coordinateKey)) {
+            coordinates.add(coordinateKey);
             flhfPolygons[key].push(fPt);
           }
         }
