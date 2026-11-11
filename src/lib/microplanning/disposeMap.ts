@@ -5,6 +5,12 @@ export function disposeMap(map: L.Map) {
   map.stop();
   const paths: L.Layer[] = [];
   const renderers: L.Layer[] = [];
+  const groups: L.LayerGroup[] = [];
+  map.eachLayer(layer => { if (layer instanceof L.LayerGroup) groups.push(layer); });
+  // Drain groups while their renderer is still alive. Otherwise Map.remove()
+  // removes the renderer first and a group's later path removal queues a frame
+  // against the already-destroyed canvas context.
+  for (const group of groups) { group.clearLayers(); map.removeLayer(group); }
   map.eachLayer(layer => { if (layer instanceof L.Canvas) renderers.push(layer); });
   map.eachLayer(layer => { if (layer instanceof L.Path) paths.push(layer); });
   for (const path of paths) map.removeLayer(path);
