@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useRef, useMemo, useDeferredValue, Fragment } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, useDeferredValue, Fragment, memo } from "react";
+import { deriveOnce } from "@/lib/microplanning/derivedCache";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";

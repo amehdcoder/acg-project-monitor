@@ -1,6 +1,7 @@
 import { disposeMap } from "@/lib/microplanning/disposeMap";
 import { renderBatches } from "@/lib/microplanning/renderBatches";
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback, memo } from "react";
+import { deriveOnce } from "@/lib/microplanning/derivedCache";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

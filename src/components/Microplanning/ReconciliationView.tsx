@@ -1,6 +1,6 @@
 import { useTablePagination } from "@/hooks/useTablePagination";
 import DatasetPagination from "./DatasetPagination";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, memo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
