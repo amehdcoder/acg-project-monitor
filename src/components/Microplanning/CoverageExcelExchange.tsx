@@ -48,6 +48,7 @@ export default function CoverageExcelExchange({entries,allocations,projectId,pro
         const existing=r.choice==="new"?undefined:byId.get(r.choice);if(r.choice!=="new"&&!existing)throw new Error("The selected community is no longer accessible.");
         const patch=coveragePatch(r.data,existing);if(!Object.keys(patch).length)throw new Error("No coverage or medicine quantities supplied.");
         const values:Record<string,unknown>={...patch,project_id:projectId,created_by:user.id,updated_by:user.id};
+        if(!existing)values.year_of_microplanning=r.data.year??entries[0]?.year_of_microplanning??new Date().getFullYear();
         if(existing)values.created_by=(existing as ExchangeEntry&{created_by?:string}).created_by;
         else Object.assign(values,{id:r.newId,state:r.data.state,lga:r.data.lga,ward:r.data.ward,flhf_name:r.data.flhf||"Unspecified FLHF",community_name:r.data.community,settlement_name:r.data.settlement||null,estimated_total_population:r.data.population??null,population_source:"Coverage Excel import",notes:"Community added after Coverage Excel reconciliation; population and GPS require verification.",status:"draft"});
         const result=await offlineMutate({table:"microplan_entries",action:existing?"update":"insert",id:existing?.id,values,userId:user.id});saved++;if(result.queued)queued++;change(i,{saved:true,error:undefined});

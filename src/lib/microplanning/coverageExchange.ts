@@ -5,6 +5,7 @@ export interface ExchangeEntry {
   total_households_treated?: number | null; medicine_used?: number | null;
   medicine_returns?: MedicineReturn[] | null;
   estimated_total_population?: number | null;
+  year_of_microplanning?: number | null;
 }
 export interface MedicineReturn { name: string; unit: string; used: number; returned: number; damaged: number }
 export interface ExchangeRow {
@@ -12,6 +13,7 @@ export interface ExchangeRow {
   community: string; settlement: string; treated?: number; households?: number;
   treatedHouseholds?: number; medicineUsed?: number; medicines: MedicineReturn[];
   population?: number; errors: string[];
+  year?: number;
 }
 export interface MatchResult { status: "exact" | "fuzzy" | "review" | "unmatched"; id?: string; score: number; candidates: { id: string; score: number }[] }
 export const normalizePlace = (value: unknown) => String(value ?? "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\b(ward|district)\b/g, "").replace(/[^a-z0-9]/g, "");

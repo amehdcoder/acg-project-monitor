@@ -29,14 +29,14 @@ export async function buildCoverageWorkbook(entries: ExchangeEntry[], allocation
   ws.mergeCells(1,1,1,headers.length);ws.getCell("A1").value="COMMUNITY COVERAGE • MEDICINE ACCOUNTABILITY";ws.getRow(1).height=34;
   ws.getCell("A1").font={name:"Arial",size:15,bold:true,color:{argb:COLORS.white}};ws.getCell("A1").fill={type:"pattern",pattern:"solid",fgColor:{argb:COLORS.navy}};
   ws.mergeCells(2,1,2,headers.length);ws.getCell("A2").value=project;ws.getCell("A2").font={name:"Arial",size:12,bold:true,color:{argb:COLORS.teal}};
-  const h=ws.getRow(4);h.values=headers;h.height=42;h.eachCell(c=>{c.font={name:"Arial",size:10,bold:true,color:{argb:COLORS.white}};c.fill={type:"pattern",pattern:"solid",fgColor:{argb:COLORS.blue}};c.alignment={wrapText:true,vertical:"middle"};});
+  const h=ws.getRow(4);h.values=[...headers,"Year of Microplanning"];h.height=42;h.eachCell(c=>{c.font={name:"Arial",size:10,bold:true,color:{argb:COLORS.white}};c.fill={type:"pattern",pattern:"solid",fgColor:{argb:COLORS.blue}};c.alignment={wrapText:true,vertical:"middle"};});
   const allocated=new Map<string,number>();allocations.forEach(a=>allocated.set(a.entryId,(allocated.get(a.entryId)??0)+a.medicineRequired));
   const rows: (ExchangeEntry | undefined)[] = [...entries, ...Array.from({length:10},()=>undefined)];
   rows.forEach((e,i)=>{
     const r=i+5;const medicine=e?.medicine_returns??[];
     const values: ExcelJS.CellValue[]=[e?.id??"",e?.state??"",e?.lga??"",e?.ward??"",e?.flhf_name??"",e?.community_name??"",e?.settlement_name??"",e?target(e):null,e?.total_treated??null,e?.total_households_reported??null,e?.total_households_treated??null,e?.medicine_used??null,e&&allocated.has(e.id)?allocated.get(e.id)??null:null,{formula:`IF(OR(M${r}="",L${r}=""),"",M${r}-L${r}-SUM(R${r}:S${r},W${r}:X${r},AB${r}:AC${r}))`,result:e?.medicine_used!=null&&allocated.has(e.id)?(allocated.get(e.id)??0)-e.medicine_used-medicine.reduce((s,m)=>s+m.returned+m.damaged,0):""}];
     for(let slot=0;slot<3;slot++){const m=medicine[slot];values.push(m?.name??"",m?.unit??"",m?.used??null,m?.returned??null,m?.damaged??null);}
-    values.push(null);ws.getRow(r).values=values;ws.getRow(r).height=24;
+    values.push(null,e?.year_of_microplanning??entries[0]?.year_of_microplanning??new Date().getFullYear());ws.getRow(r).values=values;ws.getRow(r).height=24;
     ws.getRow(r).eachCell({includeEmpty:true},(c,col)=>{const editable=(col>=9&&col<=12)||col>=15||(!e&&col<=7);c.font={name:"Arial",size:10,color:{argb:editable?"0000FF":COLORS.ink}};c.fill={type:"pattern",pattern:"solid",fgColor:{argb:editable?COLORS.input:i%2?COLORS.pale:COLORS.white}};c.alignment={vertical:"middle",wrapText:false};c.border={bottom:{style:"hair",color:{argb:"CADDE5"}}}; if((col>=8&&col<=14)||[17,18,19,22,23,24,27,28,29,30].includes(col)){c.numFmt='#,##0;(#,##0);"-"';if(editable)c.dataValidation={type:"whole",operator:"greaterThanOrEqual",formulae:[0],allowBlank:true,showErrorMessage:true,error:"Enter a non-negative whole number."};}if(col===14)c.font={name:"Arial",size:10,color:{argb:"000000"}};});
   });
   ws.views=[{state:"frozen",ySplit:4,xSplit:7}];ws.autoFilter={from:{row:4,column:1},to:{row:rows.length+4,column:headers.length}};
@@ -60,7 +60,7 @@ export async function parseCoverageWorkbook(file: File): Promise<ExchangeRow[]> 
     const errors:string[]=[];const num=(key:string):number|undefined=>{const v=get(key);if(v==="")return undefined;const n=typeof v==="number"?v:Number(String(v).replace(/,/g,""));if(!Number.isFinite(n)){errors.push(`${key} is not a number.`);return undefined;}return n;};
     const medicines:MedicineReturn[]=[];
     for(let slot=1;slot<=3;slot++){const name=text(`Medicine ${slot}`),unit=text(`Unit ${slot}`),used=num(`Used ${slot}`),returned=num(`Returned ${slot}`),damaged=num(`Damaged ${slot}`);if(name||unit||used!==undefined||returned!==undefined||damaged!==undefined){if(used===undefined)errors.push(`Used ${slot} is required for a reported medicine.`);medicines.push({name,unit,used:used??0,returned:returned??0,damaged:damaged??0});}}
-    out.push({row:i+1,entryId:text("Entry ID"),state:text("State"),lga:text("LGA"),ward:text("Ward"),flhf:text("FLHF"),community:text("Community"),settlement:text("Settlement"),treated:num("Total Treated"),households:num("Total HHs"),treatedHouseholds:num("Treated HHs"),medicineUsed:num("Medicine Used (units)"),population:num("Total Population (new records only)"),medicines,errors});
+    out.push({row:i+1,entryId:text("Entry ID"),state:text("State"),lga:text("LGA"),ward:text("Ward"),flhf:text("FLHF"),community:text("Community"),settlement:text("Settlement"),treated:num("Total Treated"),households:num("Total HHs"),treatedHouseholds:num("Treated HHs"),medicineUsed:num("Medicine Used (units)"),population:num("Total Population (new records only)"),year:num("Year of Microplanning"),medicines,errors});
     if(out.length>20000)throw new Error("Import at most 20,000 community rows per workbook.");
   }
   return out;
