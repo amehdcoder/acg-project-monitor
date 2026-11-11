@@ -6,7 +6,11 @@
  * LGA) or against a single Ward (distributed across the communities of that
  * ward only). Community-level results export to a WHO-standard workbook.
  */
-import { Fragment, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { offlineMutate } from "@/lib/programmeModule/offlineWrite";
+import { cachedRead } from "@/lib/programmeModule/offlineReadCache";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,7 +32,7 @@ import GeoExclusionPanel from "@/components/Microplanning/GeoExclusionPanel";
 import { useGeoExclusions } from "@/lib/microplanning/geoExclusions";
 import {
   AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Download, Eraser, FileUp, Gauge, Info,
-  MapPin, Pill, Search, Sliders, Sparkles, Upload,
+  MapPin, Pill, Search, Sliders, Sparkles, Upload, Save,
 } from "lucide-react";
 
 interface Props {
@@ -40,6 +44,7 @@ interface Props {
   readOnly?: boolean;
   /** stable id used to persist the allocation exclusion archive */
   scopeId?: string;
+  onSaved?: () => void;
 }
 
 const n0 = (v: number) => Math.round(v).toLocaleString();
@@ -48,8 +53,11 @@ type Issue = { level: "error" | "warn" | "info"; text: string };
 
 export default function GeoMedicineAllocationTable({
   rows, getTargetPop, scopeLabel = "All selected geographies", projectName, targetPopBasis = "Microplan target population", readOnly,
-  scopeId = "medicine-allocation",
+  scopeId = "medicine-allocation", onSaved,
 }: Props) {
+  const { user, isAdmin } = useAuth();
+  const [savedId, setSavedId] = useState<string>();
+  const [savingPlan, setSavingPlan] = useState(false);
   const [medicine, setMedicine] = useState("Ivermectin + Albendazole (IA)");
   const [unit, setUnit] = useState(findNtdMedicine("Ivermectin + Albendazole (IA)")?.unit ?? "Doses");
   const [bufferPct, setBufferPct] = useState(10);
@@ -60,6 +68,16 @@ export default function GeoMedicineAllocationTable({
   const [busy, setBusy] = useState(false);
   const [rounding, setRounding] = useState<RoundingRule>(DEFAULT_ROUNDING);
   const csvRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let current = true;
+    void cachedRead<any[]>(`microplan-matrix:${scopeId}`, () => supabase.from("microplan_medicine_allocations").select("*").eq("project_id", scopeId).eq("lga", "__geo_matrix__").order("updated_at", {ascending:false}).limit(1)).then(({data}) => {
+      if (!current || !data?.[0]) return;
+      const row=data[0];setSavedId(row.id);
+      try { const cfg=JSON.parse(row.notes||"{}");setLgaTotals(cfg.lgaTotals||{});setWardTotals(cfg.wardTotals||{});setMedicine(cfg.medicine||row.medicine_name);setUnit(cfg.unit||"Units");setBufferPct(cfg.bufferPct??10);setRounding(cfg.rounding||DEFAULT_ROUNDING); } catch { /* Legacy notes are not matrix settings. */ }
+    });
+    return () => { current=false; };
+  }, [scopeId]);
 
   const excl = useGeoExclusions(`medicine.${scopeId}`);
 
@@ -220,7 +238,23 @@ export default function GeoMedicineAllocationTable({
     }
   };
 
-  const clearAll = () => { setLgaTotals({}); setWardTotals({}); };
+  const clearAll = async () => {
+    if (!isAdmin || readOnly || !window.confirm("Remove this saved medicine allocation? Coverage and recorded medicine use will remain unchanged.")) return;
+    try { if(savedId) { if(!navigator.onLine)throw new Error("Connect to remove a saved allocation.");const {error}=await supabase.from("microplan_medicine_allocations").delete().eq("id",savedId).select("id");if(error)throw error; }setLgaTotals({});setWardTotals({});setSavedId(undefined);onSaved?.(); } catch(e) {toast({title:"Removal failed",description:String(e),variant:"destructive"});}
+  };
+  const savePlan = async () => {
+    if(!user?.id||!isAdmin||readOnly||errors.length||result.totals.allocation<=0)return;
+    setSavingPlan(true);
+    try {
+      const geoKey=(e: {state?:unknown;lga?:unknown;ward?:unknown;flhf_name?:unknown;community_name?:unknown;settlement_name?:unknown})=>[e.state,e.lga,e.ward,e.flhf_name,e.community_name,e.settlement_name].map(v=>String(v??"").trim().toLowerCase()).join("|");
+      const ids=new Map(rows.map(r=>[geoKey(r),String(r.id??"")]));
+      const snapshot=result.communities.map(c=>({entryId:ids.get(geoKey({state:c.state,lga:c.lga,ward:c.ward,flhf_name:c.flhf,community_name:c.community,settlement_name:c.settlement==="—"?"":c.settlement})),state:c.state,lga:c.lga,ward:c.ward,flhf:c.flhf,community:c.community,settlement:c.settlement,medicineRequired:c.allocation,medicineUsed:0,medicineName:medicine,unit}));
+      if(snapshot.some(r=>!r.entryId||!/^[0-9a-f-]{36}$/i.test(r.entryId)))throw new Error("Adopt uploaded population into the project microplan before saving an allocation.");
+      const id=savedId||crypto.randomUUID();
+      const values={id,project_id:scopeId,lga:"__geo_matrix__",amount:result.totals.allocation,medicine_name:medicine,created_by:user.id,updated_by:user.id,notes:JSON.stringify({lgaTotals,wardTotals,medicine,unit,bufferPct,rounding}),community_snapshot:snapshot};
+      const saved=await offlineMutate({table:"microplan_medicine_allocations",action:savedId?"update":"insert",id:savedId,values,userId:user.id});setSavedId(id);onSaved?.();toast({title:"Latest allocation saved",description:saved.queued?"Saved on this device; it will sync when connected.":"Retained for Coverage and Reconciliation until an administrator updates or removes it."});
+    }catch(e){toast({title:"Allocation could not be saved",description:e instanceof Error?e.message:String(e),variant:"destructive"});}finally{setSavingPlan(false);}
+  };
 
   const setLga = (k: string, v: string) =>
     setLgaTotals((p) => ({ ...p, [k]: Math.max(0, Number(v) || 0) }));
@@ -361,8 +395,11 @@ export default function GeoMedicineAllocationTable({
             className="h-8 text-[11px] gap-1 text-white hover:bg-white/20">
             <FileUp className="h-3.5 w-3.5" /> CSV template
           </Button>
-          <Button variant="ghost" size="sm" onClick={clearAll} className="h-8 text-[11px] gap-1 text-white hover:bg-white/20">
-            <Eraser className="h-3.5 w-3.5" /> Clear entries
+          <Button variant="secondary" size="sm" disabled={readOnly||!isAdmin||savingPlan||errors.length>0} onClick={()=>void savePlan()}>
+            <Save className="mr-1 h-4 w-4"/>{savingPlan?"Saving…":"Save latest allocation"}
+          </Button>
+          <Button variant="ghost" size="sm" disabled={readOnly||!isAdmin} onClick={()=>void clearAll()} className="h-8 text-[11px] gap-1">
+            <Eraser className="h-3.5 w-3.5" /> Remove allocation
           </Button>
         </div>
 

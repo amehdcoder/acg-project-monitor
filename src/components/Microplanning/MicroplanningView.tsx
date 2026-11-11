@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo, useDeferredValue, Fragment, memo } from "react";
 import { deriveOnce } from "@/lib/microplanning/derivedCache";
+import { mergeAllocationPlan } from "@/lib/microplanning/coverageExchange";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -1046,7 +1047,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
     const reqId = ++entriesReqRef.current;
     const key = `${user?.id}|${selectedProjectId}|${entryOnly ? "own" : "all"}`;
     if (!microplanEntriesCache.has(key)) setLoading(true);
-    const pending = listQueued().filter(q => q.kind === "op" && q.payload.table === "microplan_entries").flatMap(q => {
+    const pending = listQueued().filter(q => q.kind === "op" && q.payload.table === "microplan_entries" && q.user_id === user?.id).flatMap(q => {
       const values = q.payload.values as any;
       return values?.project_id === selectedProjectId && values?.created_by === user?.id ? [{ ...values, id: values.id || q.payload.id }] : [];
     });
@@ -1150,18 +1151,21 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
   }, [canOpenView, activeView]);
 
   // Fetch persisted medicine allocations for the active project
+  const allocationRequest = useRef(0);
   const fetchAllocations = useCallback(async () => {
     if (!selectedProjectId) return;
-    const { data, error } = await supabase
+    const request = ++allocationRequest.current;
+    const { data: cached } = await cachedRead<any[]>(`microplan-allocations:${selectedProjectId}`, () => supabase
       .from("microplan_medicine_allocations")
       .select("*")
       .eq("project_id", selectedProjectId)
-      .order("created_at", { ascending: true });
-    if (error) {
-      console.warn("Allocations load failed", error.message);
-      return;
-    }
-    setSavedAllocations(data || []);
+      .order("created_at", { ascending: true }));
+    if (request !== allocationRequest.current) return;
+    const merged = new Map((cached || []).map(r => [r.id,r]));
+    listQueued().filter(q=>q.kind==="op"&&q.payload.table==="microplan_medicine_allocations"&&q.user_id===user?.id).forEach(q=>{const v=q.payload.values as any;if(v?.project_id===selectedProjectId)merged.set(v.id||q.payload.id,{...merged.get(v.id||q.payload.id),...v});});
+    const all = [...merged.values()];
+    const data = all.filter(r=>r.lga!=="__geo_matrix__");
+    setSavedAllocations(all);
     if (data && data.length > 0) {
       setMedAllocEntries(data.map((d: any) => ({
         id: d.id,
@@ -1169,13 +1173,14 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
         ward: d.ward || "",
         flhf: d.flhf || "",
         amount: String(d.amount ?? ""),
+        jrsm: d.jrsm_target == null ? "" : String(d.jrsm_target),
         medicine_name: d.medicine_name || "",
         year: d.year,
       })));
     } else {
       setMedAllocEntries([{ lga: "", ward: "", flhf: "", amount: "" }]);
     }
-  }, [selectedProjectId]);
+  }, [selectedProjectId, user?.id]);
   useEffect(() => { fetchAllocations(); }, [fetchAllocations]);
 
   // Auto-open the entry form when in entryOnly mode
@@ -2056,7 +2061,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
         toast({ title: "Nothing to allocate", description: "No medicine quantities found in the sheet.", variant: "destructive" });
         return;
       }
-      setMedAllocEntries(built);
+      setMedAllocEntries(prev => mergeAllocationPlan(prev.filter(r=>r.lga), built));
       toast({
         title: `✅ ${built.length.toLocaleString()} allocation(s) built`,
         description: `From ${total.toLocaleString()} rows${skipped > 0 ? ` · ${skipped.toLocaleString()} skipped` : ""}. Medicine & expected treatment auto-distributed per community.`,
@@ -2382,6 +2387,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
     toast({ title: `✅ ${missingAllocationWards.length} ward(s) added`, description: "Enter medicine & JRSM targets to spread them to communities." });
   };
   const removeMedAllocRow = async (idx: number) => {
+    if (!isAdmin || lensReadOnly || !window.confirm("Remove this medicine allocation? Recorded coverage and medicine use will remain unchanged.")) return;
     const row = medAllocEntries[idx];
     if (row?.id) {
       // Persisted row → delete from DB (audit trail captured by trigger)
@@ -2436,6 +2442,8 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
           ward: row.ward || null,
           flhf: row.flhf || null,
           amount: Number(row.amount),
+          jrsm_target: row.jrsm ? Number(row.jrsm) : null,
+          community_snapshot: medicineAllocationData.filter(r => allocScope(row).some(n=>n.e.id===r.entryId)),
           medicine_name: row.medicine_name || null,
           year: row.year || new Date().getFullYear(),
           state: displayEntries.find((e: any) => e.lga === row.lga)?.state || null,
@@ -3103,13 +3111,15 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
           {renderedView === "medicine" && (
             <>
             <GeoMedicineAllocationTable
+              key={selectedProjectId}
               rows={medicineSourceEntries as any[]}
               getTargetPop={getTargetPop}
               scopeLabel={`${allLgasForMedicine.length} LGA(s) in view`}
               projectName={projects.find((p) => p.id === selectedProjectId)?.name}
               targetPopBasis={uploadedMedEntries.length > 0 ? `Uploaded total population × ${medTargetPct}%` : "Microplan target population"}
-              readOnly={false}
+              readOnly={lensReadOnly || !isAdmin}
               scopeId={selectedProjectId || "all"}
+              onSaved={fetchAllocations}
 
             />
             <Card className="border-border/50">
@@ -3702,14 +3712,14 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
 
           {/* Coverage View */}
           {renderedView === "coverage" && (
-            <CoverageView entries={displayEntries} onRefresh={fetchEntries} projectId={selectedProjectId || null} projectName={selectedProjectName} />
+            <CoverageView entries={displayEntries} allocationRows={reconciliationRows} readOnly={lensReadOnly} onRefresh={fetchEntries} projectId={selectedProjectId || null} projectName={selectedProjectName} />
           )}
 
           {/* Reconciliation View — Balance of medicine + reversal destination */}
           {renderedView === "reconciliation" && (
             <ReconciliationView
               entries={displayEntries as any}
-              allocationRows={medicineAllocationData}
+              allocationRows={reconciliationRows}
               onRefresh={fetchEntries}
               projectId={selectedProjectId || null}
             />
