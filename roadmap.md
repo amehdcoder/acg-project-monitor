@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Perfect Geo Microplanning switching across Planning, Medicine, Coverage, Reconciliation, Gaps, Map, Routes, Historical and Summary; verify live large-project desktop/phone switching and rapid navigation without stale panels or crashes.
+
 - [x] Strengthen offline launch and password sign-in for prepared accounts; cancel late password completions after sign-out. All 35 offline/auth/saved-form tests pass. Published login shell reopens without network; real-account isolated-browser password rejection, offline unlock and reconnect retain Forms. Browser cache preparation was isolated, not a change to the account's server password. First-use and live external services require internet.
 - [ ] Verify the updated release on a physically installed device after publication; browser offline reopening is verified, but device-specific storage eviction and installation behavior require that device.
 
