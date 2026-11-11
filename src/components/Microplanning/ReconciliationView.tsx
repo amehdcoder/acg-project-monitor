@@ -69,6 +69,7 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId, rea
   useRealtimeReconciliationEntries(projectId ?? null, onRefresh);
   // local edits
   const [editedUsed, setEditedUsed] = useState<Record<string, string>>({});
+  const [editedMedicines, setEditedMedicines] = useState<Record<string, Record<number, string>>>({});
   const [editedReversed, setEditedReversed] = useState<Record<string, string>>({});
   const [editedOther, setEditedOther] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -106,6 +107,8 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId, rea
   const pagination = useTablePagination(filtered, 20);
 
   const getUsedFor = (row: AllocationRow) => {
+    const medicines = entryById.get(row.entryId)?.medicine_returns;
+    if (editedMedicines[row.entryId] && medicines) return medicines.reduce((sum, item, index) => sum + Number(editedMedicines[row.entryId][index] ?? item.used), 0);
     if (editedUsed[row.entryId] !== undefined) {
       const n = Number(editedUsed[row.entryId]);
       return Number.isFinite(n) ? n : 0;
@@ -127,14 +130,15 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId, rea
     const used = filtered.reduce((s, r) => s + getUsedFor(r), 0);
     const balance = allocated - used - filtered.reduce((s,r)=>s+accountedReturns(r),0);
     return { allocated, used, balance };
-  }, [filtered, editedUsed, entryById]);
+  }, [filtered, editedUsed, editedMedicines, entryById]);
 
   const isDirty = (id: string) =>
     editedUsed[id] !== undefined ||
+    editedMedicines[id] !== undefined ||
     editedReversed[id] !== undefined ||
     editedOther[id] !== undefined;
 
-  const handleSave = async (row: AllocationRow) => {
+  const handleSave = async (row: AllocationRow, confirmDefault = false) => {
     if (readOnly) return;
     if (editedUsed[row.entryId] !== undefined && !validActualUsage(editedUsed[row.entryId])) {
       toast({ title: "Enter a valid usage", description: "Actual usage must be a whole number of zero or more.", variant: "destructive" });
@@ -142,6 +146,17 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId, rea
     }
     setSavingId(row.entryId);
     const patch: Record<string, any> = {};
+    if (confirmDefault) patch.medicine_used = getUsedFor(row);
+    if (editedMedicines[row.entryId]) {
+      if (Object.values(editedMedicines[row.entryId]).some(value => !validActualUsage(value))) {
+        toast({ title: "Enter valid medicine quantities", description: "Each quantity must be a whole number of zero or more.", variant: "destructive" });
+        setSavingId(null);
+        return;
+      }
+      const medicines = entryById.get(row.entryId)?.medicine_returns ?? [];
+      patch.medicine_returns = medicines.map((item, index) => ({ ...item, used: Number(editedMedicines[row.entryId][index] ?? item.used) }));
+      patch.medicine_used = getUsedFor(row);
+    }
     if (editedUsed[row.entryId] !== undefined) {
       const v = editedUsed[row.entryId];
       patch.medicine_used = Number(v);
@@ -165,6 +180,7 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId, rea
       onSaved?.(row.entryId, patch);
       toast({ title: result.queued ? "Saved on this device · pending sync" : "Reconciliation saved" });
       setEditedUsed(prev => { const n = { ...prev }; delete n[row.entryId]; return n; });
+      setEditedMedicines(prev => { const n = { ...prev }; delete n[row.entryId]; return n; });
       setEditedReversed(prev => { const n = { ...prev }; delete n[row.entryId]; return n; });
       setEditedOther(prev => { const n = { ...prev }; delete n[row.entryId]; return n; });
       onRefresh();
@@ -187,7 +203,7 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId, rea
         Community: r.community, Settlement: r.settlement,
         "Allocated": r.medicineRequired,
         "Quantity Used": used,
-        "Usage basis": entryById.get(r.entryId)?.medicine_used != null || editedUsed[r.entryId] !== undefined ? "Actual" : r.savedAllocation ? "Allocation default — unconfirmed" : "Not recorded",
+        "Usage basis": entryById.get(r.entryId)?.medicine_used != null || editedUsed[r.entryId] !== undefined || editedMedicines[r.entryId] ? "Actual" : r.savedAllocation ? "Allocation default — unconfirmed" : "Not recorded",
         "Returned / Damaged": accountedReturns(r),
         "Balance of Medicine": balance,
         "Reversed To": reversed === "Other" && other ? `Other: ${other}` : reversed,
@@ -363,12 +379,13 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId, rea
                           type="number"
                           min={0}
                           aria-label={`Actual usage for ${row.community}`}
-                          disabled={readOnly || savingId === row.entryId}
-                          value={editedUsed[row.entryId] !== undefined ? editedUsed[row.entryId] : getUsedFor(row)}
+                          disabled={readOnly || savingId === row.entryId || (entryById.get(row.entryId)?.medicine_returns?.length ?? 0) > 1}
+                          value={editedUsed[row.entryId] ?? getUsedFor(row)}
                           onChange={(ev) => setEditedUsed(prev => ({ ...prev, [row.entryId]: ev.target.value }))}
                           className="h-7 text-xs text-right tabular-nums w-full"
                           placeholder="0"
                         />
+                        {(entryById.get(row.entryId)?.medicine_returns?.length ?? 0) > 1 && entryById.get(row.entryId)?.medicine_returns?.map((medicine, index) => <label key={index} className="block text-[10px] text-muted-foreground mt-1">{medicine.name} ({medicine.unit})<Input type="number" min={0} step={1} aria-label={`${medicine.name} actual usage for ${row.community}`} disabled={readOnly || savingId === row.entryId} className="h-7 text-xs text-right" value={editedMedicines[row.entryId]?.[index] ?? medicine.used} onChange={event => { const value = event.target.value; setEditedMedicines(previous => ({ ...previous, [row.entryId]: { ...previous[row.entryId], [index]: value } })); }} /></label>)}
                         {entryById.get(row.entryId)?.medicine_used == null && editedUsed[row.entryId] === undefined && row.savedAllocation && <span className="text-[10px] text-muted-foreground">Allocation default · unconfirmed</span>}
                       </td>
                       <td className="px-3 py-2 border-r border-border/20 text-right">
@@ -413,10 +430,7 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId, rea
                             className="h-6 w-6"
                             aria-label={`Save actual usage for ${row.community}`}
                             title="Save actual usage"
-                            onClick={() => {
-                              if (!isDirty(row.entryId)) setEditedUsed(prev => ({ ...prev, [row.entryId]: String(getUsedFor(row)) }));
-                              else void handleSave(row);
-                            }}
+                            onClick={() => void handleSave(row, !isDirty(row.entryId))}
                             disabled={savingId === row.entryId}
                           >
                             <Save className="h-3 w-3 text-primary" />
