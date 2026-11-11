@@ -1905,6 +1905,19 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
   }, [debouncedAllocEntries, allocScope, TARGET_RATIO_MIN, TARGET_RATIO_MAX, TARGET_RATIO_MID]);
 
   // Render the per-community allocation preview in pages of 100 so even a
+  const reconciliationRows = useMemo(() => {
+    const matrix = savedAllocations.filter(a=>a.lga==="__geo_matrix__").sort((a,b)=>String(b.updated_at).localeCompare(String(a.updated_at)))[0];
+    const snapshots = matrix ? (matrix.community_snapshot || []) : savedAllocations.flatMap(a=>Array.isArray(a.community_snapshot)?a.community_snapshot:[]);
+    const authorized = new Map(displayEntries.map(e=>[e.id,e]));
+    const base: any[] = (snapshots.length ? snapshots : medicineAllocationData).filter((r:any)=>authorized.has(r.entryId));
+    const merged = new Map<string,any>();
+    base.forEach(r=>{const old=merged.get(r.entryId);merged.set(r.entryId,{...r,medicineRequired:(old?.medicineRequired||0)+(r.medicineRequired||0)});});
+    // Reported use must remain visible even when the community has no allocation.
+    displayEntries.forEach(e=>{if(!merged.has(e.id)&&((e as any).medicine_used!=null||(e as any).medicine_returns?.length))merged.set(e.id,{entryId:e.id,state:e.state,lga:e.lga,ward:e.ward,flhf:e.flhf_name,community:e.community_name,settlement:e.settlement_name||"—",medicineRequired:0,medicineUsed:(e as any).medicine_used||0,unallocated:true});});
+    return [...merged.values()];
+  }, [savedAllocations,displayEntries,medicineAllocationData]);
+
+  // Render the per-community allocation preview in pages of 100 so even a
   // computed plan spanning tens of thousands of communities stays smooth and
   // never floods the DOM (which previously froze / crashed the browser).
   const medAllocPagination = useTablePagination(medicineAllocationData, 100);
