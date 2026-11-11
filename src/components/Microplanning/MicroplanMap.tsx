@@ -1,7 +1,8 @@
 import { disposeMap } from "@/lib/microplanning/disposeMap";
 import L from "leaflet";
 import { renderBatches } from "@/lib/microplanning/renderBatches";
-import { useEffect, useRef, useState, useMemo, useCallback } from "react";
+import { useEffect, useRef, useState, useMemo, useCallback, memo } from "react";
+import { deriveOnce } from "@/lib/microplanning/derivedCache";
 import { useTargetPopFields } from "@/hooks/useTargetPopFields";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -1472,4 +1473,4 @@ function hexToRgb(hex: string) {
   } : { r: 0, g: 0, b: 0 };
 }
 
-export default MicroplanMap;
+export default memo(MicroplanMap);

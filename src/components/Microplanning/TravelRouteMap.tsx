@@ -1,6 +1,7 @@
 import { disposeMap } from "@/lib/microplanning/disposeMap";
 import { renderBatches } from "@/lib/microplanning/renderBatches";
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback, memo } from "react";
+import { deriveOnce } from "@/lib/microplanning/derivedCache";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -113,7 +114,7 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
   const dest2Ref = useRef<HTMLDivElement>(null);
 
   // Build unique location options from entries
-  const allLocations = useMemo(() => {
+  const allLocations = useMemo(() => deriveOnce(entries, "route-locations-v1", () => {
     const locMap = new Map<string, LocationOption>();
 
     entries.forEach((e) => {
@@ -1078,4 +1079,4 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
   );
 };
 
-export default TravelRouteMap;
+export default memo(TravelRouteMap);

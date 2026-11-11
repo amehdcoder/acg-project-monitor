@@ -1,6 +1,7 @@
 import { useTablePagination } from "@/hooks/useTablePagination";
 import DatasetPagination from "./DatasetPagination";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, memo } from "react";
+import { deriveOnce } from "@/lib/microplanning/derivedCache";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -231,7 +232,7 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
     }
   };
 
-  const rows: RowData[] = useMemo(() => {
+  const rows: RowData[] = useMemo(() => deriveOnce(entries, "historical-rows-v1", () => {
     const groups = new Map<string, Entry[]>();
     entries.forEach((e) => {
       if (!e.estimated_total_population || !e.year_of_microplanning) return;
@@ -568,4 +569,4 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
   );
 };
 
-export default HistoricalDataReview;
+export default memo(HistoricalDataReview);
