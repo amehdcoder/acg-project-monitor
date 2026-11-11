@@ -13,13 +13,13 @@ describe("community planning risk index", () => {
     for (const cdd_names of ["none", "nil", "0", "no CDDs"]) expect(communityRisk({ ...baseline, cdd_names }).score).toBe(20);
     expect(communityRisk(baseline).score).toBe(0);
   });
-  it("does not treat missing CDD names as confirmed absence", () => {
-    for (const cdd_names of ["", "—", "-", "N/A", "unknown", "not recorded"]) {
-      expect(communityRisk({ ...baseline, cdd_names })).toMatchObject({ score: null, minimum: 0, maximum: 20, band: "Incomplete" });
+  it("counts no usable CDD data as an explicit gap worth 20 points", () => {
+    for (const cdd_names of [undefined, null, "", " ", "—", "-", "N/A", "unknown", "not recorded", ", ; /", "none; unknown"]) {
+      expect(communityRisk({ ...baseline, cdd_names })).toMatchObject({ score: 20, minimum: 20, maximum: 20, band: "Low" });
     }
   });
   it("flags unknown security and access without a false low score", () => {
-    expect(communityRisk({})).toMatchObject({ score: null, minimum: 0, maximum: 100 });
+    expect(communityRisk({})).toMatchObject({ score: null, minimum: 20, maximum: 100 });
     expect(communityRisk({ ...baseline, security_clearance: "unknown" })).toMatchObject({ score: null, maximum: 50 });
     expect(communityRisk({ ...baseline, accessibility: "unrecognised" })).toMatchObject({ score: null, maximum: 30 });
   });

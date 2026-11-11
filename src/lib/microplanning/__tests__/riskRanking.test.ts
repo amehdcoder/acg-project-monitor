@@ -7,7 +7,14 @@ describe("local risk rankings", () => {
     expect(refreshRiskCache([{ ...entry, security_clearance: "not_cleared" }], cache).a.risk.score).toBe(50);
     expect(refreshRiskCache([{ ...entry, accessibility: "inaccessible" }], cache).a.risk.score).toBe(30);
     expect(refreshRiskCache([{ ...entry, cdd_names: "none" }], cache).a.risk.score).toBe(20);
+    expect(refreshRiskCache([{ ...entry, cdd_names: "" }], cache).a.risk.score).toBe(20);
     expect(refreshRiskCache([entry], cache).a).toBe(cache.a);
+  });
+  it("replaces old cached CDD interpretation even when community inputs are unchanged", () => {
+    const missing = { ...entry, cdd_names: "" };
+    const old = { a: { signature: JSON.stringify([missing.security_clearance, missing.accessibility, missing.cdd_names]), risk: { ...refreshRiskCache([missing]).a.risk, score: null, minimum: 0, maximum: 20 } } };
+    expect(refreshRiskCache([missing], old).a.risk.score).toBe(20);
+    expect(refreshRiskCache([entry], refreshRiskCache([missing])).a.risk.score).toBe(0);
   });
   it("filters inclusive ranges without treating unknown inputs as scores", () => {
     const risk = refreshRiskCache([{ ...entry, security_clearance: "partial" }]).a.risk;
