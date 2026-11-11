@@ -181,7 +181,7 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
     });
 
     return Array.from(locMap.values());
-  }, [entries]);
+  }), [entries]);
 
   // Separate FLHF list for "Your location" and destination options
   const flhfLocations = useMemo(() => allLocations.filter((l) => l.type === "flhf"), [allLocations]);
