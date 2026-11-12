@@ -163,6 +163,34 @@ export const usePageAccess = () => {
     return () => { cancelled = true; };
   }, [user?.id, authLoading]);
 
+  // Fetch the user's microplanning entry-form access (Tier 1 → entry form only):
+  // projects the user is assigned to that have a microplan_project_grants row,
+  // minus any per-user exclusion. Mirrors the FormsView entry-form check.
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) { setMicroplanEntryProjectIds([]); return; }
+    let cancelled = false;
+    (async () => {
+      const [grantsRes, exclRes, asgRes] = await Promise.all([
+        withTimeoutFallback(
+          (async () => await supabase.from("microplan_project_grants" as any).select("project_id"))(),
+          8000, { data: [] } as any),
+        withTimeoutFallback(
+          (async () => await supabase.from("microplan_project_exclusions" as any).select("project_id").eq("user_id", user.id))(),
+          8000, { data: [] } as any),
+        withTimeoutFallback(
+          (async () => await supabase.from("user_project_assignments").select("project_id").eq("user_id", user.id))(),
+          8000, { data: [] } as any),
+      ]);
+      const grantedSet = new Set(((grantsRes?.data as any[]) || []).map((r) => r.project_id));
+      const excludedSet = new Set(((exclRes?.data as any[]) || []).map((r) => r.project_id));
+      const myProjects = ((asgRes?.data as any[]) || []).map((r) => r.project_id);
+      const allowed = myProjects.filter((pid) => grantedSet.has(pid) && !excludedSet.has(pid));
+      if (!cancelled) setMicroplanEntryProjectIds(allowed);
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id, authLoading]);
+
   // Fetch the user's "minimal access" lock (Forms / Project Chat / My Submissions only).
   // Admins are never minimal-locked.
   useEffect(() => {
