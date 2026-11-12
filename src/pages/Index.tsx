@@ -116,7 +116,7 @@ const Index = () => {
   const [showSubmissionHistory, setShowSubmissionHistory] = useState(false);
 
   const { user, loading, profile, role, isAdmin, isApproved, isPendingApproval, isSuperAdmin, isOwner, isCoOwner, isAdhoc } = useAuth();
-  const { canAccessPage, minimalAccess, loadingAccess } = usePageAccess();
+  const { canAccessPage, minimalAccess, loadingAccess, microplanAccess, microplanEntryProjectIds } = usePageAccess();
   const { lensEnabled, loadingLens } = useMdaLens();
   const { canEditDashboards } = useCanEditDashboards();
   const navigate = useNavigate();
