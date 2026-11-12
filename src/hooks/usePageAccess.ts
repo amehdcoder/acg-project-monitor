@@ -356,7 +356,7 @@ export const usePageAccess = () => {
       if (pageId === "forms" || pageId === "cases" || pageId === "community-forum" || pageId === "project-chat") return true;
       return false;
     },
-    [isOwner, isOwnerLevel, isAdmin, isSuperAdmin, grantedPages, loadingAccess, canAccessUserPage, isFieldDesignation, hasMicroplanFormAccess, minimalAccess, lensEnabled]
+    [isOwner, isOwnerLevel, isAdmin, isSuperAdmin, grantedPages, loadingAccess, canAccessUserPage, isFieldDesignation, hasMicroplanFormAccess, minimalAccess, lensEnabled, microplanAccess]
   );
 
   const refetch = useCallback(async () => {
