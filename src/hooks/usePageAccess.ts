@@ -6,6 +6,7 @@ import { useUserAccess } from "@/hooks/useUserAccess";
 import { withTimeoutFallback } from "@/lib/withTimeout";
 import { useMdaLens } from "@/hooks/useMdaLens";
 import { LENS_PAGE_IDS } from "@/lib/mdaLens/config";
+import { resolveMicroplanAccess } from "@/lib/microplanning/microplanAccessLevel";
 
 
 // Pages that are restricted to owner only (other super admins need explicit grants)
