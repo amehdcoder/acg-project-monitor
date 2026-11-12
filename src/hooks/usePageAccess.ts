@@ -286,22 +286,20 @@ export const usePageAccess = () => {
   const designation = (profile?.designation || "").toLowerCase();
   const isFieldDesignation = FIELD_DESIGNATIONS.has(designation);
 
-  // Geo Microplanning access level:
-  //   "dashboard" — full page (owner, admins with a page grant, Tier-2 form
-  //                 access grant, MDA Lens, or a time-bounded owner grant);
-  //   "entry"     — the New Microplan Entry Form only (project members and
-  //                 field designations);
-  //   "none"      — no access.
-  const microplanAccess: "dashboard" | "entry" | "none" =
-    isOwner || isOwnerLevel ? "dashboard"
-    : canAccessUserPage("microplanning") ? "dashboard"
-    : hasMicroplanFormAccess ? "dashboard"
-    : lensEnabled ? "dashboard"
-    : isAdmin && grantedPages.includes("microplanning") ? "dashboard"
-    : minimalAccess && !isAdmin ? "none"
-    : isFieldDesignation ? "entry"
-    : microplanEntryProjectIds.length > 0 ? "entry"
-    : "none";
+  // Geo Microplanning access level: "dashboard" (full page), "entry" (New
+  // Microplan Entry Form only) or "none". See microplanAccessLevel.ts.
+  const microplanAccess = resolveMicroplanAccess({
+    isOwner,
+    isOwnerLevel,
+    hasUserPageGrant: canAccessUserPage("microplanning"),
+    hasFormAccess: hasMicroplanFormAccess,
+    lensEnabled,
+    isAdmin,
+    grantedPages,
+    minimalAccess,
+    isFieldDesignation,
+    entryProjectIds: microplanEntryProjectIds,
+  });
 
   const canAccessPage = useCallback(
     (pageId: string): boolean => {
