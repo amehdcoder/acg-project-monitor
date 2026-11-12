@@ -339,7 +339,19 @@ const Index = () => {
       case "field-intelligence": return guardedPage("field-intelligence", <FieldIntelligenceView />);
       case "surveillance": return guardedPage("surveillance", <AdminSurveillanceView />);
       case "data-quality": return guardedPage("data-quality", <DataQualityView />);
-      case "microplanning": return guardedPage("microplanning", <MicroplanningView />);
+      case "microplanning":
+        // Granted members/admins get the full dashboard; every other project
+        // member gets the New Microplan Entry Form only.
+        if (microplanAccess === "dashboard") return <MicroplanningView />;
+        if (microplanAccess === "entry") {
+          return (
+            <MicroplanningView
+              entryOnly
+              allowedProjectIds={microplanEntryProjectIds.length > 0 ? microplanEntryProjectIds : undefined}
+            />
+          );
+        }
+        return guardedPage("microplanning", <></>);
       case "lqas": return guardedPage("microplanning", <LqasView />);
       case "integrated-supervisory": return guardedPage("integrated-supervisory", <IntegratedSupervisoryView />);
       case "environment": return guardedPage("environment", <ChangeEnvironmentView />);
