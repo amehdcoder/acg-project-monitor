@@ -337,6 +337,10 @@ export const usePageAccess = () => {
       // Tier 2: a "Manage Microplanning Form Access" grant unlocks the full
       // Geo Microplanning dashboard page for any user.
       if (pageId === "microplanning" && hasMicroplanFormAccess) return true;
+      // Tier 1: project members (and field designations) can open the Geo
+      // Microplanning page for the New Microplan Entry Form only — Index
+      // renders the entry-only variant for them via `microplanAccess`.
+      if (pageId === "microplanning" && microplanAccess === "entry") return true;
       // MDA Lens: an admin-granted, geography-scoped pass to the two MDA
       // field-operations pages (Geo Microplanning + Integrated Supervisory).
       if (lensEnabled && LENS_PAGE_IDS.includes(pageId)) return true;
