@@ -324,6 +324,8 @@ export const usePageAccess = () => {
           pageId === "forms" ||
           pageId === "project-chat" ||
           pageId === "my-submissions" ||
+          // Project members keep the microplan entry form even under the lock.
+          (pageId === "microplanning" && microplanAccess === "entry") ||
           canAccessUserPage(pageId)
         );
       }

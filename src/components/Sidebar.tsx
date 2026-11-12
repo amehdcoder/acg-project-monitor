@@ -165,9 +165,13 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     if ((item as any).ownerOnly && !isOwner) return false;
     // Regular users: collaboration features by default + owner-granted pages.
     if (isRegularUser) {
-      // Minimal-access lock: ONLY Forms, Project Chat and My Submissions.
+      // Minimal-access lock: ONLY Forms, Project Chat and My Submissions —
+      // plus the Geo Microplanning entry form for project members.
       if (minimalAccess) {
-        return ["forms", "project-chat", "my-submissions"].includes(item.id);
+        return (
+          ["forms", "project-chat", "my-submissions"].includes(item.id) ||
+          (item.id === "microplanning" && !!canAccessPage?.("microplanning"))
+        );
       }
       // Quizzes: every project member sees it by default; quiz visibility itself
       // is scoped per project (with a friendly empty state when none exist).
