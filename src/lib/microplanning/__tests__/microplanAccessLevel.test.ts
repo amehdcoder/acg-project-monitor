@@ -50,13 +50,14 @@ describe("resolveMicroplanAccess", () => {
     ).toBe("entry");
   });
 
-  it("minimal-access lock blocks entry access for non-admins", () => {
+  it("minimal-access lock still allows the entry form for project members", () => {
+    // Entry is data collection (like Forms), which minimal users keep.
     expect(
       resolveMicroplanAccess({ ...base, minimalAccess: true, entryProjectIds: ["p1"] }),
-    ).toBe("none");
+    ).toBe("entry");
     expect(
       resolveMicroplanAccess({ ...base, minimalAccess: true, isFieldDesignation: true }),
-    ).toBe("none");
+    ).toBe("entry");
   });
 
   it("denies users with no membership, designation or grant", () => {

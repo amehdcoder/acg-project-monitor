@@ -38,7 +38,8 @@ export const resolveMicroplanAccess = (input: MicroplanAccessInput): MicroplanAc
   if (input.hasFormAccess) return "dashboard";
   if (input.lensEnabled) return "dashboard";
   if (input.isAdmin && input.grantedPages.includes("microplanning")) return "dashboard";
-  if (input.minimalAccess && !input.isAdmin) return "none";
+  // Entry access is data collection (like the Forms page), so it applies even
+  // under the minimal-access lock: every project member can submit entries.
   if (input.isFieldDesignation) return "entry";
   if (input.entryProjectIds.length > 0) return "entry";
   return "none";
