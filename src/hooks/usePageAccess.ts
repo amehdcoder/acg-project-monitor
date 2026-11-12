@@ -53,6 +53,10 @@ export const usePageAccess = () => {
   // Tier 2: a "Manage Microplanning Form Access" grant unlocks the full
   // Geo Microplanning dashboard page (sidebar), even for non-admins.
   const [hasMicroplanFormAccess, setHasMicroplanFormAccess] = useState(false);
+  // Tier 1: project membership (assignment ∩ project grant − exclusion) unlocks
+  // the New Microplan Entry Form on the Geo Microplanning page — entry only,
+  // never the full dashboard.
+  const [microplanEntryProjectIds, setMicroplanEntryProjectIds] = useState<string[]>([]);
   // "Minimal access" lock: when set, a non-admin user only sees Forms, Project
   // Chat and My Submissions — regardless of their designation defaults.
   const [minimalAccess, setMinimalAccess] = useState(false);
