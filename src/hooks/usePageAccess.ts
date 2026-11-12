@@ -286,6 +286,23 @@ export const usePageAccess = () => {
   const designation = (profile?.designation || "").toLowerCase();
   const isFieldDesignation = FIELD_DESIGNATIONS.has(designation);
 
+  // Geo Microplanning access level:
+  //   "dashboard" — full page (owner, admins with a page grant, Tier-2 form
+  //                 access grant, MDA Lens, or a time-bounded owner grant);
+  //   "entry"     — the New Microplan Entry Form only (project members and
+  //                 field designations);
+  //   "none"      — no access.
+  const microplanAccess: "dashboard" | "entry" | "none" =
+    isOwner || isOwnerLevel ? "dashboard"
+    : canAccessUserPage("microplanning") ? "dashboard"
+    : hasMicroplanFormAccess ? "dashboard"
+    : lensEnabled ? "dashboard"
+    : isAdmin && grantedPages.includes("microplanning") ? "dashboard"
+    : minimalAccess && !isAdmin ? "none"
+    : isFieldDesignation ? "entry"
+    : microplanEntryProjectIds.length > 0 ? "entry"
+    : "none";
+
   const canAccessPage = useCallback(
     (pageId: string): boolean => {
       // Owner/admin status comes from auth and resolves independently of the
