@@ -1,6 +1,6 @@
 # Roadmap
 
-- [ ] Remove the temporary project assignment and add administrator-managed, project-scoped Microplanning collector/dashboard roles from the live dashboard; enforce access server-side and verify grant, readback and revocation.
+- [x] Remove the temporary membership and add project-scoped Collector/Dashboard roles under Manage → Microplanning access. Administrator-authorized saves, protected role rows and project/read/write guards prevent self-grants or unrelated memberships. Thirty-nine regression tests pass; signed-in role save/readback/removal, phone controls and Coverage/Reconciliation navigation verified without runtime errors. Verification grants removed; preview build clean. No permanent recipient was selected on the user's behalf.
 
 - [x] Simplify Coverage Excel to five medicine quantities with validation and explicit received-only alignment. Twenty-four tests pass; signed-in GIveWell download/upload/alignment/save and Reconciliation export read back received 200 / used 160 / lost 5 / expired 5 / returned 30 with zero balance. Desktop/phone checked; missing stock storage repaired, temporary records removed. Saved allocations unchanged.
 
