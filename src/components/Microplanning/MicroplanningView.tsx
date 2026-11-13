@@ -81,6 +81,9 @@ import PlanningHeatmaps from "@/components/Microplanning/PlanningHeatmaps";
 import PlanningAnalyses from "@/components/Microplanning/PlanningAnalyses";
 import OsirisPlanningAnalysis from "@/components/Microplanning/OsirisPlanningAnalysis";
 import { useGeoExclusions, rowExcluded } from "@/lib/microplanning/geoExclusions";
+import MicroplanRolesDialog from "./MicroplanRolesDialog";
+import { useMicroplanProjectAccess } from "@/hooks/useMicroplanProjectAccess";
+import { scopedProjectAccess } from "@/lib/microplanning/projectRoles";
 
 import { parseMedicineUploadFile, exportMedicineUploadTemplate, parseAllocationPlanFile, exportAllocationPlanTemplate, type UploadedMedicineEntry } from "@/lib/microplanning/medicineUpload";
 
@@ -877,12 +880,14 @@ interface MicroplanningViewProps {
 // Session cache of loaded entries per project (instant re-open of a project).
 const microplanEntriesCache = new Map<string, any[]>();
 
-const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: MicroplanningViewProps) => {
-  const { user, role, isOwner, isSuperAdmin, isAdmin } = useAuth();
+const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectIds }: MicroplanningViewProps) => {
+  const { user, role, isOwner, isOwnerLevel, isSuperAdmin, isAdmin } = useAuth();
+  const { projects: accessibleProjects } = useMicroplanProjectAccess();
   const [showPopulationSettings, setShowPopulationSettings] = useState(false);
   const [entries, setEntries] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+  const entryOnly = forceEntryOnly || (!!selectedProjectId && scopedProjectAccess(accessibleProjects, selectedProjectId) !== "dashboard");
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingEntry, setEditingEntry] = useState<any>(null);
@@ -954,10 +959,16 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
   const [showKoboSettings, setShowKoboSettings] = useState(false);
   const [showDesignationManager, setShowDesignationManager] = useState(false);
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
-  const [allUsers, setAllUsers] = useState<any[]>([]);
-  const [grantedUsers, setGrantedUsers] = useState<any[]>([]);
-  const [accessSearchQuery, setAccessSearchQuery] = useState("");
-  const canManageAccess = isOwner || isSuperAdmin;
+  const [canManageProjectAccess, setCanManageProjectAccess] = useState(false);
+  const canManageAccess = isOwnerLevel || isSuperAdmin;
+  useEffect(() => {
+    let active = true;
+    if (!user) { setCanManageProjectAccess(false); return; }
+    void supabase.rpc("can_manage_microplan_access", { _uid: user.id }).then(({ data }) => {
+      if (active) setCanManageProjectAccess(data === true);
+    });
+    return () => { active = false; };
+  }, [user?.id]);
   // Use the shared `isAdmin` from useAuth so Systems Admins (not just Owner /
   // Super Admin) get full in-page admin behaviour and scope bypass.
 
@@ -999,41 +1010,15 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
   const [targetRatioMax, setTargetRatioMax] = useSharedMicroplanSetting<number>(sharedProjectKey, "target_ratio_max", 3.0, validNumber(0.01, 1000));
 
   const fetchProjects = useCallback(async () => {
-    let data: { id: string; name: string }[] | null = null;
-    if (isAdmin) {
-      // Admins/owner see every project.
-      const res = await cachedRead<{id:string; name:string}[]>("microplan-projects", () => supabase.from("projects").select("id, name").order("name"));
-      data = res.data;
-    } else {
-      // Tier 1: non-admins only see projects they are assigned to, so data is
-      // only ever entered under a project the user has been granted.
-      const { data: assignments } = await supabase
-        .from("user_project_assignments")
-        .select("project_id")
-        .eq("user_id", user?.id);
-      const projectIds = (assignments || []).map((a: any) => a.project_id);
-      if (projectIds.length > 0) {
-        const res = await supabase
-          .from("projects")
-          .select("id, name")
-          .in("id", projectIds)
-          .order("name");
-        data = res.data;
-      } else {
-        data = [];
-      }
-    }
-    data = (data || []).filter(p => !allowedProjectIds || allowedProjectIds.includes(p.id));
-    const visibleProjects = lens ? (data || []).filter((project) => projectInLensScope(lens, project.id)) : (data || []);
+    const data = accessibleProjects.map(p => ({ id: p.project_id, name: p.project_name }))
+      .filter(p => !allowedProjectIds || allowedProjectIds.includes(p.id));
+    const visibleProjects = lens ? data.filter(project => projectInLensScope(lens, project.id)) : data;
     setProjects(visibleProjects);
     if (visibleProjects.length > 0 && (!selectedProjectId || !visibleProjects.some((project) => project.id === selectedProjectId))) {
       setSelectedProjectId(visibleProjects[0].id);
-      // For entry-only users, auto-open the form immediately once project is set
-      if (entryOnly) {
-        setShowForm(true);
-      }
     }
-  }, [selectedProjectId, entryOnly, isAdmin, user?.id, lens, allowedProjectIds]);
+    if (visibleProjects.length === 0 && selectedProjectId) { setSelectedProjectId(""); setShowForm(false); setEntries([]); }
+  }, [selectedProjectId, accessibleProjects, lens, allowedProjectIds]);
 
   // Per-project cache + request guard so switching projects shows data instantly
   // and a slower, older request can never overwrite the newly selected project.
@@ -1070,7 +1055,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
           .select("*")
           .eq("project_id", selectedProjectId);
         if (entryOnly && user?.id) {
-          query = query.or(`created_by.eq.${user.id},created_by.is.null`);
+          query = query.eq("created_by", user.id);
         }
         if (afterId) query = query.gt("id", afterId);
         return query.order("id", { ascending: true }).limit(limit);
@@ -1096,36 +1081,6 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
     }
   }, [selectedProjectId, entryOnly, user?.id]);
 
-  const fetchGrantedUsers = useCallback(async () => {
-    const { data } = await supabase
-      .from("microplan_form_access")
-      .select("id, user_id, created_at");
-    if (data && data.length > 0) {
-      // Fetch profile info for granted users
-      const userIds = data.map(d => d.user_id);
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("user_id, first_name, last_name, email")
-        .in("user_id", userIds);
-      const merged = data.map(d => ({
-        ...d,
-        profile: profiles?.find(p => p.user_id === d.user_id),
-      }));
-      setGrantedUsers(merged);
-    } else {
-      setGrantedUsers([]);
-    }
-  }, []);
-
-  const fetchAllUsers = useCallback(async () => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("user_id, first_name, last_name, email, is_active")
-      .eq("is_active", true)
-      .order("first_name");
-    setAllUsers(data || []);
-  }, []);
-
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
   useEffect(() => {
     bindQueueAutoFlush(); void fetchEntries();
@@ -1140,10 +1095,10 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
   // MDA Lens users get exactly the tabs their grant lists.
   const canOpenView = useCallback(
     (v: string) => {
-      if (v === "list") return isAdmin; // Planning table is strictly admin-only
-      return isAdmin ? true : lensEnabled ? canOpenMicroplanTab(v) : false;
+      if (entryOnly) return false;
+      return lensEnabled && !isAdmin ? canOpenMicroplanTab(v) : true;
     },
-    [isAdmin, lensEnabled, canOpenMicroplanTab],
+    [entryOnly, isAdmin, lensEnabled, canOpenMicroplanTab],
   );
   // Deferred navigation must never retain a panel after its access is removed.
   const renderedView = canOpenView(deferredView) ? deferredView : "none";
@@ -1331,39 +1286,8 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
   };
 
 
-  // Grant user access
-  const grantAccess = async (userId: string) => {
-    if (!user?.id) return;
-    const { error } = await supabase.from("microplan_form_access").insert({
-      user_id: userId,
-      granted_by: user.id,
-    });
-    if (error) {
-      if (error.code === "23505") {
-        toast({ title: "User already has access", variant: "destructive" });
-      } else {
-        toast({ title: "Error granting access", description: error.message, variant: "destructive" });
-      }
-    } else {
-      toast({ title: "✅ Access granted" });
-      fetchGrantedUsers();
-    }
-  };
-
-  const revokeAccess = async (accessId: string) => {
-    const { error } = await supabase.from("microplan_form_access").delete().eq("id", accessId);
-    if (error) {
-      toast({ title: "Error revoking access", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Access revoked" });
-      fetchGrantedUsers();
-    }
-  };
-
   const openAccessManager = () => {
     setShowAccessManager(true);
-    fetchGrantedUsers();
-    fetchAllUsers();
   };
 
   // ---- EXPORT: Blank branded template or filled data ----
@@ -2501,17 +2425,6 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
     }
   };
 
-  // Access manager: filter users not already granted
-  const grantedUserIds = new Set(grantedUsers.map(g => g.user_id));
-  const availableUsers = allUsers.filter(u => {
-    if (grantedUserIds.has(u.user_id)) return false;
-    if (accessSearchQuery) {
-      const q = accessSearchQuery.toLowerCase();
-      return [u.first_name, u.last_name, u.email].some(v => v?.toLowerCase().includes(q));
-    }
-    return true;
-  });
-
   return (
     <div className={entryOnly ? "space-y-4 py-2" : "geo-workspace space-y-4 py-2"}>
       {/* Header */}
@@ -2528,7 +2441,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap w-full">
-          {!entryOnly && (
+          {projects.length > 0 && (
             <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
               <SelectTrigger className="w-[180px] h-9 text-xs border-primary/20 shadow-sm">
                 <SelectValue placeholder="Select project" />
@@ -2548,7 +2461,7 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
               <DropdownMenuLabel>Workspace management</DropdownMenuLabel>
-              {!entryOnly && canManageAccess && <DropdownMenuItem onSelect={openAccessManager}><UserPlus className="h-4 w-4 mr-2" /> Access</DropdownMenuItem>}
+              {!entryOnly && canManageProjectAccess && <DropdownMenuItem disabled={!selectedProjectId} onSelect={openAccessManager}><UserPlus className="h-4 w-4 mr-2" /> Microplanning access</DropdownMenuItem>}
               <DropdownMenuItem onSelect={() => setShowDeleteRequestsPanel(true)}><ShieldCheck className="h-4 w-4 mr-2" /> {(isAdmin || isOwner) ? "Delete Requests" : "My Delete Requests"}</DropdownMenuItem>
               {isSuperAdmin && <DropdownMenuItem onSelect={() => setShowKoboSettings(true)}><HistoryIcon className="h-4 w-4 mr-2" /> Kobo Sync</DropdownMenuItem>}
               {!entryOnly && role === "super_admin" && <DropdownMenuItem disabled={!selectedProjectId} onSelect={() => setShowPopulationSettings(true)}><Target className="h-4 w-4 mr-2" /> Population disaggregation</DropdownMenuItem>}
@@ -3847,72 +3760,10 @@ const MicroplanningView = ({ entryOnly = false, allowedProjectIds }: Microplanni
 
       {role === "super_admin" && <PopulationDisaggregationDialog open={showPopulationSettings} onOpenChange={setShowPopulationSettings} projectName={selectedProjectName} entries={filtered} />}
 
-      {/* User Access Manager Dialog - only for full access */}
-      {!entryOnly && (
-      <Dialog open={showAccessManager} onOpenChange={setShowAccessManager}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <UserPlus className="h-5 w-5 text-primary" />
-              Manage Microplanning Form Access
-            </DialogTitle>
-          </DialogHeader>
-          <p className="text-xs text-muted-foreground">
-            Grant users access to view, create, and edit microplan entries. Admins with Microplanning page access already have full access.
-          </p>
-
-          {/* Currently granted users */}
-          <div className="space-y-2">
-            <h3 className="text-xs font-semibold text-foreground">Users with Access ({grantedUsers.length})</h3>
-            <div className="max-h-[150px] overflow-y-auto space-y-1">
-              {grantedUsers.length === 0 ? (
-                <p className="text-xs text-muted-foreground py-2">No users have been granted access yet.</p>
-              ) : grantedUsers.map(g => (
-                <div key={g.id} className="flex items-center justify-between bg-muted/30 rounded px-2 py-1.5">
-                  <div className="text-xs">
-                    <span className="font-medium">{g.profile?.first_name} {g.profile?.last_name}</span>
-                    <span className="text-muted-foreground ml-2">{g.profile?.email}</span>
-                  </div>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => revokeAccess(g.id)}>
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Add users */}
-          <div className="space-y-2 flex-1 overflow-hidden flex flex-col">
-            <h3 className="text-xs font-semibold text-foreground">Add Users</h3>
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                value={accessSearchQuery}
-                onChange={e => setAccessSearchQuery(e.target.value)}
-                placeholder="Search by name or email..."
-                className="pl-8 h-8 text-xs"
-              />
-            </div>
-            <div className="flex-1 overflow-y-auto space-y-1 max-h-[200px]">
-              {availableUsers.slice(0, 50).map(u => (
-                <div key={u.user_id} className="flex items-center justify-between rounded px-2 py-1.5 hover:bg-muted/30">
-                  <div className="text-xs">
-                    <span className="font-medium">{u.first_name} {u.last_name}</span>
-                    <span className="text-muted-foreground ml-2">{u.email}</span>
-                  </div>
-                  <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={() => grantAccess(u.user_id)}>
-                    <Plus className="h-3 w-3 mr-0.5" /> Grant
-                  </Button>
-                </div>
-              ))}
-              {availableUsers.length === 0 && (
-                <p className="text-xs text-muted-foreground py-2">No matching users found.</p>
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-      )}
+      {!entryOnly && canManageProjectAccess && selectedProjectId && <MicroplanRolesDialog
+        key={selectedProjectId} open={showAccessManager} onOpenChange={setShowAccessManager}
+        projectId={selectedProjectId} projectName={selectedProjectName}
+      />}
 
       {/* Hard delete confirmation (admins) — single and bulk */}
       <MicroplanDeleteConfirmDialog
