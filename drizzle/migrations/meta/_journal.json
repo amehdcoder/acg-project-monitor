@@ -421,6 +421,13 @@
       "when": 1794538817836,
       "tag": "0059_microplan_role_lens_guards",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1794538979704,
+      "tag": "0060_microplan_role_explicit_grants",
+      "breakpoints": true
     }
   ]
 }
