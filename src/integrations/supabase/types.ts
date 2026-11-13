@@ -9287,6 +9287,7 @@ export type Database = {
           community_lng_override: number | null
           community_longitude: number | null
           community_name: string
+          coverage_target_population: number | null
           created_at: string
           created_by: string | null
           device_id: string | null
@@ -9370,6 +9371,7 @@ export type Database = {
           community_lng_override?: number | null
           community_longitude?: number | null
           community_name: string
+          coverage_target_population?: number | null
           created_at?: string
           created_by?: string | null
           device_id?: string | null
@@ -9453,6 +9455,7 @@ export type Database = {
           community_lng_override?: number | null
           community_longitude?: number | null
           community_name?: string
+          coverage_target_population?: number | null
           created_at?: string
           created_by?: string | null
           device_id?: string | null

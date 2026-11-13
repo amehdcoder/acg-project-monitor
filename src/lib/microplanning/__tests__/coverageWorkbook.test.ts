@@ -2,6 +2,20 @@ import { describe, expect, it } from "vitest";
 import { buildCoverageWorkbook, parseCoverageWorkbook } from "../coverageWorkbook";
 const entry={id:"record",state:"Kano",lga:"Dala",ward:"Gwarmai",flhf_name:"PHC",community_name:"Central",settlement_name:null};
 describe("Coverage workbook round trip",()=>{
+ it("imports typed LGA, Ward, FLHF, community, settlement and Target Pop with their coverage and medicines",async()=>{
+  const wb=await buildCoverageWorkbook([entry],[],"Project",()=>100);
+  const ws=wb.getWorksheet("Coverage");if(!ws)throw new Error("Missing sheet");
+  ws.getRow(6).values=["","Kano","Dalaa","Gwarmai Wrd","PHC","Central","North",120,80,20,15,200,160,5,5,30,"",2026];
+  const buffer=await wb.xlsx.writeBuffer();const rows=await parseCoverageWorkbook({size:buffer.byteLength,arrayBuffer:async()=>buffer} as File);
+  expect(rows).toHaveLength(1);
+  expect(rows[0]).toMatchObject({entryId:"",lga:"Dalaa",ward:"Gwarmai Wrd",flhf:"PHC",community:"Central",settlement:"North",targetPopulation:120,treated:80,households:20,treatedHouseholds:15,stock:{received:200,used:160,lost:5,expired:5,returned:30}});
+ });
+ it("imports a typed target-only row and ignores unused blank rows",async()=>{
+  const wb=await buildCoverageWorkbook([entry],[],"Project",()=>100);const ws=wb.getWorksheet("Coverage");if(!ws)throw new Error("Missing sheet");
+  ws.getCell("C6").value="Dala";ws.getCell("D6").value="Gwarmai";ws.getCell("E6").value="PHC";ws.getCell("F6").value="New community";ws.getCell("H6").value=120;
+  const buffer=await wb.xlsx.writeBuffer();const rows=await parseCoverageWorkbook({size:buffer.byteLength,arrayBuffer:async()=>buffer} as File);
+  expect(rows).toHaveLength(1);expect(rows[0]).toMatchObject({state:"Kano",targetPopulation:120,community:"New community"});
+ });
  it("ignores unfilled reference rows and imports supplied treatment and medicine fields",async()=>{
   const wb=await buildCoverageWorkbook([entry],[{entryId:"record",medicineRequired:200}],"Project",()=>100);
   const ws=wb.getWorksheet("Coverage");if(!ws)throw new Error("Missing sheet");
