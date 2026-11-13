@@ -979,6 +979,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
   // MDA Lens users are strictly read-only: they may view and export their scoped
   // data but can never edit or delete a submission (also enforced by RLS).
   const lensReadOnly = isLensReadOnly({ lens, lensEnabled, isAdmin, isOwner });
+  const dashboardReadOnly = lensReadOnly || !isAdmin;
   const blockLensWrite = () => {
     toast({
       title: "View-only access",
@@ -2481,7 +2482,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
         <div className="geo-navigation">
             {/* Analytics/dashboard tabs are admin-only. Non-admin project members
                 only see their own submitted entries (Planning list) and the form. */}
-            {(isAdmin || lensEnabled) && (
+            {!entryOnly && (
               <div className="geo-tabstrip flex max-w-full overflow-x-auto" aria-label="Microplanning views">
                 {canOpenView("list") && (<Button aria-pressed={activeView === "list"} title="Planning" variant={activeView === "list" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("list")}>
                   <List className="h-3.5 w-3.5" />
@@ -3046,7 +3047,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
               onDelete={handleDelete}
               onBulkDelete={handleBulkDelete}
 
-              readOnly={lensReadOnly}
+              readOnly={dashboardReadOnly}
               onGpsResolved={(id, patch) =>
                 setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)))
               }
@@ -3658,7 +3659,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
 
           {/* Coverage View */}
           {renderedView === "coverage" && (
-            <CoverageView entries={displayEntries} allocationRows={reconciliationRows} readOnly={lensReadOnly} onRefresh={fetchEntries} projectId={selectedProjectId || null} projectName={selectedProjectName} />
+            <CoverageView entries={displayEntries} allocationRows={reconciliationRows} readOnly={dashboardReadOnly} onRefresh={fetchEntries} projectId={selectedProjectId || null} projectName={selectedProjectName} />
           )}
 
           {/* Reconciliation View — Balance of medicine + reversal destination */}
@@ -3668,7 +3669,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
               allocationRows={reconciliationRows}
               onRefresh={fetchEntries}
               projectId={selectedProjectId || null}
-              readOnly={lensReadOnly}
+              readOnly={dashboardReadOnly}
               onSaved={applyReconciliationPatch}
             />
           )}
@@ -3698,7 +3699,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
           {renderedView === "summary" && (
             <MicroplanSummaryView
               entries={filtered as any}
-              readOnly={lensReadOnly}
+              readOnly={dashboardReadOnly}
               onRefresh={fetchEntries}
             />
           )}

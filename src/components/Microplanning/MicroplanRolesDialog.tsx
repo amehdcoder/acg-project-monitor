@@ -5,7 +5,6 @@ import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MICROPLAN_ACCESS_CHANGED, type MicroplanProjectRole } from "@/lib/microplanning/projectRoles";
@@ -86,7 +85,7 @@ export default function MicroplanRolesDialog({ open, onOpenChange, projectId, pr
     `${nameOf(member)} ${member.email ?? ""}`.toLowerCase().includes(search.trim().toLowerCase())), [members, search]);
 
   return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="w-[96vw] max-w-2xl max-h-[90dvh] flex flex-col overflow-hidden">
+    <DialogContent className="w-[96vw] max-w-2xl max-h-[90dvh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" /> Microplanning access</DialogTitle>
         <DialogDescription>{projectName || "Selected project"} · Project-specific roles</DialogDescription>
@@ -97,7 +96,7 @@ export default function MicroplanRolesDialog({ open, onOpenChange, projectId, pr
       </div>
       {!online && <p role="status" className="text-sm text-destructive">Connect to the internet to change access.</p>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-      <div className="min-h-0 flex-1 overflow-y-auto space-y-4 pr-1">
+      <div className="space-y-4 pr-1">
         <section className="space-y-2">
           <h3 className="text-sm font-semibold">Project people <span className="text-muted-foreground">({members.length})</span></h3>
           <div className="relative"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input aria-label="Search project people" placeholder="Search project people…" className="pl-9" value={search} onChange={event => setSearch(event.target.value)} /></div>
@@ -112,7 +111,7 @@ export default function MicroplanRolesDialog({ open, onOpenChange, projectId, pr
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <Select value={draft} onValueChange={value => setDrafts(previous => ({ ...previous, [member.user_id]: value }))} disabled={!!busy || !online}>
-                    <SelectTrigger aria-label={`Role for ${name}`} className="w-[150px]"><SelectValue /></SelectTrigger>
+                    <SelectTrigger aria-label={`Role for ${name}`} className="w-[175px]"><SelectValue /></SelectTrigger>
                     <SelectContent><SelectItem value="default">Inherited access</SelectItem><SelectItem value="collector">Collector</SelectItem><SelectItem value="dashboard">Dashboard</SelectItem></SelectContent>
                   </Select>
                   <Button size="icon" variant="outline" aria-label={`Save role for ${name}`} title={`Save role for ${name}`} disabled={draft === original || !!busy || !online} onClick={() => void save(member.user_id, draft === "default" ? null : draft)}>{busy === member.user_id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}</Button>

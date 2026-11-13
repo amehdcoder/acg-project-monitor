@@ -19,7 +19,8 @@ export function useMicroplanProjectAccess() {
       return { data: data as MicroplanProjectAccess[] | null, error };
     }, 8_000, user.id);
     if (request.current !== id) return;
-    setSnapshot({ userId: user.id, projects: result.data ?? [] });
+    setSnapshot(previous => previous?.userId === user.id && JSON.stringify(previous.projects) === JSON.stringify(result.data ?? [])
+      ? previous : { userId: user.id, projects: result.data ?? [] });
     setLoading(false);
   }, [user?.id, authLoading]);
 
