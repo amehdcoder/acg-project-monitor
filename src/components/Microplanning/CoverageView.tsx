@@ -22,7 +22,7 @@ import useRealtimeCoverageEntries from "@/hooks/useRealtimeCoverageEntries";
 import { TabSyncStatus } from "./TabSyncStatus";
 import CoverageExcelExchange from "./CoverageExcelExchange";
 import type { WorkbookAllocation } from "@/lib/microplanning/coverageWorkbook";
-import type { MedicineReturn } from "@/lib/microplanning/coverageExchange";
+import { coverageTargetPopulation, type MedicineReturn } from "@/lib/microplanning/coverageExchange";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isPersistedId = (id: string) => UUID_RE.test(id);
@@ -53,6 +53,7 @@ interface CoverageEntry {
   total_households_reported?: number | null;
   total_households_treated?: number | null;
   medicine_returns?: MedicineReturn[] | null;
+  coverage_target_population?: number | null;
 }
 
 
@@ -84,9 +85,9 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName, allocationRo
 
   const getTargetPop = useCallback((e: CoverageEntry) => {
     const sum = calcTargetPop(e as any);
-    if (sum > 0) return sum;
+    if (sum > 0) return coverageTargetPopulation(e,sum);
     // Fallback when none of the selected disaggregation fields have values
-    return ((e.estimated_children_5_14 || 0) + (e.estimated_adults_15_plus || 0)) || (e.estimated_total_population || 0);
+    return coverageTargetPopulation(e,((e.estimated_children_5_14 || 0) + (e.estimated_adults_15_plus || 0)) || (e.estimated_total_population || 0));
   }, [calcTargetPop]);
 
   // Cascading filters

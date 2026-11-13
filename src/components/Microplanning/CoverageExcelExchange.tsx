@@ -21,7 +21,12 @@ export default function CoverageExcelExchange({entries,allocations,projectId,pro
   const [hydrated,setHydrated]=useState(false);
   useEffect(()=>{if(!user?.id||!projectId)return;let active=true;void cacheGetForUser<ReviewRow[]>(user.id,`coverage-import:${projectId}`).then(saved=>{if(active){if(saved)setRows(saved);setHydrated(true);}});return()=>{active=false;};},[user?.id,projectId]);
   useEffect(()=>{if(hydrated&&user?.id&&projectId)void cacheSetForUser(user.id,`coverage-import:${projectId}`,rows);},[hydrated,rows,user?.id,projectId]);
-  const errorsFor=(r:ReviewRow)=>validateCoverageRow(r.data);
+  const errorsFor=(r:ReviewRow)=>{
+    const errors=validateCoverageRow(r.data);
+    const existing=byId.get(r.choice);
+    if(!errors.length&&existing){try{coveragePatch(r.data,existing,target(existing));}catch(error){errors.push(error instanceof Error?error.message:String(error));}}
+    return errors;
+  };
   const alignable=rows.filter(r=>!r.saved&&r.choice!=="skip"&&canAlignStock(r.data));
   const visible=useMemo(()=>rows.map((r,i)=>({r,i})).filter(({r})=>(!issuesOnly||!r.match.id||r.error||errorsFor(r).length)&&`${r.data.community} ${r.data.lga} ${r.data.ward}`.toLowerCase().includes(query.toLowerCase())),[rows,issuesOnly,query]);
   const pending=rows.filter(r=>!r.saved&&r.choice!=="skip");const unresolved=pending.filter(r=>!r.choice||errorsFor(r).length);
@@ -48,7 +53,7 @@ export default function CoverageExcelExchange({entries,allocations,projectId,pro
       const r=rows[i];if(r.saved||r.choice==="skip")continue;
       try{
         const existing=r.choice==="new"?undefined:byId.get(r.choice);if(r.choice!=="new"&&!existing)throw new Error("The selected community is no longer accessible.");
-        const patch=coveragePatch(r.data,existing);if(!Object.keys(patch).length)throw new Error("No coverage or medicine quantities supplied.");
+        const patch=coveragePatch(r.data,existing,existing?target(existing):undefined);if(!Object.keys(patch).length)throw new Error("No target population, coverage or medicine quantities supplied.");
         const values:Record<string,unknown>={...patch,project_id:projectId,created_by:user.id,updated_by:user.id};
         if(!existing)values.year_of_microplanning=r.data.year??entries[0]?.year_of_microplanning??new Date().getFullYear();
         if(existing)values.created_by=(existing as ExchangeEntry&{created_by?:string}).created_by;
@@ -76,12 +81,12 @@ export default function CoverageExcelExchange({entries,allocations,projectId,pro
         <div className="overflow-auto flex-1 min-h-0 border border-border rounded-md"><table className="w-full text-sm min-w-[850px]"><thead className="sticky top-0 bg-muted"><tr>{["Row / uploaded community","Treatment / households","Medicine accountability","Match","Resolution"].map(h=><th key={h} className="p-3 text-left">{h}</th>)}</tr></thead><tbody>
           {visible.slice(page*20,page*20+20).map(({r,i})=><tr key={i} className={`border-t border-border ${errorsFor(r).length||r.error||!r.choice?"bg-destructive/10":""}`}>
             <td className="p-3"><strong>{r.data.row} · {r.data.community}</strong><div className="text-xs text-muted-foreground">{r.data.settlement} · {r.data.ward} · {r.data.lga} · {r.data.state}</div>{[...errorsFor(r),r.error].filter(Boolean).map(e=><div key={e} className="text-xs text-destructive mt-1">{e}</div>)}</td>
-            <td className="p-3 tabular-nums">{r.data.treated??"—"} treated<br/>{r.data.treatedHouseholds??"—"} / {r.data.households??"—"} HHs</td>
+            <td className="p-3 tabular-nums">Target: {r.data.targetPopulation??"—"}<br/>{r.data.treated??"—"} treated<br/>{r.data.treatedHouseholds??"—"} / {r.data.households??"—"} HHs</td>
             <td className="p-3">{r.data.stock?<div className="space-y-1 tabular-nums"><div>Received: {r.data.stock.received??"—"}</div><div>Used: {r.data.stock.used??"—"} · Lost: {r.data.stock.lost??"—"}</div><div>Expired: {r.data.stock.expired??"—"} · Returned to FLHF: {r.data.stock.returned??"—"}</div><div className="text-muted-foreground">Total accounted: {stockTotal(r.data.stock)??"Incomplete"}</div>{canAlignStock(r.data)&&<Button size="sm" variant="outline" disabled={busy||r.saved||readOnly} aria-label={`Align received for row ${r.data.row}`} onClick={()=>change(i,{data:alignStock(r.data),error:undefined})}>Align received: {r.data.stock.received??"blank"} → {stockTotal(r.data.stock)}</Button>}</div>:<>{r.data.medicineUsed??(r.data.medicines.length?r.data.medicines.reduce((s,m)=>s+m.used,0):"—")}{r.data.medicines.map((m,n)=><div key={n} className="text-xs text-muted-foreground">{m.name}: {m.used} {m.unit} · {m.returned} returned · {m.damaged} damaged</div>)}</>}</td>
             <td className="p-3">{r.saved?<CheckCircle2 className="h-5 w-5 text-primary"/>:<><Badge variant="outline">{r.match.status}</Badge><div className="text-xs mt-1">{Math.round(r.match.score*100)}%</div></>}</td>
             <td className="p-3 min-w-[270px]"><Select value={r.choice||undefined} disabled={busy||r.saved} onValueChange={choice=>change(i,{choice,error:undefined})}><SelectTrigger aria-label={`Resolve row ${r.data.row}`}><SelectValue placeholder="Select reconciliation…"/></SelectTrigger><SelectContent>
               <SelectItem value="skip">Skip this row</SelectItem>{!r.data.entryId&&<SelectItem value="new">Add to microplan as new community</SelectItem>}
-              {entries.filter(e=>e.state.toLowerCase()===r.data.state.toLowerCase()&&e.lga.toLowerCase()===r.data.lga.toLowerCase()&&e.ward.toLowerCase()===r.data.ward.toLowerCase()).slice(0,500).map(e=><SelectItem key={e.id} value={e.id}>{e.community_name}{e.settlement_name?` / ${e.settlement_name}`:""} · {e.flhf_name}</SelectItem>)}
+              {entries.filter(e=>r.match.candidates.some(candidate=>candidate.id===e.id)||(normalizePlace(e.state)===normalizePlace(r.data.state)&&normalizePlace(e.lga)===normalizePlace(r.data.lga)&&normalizePlace(e.ward)===normalizePlace(r.data.ward))).sort((a,b)=>(r.match.candidates.find(candidate=>candidate.id===b.id)?.score??0)-(r.match.candidates.find(candidate=>candidate.id===a.id)?.score??0)).slice(0,500).map(e=><SelectItem key={e.id} value={e.id}>{e.community_name}{e.settlement_name?` / ${e.settlement_name}`:""} · {e.flhf_name} · {e.ward}, {e.lga}</SelectItem>)}
             </SelectContent></Select>{r.choice==="new"&&<div className="text-xs text-muted-foreground mt-1"><AlertTriangle className="h-3 w-3 inline"/>No allocation or GPS is invented.</div>}</td>
           </tr>)}
         </tbody></table></div>

@@ -1,8 +1,36 @@
 import { describe, expect, it } from "vitest";
-import { alignStock, canAlignStock, medicineAccounted, medicineReceived, coveragePatch, createCoverageMatcher, mergeAllocationPlan, validateCoverageRow, type ExchangeRow } from "../coverageExchange";
+import { alignStock, canAlignStock, medicineAccounted, medicineReceived, coveragePatch, coverageTargetPopulation, createCoverageMatcher, mergeAllocationPlan, validateCoverageRow, type ExchangeRow } from "../coverageExchange";
 const entry={id:"one",state:"Kano",lga:"Dala",ward:"Gwarmai",flhf_name:"PHC",community_name:"Gwarmai Central",settlement_name:null,total_households_reported:10,total_households_treated:5};
 const row:ExchangeRow={row:5,entryId:"",state:"Kano",lga:"Dala",ward:"Gwarmai",flhf:"PHC",community:"Gwarmai Central",settlement:"",treated:80,households:20,treatedHouseholds:15,medicineUsed:160,medicines:[],errors:[]};
 describe("Coverage Excel exchange",()=>{
+ it("fuzzy-matches typed LGA, Ward, FLHF and community while retaining the associated target and totals",()=>{
+  const typed={...row,lga:"Dalaa",ward:"Gwarmai Wrd",flhf:"Primary Health Centr",community:"Gwarmai Centrl",targetPopulation:100};
+  const source={...entry,flhf_name:"Primary Health Centre"};
+  expect(createCoverageMatcher([source])(typed)).toMatchObject({id:"one",status:"fuzzy"});
+  expect(coveragePatch(typed,source)).toMatchObject({coverage_target_population:100,total_treated:80,total_households_reported:20,total_households_treated:15,medicine_used:160});
+ });
+ it("never fuzzy-matches a typed row outside its State",()=>{
+  expect(createCoverageMatcher([entry])({...row,state:"Jigawa",lga:"Dalaa"}).candidates).toEqual([]);
+ });
+ it("saves a supplied target without creating total population or age counts",()=>{
+  const patch=coveragePatch({...row,targetPopulation:100});
+  expect(patch.coverage_target_population).toBe(100);expect(patch).not.toHaveProperty("estimated_total_population");expect(patch).not.toHaveProperty("estimated_children_5_14");
+ });
+ it("uses a saved explicit Coverage target, including zero, and preserves derived targets otherwise",()=>{
+  expect(coverageTargetPopulation({...entry,coverage_target_population:120},90)).toBe(120);
+  expect(coverageTargetPopulation({...entry,coverage_target_population:0},90)).toBe(0);
+  expect(coverageTargetPopulation(entry,90)).toBe(90);
+ });
+ it("leaves unchanged prefilled target populations derived",()=>{
+  expect(coveragePatch({...row,entryId:"one",targetPopulation:100},entry,100)).not.toHaveProperty("coverage_target_population");
+  expect(coveragePatch({...row,entryId:"one",targetPopulation:120},entry,100).coverage_target_population).toBe(120);
+ });
+ it("validates typed targets and their relation to treated and total population",()=>{
+  expect(validateCoverageRow({...row,targetPopulation:79})).toContain("Total Treated cannot exceed Target Population.");
+  expect(validateCoverageRow({...row,targetPopulation:100,population:90})).toContain("Target Population cannot exceed Total Population.");
+  expect(validateCoverageRow({...row,targetPopulation:-1}).some(e=>e.includes("Target Population must"))).toBe(true);
+  expect(()=>coveragePatch({...row,treated:undefined,targetPopulation:40},{...entry,total_treated:80})).toThrow("Target Population");
+ });
  const stockRow:ExchangeRow={...row,medicineUsed:undefined,stock:{received:200,used:160,lost:5,expired:5,returned:30}};
  it("requires received = used + lost + expired + returned to FLHF",()=>{expect(validateCoverageRow(stockRow)).toEqual([]);expect(validateCoverageRow({...stockRow,stock:{...stockRow.stock,received:201}}).some(e=>e.includes("Quantity Received must equal"))).toBe(true);});
  it("aligns only received to the four accounted quantities",()=>{

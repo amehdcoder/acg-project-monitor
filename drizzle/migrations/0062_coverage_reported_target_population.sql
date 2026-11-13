@@ -1,0 +1,3 @@
+ALTER TABLE public.microplan_entries ADD COLUMN IF NOT EXISTS coverage_target_population integer;
+ALTER TABLE public.microplan_entries ADD CONSTRAINT microplan_coverage_target_nonnegative CHECK (coverage_target_population IS NULL OR coverage_target_population >= 0);
+COMMENT ON COLUMN public.microplan_entries.coverage_target_population IS 'Verified campaign target reported through Coverage Excel. Coverage denominator only; does not manufacture or replace planning age disaggregation.';
