@@ -9779,6 +9779,44 @@ export type Database = {
           },
         ]
       }
+      microplan_project_roles: {
+        Row: {
+          created_at: string
+          granted_by: string
+          id: string
+          project_id: string
+          role: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          granted_by: string
+          id?: string
+          project_id: string
+          role: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          granted_by?: string
+          id?: string
+          project_id?: string
+          role?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "microplan_project_roles_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       microplan_project_settings: {
         Row: {
           created_at: string
@@ -15097,6 +15135,7 @@ export type Database = {
         Args: { _form_id: string; _user_id: string }
         Returns: boolean
       }
+      can_manage_microplan_access: { Args: { _uid: string }; Returns: boolean }
       can_peer_validate_survey: {
         Args: { _survey_id: string; _user_id: string }
         Returns: boolean
@@ -15278,6 +15317,14 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      get_my_microplan_project_access: {
+        Args: never
+        Returns: {
+          access_level: string
+          project_id: string
+          project_name: string
+        }[]
       }
       get_project_chat_members: {
         Args: { _project_id: string }
@@ -15477,6 +15524,19 @@ export type Database = {
         Args: { _active?: boolean; _beneficiary: string; _email: string }
         Returns: string
       }
+      list_microplan_project_members: {
+        Args: { _project_id: string }
+        Returns: {
+          assigned_role: string
+          designation: string
+          effective_access: string
+          email: string
+          first_name: string
+          is_member: boolean
+          last_name: string
+          user_id: string
+        }[]
+      }
       log_access_attempt: {
         Args: {
           _action: string
@@ -15566,6 +15626,24 @@ export type Database = {
               ward: string
             }[]
           }
+      microplan_project_access_level: {
+        Args: { _project: string; _uid: string }
+        Returns: string
+      }
+      microplan_row_role_allowed: {
+        Args: {
+          _community: string
+          _creator: string
+          _flhf: string
+          _lga: string
+          _project: string
+          _settlement: string
+          _state: string
+          _uid: string
+          _ward: string
+        }
+        Returns: boolean
+      }
       my_beneficiary_pathways: { Args: never; Returns: Json }
       next_beneficiary_case_id:
         | { Args: { _module_id: string }; Returns: string }
@@ -15719,6 +15797,10 @@ export type Database = {
           _uid: string
         }
         Returns: boolean
+      }
+      set_microplan_project_role: {
+        Args: { _project_id: string; _role: string; _user_id: string }
+        Returns: string
       }
       set_proximity_conversation_flag: {
         Args: { _action: string; _conversation_id: string }

@@ -407,6 +407,13 @@
       "when": 1794410503798,
       "tag": "0057_ensure_coverage_stock_storage",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1794538775903,
+      "tag": "0058_microplan_project_roles",
+      "breakpoints": true
     }
   ]
 }
