@@ -14,12 +14,13 @@ export async function buildCoverageWorkbook(entries: ExchangeEntry[], allocation
   const notes = [
     ["Project",project], ["Workbook", "WHO-inspired field reporting design • Not an official WHO publication"],
     ["Reporting basis", "One row per community/settlement. Enter cumulative campaign totals, not additional totals. Import replaces supplied values; blank cells leave saved values unchanged."],
-    ["Yellow cells", "Complete the coverage totals. If reporting medicines, complete all five quantity columns; enter 0 for none. Leave all five blank to preserve saved medicine data."],
+    ["Yellow cells", "Use the blank rows after the prefilled list or append more rows. Enter LGA, Ward, FLHF, Community/Settlement and Target Population, then coverage and medicine quantities. If reporting medicines, complete all five quantities; enter 0 for none."],
     ["Community identity", "Keep Entry ID and geography unchanged for listed records. For a new community leave Entry ID blank and enter State, LGA, Ward, FLHF and Community. Add a separate row for each settlement."],
     ["Medicines", "Report quantities in one consistent dispensing unit per community; do not combine tablets and bottles. Quantity Received = Quantity Used + Quantity Lost + Quantity Expired + Quantity Returned to FLHF. Lost and expired quantities are separate."],
     ["Allocation reference", "Quantity Received is actual stock received, not the saved allocation. The saved allocation is retained unchanged. New/unallocated records remain flagged until an administrator allocates them."],
     ["Balance", "Uploads are checked for whole numbers, required quantities, duplicate communities, household totals and stock equality. Align received to total accounted changes only Quantity Received in the review; verify against dispatch records before saving."],
-    ["Matching & review", "Exact IDs or unique high-confidence matches within State/LGA/Ward are suggested automatically. Review ambiguous names, duplicates and unknown communities before saving; map to a listed record, add a new record or skip."],
+    ["Matching & review", "Leave Entry ID blank on typed rows. Fuzzy matching checks LGA, Ward, FLHF, Community and Settlement within the same State and authorized project. All quantities stay with their matched row. Review uncertain matches or add a genuinely new community."],
+    ["Target Population", "Enter the verified campaign target for manually added rows. It is saved as the Coverage reporting denominator, not invented age-group counts or total population. Unchanged prefilled targets retain their planning basis."],
     ["New-record population", "Enter a verified Total Population only for new records. Missing populations and GPS stay unknown; coverage percentages require a valid target population."],
     ["Source", `Current authorized project microplan and saved medicine allocation • Exported ${new Date().toISOString()}`],
   ];
@@ -30,17 +31,18 @@ export async function buildCoverageWorkbook(entries: ExchangeEntry[], allocation
   ws.getCell("A1").font={name:"Arial",size:15,bold:true,color:{argb:COLORS.white}};ws.getCell("A1").fill={type:"pattern",pattern:"solid",fgColor:{argb:COLORS.navy}};
   ws.mergeCells(2,1,2,headers.length);ws.getCell("A2").value=project;ws.getCell("A2").font={name:"Arial",size:12,bold:true,color:{argb:COLORS.teal}};
   const h=ws.getRow(4);h.values=headers;h.height=42;h.eachCell(c=>{c.font={name:"Arial",size:10,bold:true,color:{argb:COLORS.white}};c.fill={type:"pattern",pattern:"solid",fgColor:{argb:COLORS.blue}};c.alignment={wrapText:true,vertical:"middle"};});
-  const rows: (ExchangeEntry | undefined)[] = [...entries, ...Array.from({length:10},()=>undefined)];
+  const states = [...new Set(entries.map(entry => entry.state).filter(Boolean))];
+  const rows: (ExchangeEntry | undefined)[] = [...entries, ...Array.from({length:50},()=>undefined)];
   rows.forEach((e,i)=>{
     const r=i+5; const medicines=e?.medicine_returns??[];
     const received=medicineReceived(medicines);
     const legacyDamage=medicines.some(m=>m.damaged>0 && m.lost===undefined && m.expired===undefined);
     const sum=(key:"lost"|"expired"|"returned")=>medicines.reduce((total,m)=>total+(m[key]??0),0);
     const hasStock=received!==undefined;
-    const values: ExcelJS.CellValue[]=[e?.id??"",e?.state??"",e?.lga??"",e?.ward??"",e?.flhf_name??"",e?.community_name??"",e?.settlement_name??"",e?target(e):null,e?.total_treated??null,e?.total_households_reported??null,e?.total_households_treated??null,received??null,e?.medicine_used??null,hasStock&&!legacyDamage?sum("lost"):null,hasStock&&!legacyDamage?sum("expired"):null,hasStock?sum("returned"):null,null,e?.year_of_microplanning??entries[0]?.year_of_microplanning??new Date().getFullYear()];
+    const values: ExcelJS.CellValue[]=[e?.id??"",e?.state??(states.length===1?states[0]:""),e?.lga??"",e?.ward??"",e?.flhf_name??"",e?.community_name??"",e?.settlement_name??"",e?target(e):null,e?.total_treated??null,e?.total_households_reported??null,e?.total_households_treated??null,received??null,e?.medicine_used??null,hasStock&&!legacyDamage?sum("lost"):null,hasStock&&!legacyDamage?sum("expired"):null,hasStock?sum("returned"):null,null,e?.year_of_microplanning??entries[0]?.year_of_microplanning??new Date().getFullYear()];
     ws.getRow(r).values=values;ws.getRow(r).height=24;
     ws.getRow(r).eachCell({includeEmpty:true},(c,col)=>{
-      const editable=col>=9||(!e&&col<=7);
+      const editable=col>=9||(!e&&col>=2&&col<=8);
       c.font={name:"Arial",size:10,color:{argb:editable?"0000FF":COLORS.ink}};
       c.fill={type:"pattern",pattern:"solid",fgColor:{argb:editable?COLORS.input:i%2?COLORS.pale:COLORS.white}};
       c.alignment={vertical:"middle",wrapText:false};c.border={bottom:{style:"hair",color:{argb:"CADDE5"}}};
@@ -65,14 +67,15 @@ export async function parseCoverageWorkbook(file: File): Promise<ExchangeRow[]> 
   if(new Set(head).size!==head.length)throw new Error("Duplicate column headings were found.");const out: ExchangeRow[]=[];
   for(let i=headerIndex+1;i<cells.length;i++){
     const values=cells[i];const get=(key:string)=>values[head.indexOf(key)]??"";const text=(key:string)=>String(get(key)).trim();
-    if(!["Total Treated","Total HHs","Treated HHs","Medicine Used (units)","Used 1","Returned 1","Damaged 1","Used 2","Returned 2","Damaged 2","Used 3","Returned 3","Damaged 3","Quantity Received","Quantity Used","Quantity Lost","Quantity Expired","Quantity Returned to FLHF"].some(k=>get(k)!==""))continue;
+    const manuallyEntered = !text("Entry ID") && ["LGA","Ward","FLHF","Community","Settlement","Target Population","Target Pop"].some(k=>get(k)!=="");
+    if(!manuallyEntered&&!["Total Treated","Total HHs","Treated HHs","Medicine Used (units)","Used 1","Returned 1","Damaged 1","Used 2","Returned 2","Damaged 2","Used 3","Returned 3","Damaged 3","Quantity Received","Quantity Used","Quantity Lost","Quantity Expired","Quantity Returned to FLHF"].some(k=>get(k)!==""))continue;
     const errors:string[]=[];const num=(key:string):number|undefined=>{const v=get(key);if(v==="")return undefined;const n=typeof v==="number"?v:Number(String(v).replace(/,/g,""));if(!Number.isFinite(n)){errors.push(`${key} is not a number.`);return undefined;}return n;};
     const medicines:MedicineReturn[]=[];
     for(let slot=1;slot<=3;slot++){const name=text(`Medicine ${slot}`),unit=text(`Unit ${slot}`),used=num(`Used ${slot}`),returned=num(`Returned ${slot}`),damaged=num(`Damaged ${slot}`);if(name||unit||used!==undefined||returned!==undefined||damaged!==undefined){if(used===undefined)errors.push(`Used ${slot} is required for a reported medicine.`);medicines.push({name,unit,used:used??0,returned:returned??0,damaged:damaged??0});}}
     const stockKeys=["Quantity Received","Quantity Used","Quantity Lost","Quantity Expired","Quantity Returned to FLHF"];
     const hasStock=stockKeys.some(k=>get(k)!=="");
     const stock=hasStock?{received:num(stockKeys[0]),used:num(stockKeys[1]),lost:num(stockKeys[2]),expired:num(stockKeys[3]),returned:num(stockKeys[4])}:undefined;
-    out.push({stock,row:i+1,entryId:text("Entry ID"),state:text("State"),lga:text("LGA"),ward:text("Ward"),flhf:text("FLHF"),community:text("Community"),settlement:text("Settlement"),treated:num("Total Treated"),households:num("Total HHs"),treatedHouseholds:num("Treated HHs"),medicineUsed:num("Medicine Used (units)"),population:num("Total Population (new records only)"),year:num("Year of Microplanning"),medicines,errors});
+    out.push({stock,row:i+1,entryId:text("Entry ID"),state:text("State"),lga:text("LGA"),ward:text("Ward"),flhf:text("FLHF"),community:text("Community"),settlement:text("Settlement"),targetPopulation:num(head.includes("Target Population")?"Target Population":"Target Pop"),treated:num("Total Treated"),households:num("Total HHs"),treatedHouseholds:num("Treated HHs"),medicineUsed:num("Medicine Used (units)"),population:num("Total Population (new records only)"),year:num("Year of Microplanning"),medicines,errors});
     if(out.length>20000)throw new Error("Import at most 20,000 community rows per workbook.");
   }
   return out;
