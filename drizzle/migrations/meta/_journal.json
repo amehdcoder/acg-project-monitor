@@ -428,6 +428,13 @@
       "when": 1794538979704,
       "tag": "0060_microplan_role_explicit_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1794539149772,
+      "tag": "0061_microplan_role_support_scope",
+      "breakpoints": true
     }
   ]
 }
