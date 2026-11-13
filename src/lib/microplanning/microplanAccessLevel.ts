@@ -10,8 +10,7 @@
 //                 supervisor).
 //   "none"      — no access at all.
 //
-// The minimal-access lock (Forms / Project Chat / My Submissions only) always
-// wins over entry access for non-admins.
+// Explicit scoped roles and collection access remain available under minimal locks.
 
 export type MicroplanAccessLevel = "dashboard" | "entry" | "none";
 
@@ -30,6 +29,7 @@ export interface MicroplanAccessInput {
   isFieldDesignation: boolean;
   /** Projects where the user may submit microplan entries. */
   entryProjectIds: string[];
+  dashboardProjectIds?: string[];
 }
 
 export const resolveMicroplanAccess = (input: MicroplanAccessInput): MicroplanAccessLevel => {
@@ -38,6 +38,7 @@ export const resolveMicroplanAccess = (input: MicroplanAccessInput): MicroplanAc
   if (input.hasFormAccess) return "dashboard";
   if (input.lensEnabled) return "dashboard";
   if (input.isAdmin && input.grantedPages.includes("microplanning")) return "dashboard";
+  if (input.dashboardProjectIds?.length) return "dashboard";
   // Entry access is data collection (like the Forms page), so it applies even
   // under the minimal-access lock: every project member can submit entries.
   if (input.isFieldDesignation) return "entry";

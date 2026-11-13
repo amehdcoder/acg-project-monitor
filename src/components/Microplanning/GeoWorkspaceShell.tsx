@@ -2,6 +2,7 @@ import { LayoutGrid, LogOut, Lock, MapPinned } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import MicroplanningView from "./MicroplanningView";
+import { usePageAccess } from "@/hooks/usePageAccess";
 
 interface Props {
   projectIds?: string[];
@@ -11,6 +12,7 @@ interface Props {
 /** Full-screen Geo Microplanning workspace with no side menu. */
 const GeoWorkspaceShell = ({ onSwitchToFullApp, projectIds }: Props) => {
   const { profile, signOut } = useAuth();
+  const { microplanAccess, loadingAccess } = usePageAccess();
   return (
     <div className="flex h-[100dvh] flex-col bg-background">
       <header className="z-40 border-b border-primary/20 bg-primary text-primary-foreground shadow-lg">
@@ -45,7 +47,7 @@ const GeoWorkspaceShell = ({ onSwitchToFullApp, projectIds }: Props) => {
       </header>
       <main className="min-h-0 flex-1 overflow-auto overscroll-contain">
         <div className="mx-auto max-w-[1600px] px-3 py-4 sm:px-6">
-          <MicroplanningView allowedProjectIds={projectIds} />
+          {loadingAccess ? <p className="text-sm text-muted-foreground">Loading project access…</p> : microplanAccess === "none" ? <p className="text-sm text-muted-foreground">No microplanning access for this account.</p> : <MicroplanningView entryOnly={microplanAccess === "entry"} allowedProjectIds={projectIds} />}
         </div>
       </main>
     </div>

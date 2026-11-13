@@ -15,6 +15,9 @@ const base: MicroplanAccessInput = {
 };
 
 describe("resolveMicroplanAccess", () => {
+  it("honours a project dashboard role under the minimal lock without making the user an admin", () => {
+    expect(resolveMicroplanAccess({ ...base, minimalAccess: true, dashboardProjectIds: ["p1"] })).toBe("dashboard");
+  });
   it("gives the owner and co-owners the full dashboard", () => {
     expect(resolveMicroplanAccess({ ...base, isOwner: true })).toBe("dashboard");
     expect(resolveMicroplanAccess({ ...base, isOwnerLevel: true })).toBe("dashboard");

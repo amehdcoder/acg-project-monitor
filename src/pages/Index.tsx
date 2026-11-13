@@ -340,6 +340,7 @@ const Index = () => {
       case "surveillance": return guardedPage("surveillance", <AdminSurveillanceView />);
       case "data-quality": return guardedPage("data-quality", <DataQualityView />);
       case "microplanning":
+        if (loadingAccess) return <div className="flex h-64 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
         // Granted members/admins get the full dashboard; every other project
         // member gets the New Microplan Entry Form only.
         if (microplanAccess === "dashboard") return <MicroplanningView />;

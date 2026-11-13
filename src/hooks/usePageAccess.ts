@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
@@ -7,6 +7,8 @@ import { withTimeoutFallback } from "@/lib/withTimeout";
 import { useMdaLens } from "@/hooks/useMdaLens";
 import { LENS_PAGE_IDS } from "@/lib/mdaLens/config";
 import { resolveMicroplanAccess } from "@/lib/microplanning/microplanAccessLevel";
+import { useMicroplanProjectAccess } from "@/hooks/useMicroplanProjectAccess";
+import { projectAccessIds } from "@/lib/microplanning/projectRoles";
 
 
 // Pages that are restricted to owner only (other super admins need explicit grants)
@@ -57,7 +59,9 @@ export const usePageAccess = () => {
   // Tier 1: project membership (assignment ∩ project grant − exclusion) unlocks
   // the New Microplan Entry Form on the Geo Microplanning page — entry only,
   // never the full dashboard.
-  const [microplanEntryProjectIds, setMicroplanEntryProjectIds] = useState<string[]>([]);
+  const { projects: microplanProjects, loading: loadingMicroplanAccess, refetch: refetchMicroplanAccess } = useMicroplanProjectAccess();
+  const microplanEntryProjectIds = useMemo(() => projectAccessIds(microplanProjects), [microplanProjects]);
+  const microplanDashboardProjectIds = useMemo(() => projectAccessIds(microplanProjects, "dashboard"), [microplanProjects]);
   // "Minimal access" lock: when set, a non-admin user only sees Forms, Project
   // Chat and My Submissions — regardless of their designation defaults.
   const [minimalAccess, setMinimalAccess] = useState(false);
@@ -160,34 +164,6 @@ export const usePageAccess = () => {
         { data: [] } as any,
       );
       if (!cancelled) setHasMicroplanFormAccess(!!data && data.length > 0);
-    })();
-    return () => { cancelled = true; };
-  }, [user?.id, authLoading]);
-
-  // Fetch the user's microplanning entry-form access (Tier 1 → entry form only):
-  // projects the user is assigned to that have a microplan_project_grants row,
-  // minus any per-user exclusion. Mirrors the FormsView entry-form check.
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user) { setMicroplanEntryProjectIds([]); return; }
-    let cancelled = false;
-    (async () => {
-      const [grantsRes, exclRes, asgRes] = await Promise.all([
-        withTimeoutFallback(
-          (async () => await supabase.from("microplan_project_grants" as any).select("project_id"))(),
-          8000, { data: [] } as any),
-        withTimeoutFallback(
-          (async () => await supabase.from("microplan_project_exclusions" as any).select("project_id").eq("user_id", user.id))(),
-          8000, { data: [] } as any),
-        withTimeoutFallback(
-          (async () => await supabase.from("user_project_assignments").select("project_id").eq("user_id", user.id))(),
-          8000, { data: [] } as any),
-      ]);
-      const grantedSet = new Set(((grantsRes?.data as any[]) || []).map((r) => r.project_id));
-      const excludedSet = new Set(((exclRes?.data as any[]) || []).map((r) => r.project_id));
-      const myProjects = ((asgRes?.data as any[]) || []).map((r) => r.project_id);
-      const allowed = myProjects.filter((pid) => grantedSet.has(pid) && !excludedSet.has(pid));
-      if (!cancelled) setMicroplanEntryProjectIds(allowed);
     })();
     return () => { cancelled = true; };
   }, [user?.id, authLoading]);
@@ -300,6 +276,7 @@ export const usePageAccess = () => {
     minimalAccess,
     isFieldDesignation,
     entryProjectIds: microplanEntryProjectIds,
+    dashboardProjectIds: microplanDashboardProjectIds,
   });
 
   const canAccessPage = useCallback(
@@ -315,6 +292,7 @@ export const usePageAccess = () => {
       // Co-owners are owner-level ("near-full app rights") — grant every page,
       // including the restricted ones, just like the Owner.
       if (isOwnerLevel) return true;
+      if (pageId === "microplanning") return microplanAccess !== "none";
       // Minimal-access lock (non-admins only): ONLY Forms, Project Chat and My
       // Submissions — PLUS any page explicitly granted to the user via
       // user_page_access (an explicit owner grant always overrides the lock).
@@ -325,7 +303,6 @@ export const usePageAccess = () => {
           pageId === "project-chat" ||
           pageId === "my-submissions" ||
           // Project members keep the microplan entry form even under the lock.
-          (pageId === "microplanning" && microplanAccess === "entry") ||
           canAccessUserPage(pageId)
         );
       }
@@ -337,11 +314,9 @@ export const usePageAccess = () => {
       if (isFieldDesignation && FIELD_DESIGNATION_PAGES.has(pageId)) return true;
       // Tier 2: a "Manage Microplanning Form Access" grant unlocks the full
       // Geo Microplanning dashboard page for any user.
-      if (pageId === "microplanning" && hasMicroplanFormAccess) return true;
       // Tier 1: project members (and field designations) can open the Geo
       // Microplanning page for the New Microplan Entry Form only — Index
       // renders the entry-only variant for them via `microplanAccess`.
-      if (pageId === "microplanning" && microplanAccess === "entry") return true;
       // MDA Lens: an admin-granted, geography-scoped pass to the two MDA
       // field-operations pages (Geo Microplanning + Integrated Supervisory).
       if (lensEnabled && LENS_PAGE_IDS.includes(pageId)) return true;
@@ -365,11 +340,12 @@ export const usePageAccess = () => {
     lastUserId.current = null;
     initialLoadDone.current = false;
     await fetchAccess();
-  }, [fetchAccess]);
+    await refetchMicroplanAccess();
+  }, [fetchAccess, refetchMicroplanAccess]);
 
   // Surface per-user grant loading too, so callers (e.g. Index's guardedPage
   // spinner) wait for time-bounded grants to resolve before deciding access —
   // preventing a brief "Access Restricted" flash for users who DO have a grant.
-  return { canAccessPage, grantedPages, minimalAccess, loadingAccess: loadingAccess || loadingUserAccess, refetch, microplanAccess, microplanEntryProjectIds };
+  return { canAccessPage, grantedPages, minimalAccess, loadingAccess: loadingAccess || loadingUserAccess || loadingMicroplanAccess, refetch, microplanAccess, microplanEntryProjectIds };
 };
 

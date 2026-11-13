@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
+import { MICROPLAN_ACCESS_CHANGED } from "@/lib/microplanning/projectRoles";
 
 interface Project { id: string; name: string; scope_states: string[] | null }
 interface Member {
@@ -110,6 +111,7 @@ export default function MicroplanProjectAccessDialog({ open, onOpenChange }: Pro
         setGrantedProjectIds((s) => new Set(s).add(selectedProjectId));
         toast.success("All members of this project now have access.");
       }
+      window.dispatchEvent(new Event(MICROPLAN_ACCESS_CHANGED));
     } catch (e: any) {
       toast.error(e?.message || "Could not update grant.");
     } finally { setBusy(null); }
@@ -131,6 +133,7 @@ export default function MicroplanProjectAccessDialog({ open, onOpenChange }: Pro
         if (error) throw error;
         setExcludedUserIds((s) => { const n = new Set(s); n.delete(userId); return n; });
       }
+      window.dispatchEvent(new Event(MICROPLAN_ACCESS_CHANGED));
     } catch (e: any) {
       toast.error(e?.message || "Could not update exclusion.");
     } finally { setBusy(null); }
