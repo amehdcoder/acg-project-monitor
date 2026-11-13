@@ -27,6 +27,7 @@ interface Entry {
 
 interface Props {
   entries: Entry[];
+  readOnly?: boolean;
   projectId?: string | null;
   isInScope?: (row: {
     state?: string | null;
@@ -70,7 +71,7 @@ const norm = (s?: string | null) => (s || "").trim().toLowerCase();
 const gapKey = (state: string, lga: string, ward: string, community: string, settlement?: string | null) =>
   [norm(state), norm(lga), norm(ward), norm(community), norm(settlement)].join("|||");
 
-const MissingCommunitiesView = ({ entries, projectId, isInScope, scopeRestricted }: Props) => {
+const MissingCommunitiesView = ({ entries, projectId, isInScope, scopeRestricted, readOnly = false }: Props) => {
   const { user } = useAuth();
   const [persisted, setPersisted] = useState<PersistedRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -287,6 +288,7 @@ const MissingCommunitiesView = ({ entries, projectId, isInScope, scopeRestricted
   };
 
   const decide = async (g: Gap, status: GapStatus) => {
+    if (readOnly) return;
     if (!user) { toast({ title: "Sign in required", variant: "destructive" }); return; }
     setActingKey(g.key);
     try {
@@ -437,7 +439,7 @@ const MissingCommunitiesView = ({ entries, projectId, isInScope, scopeRestricted
                         <Button
                           size="sm" variant="outline"
                           className="h-7 text-[11px] gap-1 border-sky-300 text-sky-700 hover:bg-sky-50 dark:border-sky-800 dark:text-sky-300"
-                          disabled={busy} onClick={() => decide(g, "awaiting_capture")}
+                          disabled={busy || readOnly} onClick={() => decide(g, "awaiting_capture")}
                         >
                           {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <BellRing className="h-3 w-3" />}
                           {awaiting ? "Notify again" : "Exists – request capture"}
@@ -445,14 +447,14 @@ const MissingCommunitiesView = ({ entries, projectId, isInScope, scopeRestricted
                         <Button
                           size="sm" variant="outline"
                           className="h-7 text-[11px] gap-1 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300"
-                          disabled={busy} onClick={() => decide(g, "deleted_duplicate")}
+                          disabled={busy || readOnly} onClick={() => decide(g, "deleted_duplicate")}
                         >
                           <Copy className="h-3 w-3" /> Duplicate – remove
                         </Button>
                         <Button
                           size="sm" variant="outline"
                           className="h-7 text-[11px] gap-1 border-rose-300 text-rose-700 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-300"
-                          disabled={busy} onClick={() => decide(g, "deleted_not_exist")}
+                          disabled={busy || readOnly} onClick={() => decide(g, "deleted_not_exist")}
                         >
                           <Trash2 className="h-3 w-3" /> Doesn&apos;t exist – remove
                         </Button>

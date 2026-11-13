@@ -3678,6 +3678,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
           {renderedView === "gaps" && (
             <MissingCommunitiesView
               entries={displayEntries as any}
+              readOnly={dashboardReadOnly}
               projectId={selectedProjectId || null}
               isInScope={scope.isInScope}
               scopeRestricted={!isAdmin && !scope.hasNoRestriction}
