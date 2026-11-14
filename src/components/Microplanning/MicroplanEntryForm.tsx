@@ -20,6 +20,9 @@ import { useProjectScope } from "@/hooks/useProjectScope";
 import { filterStates, filterLgas, filterWards } from "@/lib/projectScope";
 import { getHealthFacilitiesByWard, getSettlements, getGrid3FacilitiesWithCoords, getGrid3SettlementsWithCoords, FacilityWithCoords } from "@/lib/grid3NigeriaData";
 import LinkedFencedCommunitiesPanel, { FencedCommunity } from "./LinkedFencedCommunitiesPanel";
+import MicroplanBankingFields from "./MicroplanBankingFields";
+import { useMicroplanBanks } from "@/hooks/useMicroplanBanks";
+import { microplanBankingSchema } from "@/lib/microplanning/banking";
 
 interface MicroplanEntryFormProps {
   projectId: string;
@@ -38,6 +41,9 @@ export interface MicroplanFormData {
   flhf_name: string;
   flhf_incharge_name: string;
   flhf_incharge_phone: string;
+  flhf_account_name: string;
+  flhf_account_number: string;
+  flhf_bank: string;
   community_name: string;
   community_leader_name: string;
   community_leader_phone: string;
@@ -61,6 +67,9 @@ export interface MicroplanFormData {
   trachoma_1_9_female: number | null;
   cdd_names: string;
   cdd_phone_numbers: string;
+  cdd_account_name: string;
+  cdd_account_number: string;
+  cdd_bank: string;
   cdd_from_community: boolean;
   community_latitude: number | null;
   community_longitude: number | null;
@@ -87,6 +96,7 @@ export interface MicroplanFormData {
 const defaultFormData: MicroplanFormData = {
   state: "", lga: "", ward: "",
   flhf_name: "", flhf_incharge_name: "", flhf_incharge_phone: "",
+  flhf_account_name: "", flhf_account_number: "", flhf_bank: "",
   community_name: "", community_leader_name: "", community_leader_phone: "",
   community_distance_to_flhf_km: null,
   settlement_name: "", settlement_mai_unguwa: "",
@@ -99,6 +109,7 @@ const defaultFormData: MicroplanFormData = {
   trachoma_7_14y: null, trachoma_15_plus: null,
   trachoma_1_9_male: null, trachoma_1_9_female: null,
   cdd_names: "", cdd_phone_numbers: "", cdd_from_community: false,
+  cdd_account_name: "", cdd_account_number: "", cdd_bank: "",
   community_latitude: null, community_longitude: null, community_gps_accuracy: null,
   settlement_latitude: null, settlement_longitude: null,
   flhf_latitude: null, flhf_longitude: null,
@@ -232,6 +243,7 @@ SearchableFieldCombobox.displayName = "SearchableFieldCombobox";
 const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubmitting, scopeOverride, accountFree = false }: MicroplanEntryFormProps) => {
   const { user } = useAuth();
   const device = accountFree ? readDeviceSession() : null;
+  const { banks, addBank } = useMicroplanBanks(projectId, accountFree ? undefined : user?.id, device?.deviceId);
   const draftKey = `microplan:draft:${accountFree ? `device:${device?.deviceId}` : user?.id || 'signed-out'}:${projectId}:${(initialData as any)?.id || 'new'}`;
   const [form, setForm] = useState<MicroplanFormData>(() => {
     try { const draft = localStorage.getItem(draftKey); if (draft) return { ...defaultFormData, ...JSON.parse(draft) }; } catch { /* unavailable */ }
@@ -326,17 +338,17 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
   // Cascade: when state changes, clear LGA, ward, and downstream fields
   const handleStateChange = useCallback((state: string) => {
     setWardPickerOpen(false);
-    setForm(prev => ({ ...prev, state, lga: "", ward: "", flhf_name: "", community_name: "", settlement_name: "", flhf_latitude: null, flhf_longitude: null, settlement_latitude: null, settlement_longitude: null }));
+    setForm(prev => ({ ...prev, state, lga: "", ward: "", flhf_name: "", flhf_account_name: "", flhf_account_number: "", flhf_bank: "", community_name: "", settlement_name: "", flhf_latitude: null, flhf_longitude: null, settlement_latitude: null, settlement_longitude: null }));
   }, []);
 
   const handleLgaChange = useCallback((lga: string) => {
     setWardPickerOpen(false);
-    setForm(prev => ({ ...prev, lga, ward: "", flhf_name: "", community_name: "", settlement_name: "", flhf_latitude: null, flhf_longitude: null, settlement_latitude: null, settlement_longitude: null }));
+    setForm(prev => ({ ...prev, lga, ward: "", flhf_name: "", flhf_account_name: "", flhf_account_number: "", flhf_bank: "", community_name: "", settlement_name: "", flhf_latitude: null, flhf_longitude: null, settlement_latitude: null, settlement_longitude: null }));
   }, []);
 
   // When ward changes, clear FLHF, Community, Settlement
   const handleWardSelect = useCallback((ward: string) => {
-    setForm(prev => ({ ...prev, ward, flhf_name: "", community_name: "", settlement_name: "", flhf_latitude: null, flhf_longitude: null, settlement_latitude: null, settlement_longitude: null }));
+    setForm(prev => ({ ...prev, ward, flhf_name: "", flhf_account_name: "", flhf_account_number: "", flhf_bank: "", community_name: "", settlement_name: "", flhf_latitude: null, flhf_longitude: null, settlement_latitude: null, settlement_longitude: null }));
     setWardPickerOpen(false);
   }, []);
 
@@ -411,8 +423,17 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       toast({ title: "Required fields missing", description: "State, LGA, Ward, FLHF, and Community are required.", variant: "destructive" });
       return;
     }
-    const submitData = showTrachoma ? form : {
-      ...form,
+    const banking = microplanBankingSchema.safeParse(form);
+    if (!banking.success) {
+      const issue = banking.error.issues[0];
+      const kind = String(issue?.path[0]).startsWith('cdd_') ? 'CDD' : 'FLHF';
+      toast({ title: `Invalid ${kind} banking details`, description: issue?.message, variant: "destructive" });
+      formScrollRef.current?.querySelector(`#section-${kind.toLowerCase()}`)?.scrollIntoView({ block: 'center' });
+      return;
+    }
+    const normalizedForm = { ...form, ...Object.fromEntries(Object.entries(banking.data).map(([key, value]) => [key, value || ''])) };
+    const submitData = showTrachoma ? normalizedForm : {
+      ...normalizedForm,
       trachoma_0_5_months: null, trachoma_6m_6y: null, trachoma_7_14y: null, trachoma_15_plus: null,
       trachoma_1_9_male: null, trachoma_1_9_female: null,
     };
@@ -558,11 +579,12 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
             setForm(prev => ({
               ...prev,
               flhf_name: v,
+              ...(prev.flhf_name !== v ? { flhf_account_name: "", flhf_account_number: "", flhf_bank: "" } : {}),
               ...(match?.latitude != null ? { flhf_latitude: match.latitude } : {}),
               ...(match?.longitude != null ? { flhf_longitude: match.longitude } : {}),
             }));
           }}
-          onAddCustom={name => set("flhf_name", name)}
+          onAddCustom={name => setForm(prev => ({ ...prev, flhf_name: name, flhf_account_name: "", flhf_account_number: "", flhf_bank: "" }))}
           placeholder="Search or add FLHF..."
         />
         <Field label="FLHF In-charge Name">
@@ -571,6 +593,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
         <Field label="FLHF In-charge Phone">
           <Input value={form.flhf_incharge_phone} onChange={e => set("flhf_incharge_phone", e.target.value)} type="tel" className="h-8 text-xs" />
         </Field>
+        <MicroplanBankingFields kind="FLHF" accountName={form.flhf_account_name || ''} accountNumber={form.flhf_account_number || ''} bank={form.flhf_bank || ''} banks={banks} onChange={(field, value) => set(`flhf_${field}`, value)} onAddBank={addBank} />
         {form.flhf_latitude != null && form.flhf_longitude != null && (
           <p className="text-[10px] text-primary col-span-full">📍 Auto-populated from GRID3 database — editable below</p>
         )}
@@ -810,6 +833,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
           <Switch checked={form.cdd_from_community} onCheckedChange={v => set("cdd_from_community", v)} />
           <Label className="text-xs">CDD is from Community/Settlement</Label>
         </div>
+        <MicroplanBankingFields kind="CDD" accountName={form.cdd_account_name || ''} accountNumber={form.cdd_account_number || ''} bank={form.cdd_bank || ''} banks={banks} onChange={(field, value) => set(`cdd_${field}`, value)} onAddBank={addBank} />
       </Section>
 
       {/* Notes */}

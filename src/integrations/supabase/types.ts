@@ -9274,6 +9274,9 @@ export type Database = {
           accessibility: string | null
           campaign_type: string | null
           catchment_boundary: Json | null
+          cdd_account_name: string | null
+          cdd_account_number: string | null
+          cdd_bank: string | null
           cdd_from_community: boolean | null
           cdd_names: string | null
           cdd_phone_numbers: string | null
@@ -9297,6 +9300,9 @@ export type Database = {
           estimated_total_population: number | null
           external_ref: string | null
           extra_metadata: Json
+          flhf_account_name: string | null
+          flhf_account_number: string | null
+          flhf_bank: string | null
           flhf_incharge_name: string | null
           flhf_incharge_phone: string | null
           flhf_lat_override: number | null
@@ -9358,6 +9364,9 @@ export type Database = {
           accessibility?: string | null
           campaign_type?: string | null
           catchment_boundary?: Json | null
+          cdd_account_name?: string | null
+          cdd_account_number?: string | null
+          cdd_bank?: string | null
           cdd_from_community?: boolean | null
           cdd_names?: string | null
           cdd_phone_numbers?: string | null
@@ -9381,6 +9390,9 @@ export type Database = {
           estimated_total_population?: number | null
           external_ref?: string | null
           extra_metadata?: Json
+          flhf_account_name?: string | null
+          flhf_account_number?: string | null
+          flhf_bank?: string | null
           flhf_incharge_name?: string | null
           flhf_incharge_phone?: string | null
           flhf_lat_override?: number | null
@@ -9442,6 +9454,9 @@ export type Database = {
           accessibility?: string | null
           campaign_type?: string | null
           catchment_boundary?: Json | null
+          cdd_account_name?: string | null
+          cdd_account_number?: string | null
+          cdd_bank?: string | null
           cdd_from_community?: boolean | null
           cdd_names?: string | null
           cdd_phone_numbers?: string | null
@@ -9465,6 +9480,9 @@ export type Database = {
           estimated_total_population?: number | null
           external_ref?: string | null
           extra_metadata?: Json
+          flhf_account_name?: string | null
+          flhf_account_number?: string | null
+          flhf_bank?: string | null
           flhf_incharge_name?: string | null
           flhf_incharge_phone?: string | null
           flhf_lat_override?: number | null

@@ -442,6 +442,13 @@
       "when": 1794540054542,
       "tag": "0062_coverage_reported_target_population",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1794636358594,
+      "tag": "0063_microplan_cdd_flhf_bank_details",
+      "breakpoints": true
     }
   ]
 }
