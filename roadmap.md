@@ -1,6 +1,7 @@
 # Roadmap
 
-- [ ] Add optional CDD and FLHF account names, Nigerian account-number validation and searchable bank selectors with offline-safe custom additions; persist through signed-in and device collection, and verify validation/save/readback.
+- [x] Add optional CDD/FLHF account names, 10-digit Nigerian account validation (preserving leading zeros) and searchable banks with scoped offline custom additions. Six text columns and database validation confirmed; shared device intake deployed; 994 published bank/institution names bundled. All 199 Microplanning tests pass (3 optional XLSForm conversion checks skipped); isolated shared-form desktop/390px phone checks validate input, add/reuse a custom bank offline and submit both groups without runtime errors. Existing record access is unchanged.
+- [ ] Verify CDD/FLHF live save and record readback — the requesting account has no Microplanning access and its access RPC is missing from the live API schema cache. No permissions or project records changed for verification.
 
 - [x] Enable extra Coverage Excel rows with typed LGA/Ward/FLHF/community/settlement and Target Pop; fuzzy-match associated coverage/medicine data within the authorized project/State, and preserve explicit Coverage targets. Fixed abbreviated Ward matching without weakening confidence thresholds. All 39 focused workbook/matching/reconciliation/population tests pass; saved target column confirmed and preview build clean.
 - [ ] Verify typed Coverage Excel import → live save → Coverage/Reconciliation readback — the requesting account opens Access Restricted on Geo Microplanning; requires dashboard access granted by an authorized administrator. No roles or project records changed for verification.
