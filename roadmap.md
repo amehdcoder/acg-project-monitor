@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Restore existing authorized Microplanning live-save access, resolve the missing access-service signal, and verify CDD/FLHF banking save/readback without broadening permissions.
+
 - [x] Add optional CDD/FLHF account names, 10-digit Nigerian account validation (preserving leading zeros) and searchable banks with scoped offline custom additions. Six text columns and database validation confirmed; shared device intake deployed; 994 published bank/institution names bundled. All 199 Microplanning tests pass (3 optional XLSForm conversion checks skipped); isolated shared-form desktop/390px phone checks validate input, add/reuse a custom bank offline and submit both groups without runtime errors. Existing record access is unchanged.
 - [ ] Verify CDD/FLHF live save and record readback — the requesting account has no Microplanning access and its access RPC is missing from the live API schema cache. No permissions or project records changed for verification.
 
