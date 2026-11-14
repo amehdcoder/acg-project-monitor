@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Add optional CDD and FLHF account names, Nigerian account-number validation and searchable bank selectors with offline-safe custom additions; persist through signed-in and device collection, and verify validation/save/readback.
+
 - [x] Enable extra Coverage Excel rows with typed LGA/Ward/FLHF/community/settlement and Target Pop; fuzzy-match associated coverage/medicine data within the authorized project/State, and preserve explicit Coverage targets. Fixed abbreviated Ward matching without weakening confidence thresholds. All 39 focused workbook/matching/reconciliation/population tests pass; saved target column confirmed and preview build clean.
 - [ ] Verify typed Coverage Excel import → live save → Coverage/Reconciliation readback — the requesting account opens Access Restricted on Geo Microplanning; requires dashboard access granted by an authorized administrator. No roles or project records changed for verification.
 
