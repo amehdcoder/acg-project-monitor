@@ -12,6 +12,12 @@ describe("Coverage Excel exchange",()=>{
  it("never fuzzy-matches a typed row outside its State",()=>{
   expect(createCoverageMatcher([entry])({...row,state:"Jigawa",lga:"Dalaa"}).candidates).toEqual([]);
  });
+ it("keeps typed settlement coverage and all five medicine quantities on the matched record",()=>{
+  const typed={...row,lga:"Dalaa",ward:"Gwarmai Wrd",settlement:"North",targetPopulation:100,medicineUsed:undefined,stock:{received:200,used:160,lost:5,expired:5,returned:30}};
+  const source={...entry,settlement_name:"North"};
+  expect(createCoverageMatcher([source,{...source,id:"south",settlement_name:"South"}])(typed)).toMatchObject({id:"one",status:"fuzzy"});
+  expect(coveragePatch(typed,source)).toMatchObject({coverage_target_population:100,total_treated:80,total_households_reported:20,total_households_treated:15,medicine_used:160,medicine_returns:[{received:200,used:160,lost:5,expired:5,returned:30}]});
+ });
  it("saves a supplied target without creating total population or age counts",()=>{
   const patch=coveragePatch({...row,targetPopulation:100});
   expect(patch.coverage_target_population).toBe(100);expect(patch).not.toHaveProperty("estimated_total_population");expect(patch).not.toHaveProperty("estimated_children_5_14");

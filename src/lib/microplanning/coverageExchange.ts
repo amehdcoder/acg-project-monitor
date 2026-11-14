@@ -38,7 +38,7 @@ export function medicineReceived(medicines: MedicineReturn[]): number | undefine
   return medicines.length && medicines.every(m => m.received !== undefined) ? medicines.reduce((sum, m) => sum + (m.received ?? 0), 0) : undefined;
 }
 export interface MatchResult { status: "exact" | "fuzzy" | "review" | "unmatched"; id?: string; score: number; candidates: { id: string; score: number }[] }
-export const normalizePlace = (value: unknown) => String(value ?? "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\b(ward|district)\b/g, "").replace(/[^a-z0-9]/g, "");
+export const normalizePlace = (value: unknown) => String(value ?? "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\b(ward|wrd|district)\b/g, "").replace(/[^a-z0-9]/g, "");
 const similar = (a: string, b: string) => {
   if (a === b) return 1;
   if (!a || !b) return 0;
