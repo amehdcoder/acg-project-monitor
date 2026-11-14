@@ -1,6 +1,7 @@
 # Roadmap
 
-- [ ] Enable extra Coverage Excel rows with typed LGA/Ward/FLHF/community/settlement and Target Pop; fuzzy-match their associated coverage/medicine data, preserve project scope, and verify saved target totals.
+- [x] Enable extra Coverage Excel rows with typed LGA/Ward/FLHF/community/settlement and Target Pop; fuzzy-match associated coverage/medicine data within the authorized project/State, and preserve explicit Coverage targets. Fixed abbreviated Ward matching without weakening confidence thresholds. All 39 focused workbook/matching/reconciliation/population tests pass; saved target column confirmed and preview build clean.
+- [ ] Verify typed Coverage Excel import → live save → Coverage/Reconciliation readback — the requesting account opens Access Restricted on Geo Microplanning; requires dashboard access granted by an authorized administrator. No roles or project records changed for verification.
 
 - [x] Remove the temporary membership and add project-scoped Collector/Dashboard roles under Manage → Microplanning access. Administrator-authorized saves, protected role rows and project/read/write guards prevent self-grants or unrelated memberships. Thirty-nine regression tests pass; signed-in role save/readback/removal, phone controls and Coverage/Reconciliation navigation verified without runtime errors. Verification grants removed; preview build clean. No permanent recipient was selected on the user's behalf.
 
