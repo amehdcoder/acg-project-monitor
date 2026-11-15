@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Connect the updated Kobo XLSForm to validated individual CDD/FLHF banking and independent Trachoma 1–9 counts, preserve all existing fields and realtime/idempotent sync, deploy and verify readback.
+
 - [x] BMZ Outputs & Outcomes reopens instantly from in-session and saved results; fast delta refresh first, deletion reconciliation deferred until live updates connect. 103 Eye tests pass; live timing not measured.
 
 - [ ] Exhaustively verify real CDD/FLHF banking create, edit, clear and fresh reopen, invalid-account rejection, offline draft/queued reopen and reconnect replay; remove only temporary verification records.
