@@ -11,6 +11,8 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { normalizeMicroplanEntry } from '@/lib/microplanning/normalizeEntry';
+import useRealtimeMicroplanEntries from '@/hooks/useRealtimeMicroplanEntries';
 
 export interface MicroplanProjectOption {
   id: string;
@@ -23,6 +25,7 @@ const ENTRY_COLUMNS =
   "id, state, lga, ward, flhf_name, community_name, settlement_name, " +
   "estimated_total_population, estimated_children_0_4, estimated_children_5_14, estimated_adults_15_plus, " +
   "trachoma_0_5_months, trachoma_6m_6y, trachoma_7_14y, trachoma_15_plus, " +
+  "trachoma_1_9_male, trachoma_1_9_female, number_of_households, security_clearance, cdd_names, " +
   "community_distance_to_flhf_km, settlement_distance_to_flhf_km, accessibility, terrain_type, " +
   "project_id, created_at";
 
@@ -101,7 +104,7 @@ export function useMicroplanProjectEntries(projectId: string | null | undefined)
           .range(from, from + PAGE_SIZE - 1);
         if (error) throw error;
         if (!data?.length) break;
-        all.push(...((data as unknown) as MicroplanEntry[]));
+        all.push(...((data as unknown) as MicroplanEntry[]).map(normalizeMicroplanEntry));
         if (data.length < PAGE_SIZE) break;
       }
       if (req !== reqRef.current) return;
@@ -118,16 +121,7 @@ export function useMicroplanProjectEntries(projectId: string | null | undefined)
 
   useEffect(() => { void load(); }, [load]);
 
-  useEffect(() => {
-    if (!projectId) return;
-    const ch = supabase
-      .channel(`microplan-linkage-${projectId}`)
-      .on("postgres_changes",
-        { event: "*", schema: "public", table: "microplan_entries", filter: `project_id=eq.${projectId}` },
-        () => { void load(); })
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [projectId, load]);
+  useRealtimeMicroplanEntries(projectId, load);
 
   return useMemo(
     () => ({ entries, loading, fromCache, syncedAt, refresh: load }),

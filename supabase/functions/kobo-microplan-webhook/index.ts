@@ -14,7 +14,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders as baseCors } from "npm:@supabase/supabase-js@2/cors";
-import { resolveCoordinates, validateRepeatDisaggregations } from "../_shared/microplanRepeatItem.ts";
+import { resolveCoordinates, validateRepeatDisaggregations, communityRepeatItems, mappedScope } from "../_shared/microplanRepeatItem.ts";
 import { extractKoboMicroplanSchema } from "../_shared/koboMicroplanSchema.ts";
 import { normalizeMicroplanChoice } from "../_shared/microplanChoices.ts";
 
@@ -599,7 +599,7 @@ Deno.serve(async (req) => {
   // `${_uuid}_${index}` so retries stay idempotent per repeat item.
   // Hand-built Kobo forms name the roster with a random group id
   // ("group_yf5bw16"), so fall back to structural detection.
-  const repeatItems: Array<Record<string, unknown>> = detectRepeatArray(payload);
+  const repeatItems: Array<Record<string, unknown>> = communityRepeatItems(payload);
 
   const buildRecord = (
     extra: Record<string, unknown>,
@@ -639,7 +639,8 @@ Deno.serve(async (req) => {
     n == null || (Number.isFinite(n) && n >= 0 && n <= TARGET_POP_MAX);
 
   if (repeatItems.length > 0) {
-    repeatItems.forEach((item, idx) => {
+    repeatItems.forEach((rawItem, idx) => {
+      const item = mappedScope(rawItem, mapping);
       let schemaFields: Record<string, unknown>;
       try { schemaFields = extractKoboMicroplanSchema(item, mapping); }
       catch (error) {

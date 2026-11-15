@@ -11,6 +11,8 @@ export function getFlat(obj: AnyRec, key: string): unknown {
     const kl = k.toLowerCase();
     if (kl === lowered || kl.endsWith(`/${lowered}`)) return v;
   }
+  const token = (s: string) => s.split('/').at(-1)?.toLowerCase().replace(/[^a-z0-9]/g, '');
+  for (const [k, v] of Object.entries(obj)) if (token(k) === token(key)) return v;
   for (const v of Object.values(obj)) {
     if (v && typeof v === "object" && !Array.isArray(v)) {
       const found = getFlat(v as AnyRec, key);
@@ -18,6 +20,37 @@ export function getFlat(obj: AnyRec, key: string): unknown {
     }
   }
   return undefined;
+}
+
+/** Apply configured column mappings in the current repeat scope, not the parent. */
+export function mappedScope(scope: AnyRec, mapping: Record<string, string>): AnyRec {
+  const out = { ...scope };
+  for (const [column, question] of Object.entries(mapping)) {
+    const value = getFlat(scope, question);
+    if (value !== undefined) out[column] = value;
+  }
+  return out;
+}
+
+/** Discover community repeats through nested Kobo groups without selecting CDD repeats. */
+export function communityRepeatItems(payload: AnyRec): AnyRec[] {
+  const explicit = getFlat(payload, 'community_repeat');
+  if (Array.isArray(explicit)) return explicit.filter((v): v is AnyRec => !!v && typeof v === 'object' && !Array.isArray(v));
+  let best: AnyRec[] = [], score = 0;
+  const scan = (obj: AnyRec) => {
+    for (const [key, value] of Object.entries(obj)) {
+      if (key.startsWith('_') || /cdd_repeat$/i.test(key)) continue;
+      if (Array.isArray(value)) {
+        const items = value.filter((v): v is AnyRec => !!v && typeof v === 'object' && !Array.isArray(v));
+        if (!items.length) continue;
+        const hits = ['Community_Name', 'community', 'Total_Population', 'estimated_total_population', 'Number_of_Households', 'community_gps', 'Settlement_Name', 'Type_of_Terrain', 'accessibility']
+          .filter(field => getFlat(items[0], field) !== undefined).length;
+        if (hits > score) { best = items; score = hits; }
+      } else if (value && typeof value === 'object') scan(value as AnyRec);
+    }
+  };
+  scan(payload);
+  return score >= 2 ? best : [];
 }
 
 export function pickFirst(obj: AnyRec, keys: string[]): string | null {
