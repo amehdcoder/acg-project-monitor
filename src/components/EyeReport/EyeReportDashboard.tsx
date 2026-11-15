@@ -15,7 +15,7 @@ import {
   AGE_BANDS, MONTHS, aggregate, aggregatePatients, byMonth, normCsom, normSummary, pct, t, totals, vaTotal,
   type EyePatientRow, type EyeReportRow,
 } from "@/lib/eyeReport/definition";
-import { deleteReport } from "@/lib/eyeReport/store";
+import { deleteReport, loadReportAttachments } from "@/lib/eyeReport/store";
 import { useEyeDataset } from "@/lib/eyeReport/useEyeDataset";
 import { exportAggregated, exportDailyReport } from "@/lib/eyeReport/exportExcel";
 import EyeDailyReportForm, { type EyeFacility } from "./EyeDailyReportForm";
@@ -105,6 +105,15 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
     setExporting(true);
     try { await exportAggregated(filtered, { projectName, facilityLabel: facility !== "all" ? facility : lga !== "all" ? `All facilities — ${lga} LGA` : "All facilities", periodLabel, filters: csomOnly ? "CSOM reports only" : undefined }); }
     catch { toast.error("Export failed"); } finally { setExporting(false); }
+  };
+  const [opening, setOpening] = useState<string | null>(null);
+  // Photos are not part of the dashboard download; load them before editing so saving never drops them.
+  const edit = async (r: EyeReportRow) => {
+    if (!navigator.onLine) { toast.error("Connect to the internet to edit this report — its source documents must load first."); return; }
+    setOpening(r.id);
+    try { setForm({ open: true, existing: { ...r, attachments: await loadReportAttachments(r.id) } }); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "Could not open the report"); }
+    finally { setOpening(null); }
   };
   const remove = async (r: EyeReportRow) => {
     if (!confirm(`Delete the ${r.facility_name} report for ${r.report_date} and its linked WG-SS screenings? Standalone screenings will be kept.`)) return;
@@ -248,7 +257,7 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
                 <td className="p-3 text-xs">{r.prepared_by ?? r.collector_label ?? "—"}</td>
                 <td className="p-3"><div className="flex justify-end gap-1">
                   <Button size="icon" variant="ghost" aria-label="Download report" onClick={() => void exportDailyReport(r, projectName)}><Download className="h-4 w-4 text-eye-blue" /></Button>
-                  {(canManage || (mine && canReport)) && <Button size="icon" variant="ghost" aria-label="Edit report" onClick={() => setForm({ open: true, existing: r })}><Pencil className="h-4 w-4" /></Button>}
+                  {(canManage || (mine && canReport)) && <Button size="icon" variant="ghost" aria-label="Edit report" disabled={opening === r.id} onClick={() => void edit(r)}>{opening === r.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pencil className="h-4 w-4" />}</Button>}
                   {canManage && <Button size="icon" variant="ghost" aria-label="Delete report" onClick={() => void remove(r)}><Trash2 className="h-4 w-4 text-destructive" /></Button>}
                 </div></td>
               </tr>); })}</tbody>
