@@ -1,7 +1,7 @@
 import { entryPoint, geometryContains, normState, type HeatEntry } from './heatmaps';
 import { distanceKm, recordedNumber, type Boundary } from './osiris';
 
-export interface AreaEntry extends HeatEntry { id?: string; settlement_name?: string | null; source_of_population?: string | null; year_of_microplanning?: number | null; trachoma_1_9_male?: number | null; trachoma_1_9_female?: number | null }
+export interface AreaEntry extends HeatEntry { id?: string; settlement_name?: string | null; population_source?: string | null; year_of_microplanning?: number | null; trachoma_1_9_male?: number | null; trachoma_1_9_female?: number | null }
 export interface ReferenceSettlement { name: string; lga: string; ward: string; latitude: number | null; longitude: number | null }
 export interface AreaRow { name: string; ward: string; lat: number | null; lng: number | null; population: number | null; populationSource: string; locationSource: string; status: string; year: number | null; male: number | null; female: number | null }
 export interface LandEvidence { name: string; feature: string; lat: number; lng: number; population: number | null; source: string }
@@ -12,7 +12,7 @@ export function areaRows(entries: AreaEntry[], references: ReferenceSettlement[]
   const scoped = entries.filter(e => normState(e.state) === normState(state) && normState(e.lga) === normState(lga));
   const rows: AreaRow[] = scoped.map(e => { const p = entryPoint(e); return {
     name: String(e.settlement_name || e.community_name || 'Unnamed recorded location'), ward: String(e.ward || ''), lat: p?.[0] ?? null, lng: p?.[1] ?? null,
-    population: recordedNumber(e.estimated_total_population), populationSource: e.source_of_population || 'Source not recorded', locationSource: 'Project submission GPS', status: 'Recorded — verify current occupancy', year: e.year_of_microplanning ?? null,
+    population: recordedNumber(e.estimated_total_population), populationSource: e.population_source || 'Source not recorded', locationSource: 'Project submission GPS', status: 'Recorded — verify current occupancy', year: e.year_of_microplanning ?? null,
     male: recordedNumber(e.trachoma_1_9_male), female: recordedNumber(e.trachoma_1_9_female),
   }; });
   for (const ref of references.filter(r => normState(r.lga) === normState(lga))) {
