@@ -37,7 +37,7 @@ const readCache = (projectId: string): MicroplanEntry[] | null => {
     const raw = localStorage.getItem(cacheKey(projectId));
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed?.rows) ? (parsed.rows as MicroplanEntry[]) : null;
+    return Array.isArray(parsed?.rows) ? (parsed.rows as MicroplanEntry[]).map(normalizeMicroplanEntry) : null;
   } catch {
     return null;
   }

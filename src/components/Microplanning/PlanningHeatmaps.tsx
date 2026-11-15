@@ -163,11 +163,11 @@ function StateMap({ group, lgas, espen }: { group: StateGroup; lgas: Feature[]; 
     <div className="space-y-1">
       <div className="mb-1 text-[10px] font-semibold">{espenMap.legendTitle}</div>
       {espenMap.colors.map((c, i) => {
-        const k = group.points.filter((p) => { const v = espenMap.value(p.entry as EspenEntry, 1); return v != null && classIndex(espenMap, v) === i; }).length;
+        const k = blocks.filter((b) => { const p = group.points[b.index]; if (!p) return false; const v = espenMap.value(p.entry as EspenEntry, b.areaKm2); return v != null && classIndex(espenMap, v) === i; }).length;
         const showCount = !/\/ km²/.test(espenMap.legendTitle);
         return <div key={c} className="flex items-center gap-2 text-[11px]"><span className="h-4 w-6 rounded-sm" style={{ background: c }} /><span className="flex-1">{espenMap.labels[i]}</span>{showCount && <b>{k}</b>}</div>;
       })}
-      <div className="flex items-center gap-2 text-[11px]"><span className="h-4 w-6 rounded-sm" style={{ background: NO_DATA }} /><span className="flex-1">Not recorded</span><b>{group.points.filter((p) => espenMap.value(p.entry as EspenEntry, 1) == null).length}</b></div>
+      <div className="flex items-center gap-2 text-[11px]"><span className="h-4 w-6 rounded-sm" style={{ background: NO_DATA }} /><span className="flex-1">Not recorded</span><b>{blocks.filter((b) => { const p = group.points[b.index]; return p && espenMap.value(p.entry as EspenEntry, b.areaKm2) == null; }).length}</b></div>
       <p className="pt-1 text-[9px] leading-snug text-muted-foreground">{espenMap.description}</p>
     </div>
   ) : view === "access_pop" ? (
