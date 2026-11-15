@@ -69,6 +69,7 @@ import { rowInScope } from "@/lib/projectScope";
 import { projectKeyFor, useSharedMicroplanSetting, validNumber } from "@/lib/microplanning/sharedSettings";
 import { useTargetPopFields } from "@/hooks/useTargetPopFields";
 import { fetchAllRowsKeyset } from "@/lib/fetchAllRowsKeyset";
+import geoMicroplanXlsform from "@/assets/geoMicroplanXlsform.asset.json";
 import { ShieldCheck, History as HistoryIcon, Layers as LayersIcon, ChevronDown, Accessibility, ArrowUpDown } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DEMO_ENTRIES } from "./demoData";
@@ -2466,6 +2467,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
               <DropdownMenuItem onSelect={() => setShowDeleteRequestsPanel(true)}><ShieldCheck className="h-4 w-4 mr-2" /> {(isAdmin || isOwner) ? "Delete Requests" : "My Delete Requests"}</DropdownMenuItem>
               {isSuperAdmin && <DropdownMenuItem onSelect={() => setShowKoboSettings(true)}><HistoryIcon className="h-4 w-4 mr-2" /> Kobo Sync</DropdownMenuItem>}
               {!entryOnly && role === "super_admin" && <DropdownMenuItem disabled={!selectedProjectId} onSelect={() => setShowPopulationSettings(true)}><Target className="h-4 w-4 mr-2" /> Population disaggregation</DropdownMenuItem>}
+              {role === "super_admin" && <DropdownMenuItem asChild><a href={geoMicroplanXlsform.url} download={geoMicroplanXlsform.original_filename}><FileSpreadsheet className="h-4 w-4 mr-2" /> KoboToolbox XLSForm (latest)</a></DropdownMenuItem>}
             </DropdownMenuContent>
           </DropdownMenu>
           <Button size="sm" onClick={() => { setEditingEntry(null); setShowForm(true); }} className="shadow-sm font-semibold">
