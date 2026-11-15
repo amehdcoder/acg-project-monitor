@@ -362,6 +362,11 @@ Deno.serve(async (req) => {
     });
   }
 
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return new Response(JSON.stringify({ error: "Submission must be a JSON object" }), {
+      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
   const koboUuid =
     (payload["_uuid"] as string | undefined) ??
     (payload["formhub/uuid"] as string | undefined) ??
@@ -499,9 +504,9 @@ Deno.serve(async (req) => {
     lat = legacy.lat; lng = legacy.lng;
   }
   const flhfCoords = resolveCoordinates(payload, {
-    geopointKeys: ["flhf_gps", "flhf_gps_override"],
-    latKeys: ["flhf_manual_latitude", "flhf_latitude", "flhf_lat"],
-    lngKeys: ["flhf_manual_longitude", "flhf_longitude", "flhf_lng"],
+    geopointKeys: ["flhf_gps", "flhf_gps_override", "gps_capture"],
+    latKeys: ["flhf_manual_latitude", "flhf_latitude", "flhf_lat", "latitude"],
+    lngKeys: ["flhf_manual_longitude", "flhf_longitude", "flhf_lng", "longitude"],
   });
   const projectIdResolved =
     mapped("project_id", ["project_id", "amehnities_project_id"]) ??
