@@ -1,5 +1,5 @@
-import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
-export async function storeEyePhotos(db: SupabaseClient, project: string, report: string, raw: unknown) {
+interface PhotoStorageClient { storage: { from(bucket: string): { upload(path: string, bytes: Uint8Array, options: {contentType:string;upsert:boolean}): PromiseLike<{error:unknown}>; download(path: string): PromiseLike<{data:Blob|null;error:unknown}> } } }
+export async function storeEyePhotos(db: PhotoStorageClient, project: string, report: string, raw: unknown) {
   if (!Array.isArray(raw) || raw.length > 30) throw new Error('Invalid report attachments');
   const output=[];
   for (const a of raw) {
