@@ -96,6 +96,18 @@ describe("Eye dashboard retained data", () => {
     expect((await syncEyeRows("alice", "p", table)).rows).toHaveLength(1001);
     expect(mocks.queries[1].or).toEqual(["updated_at.gt.2026-11-02T07:00:00Z,and(updated_at.eq.2026-11-02T07:00:00Z,id.gt.id-999)"]);
   });
+  it("never downloads or keeps inline source-document photos in the dashboard dataset", async () => {
+    const key = datasetKey(table, "p");
+    mocks.cache.set(`alice:${key}`, [{ ...row("a", 324), attachments: [{ ref: "data:image/jpeg;base64,AAAA" }] }]);
+    mocks.cache.set(`alice:${key}:sync-v1`, { cursor: "2026-11-02T07:00:00Z", reconciledAt: Date.now() });
+    mocks.replies.push({ data: [row("b", 12)], error: null });
+    const result = await syncEyeRows<any>("alice", "p", table);
+    expect(String(mocks.queries[0].select?.[0])).not.toContain("attachments");
+    expect(String(mocks.queries[0].select?.[0])).not.toBe("*");
+    expect(result.rows.map(r => r.count)).toEqual([324, 12]);
+    expect(result.rows.some(r => "attachments" in r)).toBe(false);
+    expect((await savedEyeRows<any>("alice", "p", table))!.some(r => "attachments" in r)).toBe(false);
+  });
   it("preserves this user's pending batch edits and deletes, excluding other users", () => {
     const items: any[] = [{ kind: "op", user_id: "alice", payload: { action: "batch", operations: [
       { table, action: "update", id: "a", values: { count: 99 } },

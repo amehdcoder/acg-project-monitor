@@ -6,16 +6,17 @@ import { cachedRead, cachePatchRows, cacheGet, cacheSet, cacheGetForUser, cacheS
 import { offlineMutate, type OpPayload } from "@/lib/programmeModule/offlineWrite";
 import { saveSavedEntry, listAllSavedEntries } from "@/lib/savedForms";
 import { syncDeviceRecords } from "@/lib/deviceSync";
-import type { EyePatientRow, EyeReportRow } from "./definition";
+import type { EyeAttachment, EyePatientRow, EyeReportRow } from "./definition";
+import { EYE_REPORT_LIST_COLUMNS } from "./incrementalData";
 
 const db = supabase as unknown as { from: (t: string) => any; rpc: (f: string, a: any) => any }; // eslint-disable-line @typescript-eslint/no-explicit-any
 export const cacheKey = (projectId: string) => `eye-reports:${projectId}`;
 export const patientCacheKey = (projectId: string) => `eye-patients-v2:${projectId}`;
 
-async function readAll<T>(table: string, projectId: string) {
+async function readAll<T>(table: string, projectId: string, columns = "*") {
   const rows: T[] = [];
   for (let offset = 0; ; offset += 1000) {
-    const { data, error } = await db.from(table).select("*").eq("project_id", projectId)
+    const { data, error } = await db.from(table).select(columns).eq("project_id", projectId)
       .order("report_date", { ascending: false }).order("id").range(offset, offset + 999);
     if (error) return { data: null, error };
     rows.push(...(data ?? []));
@@ -24,8 +25,15 @@ async function readAll<T>(table: string, projectId: string) {
 }
 
 export async function loadReports(projectId: string): Promise<{ rows: EyeReportRow[]; fromCache: boolean; unavailable: boolean }> {
-  const { data, fromCache } = await cachedRead<EyeReportRow[]>(cacheKey(projectId), () => readAll<EyeReportRow>("eye_daily_reports", projectId), 30_000);
+  const { data, fromCache } = await cachedRead<EyeReportRow[]>(cacheKey(projectId), () => readAll<EyeReportRow>("eye_daily_reports", projectId, EYE_REPORT_LIST_COLUMNS), 30_000);
   return { rows: data ?? [], fromCache, unavailable: data === null };
+}
+
+/** Source-document photos are excluded from list reads; fetch them only when a report is opened for editing. */
+export async function loadReportAttachments(reportId: string): Promise<EyeAttachment[]> {
+  const { data, error } = await db.from("eye_daily_reports").select("attachments").eq("id", reportId).maybeSingle().abortSignal(AbortSignal.timeout(60_000));
+  if (error) throw new Error("Source documents could not be loaded. Reconnect and try again.");
+  return Array.isArray(data?.attachments) ? data.attachments : [];
 }
 
 export type ReportPayload = Omit<EyeReportRow, "id" | "created_by" | "device_id" | "collector_label"> & { id?: string };
