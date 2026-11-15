@@ -1,0 +1,1 @@
+- Source-document migration uploads deterministic content-hashed private files, verifies stored bytes and conditionally replaces report references against the read revision; lists exclude images and previews use signed URLs — why: retries and concurrent edits must not lose evidence or slow aggregates.
