@@ -1,5 +1,7 @@
 # Roadmap
 
+- [x] Connect the updated Kobo XLSForm to validated individual CDD/FLHF banking and independent Trachoma 1–9 counts; match all 994 bank codes and repair old workbook age/leader/phone/GPS aliases. Receiver and registration/backfill deployed; 50 regression tests pass. Authenticated live receiver test saved both CDD accounts, custom banks, FLHF account and all six age counts, repeated delivery kept one ID, and the open dashboard updated without reload; invalid CDD in a second community returned 400 with zero rows saved. All temporary entries removed. Actual delivery from an uploaded/redeployed Kobo form awaits that form and a genuine submission; existing REST Service registration remains required.
+
 - [x] BMZ Outputs & Outcomes reopens instantly from in-session and saved results; fast delta refresh first, deletion reconciliation deferred until live updates connect. 103 Eye tests pass; live timing not measured.
 
 - [ ] Exhaustively verify real CDD/FLHF banking create, edit, clear and fresh reopen, invalid-account rejection, offline draft/queued reopen and reconnect replay; remove only temporary verification records.

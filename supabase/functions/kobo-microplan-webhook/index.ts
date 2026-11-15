@@ -15,6 +15,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders as baseCors } from "npm:@supabase/supabase-js@2/cors";
 import { resolveCoordinates, validateRepeatDisaggregations } from "../_shared/microplanRepeatItem.ts";
+import { extractKoboMicroplanSchema } from "../_shared/koboMicroplanSchema.ts";
 
 const corsHeaders = {
   ...baseCors,
@@ -23,8 +24,8 @@ const corsHeaders = {
 };
 
 const supabase = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  Deno.env.get("SUPABASE_URL") ?? "",
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
   { auth: { persistSession: false } },
 );
 
@@ -128,8 +129,8 @@ const A = {
   flhf_incharge_name: ["flhf_incharge_name", "flhf_in_charge_name", "flhf_incharge", "name_of_flhf_in_charge"],
   flhf_incharge_phone: ["flhf_incharge_phone", "flhf_in_charge_phone_number", "flhf_in_charge_phone", "flhf_phone"],
   community_name: ["community_name", "community", "name_of_community"],
-  community_leader_name: ["community_leader_name", "community_leader", "name_of_community_leader"],
-  community_leader_phone: ["community_leader_phone", "community_leader_phone_number", "community_phone"],
+  community_leader_name: ["community_leader_name", "Community_Leader_s_Name", "community_leader", "name_of_community_leader"],
+  community_leader_phone: ["community_leader_phone", "Community_Leader_s_Phone_Number", "community_leader_phone_number", "community_phone"],
   settlement_name: ["settlement_name", "settlement", "name_of_settlement"],
   settlement_mai_unguwa: ["settlement_mai_unguwa", "mai_unguwa", "name_of_mai_unguwa"],
   total_population: ["estimated_total_population", "total_population", "estimated_total_pop", "population", "total_pop"],
@@ -143,7 +144,7 @@ const A = {
   community_dist: ["community_distance_to_flhf_km", "flhf_community_dist_km", "distance_community_flhf_km", "distance_to_flhf_km"],
   settlement_dist: ["settlement_distance_to_flhf_km", "flhf_settlement_dist_km", "distance_settlement_flhf_km"],
   cdd_names: ["cdd_names", "name_s_of_cdd", "names_of_cdd", "name_of_cdds", "cdd_name"],
-  cdd_phones: ["cdd_phone_numbers", "cdd_phone", "phone_number_s_of_cdd", "cdd_phone_number"],
+  cdd_phones: ["cdd_phone_numbers", "Phone_Number_s_of_CDD_s", "cdd_phone", "phone_number_s_of_cdd", "cdd_phone_number"],
   cdd_from_community: ["cdd_from_community", "is_cdd_s_from_community_settlement", "is_cdd_from_community"],
   campaign_type: ["campaign_type", "type_of_campaign"],
   population_source: ["population_source", "source_of_population_data"],
@@ -162,10 +163,10 @@ const PWD_ALIASES: Record<string, string[]> = {
 };
 
 const TRACHOMA_ALIASES: Record<string, string[]> = {
-  trachoma_0_5_months: ["trachoma_0_5_months", "trachoma_0_5months", "trachoma_0_5m"],
-  trachoma_6m_6y: ["trachoma_6m_6y", "trachoma_6months_6yrs", "trachoma_6m_6yrs"],
-  trachoma_7_14y: ["trachoma_7_14y", "trachoma_7_14yrs", "trachoma_7_14"],
-  trachoma_15_plus: ["trachoma_15_plus", "trachoma_15plus", "trachoma_15_yrs_above"],
+  trachoma_0_5_months: ["trachoma_0_5_months", "_0_5_Months", "trachoma_0_5months", "trachoma_0_5m"],
+  trachoma_6m_6y: ["trachoma_6m_6y", "_6_Months_6_Years", "trachoma_6months_6yrs", "trachoma_6m_6yrs"],
+  trachoma_7_14y: ["trachoma_7_14y", "_7_14_Years", "trachoma_7_14yrs", "trachoma_7_14"],
+  trachoma_15_plus: ["trachoma_15_plus", "_15_Years", "trachoma_15plus", "trachoma_15_yrs_above"],
 };
 
 // Extracts PWD / trachoma / CDD disaggregations from any Kobo naming style.
@@ -308,7 +309,7 @@ const NUMERIC_COLS = new Set([
 ]);
 
 // Columns that must survive the null-pruning pass even when falsy.
-const PRESERVED_COLS = new Set(["geotagged", "extra_metadata"]);
+const PRESERVED_COLS = new Set(["geotagged", "extra_metadata", "cdd_details", "cdd_account_name", "cdd_account_number", "cdd_bank", "flhf_account_name", "flhf_account_number", "flhf_bank", "trachoma_1_9_male", "trachoma_1_9_female"]);
 
 
 Deno.serve(async (req) => {
@@ -361,6 +362,11 @@ Deno.serve(async (req) => {
     });
   }
 
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return new Response(JSON.stringify({ error: "Submission must be a JSON object" }), {
+      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
   const koboUuid =
     (payload["_uuid"] as string | undefined) ??
     (payload["formhub/uuid"] as string | undefined) ??
@@ -498,9 +504,9 @@ Deno.serve(async (req) => {
     lat = legacy.lat; lng = legacy.lng;
   }
   const flhfCoords = resolveCoordinates(payload, {
-    geopointKeys: ["flhf_gps", "flhf_gps_override"],
-    latKeys: ["flhf_manual_latitude", "flhf_latitude", "flhf_lat"],
-    lngKeys: ["flhf_manual_longitude", "flhf_longitude", "flhf_lng"],
+    geopointKeys: ["flhf_gps", "flhf_gps_override", "gps_capture"],
+    latKeys: ["flhf_manual_latitude", "flhf_latitude", "flhf_lat", "latitude"],
+    lngKeys: ["flhf_manual_longitude", "flhf_longitude", "flhf_lng", "longitude"],
   });
   const projectIdResolved =
     mapped("project_id", ["project_id", "amehnities_project_id"]) ??
@@ -560,6 +566,15 @@ Deno.serve(async (req) => {
     notes: `Ingested from KoboToolbox (_uuid=${koboUuid}, form=${formUid ?? "unknown"}, submitted_by=${submittedBy ?? "unknown"})`,
   };
 
+  try {
+    Object.assign(record, extractKoboMicroplanSchema(payload, mapping));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Invalid banking or child counts';
+    await logEvent({ status: "failed", error: message, payload, kobo_uuid: koboUuid, project_id: projectIdResolved });
+    return new Response(JSON.stringify({ error: message, code: "invalid_microplan_schema" }), {
+      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 
   for (const k of Object.keys(record)) {
     if (typeof record[k] === "string" && SENTINEL_VALUES.has((record[k] as string).trim().toLowerCase())) {
@@ -624,6 +639,12 @@ Deno.serve(async (req) => {
 
   if (repeatItems.length > 0) {
     repeatItems.forEach((item, idx) => {
+      let schemaFields: Record<string, unknown>;
+      try { schemaFields = extractKoboMicroplanSchema(item, mapping); }
+      catch (error) {
+        rejectedItems.push({ index: idx, reason: error instanceof Error ? error.message : 'Invalid CDD or banking details' });
+        return;
+      }
       // Runtime validation of the disaggregation columns BEFORE mapping.
       // Malformed values (non-numeric / negative / non-text) fail fast and the
       // item is rejected with a clear, auditable reason instead of writing junk.
@@ -700,9 +721,10 @@ Deno.serve(async (req) => {
         // (per-community), so pass them through per row instead of the parent.
         ...disaggregations,
         ...extractDisaggregations(item),
+        ...schemaFields,
       };
       for (const k of Object.keys(itemFields)) {
-        if (itemFields[k] == null && record[k] != null) delete itemFields[k];
+        if (!(k in schemaFields) && itemFields[k] == null && record[k] != null) delete itemFields[k];
       }
       upserts.push(buildRecord(itemFields, `${koboUuid}_${idx}`, { lat: cLat, lng: cLng }));
     });
@@ -713,6 +735,12 @@ Deno.serve(async (req) => {
 
   let firstId: string | null = null;
   let upsertError: { message: string; code?: string } | null = null;
+  if (rejectedItems.length > 0) {
+    await logEvent({ status: "failed", error: JSON.stringify(rejectedItems), payload, kobo_uuid: koboUuid, project_id: projectIdResolved });
+    return new Response(JSON.stringify({ ok: false, error: "Submission validation failed; no rows saved.", rejected_items: rejectedItems }), {
+      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
   if (upserts.length === 0) {
     // Every repeat item failed validation — skip the upsert but still respond
     // successfully so KoboToolbox does not retry. The rejected items are
