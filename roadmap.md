@@ -1,6 +1,6 @@
 # Roadmap
 
-- [ ] Make BMZ Outputs & Outcomes reopen immediately from user/project-scoped saved results, reduce redundant loading, keep realtime freshness, and verify live desktop/phone timings.
+- [x] BMZ Outputs & Outcomes reopens instantly from in-session and saved results; fast delta refresh first, deletion reconciliation deferred until live updates connect. 103 Eye tests pass; live timing not measured.
 
 - [ ] Exhaustively verify real CDD/FLHF banking create, edit, clear and fresh reopen, invalid-account rejection, offline draft/queued reopen and reconnect replay; remove only temporary verification records.
 

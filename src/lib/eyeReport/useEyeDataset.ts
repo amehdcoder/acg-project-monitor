@@ -2,15 +2,19 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { savedEyeRows, syncEyeRows, type EyeTable, type SyncRow } from "./incrementalData";
 
+// In-memory snapshot so reopening the dashboard in the same session renders instantly.
+const memory = new Map<string, unknown[]>();
+
 export function useEyeDataset<T extends SyncRow>(userId: string, projectId: string, table: EyeTable) {
   const scope = `${userId}:${projectId}:${table}`;
-  const [state, setState] = useState({ scope, rows: [] as T[], loading: true, refreshing: false, fromCache: false, unavailable: false, checkedAt: null as number | null });
+  const [state, setState] = useState(() => ({ scope, rows: (memory.get(scope) ?? []) as T[], loading: !memory.has(scope), refreshing: false, fromCache: false, unavailable: false, checkedAt: null as number | null }));
   const refreshRef = useRef<(reconcile?: boolean) => Promise<void>>(async () => {});
   const refresh = useCallback((reconcile = false) => refreshRef.current(reconcile), []);
   useEffect(() => {
     let active = true, running = false, trailing = false, force = false;
     let debounce: ReturnType<typeof setTimeout> | undefined;
-    setState({ scope, rows: [], loading: true, refreshing: false, fromCache: false, unavailable: false, checkedAt: null });
+    const warm = memory.get(scope) as T[] | undefined;
+    setState(s => s.scope === scope ? s : { scope, rows: warm ?? [], loading: !warm, refreshing: false, fromCache: !!warm, unavailable: false, checkedAt: null });
     const load = async (reconcile = false) => {
       force ||= reconcile;
       if (running) { trailing = true; return; }
@@ -21,6 +25,7 @@ export function useEyeDataset<T extends SyncRow>(userId: string, projectId: stri
         if (active) setState(s => ({ ...s, refreshing: true }));
         try {
           const result = await syncEyeRows<T>(userId, projectId, table, reconcileNow);
+          if (active) memory.set(scope, result.rows);
           if (active) setState(s => ({ ...s, ...result, checkedAt: result.checkedAt ?? s.checkedAt, loading: false, refreshing: false }));
         } catch {
           if (active) setState(s => ({ ...s, fromCache: true, loading: false, refreshing: false, unavailable: s.loading && !s.rows.length }));
@@ -37,8 +42,9 @@ export function useEyeDataset<T extends SyncRow>(userId: string, projectId: stri
     const start = async () => {
       const rows = await savedEyeRows<T>(userId, projectId, table);
       if (!active) return;
-      if (rows !== null) setState(s => ({ ...s, rows, loading: false, fromCache: true }));
-      void load(true);
+      if (rows !== null) { memory.set(scope, rows); setState(s => ({ ...s, rows, loading: false, fromCache: true })); }
+      // Fast delta first; the heavier ID reconciliation runs once realtime subscribes.
+      void load(false);
     };
     void start();
     const channel = supabase.channel(`eye-live:${scope}:${crypto.randomUUID()}`)
@@ -46,12 +52,12 @@ export function useEyeDataset<T extends SyncRow>(userId: string, projectId: stri
       .on("postgres_changes", { event: "UPDATE", schema: "public", table, filter: `project_id=eq.${projectId}` }, () => schedule())
       // Deletes cannot reliably be project-filtered; use only the ID to reconcile our own authorized dataset.
       .on("postgres_changes", { event: "DELETE", schema: "public", table }, () => schedule(true))
-      .subscribe(status => { if (status === "SUBSCRIBED") schedule(true); });
+      .subscribe(status => { if (status === "SUBSCRIBED") { force = true; setTimeout(() => { if (active) void load(); }, 1500); } });
     const reconnect = () => schedule(true);
     const focus = () => { if (navigator.onLine && document.visibilityState === "visible") schedule(true); };
     const local = async () => {
       const rows = await savedEyeRows<T>(userId, projectId, table);
-      if (active && rows !== null) setState(s => ({ ...s, rows }));
+      if (active && rows !== null) { memory.set(scope, rows); setState(s => ({ ...s, rows })); }
       if (navigator.onLine) schedule();
     };
     const offline = () => setState(s => ({ ...s, fromCache: true }));
