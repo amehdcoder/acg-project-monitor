@@ -904,8 +904,10 @@ Deno.serve(async (req) => {
       let resolvedFormUid = typeof form_uid === "string" && form_uid ? form_uid : null;
 
       const replay = async (payload: Record<string, unknown>) => {
-        const qs = resolvedProjectId ? `?project_id=${encodeURIComponent(resolvedProjectId)}` : "";
-        const r = await fetch(`${SUPABASE_URL}/functions/v1/kobo-microplan-webhook${qs}`, {
+        const query = new URLSearchParams();
+        if (resolvedProjectId) query.set("project_id", resolvedProjectId);
+        if (resolvedFormUid) query.set("form_uid", resolvedFormUid);
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/kobo-microplan-webhook?${query}`, {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-kobo-secret": secret },
           body: JSON.stringify(payload),
@@ -990,6 +992,7 @@ Deno.serve(async (req) => {
       const hookFn = isLqas ? "kobo-webhook" : "kobo-microplan-webhook";
       const qs = new URLSearchParams();
       if (isLqas) qs.set("form_type", "lqas");
+      qs.set("form_uid", String(form_uid));
       if (project_id) qs.set("project_id", String(project_id));
       const endpoint = `${SUPABASE_URL}/functions/v1/${hookFn}${qs.toString() ? `?${qs}` : ""}`;
       const body = {
