@@ -309,7 +309,7 @@ const NUMERIC_COLS = new Set([
 ]);
 
 // Columns that must survive the null-pruning pass even when falsy.
-const PRESERVED_COLS = new Set(["geotagged", "extra_metadata"]);
+const PRESERVED_COLS = new Set(["geotagged", "extra_metadata", "cdd_details", "cdd_account_name", "cdd_account_number", "cdd_bank", "flhf_account_name", "flhf_account_number", "flhf_bank", "trachoma_1_9_male", "trachoma_1_9_female"]);
 
 
 Deno.serve(async (req) => {
