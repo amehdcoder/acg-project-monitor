@@ -9277,6 +9277,7 @@ export type Database = {
           cdd_account_name: string | null
           cdd_account_number: string | null
           cdd_bank: string | null
+          cdd_details: Json
           cdd_from_community: boolean | null
           cdd_names: string | null
           cdd_phone_numbers: string | null
@@ -9367,6 +9368,7 @@ export type Database = {
           cdd_account_name?: string | null
           cdd_account_number?: string | null
           cdd_bank?: string | null
+          cdd_details?: Json
           cdd_from_community?: boolean | null
           cdd_names?: string | null
           cdd_phone_numbers?: string | null
@@ -9457,6 +9459,7 @@ export type Database = {
           cdd_account_name?: string | null
           cdd_account_number?: string | null
           cdd_bank?: string | null
+          cdd_details?: Json
           cdd_from_community?: boolean | null
           cdd_names?: string | null
           cdd_phone_numbers?: string | null

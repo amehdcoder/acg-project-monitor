@@ -29,3 +29,40 @@ export function validatedMicroplanBanking(input: Record<string, unknown>): Recor
   }
   return result;
 }
+export type CddDetail = { name: string; phone: string; account_name: string; account_number: string; bank: string };
+
+/** Validate repeated CDD rows; blank rows are dropped. */
+export function validatedCddDetails(raw: unknown): CddDetail[] {
+  if (raw == null) return [];
+  if (!Array.isArray(raw) || raw.length > 100) throw new Error('CDD list is invalid.');
+  const out: CddDetail[] = [];
+  raw.forEach((item, i) => {
+    if (!item || typeof item !== 'object') throw new Error(`CDD ${i + 1} is invalid.`);
+    const r = item as Record<string, unknown>;
+    const get = (k: string, max: number) => { const v = r[k]; if (v != null && typeof v !== 'string') throw new Error(`CDD ${i + 1}: ${k} must be text.`); const s = String(v ?? '').trim(); if (s.length > max) throw new Error(`CDD ${i + 1}: ${k} is too long.`); return s; };
+    const row = { name: get('name', 150), phone: get('phone', 30), account_name: get('account_name', BANKING_TEXT_MAX), account_number: get('account_number', 10), bank: get('bank', BANKING_TEXT_MAX) };
+    if (!Object.values(row).some(Boolean)) return;
+    if (!row.name) throw new Error(`CDD ${i + 1}: enter the CDD's name.`);
+    const err = nigerianAccountNumberError(row.account_number); if (err) throw new Error(`CDD ${i + 1} (${row.name}): ${err}`);
+    out.push(row);
+  });
+  return out;
+}
+
+/** Legacy summary columns kept in sync so risk scores, exports and older devices keep working. */
+export function cddLegacyColumns(list: CddDetail[]) {
+  const first = list[0];
+  return {
+    cdd_names: list.map(c => c.name).join(', '),
+    cdd_phone_numbers: list.map(c => c.phone).filter(Boolean).join(', '),
+    cdd_account_name: first?.account_name || null, cdd_account_number: first?.account_number || null, cdd_bank: first?.bank || null,
+  };
+}
+
+/** Turn older comma-separated records into individual rows. */
+export function cddDetailsFromLegacy(input: { cdd_details?: unknown; cdd_names?: string | null; cdd_phone_numbers?: string | null; cdd_account_name?: string | null; cdd_account_number?: string | null; cdd_bank?: string | null }): CddDetail[] {
+  if (Array.isArray(input.cdd_details) && input.cdd_details.length) return input.cdd_details as CddDetail[];
+  const names = String(input.cdd_names || '').split(',').map(s => s.trim()).filter(Boolean);
+  const phones = String(input.cdd_phone_numbers || '').split(',').map(s => s.trim());
+  return names.map((name, i) => ({ name, phone: phones[i] || '', account_name: i === 0 ? input.cdd_account_name || '' : '', account_number: i === 0 ? input.cdd_account_number || '' : '', bank: i === 0 ? input.cdd_bank || '' : '' }));
+}

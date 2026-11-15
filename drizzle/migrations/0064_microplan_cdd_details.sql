@@ -1,0 +1,2 @@
+ALTER TABLE public.microplan_entries ADD COLUMN IF NOT EXISTS cdd_details jsonb NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE public.microplan_entries ADD CONSTRAINT microplan_entries_cdd_details_array CHECK (jsonb_typeof(cdd_details) = 'array' AND jsonb_array_length(cdd_details) <= 100);

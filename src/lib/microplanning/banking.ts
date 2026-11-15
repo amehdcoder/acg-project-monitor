@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { BANKING_TEXT_MAX, nigerianAccountNumberError } from '../../../supabase/functions/_shared/microplanBanking';
 
 export { BANKING_TEXT_MAX, nigerianAccountNumberError };
+export { validatedCddDetails, cddLegacyColumns, cddDetailsFromLegacy, type CddDetail } from '../../../supabase/functions/_shared/microplanBanking';
 
 const bankingText = z.string().trim().max(BANKING_TEXT_MAX).nullish();
 const accountNumber = z.string().trim().superRefine((value, ctx) => {

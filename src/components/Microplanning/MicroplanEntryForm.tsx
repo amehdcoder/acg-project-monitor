@@ -22,7 +22,8 @@ import { getHealthFacilitiesByWard, getSettlements, getGrid3FacilitiesWithCoords
 import LinkedFencedCommunitiesPanel, { FencedCommunity } from "./LinkedFencedCommunitiesPanel";
 import MicroplanBankingFields from "./MicroplanBankingFields";
 import { useMicroplanBanks } from "@/hooks/useMicroplanBanks";
-import { microplanBankingSchema } from "@/lib/microplanning/banking";
+import { microplanBankingSchema, validatedCddDetails, cddLegacyColumns, cddDetailsFromLegacy, type CddDetail } from "@/lib/microplanning/banking";
+import { Trash2 } from "lucide-react";
 
 interface MicroplanEntryFormProps {
   projectId: string;
@@ -71,6 +72,7 @@ export interface MicroplanFormData {
   cdd_account_number: string;
   cdd_bank: string;
   cdd_from_community: boolean;
+  cdd_details: CddDetail[];
   community_latitude: number | null;
   community_longitude: number | null;
   community_gps_accuracy: number | null;
@@ -108,7 +110,7 @@ const defaultFormData: MicroplanFormData = {
   trachoma_0_5_months: null, trachoma_6m_6y: null,
   trachoma_7_14y: null, trachoma_15_plus: null,
   trachoma_1_9_male: null, trachoma_1_9_female: null,
-  cdd_names: "", cdd_phone_numbers: "", cdd_from_community: false,
+  cdd_names: "", cdd_phone_numbers: "", cdd_from_community: false, cdd_details: [],
   cdd_account_name: "", cdd_account_number: "", cdd_bank: "",
   community_latitude: null, community_longitude: null, community_gps_accuracy: null,
   settlement_latitude: null, settlement_longitude: null,
@@ -247,7 +249,8 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
   const draftKey = `microplan:draft:${accountFree ? `device:${device?.deviceId}` : user?.id || 'signed-out'}:${projectId}:${(initialData as any)?.id || 'new'}`;
   const [form, setForm] = useState<MicroplanFormData>(() => {
     try { const draft = localStorage.getItem(draftKey); if (draft) return { ...defaultFormData, ...JSON.parse(draft) }; } catch { /* unavailable */ }
-    return { ...defaultFormData, ...initialData };
+    const base = { ...defaultFormData, ...initialData } as MicroplanFormData;
+    return { ...base, cdd_details: cddDetailsFromLegacy(base) };
   });
   const formScrollRef = useRef<HTMLFormElement | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
@@ -431,7 +434,14 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       formScrollRef.current?.querySelector(`#section-${kind.toLowerCase()}`)?.scrollIntoView({ block: 'center' });
       return;
     }
-    const normalizedForm = { ...form, ...Object.fromEntries(Object.entries(banking.data).map(([key, value]) => [key, value || ''])) };
+    let cdds: CddDetail[];
+    try { cdds = validatedCddDetails(form.cdd_details); }
+    catch (err) {
+      toast({ title: "Invalid CDD details", description: (err as Error).message, variant: "destructive" });
+      formScrollRef.current?.querySelector('#section-cdd')?.scrollIntoView({ block: 'center' });
+      return;
+    }
+    const normalizedForm = { ...form, cdd_details: cdds, ...cddLegacyColumns(cdds), ...Object.fromEntries(Object.entries(banking.data).map(([key, value]) => [key, value || ''])) };
     const submitData = showTrachoma ? normalizedForm : {
       ...normalizedForm,
       trachoma_0_5_months: null, trachoma_6m_6y: null, trachoma_7_14y: null, trachoma_15_plus: null,
@@ -823,17 +833,30 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
 
       {/* CDD Information */}
       <Section id="cdd" title="CDD Information" icon={UserCheck}>
-        <Field label="Name(s) of CDD">
-          <Input value={form.cdd_names} onChange={e => set("cdd_names", e.target.value)} placeholder="Comma-separated" className="h-8 text-xs" />
-        </Field>
-        <Field label="Phone Number(s) of CDD(s)">
-          <Input value={form.cdd_phone_numbers} onChange={e => set("cdd_phone_numbers", e.target.value)} placeholder="Comma-separated" className="h-8 text-xs" />
-        </Field>
-        <div className="flex items-center gap-3 pt-4">
-          <Switch checked={form.cdd_from_community} onCheckedChange={v => set("cdd_from_community", v)} />
-          <Label className="text-xs">CDD is from Community/Settlement</Label>
+        <div className="col-span-1 sm:col-span-2 lg:col-span-3 space-y-3">
+          {form.cdd_details.length === 0 && <p className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">No CDDs added yet. Add each CDD individually with their phone and account details.</p>}
+          {form.cdd_details.map((cdd, i) => {
+            const update = (patch: Partial<CddDetail>) => setForm(prev => ({ ...prev, cdd_details: prev.cdd_details.map((c, j) => j === i ? { ...c, ...patch } : c) }));
+            return (
+              <div key={i} className="rounded-lg border bg-muted/30 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-xs font-semibold text-primary">CDD {i + 1}{cdd.name ? ` · ${cdd.name}` : ''}</p>
+                  <Button type="button" variant="ghost" size="sm" aria-label={`Remove CDD ${i + 1}`} className="h-7 px-2 text-destructive" onClick={() => setForm(prev => ({ ...prev, cdd_details: prev.cdd_details.filter((_, j) => j !== i) }))}><Trash2 className="h-3.5 w-3.5" /></Button>
+                </div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  <Field label="CDD Name"><Input aria-label={`CDD ${i + 1} name`} value={cdd.name} maxLength={150} onChange={e => update({ name: e.target.value })} className="h-8 text-xs" /></Field>
+                  <Field label="Phone Number"><Input aria-label={`CDD ${i + 1} phone number`} type="tel" inputMode="tel" maxLength={30} value={cdd.phone} onChange={e => update({ phone: e.target.value })} className="h-8 text-xs" /></Field>
+                  <MicroplanBankingFields kind="CDD" accountName={cdd.account_name} accountNumber={cdd.account_number} bank={cdd.bank} banks={banks} onChange={(field, value) => update({ [field]: value } as Partial<CddDetail>)} onAddBank={addBank} />
+                </div>
+              </div>
+            );
+          })}
+          <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={() => setForm(prev => ({ ...prev, cdd_details: [...prev.cdd_details, { name: "", phone: "", account_name: "", account_number: "", bank: "" }] }))}><Plus className="mr-1 h-3.5 w-3.5" /> Add CDD</Button>
         </div>
-        <MicroplanBankingFields kind="CDD" accountName={form.cdd_account_name || ''} accountNumber={form.cdd_account_number || ''} bank={form.cdd_bank || ''} banks={banks} onChange={(field, value) => set(`cdd_${field}`, value)} onAddBank={addBank} />
+        <div className="flex items-center gap-3 pt-2">
+          <Switch checked={form.cdd_from_community} onCheckedChange={v => set("cdd_from_community", v)} />
+          <Label className="text-xs">CDD(s) from Community/Settlement</Label>
+        </div>
       </Section>
 
       {/* Notes */}

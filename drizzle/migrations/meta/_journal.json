@@ -449,6 +449,13 @@
       "when": 1794636358594,
       "tag": "0063_microplan_cdd_flhf_bank_details",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1794762602464,
+      "tag": "0064_microplan_cdd_details",
+      "breakpoints": true
     }
   ]
 }
