@@ -51,4 +51,4 @@
 - Eye environment uses dated WPDx/CAMS plus project-scoped WASH/facility reads; hotspot counts deduplicate facilities, label report proxies and 1km point proximity — why: no invented locations, access or causal risk.
 - WHO surveys use count-based saved forms, shared validation and user-scoped offline caches; Super Admin clear/delete uses an online RPC and replay tombstones; reports stay intact — why: accurate evidence and safe deletion.
 - Visual acuity uses pseudonymous per-eye measured logMAR, offline imports and explicit DHIS2 tracker field/LGA mappings with observation provenance; GPS exports are stable report events, not unit-geometry edits; aggregates stay separate — why: honest private evidence and safe retries.
-- Eye report list/dashboard reads select explicit columns without `attachments` (inline base64 photos reach MBs per row); photos load per report only when editing — why: full-row reads timed out and showed totals as unavailable.
+- Eye report list reads omit `attachments`; photos load per report on edit — why: inline photos made full reads time out.
