@@ -81,6 +81,7 @@ import GeoExclusionPanel from "@/components/Microplanning/GeoExclusionPanel";
 import PlanningHeatmaps from "@/components/Microplanning/PlanningHeatmaps";
 import PlanningAnalyses from "@/components/Microplanning/PlanningAnalyses";
 import OsirisPlanningAnalysis from "@/components/Microplanning/OsirisPlanningAnalysis";
+import AreaEvidenceInspector from "./AreaEvidenceInspector";
 import { useGeoExclusions, rowExcluded } from "@/lib/microplanning/geoExclusions";
 import MicroplanRolesDialog from "./MicroplanRolesDialog";
 import { useMicroplanProjectAccess } from "@/hooks/useMicroplanProjectAccess";
@@ -1473,6 +1474,11 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
   }, [scopedEntries, dashExcl.archived]);
 
   const communityRisks = useCommunityRiskCache(displayEntries, user?.id, selectedProjectId || undefined);
+  const allowAreaReference = useCallback((row: {state:string;lga:string;ward:string}) => {
+    if (!isAdmin && scope.loading) return false;
+    if (!isAdmin && !scope.hasNoRestriction && !scope.isInScope(row)) return false;
+    return rowInScope(projectScope,row) && (!lens || rowInLensScope(lens,row.state,row.lga,row.ward)) && !rowExcluded(dashExcl.keys,row);
+  },[isAdmin,scope,projectScope,lens,dashExcl.keys]);
 
   const applyReconciliationPatch = (id: string, patch: Record<string, unknown>) => {
     setEntries(previous => {
@@ -2429,6 +2435,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
 
   return (
     <div className={entryOnly ? "space-y-4 py-2" : "geo-workspace space-y-4 py-2"}>
+      {!entryOnly && !isUsingDemoData && <AreaEvidenceInspector entries={displayEntries} scopeKey={entriesKey} allowReference={allowAreaReference} />}
       {/* Header */}
       <div className="geo-command flex flex-col items-start justify-between gap-4">
         <div>

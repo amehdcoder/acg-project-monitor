@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { inspectMapArea } from "@/lib/microplanning/areaMapInteraction";
 import maplibregl, { type GeoJSONSource, type Map as LibreMap } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Maximize2, Minimize2, LocateFixed, RefreshCw, Layers, ExternalLink, Loader2, Satellite, Navigation, X } from "lucide-react";
@@ -88,6 +89,7 @@ export default function OsirisSatelliteMap({entries,projectName}:{entries:IntelE
     m.on('click','settlement-points',e=>{const key=String(e.features?.[0].properties?.key??'');const p=pointIndex.current.get(key);if(p){setSelected(p);setTerrain(false);m.setTerrain(null);m.jumpTo({center:[p.lng,p.lat],zoom:17,pitch:35});}});
     m.on('click','clusters',async e=>{const f=e.features?.[0];if(!f||f.geometry.type!=='Point')return;const source=m.getSource('settlements') as GeoJSONSource;const z=await source.getClusterExpansionZoom(f.properties?.cluster_id);if(map.current===m)m.easeTo({center:f.geometry.coordinates as [number,number],zoom:z,duration:350});});
     m.on('click','context-points',e=>{const id=String(e.features?.[0].properties?.id??'');const el=document.createElement('div');el.className='text-sm';el.textContent=String(e.features?.[0].properties?.title??id);new maplibregl.Popup().setLngLat(e.lngLat).setDOMContent(el).addTo(m);});
+    m.on('click',e=>{if(!m.isStyleLoaded())return;const layers=['settlement-points','clusters','context-points'].filter(id=>m.getLayer(id));if(!m.queryRenderedFeatures(e.point,{layers}).length)inspectMapArea(e.lngLat.lat,e.lngLat.lng);});
     const canvas=m.getCanvas();const lost=(e:Event)=>{e.preventDefault();setError("3D graphics were interrupted. Close and reopen this panel to retry; other dashboard tools are unaffected.");};canvas.addEventListener('webglcontextlost',lost);
     const ro=new ResizeObserver(()=>{if(map.current===m)m.resize();});ro.observe(holder.current);
     return()=>{const c=m.getCenter();camera.current={center:[c.lng,c.lat],zoom:m.getZoom(),pitch:m.getPitch(),bearing:m.getBearing()};ro.disconnect();canvas.removeEventListener('webglcontextlost',lost);map.current=null;m.remove();};

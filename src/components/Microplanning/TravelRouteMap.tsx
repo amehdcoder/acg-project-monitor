@@ -1,4 +1,5 @@
 import { disposeMap } from "@/lib/microplanning/disposeMap";
+import { attachAreaInspection } from "@/lib/microplanning/areaMapInteraction";
 import { renderBatches } from "@/lib/microplanning/renderBatches";
 import { useState, useMemo, useEffect, useRef, useCallback, memo } from "react";
 import { deriveOnce } from "@/lib/microplanning/derivedCache";
@@ -303,6 +304,7 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
 
     L.control.zoom({ position: "bottomright" }).addTo(map);
     L.control.attribution({ position: "bottomleft", prefix: false }).addTo(map);
+    const detachInspection = attachAreaInspection(map);
 
     routeLayerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
@@ -311,6 +313,7 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
     map.setView([9.06, 7.49], 6);
 
     return () => {
+      detachInspection();
       disposeMap(map);
       mapRef.current = null;
     };
