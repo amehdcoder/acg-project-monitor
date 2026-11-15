@@ -463,6 +463,13 @@
       "when": 1794768905486,
       "tag": "0065_eye_report_photo_read_access",
       "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1794769374203,
+      "tag": "0066_bind_eye_photo_reads_to_report_permissions",
+      "breakpoints": true
     }
   ]
 }
