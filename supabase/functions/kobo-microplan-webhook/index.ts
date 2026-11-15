@@ -14,6 +14,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders as baseCors } from "npm:@supabase/supabase-js@2/cors";
+import { extractKoboBanking } from "../_shared/koboMicroplanBanking.ts";
 import { resolveCoordinates, validateRepeatDisaggregations } from "../_shared/microplanRepeatItem.ts";
 
 const corsHeaders = {
@@ -162,10 +163,10 @@ const PWD_ALIASES: Record<string, string[]> = {
 };
 
 const TRACHOMA_ALIASES: Record<string, string[]> = {
-  trachoma_0_5_months: ["trachoma_0_5_months", "trachoma_0_5months", "trachoma_0_5m"],
-  trachoma_6m_6y: ["trachoma_6m_6y", "trachoma_6months_6yrs", "trachoma_6m_6yrs"],
-  trachoma_7_14y: ["trachoma_7_14y", "trachoma_7_14yrs", "trachoma_7_14"],
-  trachoma_15_plus: ["trachoma_15_plus", "trachoma_15plus", "trachoma_15_yrs_above"],
+  trachoma_0_5_months: ["trachoma_0_5_months", "trachoma_0_5months", "trachoma_0_5m", "_0_5_months", "0_5_months"],
+  trachoma_6m_6y: ["trachoma_6m_6y", "trachoma_6months_6yrs", "trachoma_6m_6yrs", "_6_months_6_years", "6_months_6_years"],
+  trachoma_7_14y: ["trachoma_7_14y", "trachoma_7_14yrs", "trachoma_7_14", "_7_14_years", "7_14_years"],
+  trachoma_15_plus: ["trachoma_15_plus", "trachoma_15plus", "trachoma_15_yrs_above", "_15_years", "15_years"],
 };
 
 // Extracts PWD / trachoma / CDD disaggregations from any Kobo naming style.
@@ -191,6 +192,7 @@ function extractDisaggregations(src: Record<string, unknown>): Record<string, un
   if (cddPhone) out.cdd_phone_numbers = cddPhone;
   const cddFrom = pickBool(src, A.cdd_from_community as unknown as string[]);
   if (cddFrom != null) out.cdd_from_community = cddFrom;
+  Object.assign(out, extractKoboBanking(src));
   return out;
 }
 
