@@ -8,6 +8,12 @@ export type SyncRow = { id: string; project_id: string; updated_at?: string; rep
 type SyncMeta = { cursor: string | null; reconciledAt: number };
 const db = supabase as unknown as { from: (table: string) => any };
 const flights = new Map<string, Promise<SyncResult<SyncRow>>>();
+/** Source-document photos (some stored inline as base64, up to MBs each) are never part of dashboard sync; they load on demand for editing. */
+export const EYE_REPORT_LIST_COLUMNS = "id,project_id,facility_id,facility_name,state,lga,report_date,summary,csom,notes,prepared_by,confirmed_by,created_by,device_id,collector_label,created_at,updated_at,gps";
+const listColumns = (table: EyeTable) => table === "eye_daily_reports" ? EYE_REPORT_LIST_COLUMNS : "*";
+export function withoutAttachments<T>(rows: T[]): T[] {
+  return rows.map(r => r && typeof r === "object" && "attachments" in (r as object) ? (({ attachments: _a, ...rest }) => rest)(r as T & { attachments?: unknown }) as T : r);
+}
 export type SyncResult<T> = { rows: T[]; fromCache: boolean; unavailable: boolean; checkedAt: number | null };
 
 export function mergeRows<T extends { id: string }>(previous: T[], changes: T[], ids?: Set<string>): T[] {
@@ -43,7 +49,8 @@ export function overlayPending<T extends SyncRow>(rows: T[], items: QueuedItem[]
 export const datasetKey = (table: EyeTable, projectId: string) => `${table === "eye_daily_reports" ? "eye-reports" : "eye-patients-v2"}:${projectId}`;
 
 export async function savedEyeRows<T extends SyncRow>(userId: string, projectId: string, table: EyeTable) {
-  const rows = await cacheGetForUser<T[]>(userId, datasetKey(table, projectId));
+  const raw = await cacheGetForUser<T[]>(userId, datasetKey(table, projectId));
+  const rows = raw === null ? null : table === "eye_daily_reports" ? withoutAttachments(raw) : raw;
   return rows === null ? null : overlayPending(rows, listQueued(), userId, projectId, table);
 }
 
@@ -59,7 +66,9 @@ export function syncEyeRows<T extends SyncRow>(userId: string, projectId: string
 
 async function sync<T extends SyncRow>(userId: string, projectId: string, table: EyeTable, reconcile: boolean): Promise<SyncResult<T>> {
   const key = datasetKey(table, projectId), metaKey = `${key}:sync-v1`;
-  const [previous, meta] = await Promise.all([cacheGetForUser<T[]>(userId, key), cacheGetForUser<SyncMeta>(userId, metaKey)]);
+  const [cachedPrevious, meta] = await Promise.all([cacheGetForUser<T[]>(userId, key), cacheGetForUser<SyncMeta>(userId, metaKey)]);
+  const lean = (rows: T[]) => table === "eye_daily_reports" ? withoutAttachments(rows) : rows;
+  const previous = cachedPrevious === null ? null : lean(cachedPrevious);
   let nextMeta = meta;
   const result = await cachedRead<T[]>(key, async () => {
     const changes: T[] = [];
@@ -67,7 +76,7 @@ async function sync<T extends SyncRow>(userId: string, projectId: string, table:
     const since = previous !== null && meta?.cursor ? new Date(Date.parse(meta.cursor) - 60_000).toISOString() : null;
     let after: { updated_at: string; id: string } | null = null;
     for (;;) {
-      let query = db.from(table).select("*").eq("project_id", projectId)
+      let query = db.from(table).select(listColumns(table)).eq("project_id", projectId)
         .order("updated_at").order("id").limit(1000);
       if (since) query = query.gte("updated_at", since);
       if (after) query = query.or(`updated_at.gt.${after.updated_at},and(updated_at.eq.${after.updated_at},id.gt.${after.id})`);
@@ -98,7 +107,8 @@ async function sync<T extends SyncRow>(userId: string, projectId: string, table:
     const cursor = changes.reduce((latest, row) => row.updated_at && (!latest || row.updated_at > latest) ? row.updated_at : latest, meta?.cursor ?? null);
     nextMeta = { cursor, reconciledAt: shouldReconcile || previous === null ? Date.now() : meta?.reconciledAt ?? 0 };
     // Read the cache again to include local writes completed while the network was busy.
-    const latest = await cacheGetForUser<T[]>(userId, key);
+    const latestRaw = await cacheGetForUser<T[]>(userId, key);
+    const latest = latestRaw === null ? null : lean(latestRaw);
     return { data: overlayPending(mergeRows(since ? latest ?? previous ?? [] : [], changes, ids), listQueued(), userId, projectId, table), error: null };
   }, 30_000, userId);
   if (!result.fromCache && nextMeta) await cacheSetForUser(userId, metaKey, nextMeta);
