@@ -14,8 +14,9 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders as baseCors } from "npm:@supabase/supabase-js@2/cors";
-import { resolveCoordinates, validateRepeatDisaggregations } from "../_shared/microplanRepeatItem.ts";
+import { resolveCoordinates, validateRepeatDisaggregations, communityRepeatItems, mappedScope } from "../_shared/microplanRepeatItem.ts";
 import { extractKoboMicroplanSchema } from "../_shared/koboMicroplanSchema.ts";
+import { normalizeMicroplanChoice } from "../_shared/microplanChoices.ts";
 
 const corsHeaders = {
   ...baseCors,
@@ -458,7 +459,7 @@ Deno.serve(async (req) => {
   const mappedNum = (col: string, defaults: string[]): number | null => {
     const v = mapped(col, defaults);
     if (v == null) return null;
-    const n = Number(v);
+    const n = Number(v.replace(/,/g, ''));
     return Number.isFinite(n) ? n : null;
   };
 
@@ -536,7 +537,7 @@ Deno.serve(async (req) => {
     number_of_households: mappedNum("number_of_households", [
       ...A.households, "demographics/households", "demographics/number_of_households",
     ]),
-    campaign_type: normEnum(mapped("campaign_type", [...A.campaign_type])),
+    campaign_type: normalizeMicroplanChoice('campaign_type', mapped("campaign_type", [...A.campaign_type])),
     population_source: normEnum(mapped("population_source", [...A.population_source])),
     year_of_microplanning: (() => {
       const raw = mapped("year_of_microplanning", [...A.year]);
@@ -550,9 +551,9 @@ Deno.serve(async (req) => {
     settlement_longitude: mappedNum("settlement_longitude", ["settlement_lng", "settlement_longitude"]) ?? lng,
     flhf_latitude: flhfCoords.lat ?? mappedNum("flhf_latitude", ["flhf_lat", "flhf_latitude", "flhf_grp/flhf_latitude"]),
     flhf_longitude: flhfCoords.lng ?? mappedNum("flhf_longitude", ["flhf_lng", "flhf_longitude", "flhf_grp/flhf_longitude"]),
-    terrain_type: normEnum(mapped("terrain_type", [...A.terrain, "context_grp/terrain_type"])),
-    accessibility: normEnum(mapped("accessibility", [...A.accessibility, "context_grp/accessibility"])),
-    security_clearance: normEnum(mapped("security_clearance", [...A.security, "context_grp/security_clearance"])),
+    terrain_type: normalizeMicroplanChoice('terrain_type', mapped("terrain_type", [...A.terrain, "context_grp/terrain_type"])),
+    accessibility: normalizeMicroplanChoice('accessibility', mapped("accessibility", [...A.accessibility, "context_grp/accessibility"])),
+    security_clearance: normalizeMicroplanChoice('security_clearance', mapped("security_clearance", [...A.security, "context_grp/security_clearance"])),
     community_distance_to_flhf_km: mappedNum("community_distance_to_flhf_km", [
       ...A.community_dist, "community_grp/community_distance_to_flhf_km",
     ]),
@@ -598,7 +599,7 @@ Deno.serve(async (req) => {
   // `${_uuid}_${index}` so retries stay idempotent per repeat item.
   // Hand-built Kobo forms name the roster with a random group id
   // ("group_yf5bw16"), so fall back to structural detection.
-  const repeatItems: Array<Record<string, unknown>> = detectRepeatArray(payload);
+  const repeatItems: Array<Record<string, unknown>> = communityRepeatItems(payload);
 
   const buildRecord = (
     extra: Record<string, unknown>,
@@ -638,7 +639,8 @@ Deno.serve(async (req) => {
     n == null || (Number.isFinite(n) && n >= 0 && n <= TARGET_POP_MAX);
 
   if (repeatItems.length > 0) {
-    repeatItems.forEach((item, idx) => {
+    repeatItems.forEach((rawItem, idx) => {
+      const item = mappedScope(rawItem, mapping);
       let schemaFields: Record<string, unknown>;
       try { schemaFields = extractKoboMicroplanSchema(item, mapping); }
       catch (error) {
@@ -700,9 +702,9 @@ Deno.serve(async (req) => {
         estimated_adults_15_plus: pickNumber(item, [...A.adults_15_plus]),
         estimated_total_population: totalPop,
         number_of_households: pickNumber(item, [...A.households]),
-        terrain_type: normEnum(pickFirst(item, [...A.terrain])),
-        accessibility: normEnum(pickFirst(item, [...A.accessibility])),
-        security_clearance: normEnum(pickFirst(item, [...A.security])),
+        terrain_type: normalizeMicroplanChoice('terrain_type', pickFirst(item, [mapping.terrain_type, ...A.terrain].filter(Boolean))),
+        accessibility: normalizeMicroplanChoice('accessibility', pickFirst(item, [mapping.accessibility, ...A.accessibility].filter(Boolean))),
+        security_clearance: normalizeMicroplanChoice('security_clearance', pickFirst(item, [mapping.security_clearance, ...A.security].filter(Boolean))),
         // additional_notes now lives inside the community_repeat so each
         // community carries its own free-text observations through to the DB.
         notes: pickFirst(item, [...A.notes]),

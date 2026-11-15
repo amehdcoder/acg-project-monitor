@@ -18,7 +18,7 @@ import useRealtimeTables, { type RealtimeTableSpec } from "@/hooks/useRealtimeTa
  */
 export function useRealtimeMicroplanEntries(
   projectId: string | null | undefined,
-  onChange: () => void,
+  onChange: () => void | Promise<void>,
   userId?: string | null,
 ) {
   const accept = useCallback(

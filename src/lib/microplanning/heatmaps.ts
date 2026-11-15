@@ -3,6 +3,7 @@
 // community → settlement) and are kept only when they fall inside the
 // recorded State's boundary, so no community is drawn in the wrong place.
 
+import { normalizeMicroplanChoice } from '../../../supabase/functions/_shared/microplanChoices';
 export type HeatTheme = "accessibility" | "security" | "terrain" | "population";
 
 export interface HeatEntry {
@@ -89,10 +90,12 @@ export function populationBand(pop: number): string {
 
 export function categoryOf(e: HeatEntry, theme: HeatTheme): Category {
   const t = THEMES[theme];
-  if (theme === "population") return t.categories.find((c) => c.key === populationBand(Number(e.estimated_total_population) || 0))!;
-  let raw = String(e[t.field!] ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  const fallback = t.categories.find((c) => c.key === "unset" || c.key === "unknown") ?? t.categories[0];
+  if (theme === "population") return t.categories.find((c) => c.key === populationBand(Number(e.estimated_total_population) || 0)) ?? fallback;
+  const field = t.field;
+  let raw = field ? normalizeMicroplanChoice(field, e[field]) ?? '' : '';
   if (theme === "security" && !raw) raw = "unknown";
-  return t.categories.find((c) => c.key === raw) ?? t.categories.find((c) => c.key === "unset" || c.key === "unknown")!;
+  return t.categories.find((c) => c.key === raw) ?? fallback;
 }
 
 type Ring = number[][];

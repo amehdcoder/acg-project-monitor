@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo, useDeferredValue, Fragment, memo } from "react";
 import { deriveOnce } from "@/lib/microplanning/derivedCache";
+import { normalizeMicroplanEntry } from "@/lib/microplanning/normalizeEntry";
 import { mergeAllocationPlan } from "@/lib/microplanning/coverageExchange";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -1439,7 +1440,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
   }, [harmonizeKey]);
 
   const baseEntries = useMemo<any[]>(
-    () => (facilityRenames.length ? applyRenamesLocally(rawBaseEntries as any[], facilityRenames) : (rawBaseEntries as any[])),
+    () => (facilityRenames.length ? applyRenamesLocally(rawBaseEntries as any[], facilityRenames) : (rawBaseEntries as any[])).map(normalizeMicroplanEntry),
     [rawBaseEntries, facilityRenames],
   );
 

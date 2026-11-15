@@ -1,3 +1,4 @@
+import { normalizeMicroplanChoice } from '../../../supabase/functions/_shared/microplanChoices';
 export interface CommunityRiskInput {
   security_clearance?: string | null;
   accessibility?: string | null;
@@ -15,8 +16,8 @@ export function communityRisk(entry: CommunityRiskInput) {
   const names = cdd.replace(/\bn\s*\/\s*a\b/gi, "unknown").split(/[,;\n/]+|\band\b/i).map(s => s.trim()).filter(s =>
     s && !/^(—|-|none|nil|0|no cdds?|n\/?a|not recorded|unknown)$/i.test(s));
   const parts = [
-    { label: "Security", points: security[normalize(entry.security_clearance)] ?? null, max: 50 },
-    { label: "Hard to reach", points: access[normalize(entry.accessibility)] ?? null, max: 30 },
+    { label: "Security", points: security[normalizeMicroplanChoice('security_clearance', entry.security_clearance) ?? ''] ?? null, max: 50 },
+    { label: "Hard to reach", points: access[normalizeMicroplanChoice('accessibility', entry.accessibility) ?? ''] ?? null, max: 30 },
     { label: "CDD gap", points: names.length ? 0 : 20, max: 20 },
   ];
   const minimum = parts.reduce((sum, part) => sum + (part.points ?? 0), 0);
