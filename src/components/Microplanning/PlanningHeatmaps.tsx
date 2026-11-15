@@ -1,4 +1,5 @@
 import { memo, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { attachAreaInspection } from "@/lib/microplanning/areaMapInteraction";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Card, CardContent } from "@/components/ui/card";
@@ -98,6 +99,7 @@ function StateMap({ group, lgas, espen }: { group: StateGroup; lgas: Feature[]; 
     L.control.scale({ position: "bottomleft", imperial: false }).addTo(m);
     const tiles = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap contributors · Wards © GRID3 · Landblocks: nearest-community areas", maxZoom: 18, className: "espen-light-tiles" }).addTo(m);
     void tiles;
+    const detachInspection = attachAreaInspection(m);
     m.createPane("blocks"); m.getPane("blocks")!.style.zIndex = "420";
     m.createPane("bounds"); m.getPane("bounds")!.style.zIndex = "460"; m.getPane("bounds")!.style.pointerEvents = "none";
     const fc = { type: "FeatureCollection", features: lgas } as never;
@@ -113,7 +115,7 @@ function StateMap({ group, lgas, espen }: { group: StateGroup; lgas: Feature[]; 
     map.current = m;
     const ro = new ResizeObserver(() => m.invalidateSize());
     ro.observe(el.current);
-    return () => { ro.disconnect(); m.remove(); map.current = null; };
+    return () => { detachInspection(); ro.disconnect(); m.remove(); map.current = null; };
   }, [visible, lgas]);
 
   useEffect(() => {

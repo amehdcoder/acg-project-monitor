@@ -81,6 +81,7 @@ import GeoExclusionPanel from "@/components/Microplanning/GeoExclusionPanel";
 import PlanningHeatmaps from "@/components/Microplanning/PlanningHeatmaps";
 import PlanningAnalyses from "@/components/Microplanning/PlanningAnalyses";
 import OsirisPlanningAnalysis from "@/components/Microplanning/OsirisPlanningAnalysis";
+import AreaEvidenceInspector from "./AreaEvidenceInspector";
 import { useGeoExclusions, rowExcluded } from "@/lib/microplanning/geoExclusions";
 import MicroplanRolesDialog from "./MicroplanRolesDialog";
 import { useMicroplanProjectAccess } from "@/hooks/useMicroplanProjectAccess";
@@ -2429,6 +2430,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
 
   return (
     <div className={entryOnly ? "space-y-4 py-2" : "geo-workspace space-y-4 py-2"}>
+      {!entryOnly && !isUsingDemoData && <AreaEvidenceInspector entries={displayEntries} scopeKey={entriesKey} />}
       {/* Header */}
       <div className="geo-command flex flex-col items-start justify-between gap-4">
         <div>
