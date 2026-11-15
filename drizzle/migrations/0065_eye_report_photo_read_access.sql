@@ -1,0 +1,1 @@
+CREATE POLICY "Read source documents through permitted eye reports" ON storage.objects FOR SELECT TO authenticated USING (bucket_id = 'beneficiary-media' AND split_part(name,'/',2) = 'eye-reports' AND EXISTS (SELECT 1 FROM public.eye_daily_reports r WHERE r.id::text = split_part(name,'/',3) AND r.project_id::text = split_part(name,'/',1)));

@@ -30,6 +30,7 @@ import WgPatientWizard, { emptyWgPatient, type WgPatientDraft } from "./WgPatien
 import ScrollRail from "@/components/ProgrammeModule/ScrollRail";
 import EyeGpsCapture from "./EyeGpsCapture";
 import { normEyeGps, type EyeGps } from "@/lib/eyeReport/gps";
+import SourcePhotoPreview from './SourcePhotoPreview';
 
 export interface EyeFacility { id: string; name: string; state?: string | null; lga?: string | null }
 type Mode = { kind: "user"; userId: string } | { kind: "device"; deviceId: string; label: string };
@@ -735,6 +736,7 @@ export default function EyeDailyReportForm({ projectId, projectName, facilities,
                   <ul className="grid gap-3 sm:grid-cols-2">
                     {f.attachments.map((a, i) => (
                       <li key={i} className="space-y-2 rounded-2xl border bg-card p-3 shadow-sm">
+                        {a.mime.startsWith('image/') && <SourcePhotoPreview refPath={a.ref} label={a.label} />}
                         <div className="flex items-center gap-2">
                           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-eye-orange/15 text-eye-orange"><ImagePlus className="h-4 w-4" /></span>
                           <span className="min-w-0 flex-1">
