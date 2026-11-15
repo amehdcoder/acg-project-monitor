@@ -10,7 +10,7 @@ import { AREA_INSPECT_EVENT } from '@/lib/microplanning/areaMapInteraction';
 import { buildAreaWorkbook } from '@/lib/microplanning/areaWorkbook';
 import type { Boundary } from '@/lib/microplanning/osiris';
 
-export default function AreaEvidenceInspector({entries,scopeKey}:{entries:AreaEntry[];scopeKey:string}) {
+export default function AreaEvidenceInspector({entries,scopeKey,allowReference}:{entries:AreaEntry[];scopeKey:string;allowReference:(row:{state:string;lga:string;ward:string})=>boolean}) {
   const [point,setPoint]=useState<{lat:number;lng:number}|null>(null),[boundaries,setBoundaries]=useState<Boundary[]>([]);
   const [rows,setRows]=useState<AreaRow[]>([]),[features,setFeatures]=useState<LandEvidence[]>([]),[status,setStatus]=useState(''),[busy,setBusy]=useState(false),[revision,setRevision]=useState(0);
   const [file,setFile]=useState<Blob|null>(null),[mapNode,setMapNode]=useState<HTMLDivElement|null>(null);
@@ -25,8 +25,7 @@ export default function AreaEvidenceInspector({entries,scopeKey}:{entries:AreaEn
       let refs:Awaited<ReturnType<typeof getGrid3FullStateEntries>>=[];let evidence:LandEvidence[]=[];let lookup='';
       try {refs=await getGrid3FullStateEntries('set',scope.properties.state);}catch{lookup='GRID3 unavailable; project records retained. ';}
       // Never broaden reference evidence beyond the wards visible to this viewer.
-      const wards=new Set(entries.filter(e=>e.state===scope.properties.state&&e.lga===scope.properties.lga).map(e=>String(e.ward).trim().toLowerCase()));
-      const list=areaRows(entries,refs.filter(r=>wards.has(r.ward.trim().toLowerCase())),scope.properties.state,scope.properties.lga||'');
+      const list=areaRows(entries,refs.filter(r=>allowReference({state:scope.properties.state,lga:r.lga,ward:r.ward})),scope.properties.state,scope.properties.lga||'');
       if(live)setRows(list);
       if(navigator.onLine) {
         try {
@@ -41,7 +40,7 @@ export default function AreaEvidenceInspector({entries,scopeKey}:{entries:AreaEn
       if(live)setFile(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
     };work().catch(()=>{if(live)setStatus('Evidence export could not be prepared. Retry; saved project records are unchanged.');}).finally(()=>{if(live)setBusy(false);});
     return()=>{live=false;abort.abort();};
-  },[point,scope,entries,revision]);
+  },[point,scope,entries,revision,allowReference]);
   const nearby=useMemo(()=>point?nearbyAreaRows(rows,point.lat,point.lng):[],[rows,point]);
   useEffect(()=>{
     if(!mapNode||!point||!scope)return;

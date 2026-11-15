@@ -1,6 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { inspectMapArea } from "@/lib/microplanning/areaMapInteraction";
-import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import maplibregl, { type GeoJSONSource, type Map as LibreMap } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Maximize2, Minimize2, LocateFixed, RefreshCw, Layers, ExternalLink, Loader2, Satellite, Navigation, X } from "lucide-react";
@@ -14,7 +13,6 @@ import { categoryOf, normState, THEMES } from "@/lib/microplanning/heatmaps";
 import { cddCategory, emptyLegendFilters, filterLegendPoints, type LegendGroup, eventsInState, nearbyEvents, recordedNumber, statePoints, type Boundary, type IntelEntry, type IntelEvent, type IntelPoint } from "@/lib/microplanning/osiris";
 
 const StreetViewPanel = lazy(() => import("@/components/maps/GoogleStreetViewPanel"));
-maplibregl.setWorkerUrl(workerUrl);
 type Dimension="security"|"accessibility"|"terrain"|"population"|"cdd";
 const themes: {id:Dimension;label:string}[]=[{id:"security",label:"Security clearance"},{id:"accessibility",label:"Accessibility"},{id:"terrain",label:"Terrain types"},{id:"population",label:"Recorded population"},{id:"cdd",label:"CDD assignments"}];
 const empty={type:"FeatureCollection" as const,features:[]};
