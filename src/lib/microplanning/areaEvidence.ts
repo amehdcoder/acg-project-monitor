@@ -15,9 +15,10 @@ export function areaRows(entries: AreaEntry[], references: ReferenceSettlement[]
     population: recordedNumber(e.estimated_total_population), populationSource: e.population_source || 'Source not recorded', locationSource: 'Project submission GPS', status: 'Recorded — verify current occupancy', year: e.year_of_microplanning ?? null,
     male: recordedNumber(e.trachoma_1_9_male), female: recordedNumber(e.trachoma_1_9_female),
   }; });
+  const seen = new Set(rows.map(r => `${normState(r.ward)}|${normState(r.name)}`));
   for (const ref of references.filter(r => normState(r.lga) === normState(lga))) {
-    const matched = rows.some(r => normState(r.ward) === normState(ref.ward) && normState(r.name) === normState(ref.name));
-    if (!matched) rows.push({name: ref.name, ward: ref.ward, lat: ref.latitude, lng: ref.longitude, population: null, populationSource: 'Not available in GRID3 settlement registry', locationSource: 'Bundled GRID3 Nigeria settlement registry', status: 'Reference settlement — not matched to a submission', year: null, male: null, female: null});
+    const key = `${normState(ref.ward)}|${normState(ref.name)}`;
+    if (!seen.has(key)) { seen.add(key); rows.push({name: ref.name, ward: ref.ward, lat: ref.latitude, lng: ref.longitude, population: null, populationSource: 'Not available in GRID3 settlement registry', locationSource: 'Bundled GRID3 Nigeria settlement registry', status: 'Reference settlement — not matched to a submission', year: null, male: null, female: null}); }
   }
   return rows;
 }

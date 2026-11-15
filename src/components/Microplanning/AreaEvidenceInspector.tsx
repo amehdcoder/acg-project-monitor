@@ -31,7 +31,7 @@ export default function AreaEvidenceInspector({entries,scopeKey,allowReference}:
         try {
           const query=`[out:json][timeout:20];(nwr(around:2000,${point.lat},${point.lng})[place];way(around:2000,${point.lat},${point.lng})[building];nwr(around:2000,${point.lat},${point.lng})[natural];nwr(around:2000,${point.lat},${point.lng})[landuse];way(around:2000,${point.lat},${point.lng})[waterway];);out center 300;`;
           const timer=setTimeout(()=>abort.abort(),25000);
-          try {const response=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:new URLSearchParams({data:query}),signal:abort.signal});if(!response.ok)throw Error(`Public lookup unavailable (${response.status})`);const result=await response.json();if(result.remark)throw Error('Public lookup incomplete');evidence=parseLandEvidence(result);lookup+='OpenStreetMap returned up to 300 nearby features; incomplete coverage.';}finally{clearTimeout(timer);}
+          try {const response=await fetch(`https://overpass-api.de/api/interpreter?${new URLSearchParams({data:query})}`,{signal:abort.signal});if(!response.ok)throw Error(`Public lookup unavailable (${response.status})`);const result=await response.json();if(result.remark)throw Error('Public lookup incomplete');evidence=parseLandEvidence(result);lookup+='OpenStreetMap returned up to 300 nearby features; incomplete coverage.';}finally{clearTimeout(timer);}
         }catch{lookup+='Public land-feature lookup unavailable; not evidence of an empty area.';}
       }else lookup+='Offline: public imagery and land-feature lookup need connectivity.';
       if(!live)return;setFeatures(evidence);setStatus(lookup);
@@ -47,7 +47,7 @@ export default function AreaEvidenceInspector({entries,scopeKey,allowReference}:
     const m=L.map(mapNode,{maxZoom:21}).setView([point.lat,point.lng],17);
     const imagery=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxNativeZoom:19,maxZoom:21,attribution:'© Esri, Vantor, Earthstar Geographics, GIS User Community'}).addTo(m);
     const labels=L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{maxNativeZoom:18,maxZoom:21,attribution:'© Esri reference labels'});
-    L.control.layers({'Satellite imagery':imagery},{'Hybrid place labels':labels}).addTo(m);L.control.scale().addTo(m);
+    L.control.layers({'Satellite imagery':imagery},{'Hybrid place labels':labels},{collapsed:false}).addTo(m);L.control.scale().addTo(m);
     L.circle([point.lat,point.lng],{radius:2000,fill:false}).addTo(m);L.circleMarker([point.lat,point.lng],{radius:6}).addTo(m);
     const observer=new ResizeObserver(()=>m.invalidateSize());observer.observe(mapNode);return()=>{observer.disconnect();m.remove();};
   },[mapNode,point,scope]);
@@ -59,7 +59,7 @@ export default function AreaEvidenceInspector({entries,scopeKey,allowReference}:
       <div ref={setMapNode} className="h-80 w-full overflow-hidden rounded-md border" aria-label="Area satellite inspection"/>
       <p role="status" className="text-xs text-muted-foreground">{status}</p>
       <p className="text-xs text-muted-foreground">Nearby evidence: 2 km radius. Workbook: all reference settlements and visible submissions in this LGA’s permitted wards. Unknown population stays blank. Land cover and roofs do not prove habitation; imagery dates and native detail vary.</p>
-      <div className="max-h-52 overflow-auto"><table className="w-full text-left text-xs"><thead><tr className="border-b"><th className="p-2">Nearby settlement</th><th>Distance</th><th>Population</th><th>Source</th></tr></thead><tbody>{nearby.slice(0,30).map((r,i)=><tr key={i} className="border-b"><td className="p-2">{r.name} · {r.ward}</td><td>{r.distance.toFixed(2)} km</td><td>{r.population?.toLocaleString()??'Unknown'}</td><td>{r.populationSource}</td></tr>)}</tbody></table>{!nearby.length&&<p className="p-2 text-sm text-muted-foreground">No reference settlement or recorded GPS within 2 km. Habitation remains unknown.</p>}</div>
+      <div className="max-h-52 overflow-auto"><table className="w-full min-w-[620px] text-left text-xs"><thead><tr className="border-b"><th className="p-2">Nearby settlement</th><th className="p-2">Distance</th><th className="p-2">Population</th><th className="p-2">Source</th></tr></thead><tbody>{nearby.slice(0,30).map((r,i)=><tr key={i} className="border-b"><td className="p-2">{r.name} · {r.ward}</td><td className="p-2 whitespace-nowrap">{r.distance.toFixed(2)} km</td><td className="p-2">{r.population?.toLocaleString()??'Unknown'}</td><td className="p-2">{r.populationSource}</td></tr>)}</tbody></table>{!nearby.length&&<p className="p-2 text-sm text-muted-foreground">No reference settlement or recorded GPS within 2 km. Habitation remains unknown.</p>}</div>
       {features.length>0&&<div className="max-h-40 overflow-auto text-xs">{features.slice(0,30).map((e,i)=><p key={i} className="border-b py-2"><a className="text-primary underline" href={e.source} target="_blank" rel="noopener noreferrer">{e.name}</a> · {e.feature}</p>)}</div>}
     </>}
   </DialogContent></Dialog>;
