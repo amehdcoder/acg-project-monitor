@@ -4,3 +4,4 @@
 - OSIRIS Street View lazy-loads the shared panorama panel and releases the satellite renderer while open, restoring its camera on return — why: two graphics engines must not compete on field devices.
 - OSIRIS legend filtering uses shared tested predicates on State-verified scoped points, unions within groups and intersections across groups; CDD placeholders mean unrecorded assignments — why: map counts, search and zoom must agree without inventing distributor absence.
 - Normalize Kobo choice codes with the same helper at intake and before dashboard derivation; retain unknown values and normalize saved/offline rows without changing measured counts — why: every legend, filter, risk score and export must agree across form versions.
+- Versioned nested settlement evidence owns its population/CDDs; detailed parent rows have no additive measures while legacy rows retain census scope — why: sum current settlement evidence once without reinterpreting historical totals.

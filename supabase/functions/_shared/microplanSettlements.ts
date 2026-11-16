@@ -53,11 +53,16 @@ export function expandNestedSettlements(community: AnyRec, raw: AnyRec): AnyRec[
     for (const field of COMMUNITY_MEASURES) child[field] = null;
     if (detailed) {
       if (getFlat(item, 'settlement_schema_version') !== 'details_v1') throw new Error(`Settlement ${index + 1} requires the complete updated settlement form`);
+      const clean = (value: unknown): unknown => {
+        if (Array.isArray(value)) return value.map(clean);
+        if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k,v]) => [(k.split('/').at(-1) ?? k).replace(/^settlement_/, ''), clean(v)]));
+        return value;
+      };
       const scope: AnyRec = {};
       const flatten = (obj: AnyRec) => {
         for (const [key, value] of Object.entries(obj)) {
           if (value && typeof value === 'object' && !Array.isArray(value)) flatten(value as AnyRec);
-          else scope[(key.split('/').at(-1) ?? key).replace(/^settlement_/, '')] = value;
+          else scope[(key.split('/').at(-1) ?? key).replace(/^settlement_/, '')] = clean(value);
         }
       };
       flatten(item);

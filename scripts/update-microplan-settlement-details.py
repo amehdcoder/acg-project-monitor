@@ -34,7 +34,7 @@ def update_workbook(w):
     # It is cloned there already, retaining the standard/Trachoma conditional sum.
     additions.append(row(type='integer', name='settlement_pwd_total', label='Total persons with disabilities (unique people)', required='true', constraint='. >= 0 and . <= ${settlement_Total_Population}', constraint_message='Enter a non-negative count no larger than the settlement population.', hint='Count each person once; a person may appear in more than one disability type.'))
     for r in additions:
-        if r.get('name','').startswith('settlement_') and r.get('type') == 'integer' and not r.get('constraint'):
+        if (r.get('name') or '').startswith('settlement_') and r.get('type') == 'integer' and not r.get('constraint'):
             r['constraint'] = '. >= 0'
             r['constraint_message'] = 'Enter a non-negative whole number; use 0 only when confirmed.'
     start = next(i for i,r in enumerate(rows) if r.get('name') == 'settlement_repeat')
