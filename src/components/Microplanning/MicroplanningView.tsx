@@ -2494,53 +2494,6 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
       </div>
 
       {!entryOnly && (
-        <div className="geo-navigation">
-            {/* Analytics/dashboard tabs are admin-only. Non-admin project members
-                only see their own submitted entries (Planning list) and the form. */}
-            {!entryOnly && (
-              <div className="geo-tabstrip flex max-w-full overflow-x-auto" aria-label="Microplanning views">
-                {canOpenView("list") && (<Button aria-pressed={activeView === "list"} title="Planning" variant={activeView === "list" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("list")}>
-                  <List className="h-3.5 w-3.5" />
-                  <span className="hidden md:inline text-xs">Planning</span>
-                </Button>)}
-                {canOpenView("medicine") && (<Button aria-pressed={activeView === "medicine"} title="Medicine" variant={activeView === "medicine" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("medicine")}>
-                  <Pill className="h-3.5 w-3.5" />
-                  <span className="hidden md:inline text-xs">Medicine</span>
-                </Button>)}
-                {canOpenView("coverage") && (<Button aria-pressed={activeView === "coverage"} title="Coverage" variant={activeView === "coverage" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("coverage")}>
-                  <Activity className="h-3.5 w-3.5" />
-                  <span className="hidden md:inline text-xs">Coverage</span>
-                </Button>)}
-                {canOpenView("reconciliation") && (<Button aria-pressed={activeView === "reconciliation"} title="Reconciliation" variant={activeView === "reconciliation" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("reconciliation")}>
-                  <Heart className="h-3.5 w-3.5" />
-                  <span className="hidden md:inline text-xs">Reconciliation</span>
-                </Button>)}
-                {canOpenView("gaps") && (<Button aria-pressed={activeView === "gaps"} title="Gaps" variant={activeView === "gaps" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("gaps")}>
-                  <Target className="h-3.5 w-3.5" />
-                  <span className="hidden md:inline text-xs">Gaps</span>
-                </Button>)}
-                {canOpenView("map") && (<Button aria-pressed={activeView === "map"} title="Map" variant={activeView === "map" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("map")}>
-                  <MapIcon className="h-3.5 w-3.5" />
-                  <span className="hidden md:inline text-xs">Map</span>
-                </Button>)}
-                {canOpenView("routes") && (<Button aria-pressed={activeView === "routes"} title="Routes" variant={activeView === "routes" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("routes")}>
-                  <Navigation className="h-3.5 w-3.5" />
-                  <span className="hidden md:inline text-xs">Routes</span>
-                </Button>)}
-                {canOpenView("historical") && (<Button aria-pressed={activeView === "historical"} title="Historical" variant={activeView === "historical" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("historical")}>
-                  <HistoryIcon className="h-3.5 w-3.5" />
-                  <span className="hidden md:inline text-xs">Historical</span>
-                </Button>)}
-                {canOpenView("summary") && (<Button aria-pressed={activeView === "summary"} title="Summary" variant={activeView === "summary" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("summary")}>
-                  <LayersIcon className="h-3.5 w-3.5" />
-                  <span className="hidden md:inline text-xs">Summary</span>
-                </Button>)}
-              </div>
-            )}
-        </div>
-      )}
-
-      {!entryOnly && (
         <div className="geo-services grid gap-3 lg:grid-cols-[2fr_1fr]">
           <Dhis2MicroplanEngine
             projectId={selectedProjectId}
@@ -2921,6 +2874,50 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
             campaignLabel={(exportFilterContext as any).campaign}
             exclusions={projectTableExclusions}
           />
+          <div className="geo-navigation">
+            {/* Analytics/dashboard tabs are admin-only. Non-admin project members
+                only see their own submitted entries (Planning list) and the form. */}
+            {!entryOnly && (
+              <div className="geo-tabstrip flex max-w-full overflow-x-auto" aria-label="Microplanning views">
+                {canOpenView("list") && (<Button aria-pressed={activeView === "list"} title="Planning" variant={activeView === "list" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("list")}>
+                  <List className="h-3.5 w-3.5" />
+                  <span className="hidden md:inline text-xs">Planning</span>
+                </Button>)}
+                {canOpenView("medicine") && (<Button aria-pressed={activeView === "medicine"} title="Medicine" variant={activeView === "medicine" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("medicine")}>
+                  <Pill className="h-3.5 w-3.5" />
+                  <span className="hidden md:inline text-xs">Medicine</span>
+                </Button>)}
+                {canOpenView("coverage") && (<Button aria-pressed={activeView === "coverage"} title="Coverage" variant={activeView === "coverage" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("coverage")}>
+                  <Activity className="h-3.5 w-3.5" />
+                  <span className="hidden md:inline text-xs">Coverage</span>
+                </Button>)}
+                {canOpenView("reconciliation") && (<Button aria-pressed={activeView === "reconciliation"} title="Reconciliation" variant={activeView === "reconciliation" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("reconciliation")}>
+                  <Heart className="h-3.5 w-3.5" />
+                  <span className="hidden md:inline text-xs">Reconciliation</span>
+                </Button>)}
+                {canOpenView("gaps") && (<Button aria-pressed={activeView === "gaps"} title="Gaps" variant={activeView === "gaps" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("gaps")}>
+                  <Target className="h-3.5 w-3.5" />
+                  <span className="hidden md:inline text-xs">Gaps</span>
+                </Button>)}
+                {canOpenView("map") && (<Button aria-pressed={activeView === "map"} title="Map" variant={activeView === "map" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("map")}>
+                  <MapIcon className="h-3.5 w-3.5" />
+                  <span className="hidden md:inline text-xs">Map</span>
+                </Button>)}
+                {canOpenView("routes") && (<Button aria-pressed={activeView === "routes"} title="Routes" variant={activeView === "routes" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("routes")}>
+                  <Navigation className="h-3.5 w-3.5" />
+                  <span className="hidden md:inline text-xs">Routes</span>
+                </Button>)}
+                {canOpenView("historical") && (<Button aria-pressed={activeView === "historical"} title="Historical" variant={activeView === "historical" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("historical")}>
+                  <HistoryIcon className="h-3.5 w-3.5" />
+                  <span className="hidden md:inline text-xs">Historical</span>
+                </Button>)}
+                {canOpenView("summary") && (<Button aria-pressed={activeView === "summary"} title="Summary" variant={activeView === "summary" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("summary")}>
+                  <LayersIcon className="h-3.5 w-3.5" />
+                  <span className="hidden md:inline text-xs">Summary</span>
+                </Button>)}
+              </div>
+            )}
+        </div>
 
 
 
