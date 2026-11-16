@@ -2545,7 +2545,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
           {/* Primary project metrics */}
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
             {[
-              { label: "Communities", value: filtered.length.toLocaleString(), icon: Building2, tone: "geo-metric-blue" },
+              { label: "Communities", value: new Set(filtered.map(e => [e.state, e.lga, e.ward, e.flhf_name, e.community_name].join("||"))).size.toLocaleString(), icon: Building2, tone: "geo-metric-blue" },
               { label: "Total Population", value: totalPop.toLocaleString(), icon: Users, tone: "geo-metric-blue" },
               { label: "Target Population", value: targetPop.toLocaleString(), icon: Target, tone: "geo-metric-teal" },
               { label: "Health Facilities", value: String(uniqueFLHFs), icon: Heart, tone: "geo-metric-violet" },
