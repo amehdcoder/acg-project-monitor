@@ -1,0 +1,32 @@
+{
+  "dataset": "Nigeria COD-AB v01 (standard, unsuffixed layers)",
+  "publisher": "OCHA Nigeria / OCHA FIS",
+  "source": "Office for the Surveyor General of the Federation of Nigeria (OSGOF), Ehealth, United Nations Cartographic Section (UNCS)",
+  "url": "https://data.humdata.org/dataset/cod-ab-nga",
+  "download": "https://data.humdata.org/dataset/81ac1d38-f603-4a98-804d-325c658599a3/resource/7e30ec96-7f29-4ee8-9f4c-77633b353cbb/download/nga_admin_boundaries.geojson.zip",
+  "license": "CC BY-IGO",
+  "crs": "OGC:CRS84 (WGS84 longitude, latitude)",
+  "valid_on": "2019-04-17",
+  "reviewed_on": "2025-10-30",
+  "resource_updated_on": "2026-04-16",
+  "limitations": [
+    "Review and resource timestamps do not establish newly surveyed geometry; source reference dates are 1996-10-01.",
+    "No published metre-level positional accuracy or legal boundary certification.",
+    "Lagos ADM1 contains 0.0149811894 square degrees not assigned to ADM2 polygons (coastal/water coverage); retain both source layers without inventing an LGA.",
+    "GRID3 operational wards and basemap boundary depictions can differ from this administrative reference."
+  ],
+  "layers": {
+    "states": {
+      "features": 37,
+      "geometry_sha256": "c686475c840db25dd9021f49744a17d73a80d7d8867aea9ff933f8cda0f73bad",
+      "file_sha256": "8003cce4335c073185b8677f63417570260c4c53cbc6592f06c2d276d5bbc87f",
+      "bytes": 1487445
+    },
+    "lgas": {
+      "features": 774,
+      "geometry_sha256": "db6c45311f0bb3de1ac1962c77b678c0b1caaf5036636edb8a5a98d161f7676c",
+      "file_sha256": "82fa0730c90407cf8e370a12bc1b3fd0face5075013b234dee91b2a1a072eee8",
+      "bytes": 4938914
+    }
+  }
+}
