@@ -1,4 +1,10 @@
 /* Fonts loaded via index.html <link> tags */
+.geo-settlement-pin { background: transparent; border: 0; }
+.geo-settlement-pin > span { display: block; width: 22px; height: 22px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: hsl(var(--chart-secondary)); border: 2px solid hsl(var(--card)); box-shadow: 0 2px 5px hsl(var(--foreground) / .3); }
+.geo-settlement-pin > span::after { content: ''; display: block; width: 6px; height: 6px; margin: 6px; border-radius: 50%; background: hsl(var(--card)); }
+.geo-settlement-tooltip.leaflet-tooltip { background: hsl(var(--card)); color: hsl(var(--foreground)); border: 1px solid hsl(var(--border)); }
+.geo-settlement-detail { font-size: 12px; line-height: 1.6; white-space: normal; overflow-wrap: anywhere; max-width: 240px; }
+.geo-settlement-detail strong { display: block; font-size: 14px; color: hsl(var(--foreground)); }
 .osiris-map-surface.maplibregl-map { position: absolute; inset: 0; width: 100%; height: 100%; }
 .osiris-map-surface canvas.maplibregl-canvas { max-width: none; }
 .osiris-map-surface .maplibregl-popup-content { background: hsl(var(--card)); color: hsl(var(--foreground)); }
