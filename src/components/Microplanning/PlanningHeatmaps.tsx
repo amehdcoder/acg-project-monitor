@@ -12,6 +12,8 @@ import { catchmentColor, classIndex, ESPEN_MAPS, NO_DATA, type EspenEntry } from
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, Layers, Maximize2, Minimize2 } from "lucide-react";
 import { buildLandblocks, SETTLEMENT_RADIUS_KM } from "@/lib/microplanning/landblocks";
+import { loadNigeriaAdminBoundaries, type AdminCollection, type AdminBoundary } from "@/lib/microplanning/nigeriaAdminBoundaries";
+import { drawNigeriaAdminBoundaries } from "@/lib/microplanning/leafletAdminBoundaries";
 
 type Feature = { type: "Feature"; properties: Record<string, string>; geometry: { type: string; coordinates: unknown } };
 type FC = { type: "FeatureCollection"; features: Feature[] };
@@ -24,8 +26,6 @@ const VIEWS: { id: View; label: string }[] = [
   { id: "population", label: "Population density" },
 ];
 
-let lgaPromise: Promise<FC> | null = null;
-const loadLgas = () => (lgaPromise ??= fetch("/nigeria-lga.geojson").then((r) => r.json()));
 const wardCache = new Map<string, Promise<FC | null>>();
 const WARD_URL = "https://services3.arcgis.com/BU6Aadhn6tbBEdyk/arcgis/rest/services/GRID3_NGA_operational_wards_v4_0/FeatureServer/0/query";
 function loadWards(state: string) {
@@ -41,7 +41,7 @@ function loadWards(state: string) {
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 const INK = "#1F2A36";
 
-function StateMap({ group, lgas, espen }: { group: StateGroup; lgas: Feature[]; espen?: string }) {
+function StateMap({ group, lgas, states, espen }: { group: StateGroup; lgas: AdminBoundary[]; states: AdminBoundary[]; espen?: string }) {
   const espenMap = espen ? ESPEN_MAPS.find((m) => m.id === espen) : undefined;
   const holder = useRef<HTMLDivElement>(null);
   const el = useRef<HTMLDivElement>(null);
@@ -89,7 +89,7 @@ function StateMap({ group, lgas, espen }: { group: StateGroup; lgas: Feature[]; 
     return () => { live = false; };
   }, [visible, group.state]);
 
-  const blocks = useMemo(() => (visible ? buildLandblocks(group.points.map((p) => ({ lat: p.lat, lng: p.lng, pop: Number(p.entry.estimated_total_population) || 0 })), lgas.map((f) => f.geometry)) : []), [visible, group, lgas]);
+  const blocks = useMemo(() => (visible ? buildLandblocks(group.points.map((p) => ({ lat: p.lat, lng: p.lng, pop: Number(p.entry.estimated_total_population) || 0 })), states.map((f) => f.geometry)) : []), [visible, group, states]);
 
   // Base map, boundaries
   useEffect(() => {
@@ -100,23 +100,24 @@ function StateMap({ group, lgas, espen }: { group: StateGroup; lgas: Feature[]; 
     const tiles = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap contributors · Wards © GRID3 · Landblocks: nearest-community areas", maxZoom: 18, className: "espen-light-tiles" }).addTo(m);
     void tiles;
     const detachInspection = attachAreaInspection(m);
-    m.createPane("blocks"); m.getPane("blocks")!.style.zIndex = "420";
-    m.createPane("bounds"); m.getPane("bounds")!.style.zIndex = "460"; m.getPane("bounds")!.style.pointerEvents = "none";
-    const fc = { type: "FeatureCollection", features: lgas } as never;
-    L.geoJSON(fc, { pane: "bounds", style: { color: INK, weight: 4.5, fill: false, opacity: 0.85 } }).addTo(m); // outer State casing
-    const lgaLayer = L.geoJSON(fc, { pane: "bounds", style: { color: INK, weight: 1.8, fill: false, opacity: 1 } }).addTo(m);
+    const blockPane = m.createPane("blocks"); blockPane.style.zIndex = "420";
+    const boundPane = m.createPane("bounds"); boundPane.style.zIndex = "460"; boundPane.style.pointerEvents = "none";
+    const adminLayers = drawNigeriaAdminBoundaries(m, {
+      states: { type: "FeatureCollection", features: states },
+      lgas: { type: "FeatureCollection", features: lgas },
+    });
     lgas.forEach((f) => {
-      const c = L.geoJSON(f as never).getBounds().getCenter();
-      L.marker(c, { pane: "bounds", interactive: false, icon: L.divIcon({ className: "", html: `<div style="font:700 10px system-ui;letter-spacing:.02em;color:${INK};text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 3px #fff;white-space:nowrap;transform:translate(-50%,-50%)">${esc(f.properties.lga)}</div>` }) }).addTo(m);
+      const c: L.LatLngTuple = [f.properties.center_lat, f.properties.center_lon];
+      L.marker(c, { pane: "bounds", interactive: false, icon: L.divIcon({ className: "", html: `<div class="geo-admin-label">${esc(f.properties.lga)}</div>` }) }).addTo(m);
     });
     blocksLayer.current = L.layerGroup().addTo(m);
-    const b = lgaLayer.getBounds();
+    const b = adminLayers.bounds;
     if (b.isValid()) m.fitBounds(b, { padding: [10, 10] }); else m.setView([9.1, 8.7], 6);
     map.current = m;
     const ro = new ResizeObserver(() => m.invalidateSize());
     ro.observe(el.current);
-    return () => { detachInspection(); ro.disconnect(); m.remove(); map.current = null; };
-  }, [visible, lgas]);
+    return () => { detachInspection(); ro.disconnect(); adminLayers.remove(); m.remove(); map.current = null; };
+  }, [visible, lgas, states]);
 
   useEffect(() => {
     const m = map.current;
@@ -204,7 +205,8 @@ function StateMap({ group, lgas, espen }: { group: StateGroup; lgas: Feature[]; 
           {group.noGps > 0 && <Badge variant="outline">{group.noGps.toLocaleString()} without GPS</Badge>}
           {group.outside > 0 && <Badge variant="outline" className="border-destructive/50 text-destructive">{group.outside.toLocaleString()} GPS outside {group.state} — not plotted</Badge>}
           <span className="ml-auto flex items-center gap-1 text-[10px] text-muted-foreground">
-            <span className="inline-block h-1 w-5 bg-foreground" /> State / LGA
+            <span className="inline-block h-1 w-5 bg-foreground" /> State
+            <span className="ml-2 inline-block w-5 border-t-2 border-foreground" /> LGA
             <span className="ml-2 inline-block w-5 border-t border-dashed border-muted-foreground" /> Ward
             {wardState === "loading" && visible && <Loader2 className="ml-1 h-3 w-3 animate-spin" />}
             {wardState === "none" && <span className="ml-1">(ward lines unavailable)</span>}
@@ -266,14 +268,21 @@ function PlanningHeatmaps({ entries: liveEntries }: { entries: HeatEntry[] }) {
     if (sig !== sigRef.current.sig) sigRef.current = { sig, entries: deferred };
     return sigRef.current.entries;
   }, [deferred]);
-  const [lgaFc, setLgaFc] = useState<FC | null>(null);
-  useEffect(() => { loadLgas().then(setLgaFc).catch(() => setLgaFc({ type: "FeatureCollection", features: [] })); }, []);
-  const groups = useMemo(() => (lgaFc ? groupByState(entries, lgaFc.features as never) : []), [entries, lgaFc]);
+  const [lgaFc, setLgaFc] = useState<AdminCollection | null>(null);
+  const [stateFc, setStateFc] = useState<AdminCollection | null>(null);
+  const [boundaryError, setBoundaryError] = useState(false);
+  useEffect(() => { let live=true; loadNigeriaAdminBoundaries().then(data=>{if(live){setLgaFc(data.lgas);setStateFc(data.states);}}).catch(()=>{if(live)setBoundaryError(true);});return()=>{live=false;}; }, []);
+  const groups = useMemo(() => (stateFc ? groupByState(entries, stateFc.features) : []), [entries, stateFc]);
   const lgasByState = useMemo(() => {
-    const m = new Map<string, Feature[]>();
-    lgaFc?.features.forEach((f) => { const k = normState(f.properties.state); (m.get(k) ?? m.set(k, []).get(k)!).push(f); });
+    const m = new Map<string, AdminBoundary[]>();
+    lgaFc?.features.forEach((f) => { const k = normState(f.properties.state); const list=m.get(k)??[];list.push(f);m.set(k,list); });
     return m;
   }, [lgaFc]);
+  const statesByState = useMemo(() => {
+    const m = new Map<string, AdminBoundary[]>();
+    stateFc?.features.forEach(f=>m.set(normState(f.properties.state),[f]));
+    return m;
+  }, [stateFc]);
 
   return (
     <div className="space-y-3">
@@ -282,9 +291,10 @@ function PlanningHeatmaps({ entries: liveEntries }: { entries: HeatEntry[] }) {
         <Flame className="h-4 w-4 text-destructive" />
         <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Planning heatmaps by State · live</p>
       </div>
-      {!lgaFc && <div className="flex h-24 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>}
+      {boundaryError && <p role="status" className="text-xs text-destructive">State/LGA outlines unavailable — reconnect and reopen the map.</p>}
+      {!lgaFc && !boundaryError && <div className="flex h-24 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>}
       {lgaFc && !groups.length && <p className="text-xs text-muted-foreground">No communities with State and GPS yet.</p>}
-      {groups.map((g) => <StateMapMemo key={g.state} group={g} lgas={lgasByState.get(normState(g.state)) ?? []} />)}
+      {groups.map((g) => <StateMapMemo key={g.state} group={g} lgas={lgasByState.get(normState(g.state)) ?? []} states={statesByState.get(normState(g.state)) ?? []} />)}
       {groups.length > 0 && (
         <div className="space-y-2 pt-2">
           <div className="flex items-center gap-2"><Layers className="h-4 w-4 text-primary" /><p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">ESPEN microplanner thematic maps · {EXTRA.length} maps</p></div>
@@ -296,7 +306,7 @@ function PlanningHeatmaps({ entries: liveEntries }: { entries: HeatEntry[] }) {
                 <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />
               </CollapsibleTrigger>
               <CollapsibleContent className="space-y-3 border-t p-3">
-                {groups.map((g) => <StateMapMemo key={g.state} group={g} lgas={lgasByState.get(normState(g.state)) ?? []} espen={x.id} />)}
+                {groups.map((g) => <StateMapMemo key={g.state} group={g} lgas={lgasByState.get(normState(g.state)) ?? []} states={statesByState.get(normState(g.state)) ?? []} espen={x.id} />)}
               </CollapsibleContent>
             </Collapsible>
           ))}

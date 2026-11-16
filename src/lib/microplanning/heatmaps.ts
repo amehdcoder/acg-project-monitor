@@ -100,6 +100,22 @@ export function categoryOf(e: HeatEntry, theme: HeatTheme): Category {
 
 type Ring = number[][];
 type Geom = { type: string; coordinates: unknown };
+const geometryBounds = new WeakMap<Geom, [number, number, number, number]>();
+function boundsOfGeometry(g: Geom) {
+  const saved = geometryBounds.get(g);
+  if (saved) return saved;
+  const bounds: [number, number, number, number] = [Infinity, Infinity, -Infinity, -Infinity];
+  const visit = (value: unknown) => {
+    if (!Array.isArray(value)) return;
+    if (typeof value[0] === "number" && typeof value[1] === "number") {
+      bounds[0] = Math.min(bounds[0], value[0]); bounds[1] = Math.min(bounds[1], value[1]);
+      bounds[2] = Math.max(bounds[2], value[0]); bounds[3] = Math.max(bounds[3], value[1]);
+    } else value.forEach(visit);
+  };
+  visit(g.coordinates);
+  geometryBounds.set(g, bounds);
+  return bounds;
+}
 function ringContains(ring: Ring, lng: number, lat: number) {
   let inside = false;
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -109,11 +125,13 @@ function ringContains(ring: Ring, lng: number, lat: number) {
   return inside;
 }
 export function geometryContains(g: Geom, lat: number, lng: number): boolean {
+  const [west, south, east, north] = boundsOfGeometry(g);
+  if (lng < west || lng > east || lat < south || lat > north) return false;
   const polys = g.type === "Polygon" ? [g.coordinates as Ring[]] : g.type === "MultiPolygon" ? (g.coordinates as Ring[][]) : [];
   return polys.some((rings) => rings.length > 0 && ringContains(rings[0], lng, lat) && !rings.slice(1).some((h) => ringContains(h, lng, lat)));
 }
 
-export const normState = (s: string | null | undefined) => String(s ?? "").trim().toUpperCase().replace(/\s+STATE$/, "").replace(/^FCT$|^ABUJA$|FEDERAL CAPITAL TERRITORY/, "FCT");
+export const normState = (s: string | null | undefined) => String(s ?? "").trim().toUpperCase().replace(/\s+STATE$/, "").replace(/^FCT$|^ABUJA$|FEDERAL CAPITAL TERRITORY/, "FCT").replace(/^NASSARAWA$/, "NASARAWA");
 
 export interface StatePoint { lat: number; lng: number; entry: HeatEntry }
 export interface StateGroup { state: string; points: StatePoint[]; outside: number; noGps: number }

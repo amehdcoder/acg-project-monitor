@@ -111,7 +111,7 @@ export default defineConfig(({ mode }) => {
         // navigation handler below (it always wins for navigations when the
         // network is reachable), plus skipWaiting + cleanupOutdatedCaches and the
         // in-app update manager — so users never get stuck on a stale shell.
-        globPatterns: ["**/*.{js,css,ico,png,jpg,jpeg,svg,webp,woff,woff2,html}", "data/grid3/manifest.json", "data/grid3/*/index.json"],
+        globPatterns: ["**/*.{js,css,ico,png,jpg,jpeg,svg,webp,woff,woff2,html}", "data/grid3/manifest.json", "data/grid3/*/index.json", "data/nigeria-admin/cod-v01/*.{geojson,json}"],
         maximumFileSizeToCacheInBytes: 16 * 1024 * 1024, // 16 MiB
         navigateFallbackDenylist: [/^\/~oauth/],
         // Do NOT let a freshly published service worker take over on its own.

@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { categoryOf, normState, THEMES } from "@/lib/microplanning/heatmaps";
 import { cddCategory, emptyLegendFilters, filterLegendPoints, type LegendGroup, eventsInState, nearbyEvents, recordedNumber, statePoints, type Boundary, type IntelEntry, type IntelEvent, type IntelPoint } from "@/lib/microplanning/osiris";
+import { adminBoundaryPalette, loadNigeriaAdminBoundaries, NIGERIA_ADMIN_ATTRIBUTION } from "@/lib/microplanning/nigeriaAdminBoundaries";
 
 const StreetViewPanel = lazy(() => import("@/components/maps/GoogleStreetViewPanel"));
 type Dimension="security"|"accessibility"|"terrain"|"population"|"cdd";
@@ -34,9 +35,9 @@ export default function OsirisSatelliteMap({entries,projectName}:{entries:IntelE
   const root=useRef<HTMLDivElement>(null),holder=useRef<HTMLDivElement>(null),map=useRef<LibreMap|null>(null),pointIndex=useRef(new Map<string,IntelPoint>());
   useEffect(()=>{if(!states.includes(state)){setState(states[0]??"");setSelected(null);}},[states,state]);
   useEffect(()=>{
-    const abort=new AbortController();
-    Promise.all([fetch('/nigeria-state-outlines.geojson',{signal:abort.signal}).then(r=>{if(!r.ok)throw Error("State boundaries unavailable");return r.json();}),fetch('/nigeria-lga.geojson',{signal:abort.signal}).then(r=>{if(!r.ok)throw Error("LGA boundaries unavailable");return r.json();})]).then(([s,l])=>{setBoundaries(s.features);setLgas(l.features);}).catch(e=>{if(!abort.signal.aborted)setError(e.message);});
-    return()=>abort.abort();
+    let live=true;
+    loadNigeriaAdminBoundaries().then(data=>{if(live){setBoundaries(data.states.features);setLgas(data.lgas.features);}}).catch(e=>{if(live)setError(e.message);});
+    return()=>{live=false;};
   },[]);
   useEffect(()=>{
     if(streetLocation)return;
@@ -48,8 +49,8 @@ export default function OsirisSatelliteMap({entries,projectName}:{entries:IntelE
   },[revision,streetLocation]);
   const shapes=useMemo(()=>boundaries.filter(b=>normState(b.properties.state)===normState(state)),[boundaries,state]);
   const localLgas=useMemo(()=>lgas.filter(b=>normState(b.properties.state)===normState(state)),[lgas,state]);
-  const scoped=useMemo(()=>statePoints(entries,state,lgas),[entries,state,lgas]);
-  const localEvents=useMemo(()=>eventsInState(events,state,lgas),[events,state,lgas]);
+  const scoped=useMemo(()=>statePoints(entries,state,boundaries),[entries,state,boundaries]);
+  const localEvents=useMemo(()=>eventsInState(events,state,boundaries),[events,state,boundaries]);
   const nearby=useMemo(()=>selected?nearbyEvents(selected,events):[],[selected,events]);
   const plotted=useMemo(()=>filterLegendPoints(scoped.points,legendFilters),[scoped.points,legendFilters]);
   const legendGroups=useMemo(()=>['security','accessibility','terrain','cdd'].map(id=>{
@@ -73,13 +74,17 @@ export default function OsirisSatelliteMap({entries,projectName}:{entries:IntelE
     try{m=new maplibregl.Map({container:holder.current,style:{version:8,sources:{imagery:{type:"raster",tiles:["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],tileSize:256,maxzoom:19,attribution:"© Esri, Vantor, Earthstar Geographics, GIS User Community"},elevation:{type:"raster-dem",url:"https://tiles.mapterhorn.com/tilejson.json",encoding:"terrarium",tileSize:512,maxzoom:12,attribution:'<a href="https://mapterhorn.com/attribution">© Mapterhorn</a>'}},layers:[{id:"satellite",type:"raster",source:"imagery"}]},center:[8.7,9.1],zoom:5,pitch:45,maxZoom:20,maxPitch:70,canvasContextAttributes:{antialias:false},refreshExpiredTiles:false,renderWorldCopies:false});}
     catch{setError("3D rendering is unavailable on this device. Existing Geo maps remain available.");return;}
     map.current=m;const palette={blue:token('--chart-primary'),teal:token('--chart-secondary'),red:token('--status-danger'),amber:token('--status-warning'),green:token('--status-success'),neutral:token('--muted-foreground'),line:token('--primary-foreground')};
+    const adminPalette=adminBoundaryPalette();
+    m.addControl(new maplibregl.AttributionControl({customAttribution:NIGERIA_ADMIN_ATTRIBUTION}),'bottom-right');
     m.addControl(new maplibregl.NavigationControl({visualizePitch:true}),'bottom-right');m.addControl(new maplibregl.ScaleControl(),'bottom-left');
     m.on('load',()=>{
       if(map.current!==m)return;
-      m.addSource('state',{type:'geojson',data:empty});m.addSource('lgas',{type:'geojson',data:empty});
+      m.addSource('state',{type:'geojson',data:empty,tolerance:0});m.addSource('lgas',{type:'geojson',data:empty,tolerance:0});
       m.addSource('settlements',{type:'geojson',data:empty,cluster:true,clusterRadius:40,clusterMaxZoom:11});m.addSource('context',{type:'geojson',data:empty});
-      m.addLayer({id:'lga-lines',type:'line',source:'lgas',paint:{'line-color':palette.line,'line-width':1,'line-opacity':0.65}});
-      m.addLayer({id:'state-lines',type:'line',source:'state',paint:{'line-color':palette.teal,'line-width':3}});
+      m.addLayer({id:'lga-casing',type:'line',source:'lgas',paint:{'line-color':adminPalette.casing,'line-width':4.5}});
+      m.addLayer({id:'lga-lines',type:'line',source:'lgas',paint:{'line-color':adminPalette.lga,'line-width':2.2}});
+      m.addLayer({id:'state-casing',type:'line',source:'state',paint:{'line-color':adminPalette.casing,'line-width':7}});
+      m.addLayer({id:'state-lines',type:'line',source:'state',paint:{'line-color':adminPalette.state,'line-width':4.5}});
       m.addLayer({id:'clusters',type:'circle',source:'settlements',filter:['has','point_count'],paint:{'circle-color':palette.blue,'circle-radius':['step',['get','point_count'],16,100,21,1000,27],'circle-stroke-color':palette.line,'circle-stroke-width':2}});
       m.addLayer({id:'settlement-points',type:'circle',source:'settlements',filter:['!', ['has','point_count']],paint:{'circle-color':['match',['get','tone'],'red',palette.red,'amber',palette.amber,'green',palette.green,'teal',palette.teal,'blue',palette.blue,palette.neutral],'circle-radius':['interpolate',['linear'],['zoom'],5,4,12,7,18,10],'circle-stroke-color':palette.line,'circle-stroke-width':1.5}});
       m.addLayer({id:'context-points',type:'circle',source:'context',paint:{'circle-color':['match',['get','kind'],'fire',palette.amber,'weather',palette.teal,palette.red],'circle-radius':7,'circle-stroke-color':palette.line,'circle-stroke-width':2}});
