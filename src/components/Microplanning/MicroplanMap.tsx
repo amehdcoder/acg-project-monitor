@@ -459,7 +459,8 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
       }),
     });
     group.on('clusterclick', event => {
-      if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent);
+      const originalEvent = (event as L.LeafletMouseEvent).originalEvent;
+      if (originalEvent) L.DomEvent.stopPropagation(originalEvent);
       const cluster = event.layer as L.MarkerCluster;
       if (cluster.getChildCount() <= 12 || map.getZoom() >= map.getMaxZoom()) cluster.spiderfy();
       else cluster.zoomToBounds();
