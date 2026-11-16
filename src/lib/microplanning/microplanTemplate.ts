@@ -69,6 +69,7 @@ const LIST_VALIDATIONS: Record<string, string[]> = {
   "State": NIGERIA_STATES,
   "Source of Population Data": [
     "census", "projected", "community_leader", "health_facility",
+    "cdd_census_census_update",
     "household_listing", "survey", "other",
   ],
   "Type of Terrain": ["flat", "hilly", "mountainous", "riverine", "swampy", "desert", "forest"],
@@ -258,7 +259,7 @@ export async function exportMicroplanWorkbook(opts: ExportMicroplanOptions = {})
   note("Required fields (*)", "State, LGA, Ward, Name of FLHF and Name of Community are mandatory. Rows missing any of these are skipped on import.");
   note("Do not edit headers", "Fill rows below the green header row on the “Microplan” sheet. Renaming or reordering headers will break the import.");
   note("State", "Pick from the dropdown of the 36 states + FCT.");
-  note("Source of Population Data", "Choose: census, projected, community_leader, health_facility, household_listing, survey, other.");
+  note("Source of Population Data", "Choose: census, cdd_census_census_update (CDD Census/Census Update), projected, community_leader, health_facility, household_listing, survey, other.");
   note("Type of Terrain", "Choose: flat, hilly, mountainous, riverine, swampy, desert, forest.");
   note("Accessibility", "Choose: accessible, hard_to_reach, inaccessible, seasonal.");
   note("Security Clearance", "Choose: cleared, partial, not_cleared, unknown.");

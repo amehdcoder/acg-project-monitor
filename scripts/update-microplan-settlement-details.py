@@ -20,9 +20,17 @@ def finalize_workbook(w):
     s.insert_rows(position)
     for col, (value, style) in enumerate(zip(values, styles), 1):
         s.cell(position, col, value)._style = style
+    choices = w['choices']; choice_cols = {c.value: c.column for c in choices[1]}
+    source_type = s.cell(find('Source_of_Population_Data'), cols['type']).value
+    source_list = source_type.split()[1]
+    if not any(choices.cell(i, choice_cols['list_name']).value == source_list and choices.cell(i, choice_cols['name']).value == 'cdd_census_census_update' for i in range(2, choices.max_row + 1)):
+        row = choices.max_row + 1
+        for key, value in [('list_name', source_list), ('name', 'cdd_census_census_update'), ('label', 'CDD Census/Census Update')]:
+            cell = choices.cell(row, choice_cols[key], value)
+            cell._style = copy(choices.cell(2, choice_cols[key])._style)
     settings = w['settings']; cols = {c.value: c.column for c in settings[1]}
-    settings.cell(2, cols['version'], '202611162245')
-    settings.cell(2, cols['form_title'], 'Amehnities Geo Microplanning · Settlement Evidence · v2026.11.16e')
+    settings.cell(2, cols['version'], '202611162255')
+    settings.cell(2, cols['form_title'], 'Amehnities Geo Microplanning · Settlement Evidence · v2026.11.16f')
     return w
 
 def update_workbook(w):
