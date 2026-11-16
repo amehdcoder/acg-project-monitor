@@ -38,8 +38,24 @@ function bank(src: AnyRec, prefix: string): unknown {
 }
 
 /** Only fields present in this scope are emitted: omitted legacy fields never erase saved data. */
-export function extractKoboMicroplanSchema(src: AnyRec, mapping: Record<string, string> = {}): AnyRec {
+/** NTD (MDA) sub-type from the updated XLSForm: standard or trachoma population scheme. */
+export function koboMdaType(src: AnyRec): 'standard' | 'trachoma' | null {
+  const raw = value(src, ['MDA_Type', 'mda_type']);
+  if (typeof raw !== 'string') return null;
+  const key = raw.trim().toLowerCase();
+  if (key.startsWith('standard')) return 'standard';
+  if (key.startsWith('trachoma')) return 'trachoma';
+  return null;
+}
+
+const TRACHOMA_GROUPS: Array<[string, string]> = [
+  ['trachoma_0_5_months', '_0_5_Months'], ['trachoma_6m_6y', '_6_Months_6_Years'],
+  ['trachoma_7_14y', '_7_14_Years'], ['trachoma_15_plus', '_15_Years'],
+];
+
+export function extractKoboMicroplanSchema(src: AnyRec, mapping: Record<string, string> = {}, parentMdaType: 'standard' | 'trachoma' | null = null): AnyRec {
   const out: AnyRec = {};
+  const mdaType = koboMdaType(src) ?? parentMdaType;
   for (const prefix of ['flhf', 'cdd']) {
     const input: AnyRec = {};
     for (const suffix of ['account_name', 'account_number', 'bank']) {
@@ -76,6 +92,22 @@ export function extractKoboMicroplanSchema(src: AnyRec, mapping: Record<string, 
     const n = Number(raw);
     if (!Number.isSafeInteger(n) || n < 0 || n > 100000000) throw new Error(`${col}: expected a non-negative whole-number count.`);
     out[col] = n;
+  }
+  if (mdaType) out.mda_type = mdaType;
+  if (mdaType === 'trachoma') {
+    // Trachoma MDA: every Trachoma age group and the 1–9 sex split are mandatory;
+    // the standard age groups are skipped, so total population is the Trachoma sum.
+    let total = 0;
+    for (const [col, field] of TRACHOMA_GROUPS) {
+      const raw = value(src, [mapping[col] ?? field]);
+      const n = Number(raw);
+      if (raw === undefined || raw === null || raw === '' || !Number.isSafeInteger(n) || n < 0) throw new Error(`Trachoma MDA: ${field} is required as a non-negative whole number.`);
+      out[col] = n; total += n;
+    }
+    for (const col of ['trachoma_1_9_male', 'trachoma_1_9_female']) {
+      if (typeof out[col] !== 'number') throw new Error(`Trachoma MDA: ${col} is required.`);
+    }
+    out.estimated_total_population = total;
   }
   return out;
 }

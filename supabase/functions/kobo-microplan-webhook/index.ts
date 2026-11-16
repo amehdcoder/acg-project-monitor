@@ -15,7 +15,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders as baseCors } from "npm:@supabase/supabase-js@2/cors";
 import { resolveCoordinates, validateRepeatDisaggregations, communityRepeatItems, mappedScope } from "../_shared/microplanRepeatItem.ts";
-import { extractKoboMicroplanSchema } from "../_shared/koboMicroplanSchema.ts";
+import { extractKoboMicroplanSchema, koboMdaType } from "../_shared/koboMicroplanSchema.ts";
 import { normalizeMicroplanChoice } from "../_shared/microplanChoices.ts";
 
 const corsHeaders = {
@@ -642,7 +642,7 @@ Deno.serve(async (req) => {
     repeatItems.forEach((rawItem, idx) => {
       const item = mappedScope(rawItem, mapping);
       let schemaFields: Record<string, unknown>;
-      try { schemaFields = extractKoboMicroplanSchema(item, mapping); }
+      try { schemaFields = extractKoboMicroplanSchema(item, mapping, koboMdaType(payload)); }
       catch (error) {
         rejectedItems.push({ index: idx, reason: error instanceof Error ? error.message : 'Invalid CDD or banking details' });
         return;
