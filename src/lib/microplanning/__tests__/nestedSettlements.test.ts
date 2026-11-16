@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { expandNestedSettlements } from '../../../../supabase/functions/_shared/microplanSettlements';
 import { extractKoboMicroplanSchema } from '../../../../supabase/functions/_shared/koboMicroplanSchema';
+import { normalizeMicroplanEntry } from '../normalizeEntry';
+import { entryPoint } from '../heatmaps';
 
 const raw = {
   Community_Name: 'Community A', community_gps: '12.5 11.5 0 5', Has_Settlements: 'yes',
@@ -19,6 +21,10 @@ const parent = {
 };
 
 describe('nested settlement synchronization', () => {
+  it('positions every nested settlement at its own GPS in shared dashboard maps', () => {
+    const rows = expandNestedSettlements(parent, raw).map(normalizeMicroplanEntry);
+    expect(rows.map(row => entryPoint(row))).toEqual([[12.5, 11.5], [12.51, 11.51], [12.52, 11.52]]);
+  });
   it('creates one row for every settlement with its own GPS and stable retry key', () => {
     const rows = expandNestedSettlements(parent, raw);
     expect(rows.map(r => [r.settlement_name, r.settlement_latitude, r.settlement_longitude])).toEqual([
