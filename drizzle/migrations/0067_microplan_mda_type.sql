@@ -1,0 +1,2 @@
+ALTER TABLE public.microplan_entries ADD COLUMN IF NOT EXISTS mda_type text CHECK (mda_type IS NULL OR mda_type IN ('standard','trachoma'));
+COMMENT ON COLUMN public.microplan_entries.mda_type IS 'NTD (MDA) microplanning scheme: standard or trachoma population disaggregation.';

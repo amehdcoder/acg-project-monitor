@@ -9320,6 +9320,7 @@ export type Database = {
           is_custom_location: boolean
           kobo_submission_id: string | null
           lga: string
+          mda_type: string | null
           medicine_returns: Json | null
           medicine_reversed_other: string | null
           medicine_reversed_to: string | null
@@ -9411,6 +9412,7 @@ export type Database = {
           is_custom_location?: boolean
           kobo_submission_id?: string | null
           lga: string
+          mda_type?: string | null
           medicine_returns?: Json | null
           medicine_reversed_other?: string | null
           medicine_reversed_to?: string | null
@@ -9502,6 +9504,7 @@ export type Database = {
           is_custom_location?: boolean
           kobo_submission_id?: string | null
           lga?: string
+          mda_type?: string | null
           medicine_returns?: Json | null
           medicine_reversed_other?: string | null
           medicine_reversed_to?: string | null
