@@ -698,6 +698,7 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                   <span>{entry.state} / {entry.lga}</span>
                   <span>Ward: {entry.ward}</span>
                   <span>FLHF: {entry.flhf_name}</span>
+                  {entry.settlement_name && <span className="col-span-2 text-foreground font-medium break-words">Settlement: {entry.settlement_name}</span>}
                   <span>Pop: {entry.estimated_total_population?.toLocaleString() || "—"}</span>
                   <span className={pwdTotalFor(entry) >= PWD_FLAG ? "font-bold text-purple-700 dark:text-purple-300" : ""}>
                     PWD: {pwdTotalFor(entry) ? pwdTotalFor(entry).toLocaleString() : "—"}{pwdTotalFor(entry) >= PWD_FLAG ? " ⚑" : ""}
@@ -729,7 +730,7 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
         </div>
         {/* Desktop table */}
         <div className="hidden sm:block overflow-x-auto">
-          <Table>
+          <Table className="min-w-[1500px] [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap [&_td]:break-normal">
             <TableHeader>
               <TableRow>
                 {!readOnly && (
@@ -2545,7 +2546,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
           {/* Primary project metrics */}
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
             {[
-              { label: "Communities", value: filtered.length.toLocaleString(), icon: Building2, tone: "geo-metric-blue" },
+              { label: "Communities", value: new Set(filtered.map(e => [e.state, e.lga, e.ward, e.flhf_name, e.community_name].join("||"))).size.toLocaleString(), icon: Building2, tone: "geo-metric-blue" },
               { label: "Total Population", value: totalPop.toLocaleString(), icon: Users, tone: "geo-metric-blue" },
               { label: "Target Population", value: targetPop.toLocaleString(), icon: Target, tone: "geo-metric-teal" },
               { label: "Health Facilities", value: String(uniqueFLHFs), icon: Heart, tone: "geo-metric-violet" },

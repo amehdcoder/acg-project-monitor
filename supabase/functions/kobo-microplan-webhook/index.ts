@@ -17,6 +17,7 @@ import { corsHeaders as baseCors } from "npm:@supabase/supabase-js@2/cors";
 import { resolveCoordinates, validateRepeatDisaggregations, communityRepeatItems, mappedScope } from "../_shared/microplanRepeatItem.ts";
 import { extractKoboMicroplanSchema, koboMdaType } from "../_shared/koboMicroplanSchema.ts";
 import { normalizeMicroplanChoice } from "../_shared/microplanChoices.ts";
+import { expandNestedSettlements } from "../_shared/microplanSettlements.ts";
 
 const corsHeaders = {
   ...baseCors,
@@ -728,7 +729,13 @@ Deno.serve(async (req) => {
       for (const k of Object.keys(itemFields)) {
         if (!(k in schemaFields) && itemFields[k] == null && record[k] != null) delete itemFields[k];
       }
-      upserts.push(buildRecord(itemFields, `${koboUuid}_${idx}`, { lat: cLat, lng: cLng }));
+      try {
+        upserts.push(...expandNestedSettlements(
+          buildRecord(itemFields, `${koboUuid}_${idx}`, { lat: cLat, lng: cLng }), rawItem,
+        ));
+      } catch (error) {
+        rejectedItems.push({ index: idx, reason: error instanceof Error ? error.message : 'Invalid nested settlements' });
+      }
     });
 
   } else {
@@ -771,6 +778,25 @@ Deno.serve(async (req) => {
       .select("id");
     if (res.error) upsertError = { message: res.error.message, code: (res.error as any).code };
     else firstId = (res.data as Array<{ id: string }> | null)?.[0]?.id ?? null;
+    if (!res.error && projectIdResolved) {
+      // Edited Kobo submissions may remove repeats. Retire only rows created
+      // by this nested parser for this exact community and project.
+      const currentKeys = new Set(upserts.map(row => row.idempotency_key));
+      for (const row of upserts) {
+        const metadata = row.extra_metadata as Record<string, unknown> | undefined;
+        const marker = metadata?.ame_microplan as Record<string, unknown> | undefined;
+        if (marker?.kind !== 'community') continue;
+        const previous = await supabase.from('microplan_entries').select('id,idempotency_key')
+          .eq('project_id', projectIdResolved)
+          .contains('extra_metadata', { ame_microplan: { kind: 'settlement', community_key: row.idempotency_key } });
+        if (previous.error) throw new Error(previous.error.message);
+        const stale = (previous.data ?? []).filter(child => !currentKeys.has(child.idempotency_key)).map(child => child.id);
+        if (stale.length) {
+          const removed = await supabase.from('microplan_entries').delete().eq('project_id', projectIdResolved).in('id', stale);
+          if (removed.error) throw new Error(removed.error.message);
+        }
+      }
+    }
   } catch (e) {
     upsertError = { message: (e as Error).message };
   }
