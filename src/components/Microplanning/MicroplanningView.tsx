@@ -2633,9 +2633,9 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
           </div>
 
           {/* Row 3: Breakdown panels — Accessibility, Security, Terrain, CDD (click to filter) */}
-          <div className="geo-breakdowns grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 items-start gap-3">
+          <div className="geo-breakdowns grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 items-stretch gap-3">
             {/* Accessibility */}
-            <Card className="border-border/40 shadow-sm">
+            <Card className="border-border/40 shadow-sm h-full">
               <CardContent className="p-3">
                 <div className="flex items-center justify-between mb-2.5">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
@@ -2675,7 +2675,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
             </Card>
 
             {/* Security */}
-            <Card className="border-border/40 shadow-sm">
+            <Card className="border-border/40 shadow-sm h-full">
               <CardContent className="p-3">
                 <div className="flex items-center justify-between mb-2.5">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
@@ -2714,7 +2714,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
             </Card>
 
             {/* Terrain */}
-            <Card className="border-border/40 shadow-sm">
+            <Card className="border-border/40 shadow-sm h-full">
               <CardContent className="p-3">
                 <div className="flex items-center justify-between mb-2.5">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
@@ -2748,7 +2748,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
             </Card>
 
             {/* Disability Types — clickable population disaggregation */}
-            <Card className="border-border/40 shadow-sm">
+            <Card className="border-border/40 shadow-sm h-full sm:col-span-2 lg:col-span-2">
               <CardContent className="p-3">
                 <div className="flex items-center justify-between mb-2.5">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
@@ -2763,7 +2763,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
                   <span className="text-[10px] text-muted-foreground">Total persons with disability</span>
                   <span className="text-sm font-bold tabular-nums text-foreground">{totalPwd.toLocaleString()}</span>
                 </div>
-                <div className="space-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1.5">
                   {DISABILITY_TYPES.map((d) => {
                     const stat = disabilityStats[d.key] || { pop: 0, communities: 0 };
                     const active = filterDisability === d.key;
@@ -2781,10 +2781,10 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
                         >
                           <d.icon className="h-3.5 w-3.5" style={{ color: d.color }} />
                         </span>
-                        <span className="flex-1 text-left text-foreground">{d.label}</span>
-                        <span className="font-bold tabular-nums text-foreground">{stat.pop.toLocaleString()}</span>
-                        <span className="text-[9px] text-muted-foreground tabular-nums w-14 text-right">{stat.communities} comm.</span>
-                        <div className="w-14 h-2 bg-muted rounded-full overflow-hidden">
+                        <span className="flex-1 min-w-0 truncate text-left text-foreground" title={d.label}>{d.label}</span>
+                        <span className="flex-shrink-0 font-bold tabular-nums text-foreground">{stat.pop.toLocaleString()}</span>
+                        <span className="flex-shrink-0 whitespace-nowrap text-[9px] text-muted-foreground tabular-nums text-right">{stat.communities} comm.</span>
+                        <div className="flex-shrink-0 w-12 h-2 bg-muted rounded-full overflow-hidden">
                           <div className="h-full rounded-full transition-all" style={{ width: `${share}%`, background: d.color }} />
                         </div>
                       </button>
@@ -2796,7 +2796,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
 
 
             {/* CDD & Key Ratios */}
-            <Card className="border-border/40 shadow-sm">
+            <Card className="border-border/40 shadow-sm h-full">
               <CardContent className="p-3">
                 <div className="flex items-center justify-between mb-2.5">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
