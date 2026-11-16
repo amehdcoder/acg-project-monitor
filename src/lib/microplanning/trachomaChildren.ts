@@ -10,7 +10,10 @@ export function trachomaChildrenTotals(entries: Record<string, unknown>[]) {
     const metadata = entry.extra_metadata;
     const marker = metadata && typeof metadata === 'object'
       ? (metadata as Record<string, unknown>).ame_microplan : undefined;
-    return !(marker && typeof marker === 'object' && (marker as Record<string, unknown>).kind === 'settlement');
+    if (!marker || typeof marker !== 'object') return true;
+    const m = marker as Record<string, unknown>;
+    if (m.measure_scope === 'settlement_rollup') return false;
+    return m.kind !== 'settlement' || m.measure_scope === 'settlement';
   });
   let male = 0, female = 0, maleRecorded = 0, femaleRecorded = 0, complete = 0;
   const count = (value: unknown): number | null => {

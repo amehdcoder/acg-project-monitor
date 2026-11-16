@@ -27,7 +27,9 @@ const ENTRY_COLUMNS =
   "trachoma_0_5_months, trachoma_6m_6y, trachoma_7_14y, trachoma_15_plus, " +
   "trachoma_1_9_male, trachoma_1_9_female, number_of_households, security_clearance, cdd_names, " +
   "community_distance_to_flhf_km, settlement_distance_to_flhf_km, accessibility, terrain_type, " +
-  "project_id, created_at";
+  "community_latitude, community_longitude, settlement_latitude, settlement_longitude, extra_metadata, " +
+  "pwd_total, pwd_visual, pwd_hearing, pwd_physical, pwd_intellectual, pwd_communication, pwd_selfcare, pwd_albinism, " +
+  "cdd_details, cdd_phone_numbers, cdd_from_community, population_source, mda_type, notes, project_id, created_at";
 
 const PAGE_SIZE = 1000;
 const cacheKey = (projectId: string) => `microplan-linkage-cache:${projectId}`;

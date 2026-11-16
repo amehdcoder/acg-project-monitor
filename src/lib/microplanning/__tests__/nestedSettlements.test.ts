@@ -22,6 +22,37 @@ const parent = {
 };
 
 describe('nested settlement synchronization', () => {
+  const detail = (pop: number, terrain: string, name: string) => ({
+    Settlement_Name: name, settlement_gps: '12.51 11.51 0 5', settlement_schema_version: 'details_v1',
+    settlement_Type_of_Terrain: terrain, settlement_Accessibility: 'seasonal_access', settlement_Security_Clearance: 'partially_cleared', settlement_Source_of_Population_Data: 'census',
+    settlement_Children_0_4_yrs: 10, settlement_Children_5_14_yrs: 20, settlement_Adults_15_yrs: pop - 30,
+    settlement_Total_Population: pop, settlement_Number_of_Households: 12,
+    settlement_pwd_total: 3, settlement_Visual_Seeing: 2, settlement_Hearing: 1, settlement_Physical_Mobility: 0,
+    settlement_Intellectual_Cognitive: 0, settlement_Communication_Speech: 0, settlement_Self_care: 0, settlement_Albinism: 0,
+    settlement_cdd_repeat: [{settlement_CDD_Name: name + ' CDD', settlement_CDD_Phone: '08012345678', settlement_CDD_Account_Number: '0123456789', settlement_CDD_Bank: 'other', settlement_CDD_Bank_Other: 'Local Bank'}],
+    settlement_Notes: name + ' note',
+  });
+  it('saves each settlement census, disability, terrain and CDD bank independently, without parent duplication', () => {
+    const rows = expandNestedSettlements(parent, {...raw, settlement_repeat: [detail(100,'flat','East'),detail(150,'riverine','West')]});
+    expect(rows.map(r=>r.estimated_total_population)).toEqual([null,100,150]);
+    expect(rows.reduce((n,r)=>n+Number(r.estimated_total_population??0),0)).toBe(250);
+    expect(rows[2]).toMatchObject({terrain_type:'riverine',accessibility:'seasonal',security_clearance:'partial',number_of_households:12,pwd_visual:2,pwd_total:3,notes:'West note',cdd_names:'West CDD'});
+    expect(rows[1].cdd_details).toEqual([expect.objectContaining({name:'East CDD',account_number:'0123456789',bank:'Local Bank'})]);
+  });
+  it('rejects incomplete, inconsistent or invalid later settlement counts and bank accounts', () => {
+    const check=(item:Record<string,unknown>)=>expandNestedSettlements(parent,{...raw,settlement_repeat:[detail(100,'flat','East'),item]});
+    expect(()=>check({...detail(150,'flat','West'),settlement_Number_of_Households:-1})).toThrow('non-negative');
+    expect(()=>check({...detail(150,'flat','West'),settlement_Total_Population:151})).toThrow('equal');
+    expect(()=>check({...detail(150,'flat','West'),settlement_Hearing:null})).toThrow('pwd_hearing is required');
+    expect(()=>check({...detail(150,'flat','West'),settlement_cdd_repeat:[{settlement_CDD_Name:'CDD',settlement_CDD_Account_Number:'123'}]})).toThrow();
+  });
+  it('uses settlement Trachoma groups and mandatory 5–9 counts without adding the parent cohort', () => {
+    const item={...detail(100,'flat','East'), settlement__0_5_Months:10,settlement__6_Months_6_Years:20,settlement__7_14_Years:30,settlement__15_Years:40,settlement_Trachoma_5_9_Male:7,settlement_Trachoma_5_9_Female:8};
+    const rows=expandNestedSettlements({...parent,mda_type:'trachoma'},{...raw,settlement_repeat:[item]});
+    expect(rows[1].estimated_total_population).toBe(100);
+    expect(trachomaChildrenTotals(rows)).toMatchObject({total:15,communities:1,complete:1});
+    expect(()=>expandNestedSettlements({...parent,mda_type:'trachoma'},{...raw,settlement_repeat:[{...item,settlement_Trachoma_5_9_Female:null}]})).toThrow('5–9');
+  });
   it('positions every nested settlement at its own GPS in shared dashboard maps', () => {
     const rows = expandNestedSettlements(parent, raw).map(normalizeMicroplanEntry);
     expect(rows.map(row => entryPoint(row))).toEqual([[12.5, 11.5], [12.51, 11.51], [12.52, 11.52]]);
