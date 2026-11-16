@@ -3,6 +3,7 @@ import { expandNestedSettlements } from '../../../../supabase/functions/_shared/
 import { extractKoboMicroplanSchema } from '../../../../supabase/functions/_shared/koboMicroplanSchema';
 import { normalizeMicroplanEntry } from '../normalizeEntry';
 import { entryPoint } from '../heatmaps';
+import { trachomaChildrenTotals } from '../trachomaChildren';
 
 const raw = {
   Community_Name: 'Community A', community_gps: '12.5 11.5 0 5', Has_Settlements: 'yes',
@@ -36,6 +37,7 @@ describe('nested settlement synchronization', () => {
   });
   it('does not double count community population, Trachoma cohorts, disability or households', () => {
     const rows = expandNestedSettlements(parent, raw);
+    expect(trachomaChildrenTotals(rows)).toMatchObject({ total: 65, communities: 1, complete: 1 });
     for (const [field, expected] of Object.entries({ estimated_total_population: 300, trachoma_0_5_months: 10, trachoma_6m_6y: 70, trachoma_7_14y: 80, trachoma_15_plus: 140, trachoma_1_9_male: 30, trachoma_1_9_female: 35, pwd_visual: 9, number_of_households: 60 })) {
       expect(rows.reduce((s, r) => s + Number(r[field] ?? 0), 0)).toBe(expected);
       expect(rows[1][field]).toBeNull();

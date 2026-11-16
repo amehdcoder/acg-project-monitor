@@ -6,6 +6,12 @@ export function isTrachomaTarget(fields: string[]): boolean {
 
 /** Independent overlapping cohort: never estimate it from wider age bands. */
 export function trachomaChildrenTotals(entries: Record<string, unknown>[]) {
+  entries = entries.filter(entry => {
+    const metadata = entry.extra_metadata;
+    const marker = metadata && typeof metadata === 'object'
+      ? (metadata as Record<string, unknown>).ame_microplan : undefined;
+    return !(marker && typeof marker === 'object' && (marker as Record<string, unknown>).kind === 'settlement');
+  });
   let male = 0, female = 0, maleRecorded = 0, femaleRecorded = 0, complete = 0;
   const count = (value: unknown): number | null => {
     if (value == null || value === "") return null;

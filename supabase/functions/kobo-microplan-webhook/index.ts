@@ -778,6 +778,25 @@ Deno.serve(async (req) => {
       .select("id");
     if (res.error) upsertError = { message: res.error.message, code: (res.error as any).code };
     else firstId = (res.data as Array<{ id: string }> | null)?.[0]?.id ?? null;
+    if (!res.error && projectIdResolved) {
+      // Edited Kobo submissions may remove repeats. Retire only rows created
+      // by this nested parser for this exact community and project.
+      const currentKeys = new Set(upserts.map(row => row.idempotency_key));
+      for (const row of upserts) {
+        const metadata = row.extra_metadata as Record<string, unknown> | undefined;
+        const marker = metadata?.ame_microplan as Record<string, unknown> | undefined;
+        if (marker?.kind !== 'community') continue;
+        const previous = await supabase.from('microplan_entries').select('id,idempotency_key')
+          .eq('project_id', projectIdResolved)
+          .contains('extra_metadata', { ame_microplan: { kind: 'settlement', community_key: row.idempotency_key } });
+        if (previous.error) throw new Error(previous.error.message);
+        const stale = (previous.data ?? []).filter(child => !currentKeys.has(child.idempotency_key)).map(child => child.id);
+        if (stale.length) {
+          const removed = await supabase.from('microplan_entries').delete().eq('project_id', projectIdResolved).in('id', stale);
+          if (removed.error) throw new Error(removed.error.message);
+        }
+      }
+    }
   } catch (e) {
     upsertError = { message: (e as Error).message };
   }
