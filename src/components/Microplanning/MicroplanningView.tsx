@@ -2633,7 +2633,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
           </div>
 
           {/* Row 3: Breakdown panels — Accessibility, Security, Terrain, CDD (click to filter) */}
-          <div className="geo-breakdowns grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 items-stretch gap-3">
+          <div className="geo-breakdowns grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-7 items-stretch gap-3">
             {/* Accessibility */}
             <Card className="border-border/40 shadow-sm h-full">
               <CardContent className="p-3">
@@ -2748,7 +2748,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
             </Card>
 
             {/* Disability Types — clickable population disaggregation */}
-            <Card className="border-border/40 shadow-sm h-full sm:col-span-2 lg:col-span-2 2xl:col-span-2">
+            <Card className="border-border/40 shadow-sm h-full sm:col-span-2 lg:col-span-2 2xl:col-span-3">
               <CardContent className="p-3">
                 <div className="flex items-center justify-between mb-2.5">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
