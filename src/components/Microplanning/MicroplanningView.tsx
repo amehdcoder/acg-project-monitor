@@ -729,7 +729,7 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
         </div>
         {/* Desktop table */}
         <div className="hidden sm:block overflow-x-auto">
-          <Table>
+          <Table className="min-w-[1500px] [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap [&_td]:break-normal">
             <TableHeader>
               <TableRow>
                 {!readOnly && (

@@ -80,7 +80,7 @@ const GpsResolveCell = ({ entry, readOnly = false, onResolved, compact = false }
   return (
     <div className={compact ? "inline-flex items-center gap-1" : "flex items-center gap-1"}>
       {hasCoords ? (
-        <Badge variant="outline" className="text-[10px] border-blue-300 text-blue-700">
+        <Badge variant="outline" className="text-[10px] whitespace-nowrap shrink-0 border-blue-300 text-blue-700">
           <MapPin className="h-2.5 w-2.5 mr-0.5" />
           {Number(entry.community_latitude).toFixed(5)}, {Number(entry.community_longitude).toFixed(5)}
         </Badge>
