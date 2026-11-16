@@ -85,7 +85,7 @@ export function extractKoboMicroplanSchema(src: AnyRec, mapping: Record<string, 
     Object.assign(out, { cdd_details: details }, cddLegacyColumns(details));
   }
   for (const col of ['trachoma_1_9_male', 'trachoma_1_9_female']) {
-    const raw = value(src, [mapping[col] ?? col]);
+    const raw = value(src, mapping[col] ? [mapping[col]] : [col.replace('1_9', '5_9'), col]);
     if (raw === undefined) continue;
     if (raw === null || raw === '') { out[col] = null; continue; }
     if (typeof raw !== 'number' && typeof raw !== 'string') throw new Error(`${col}: expected a whole-number count.`);
@@ -107,7 +107,7 @@ export function extractKoboMicroplanSchema(src: AnyRec, mapping: Record<string, 
       out[col] = n; total += n;
     }
     for (const col of ['trachoma_1_9_male', 'trachoma_1_9_female']) {
-      if (typeof out[col] !== 'number') throw new Error(`Trachoma MDA: ${col} is required.`);
+      if (typeof out[col] !== 'number') throw new Error(`Trachoma MDA: ${col.replace('1_9', '5_9')} (children 5–9 years) is required.`);
     }
     out.estimated_total_population = total;
   }
