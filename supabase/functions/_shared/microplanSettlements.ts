@@ -33,7 +33,10 @@ export function expandNestedSettlements(community: AnyRec, raw: AnyRec): AnyRec[
     settlement_distance_to_flhf_km: null,
     extra_metadata: { ...raw, ame_microplan: { kind: 'community', community_key: key, ...(detailed ? { measure_scope: 'settlement_rollup' } : {}) } },
   };
-  if (detailed) for (const field of COMMUNITY_MEASURES) (parent as AnyRec)[field] = null;
+  if (detailed) {
+    for (const field of COMMUNITY_MEASURES) (parent as AnyRec)[field] = null;
+    (parent as AnyRec).cdd_details = [];
+  }
   const children = settlements.map((value, index) => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`Settlement ${index + 1} is not an object`);
     const item = value as AnyRec;
