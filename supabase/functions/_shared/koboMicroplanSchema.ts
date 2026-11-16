@@ -94,7 +94,9 @@ export function extractKoboMicroplanSchema(src: AnyRec, mapping: Record<string, 
     out[col] = n;
   }
   if (mdaType) out.mda_type = mdaType;
-  if (mdaType === 'trachoma') {
+  const hasTrachomaScope = TRACHOMA_GROUPS.some(([col, field]) => value(src, [mapping[col] ?? field]) !== undefined);
+  // Population lives in the community repeat; a parent scope without it is validated per item.
+  if (mdaType === 'trachoma' && hasTrachomaScope) {
     // Trachoma MDA: every Trachoma age group and the 1–9 sex split are mandatory;
     // the standard age groups are skipped, so total population is the Trachoma sum.
     let total = 0;

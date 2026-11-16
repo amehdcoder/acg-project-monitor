@@ -62,3 +62,16 @@ describe('updated Kobo Microplanning schema', () => {
     expect(extractKoboMicroplanSchema({ clinic_account: '0123456789', boys: '4' }, { flhf_account_number: 'clinic_account', trachoma_1_9_male: 'boys' })).toEqual({ flhf_account_number: '0123456789', trachoma_1_9_male: 4 });
   });
 });
+describe('NTD MDA type', () => {
+  const trach = { _0_5_Months: 1, _6_Months_6_Years: 2, _7_14_Years: 3, _15_Years: 4, Trachoma_1_9_Male: 5, Trachoma_1_9_Female: 6 };
+  it('trachoma MDA saves trachoma total as population', () => {
+    expect(extractKoboMicroplanSchema(trach, {}, 'trachoma')).toMatchObject({ mda_type: 'trachoma', estimated_total_population: 10, trachoma_15_plus: 4 });
+  });
+  it('trachoma MDA rejects missing mandatory fields', () => {
+    expect(() => extractKoboMicroplanSchema({ ...trach, Trachoma_1_9_Female: '' }, {}, 'trachoma')).toThrow();
+    expect(() => extractKoboMicroplanSchema({ ...trach, _15_Years: undefined, _7_14_Years: '' }, {}, 'trachoma')).toThrow();
+  });
+  it('standard MDA is recorded from the form choice', () => {
+    expect(extractKoboMicroplanSchema({ MDA_Type: 'standard_mda' }).mda_type).toBe('standard');
+  });
+});
