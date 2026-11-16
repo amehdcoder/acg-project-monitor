@@ -1,8 +1,10 @@
 import { disposeMap } from "@/lib/microplanning/disposeMap";
-import { settlementPinData, settlementPinContent } from '@/lib/microplanning/settlementPins';
+import { settlementPinData, settlementPinContent, settlementLayerData } from '@/lib/microplanning/settlementPins';
 import { attachAreaInspection } from "@/lib/microplanning/areaMapInteraction";
 import { useMicroplanMapBoundaries } from "@/hooks/useMicroplanMapBoundaries";
 import L from "leaflet";
+import 'leaflet.markercluster';
+import 'leaflet.markercluster/dist/MarkerCluster.css';
 import { renderBatches } from "@/lib/microplanning/renderBatches";
 import { useEffect, useRef, useState, useMemo, useCallback, memo } from "react";
 import { deriveOnce } from "@/lib/microplanning/derivedCache";
@@ -14,7 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Map as MapIcon, ZoomIn, BarChart3, Maximize2, Minimize2, FileText, Loader2, Settings2, Focus, X, ChevronDown } from "lucide-react";
+import { Map as MapIcon, MapPin, ZoomIn, BarChart3, Maximize2, Minimize2, FileText, Loader2, Settings2, Focus, X, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
@@ -308,6 +310,14 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
 
   const resetZoom = () => { setSelStates([]); setSelLgas([]); setSelWards([]); setSelFlhfs([]); setSelYears([]); setSelCampaigns([]); };
 
+  const settlementLayer = useMemo(() => settlementLayerData(cascadedEntries), [cascadedEntries]);
+  const zoomToSettlements = useCallback(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !settlementLayer.pins.length) return;
+    setShowSettlements(true);
+    map.fitBounds(settlementLayer.pins.map(({ pin }) => [pin.lat, pin.lng] as [number, number]), { padding: [45, 45], maxZoom: 18, animate: false });
+  }, [settlementLayer]);
+
   // ─── FLHF-level aggregation ───
   const flhfAggregates = useMemo(() => {
     const agg: Record<string, {
@@ -420,6 +430,7 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
     if (!L) return;
     const map = L.map(mapRef.current, { zoomControl: true, zoomSnap: 0.5 }).setView([9.0, 8.0], 6);
     mapInstanceRef.current = map;
+    map.createPane('settlements').classList.add('geo-settlement-pane');
     map.on("moveend", () => {
       if (mapInstanceRef.current === map) setViewportRevision(value => value + 1);
     });
@@ -433,6 +444,42 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
     observer.observe(mapRef.current);
     return () => { detachInspection(); observer.disconnect(); disposeMap(map); mapInstanceRef.current = null; };
   }, []);
+
+  // Keep settlement interactions separate from thematic/viewport redraws.
+  // Clustering exposes collocated pins and avoids thousands of blocking nodes.
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !showSettlements) return;
+    const group = L.markerClusterGroup({
+      clusterPane: 'settlements', maxClusterRadius: 38, chunkedLoading: true,
+      chunkInterval: 24, chunkDelay: 16, spiderfyOnMaxZoom: false, zoomToBoundsOnClick: false,
+      showCoverageOnHover: false, animate: false,
+      iconCreateFunction: cluster => L.divIcon({
+        className: 'geo-settlement-cluster', html: String(cluster.getChildCount()), iconSize: [36, 36],
+      }),
+    });
+    group.on('clusterclick', event => {
+      const originalEvent = (event as L.LeafletMouseEvent).originalEvent;
+      if (originalEvent) L.DomEvent.stopPropagation(originalEvent);
+      const cluster = event.layer as L.MarkerCluster;
+      if (cluster.getChildCount() <= 12 || map.getZoom() >= map.getMaxZoom()) cluster.spiderfy();
+      else cluster.zoomToBounds();
+    });
+    const markers = settlementLayer.pins.map(({ entry, pin }) => {
+      const marker = L.marker([pin.lat, pin.lng], {
+        pane: 'settlements', title: `Settlement: ${pin.name}`, alt: `Settlement: ${pin.name}`,
+        icon: L.divIcon({ className: 'geo-settlement-pin', html: '<span></span>', iconSize: [26, 32], iconAnchor: [13, 30], popupAnchor: [0, -26] }),
+        zIndexOffset: 2500,
+      }).bindTooltip(() => settlementPinContent(pin), { direction: 'auto', offset: [0, -16], className: 'geo-settlement-tooltip' })
+        .bindPopup(() => settlementPinContent(pin), { maxWidth: 260, className: 'geo-settlement-popup', autoPanPadding: [24, 24] });
+      marker.on('add', () => marker.getElement()?.setAttribute('data-settlement-id', entry.id));
+      if (onEntryClick) marker.on('dblclick', () => onEntryClick(entry.id));
+      return marker;
+    });
+    group.addTo(map);
+    group.addLayers(markers);
+    return () => { group.clearLayers(); map.removeLayer(group); };
+  }, [settlementLayer, showSettlements, onEntryClick]);
 
   // ─── Zoom to extent ───
   useMicroplanMapBoundaries(mapInstanceRef, cascadedEntries.map(entry => entry.state));
@@ -781,18 +828,6 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
         }
       }
 
-      // Settlement marker
-      if (showSettlements && settlementPin) {
-        const pin = L.marker([settlementPin.lat, settlementPin.lng], {
-          title: `Settlement: ${settlementPin.name}`,
-          icon: L.divIcon({ className: 'geo-settlement-pin', html: '<span></span>', iconSize: [26, 32], iconAnchor: [13, 30], popupAnchor: [0, -26] }),
-          zIndexOffset: 350,
-        }).addTo(group)
-          .bindTooltip(() => settlementPinContent(settlementPin), { direction: 'top', offset: [0, -24], className: 'geo-settlement-tooltip' })
-          .bindPopup(() => settlementPinContent(settlementPin), { maxWidth: 260 });
-        if (onEntryClick) pin.on('dblclick', () => onEntryClick(entry.id));
-        bounds.push([settlementPin.lat, settlementPin.lng]);
-      }
     }, () => {
       // User pans/zooms must not be undone by a drawing completion.
     });
@@ -807,7 +842,7 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
       if (allBounds.length) map.fitBounds(allBounds, { padding: [40, 40], maxZoom: 13, animate: false });
     }
     return cancel;
-  }, [cascadedEntries, activeTheme, showBufferZones, showDistanceLines, showLabels, showSettlements, flhfAggregates, wardAggregates, maxPop, viewportRevision]);
+  }, [cascadedEntries, activeTheme, showBufferZones, showDistanceLines, showLabels, flhfAggregates, wardAggregates, maxPop, viewportRevision]);
 
   // ─── Popup builders ───
   const buildPopup = (e: MicroplanEntry, type: "community" | "settlement" = "community") => {
@@ -1146,8 +1181,8 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
   return (
     <Card className={`border-border/50 overflow-hidden ${isFullscreen ? "rounded-none border-0 h-screen overflow-auto bg-background" : ""}`} ref={(el) => { (exportContainerRef as any).current = el; (fullscreenRef as any).current = el; }}>
       <CardHeader className="pb-2 px-3 pt-3 space-y-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle className="flex min-w-0 flex-wrap items-center gap-2">
             <MapIcon className="h-4 w-4 text-primary" />
             Geo-enabled Microplan Map
             <Badge variant="outline" className="text-[9px] ml-1">{cascadedEntries.length} entries</Badge>
@@ -1190,10 +1225,16 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
 
         {/* Toggles */}
         <div className="flex items-center gap-4 flex-wrap">
-          <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground cursor-pointer">
-            <Switch aria-label="Settlement pins" checked={showSettlements} onCheckedChange={setShowSettlements} className="scale-75" />
-            Settlements
+          <label className="flex min-h-11 items-center gap-2 text-xs font-semibold text-foreground cursor-pointer">
+            <Switch aria-label="Settlement pins" checked={showSettlements} onCheckedChange={setShowSettlements} />
+            <span className="geo-settlement-swatch" aria-hidden="true" />
+            Settlements <span className="tabular-nums text-muted-foreground">({settlementLayer.pins.length.toLocaleString()})</span>
           </label>
+          <Button variant="outline" size="sm" className="min-h-11 gap-1.5" onClick={zoomToSettlements} disabled={!settlementLayer.pins.length} title="Zoom to settlement GPS locations">
+            <MapPin className="h-4 w-4" /> Zoom to settlements
+          </Button>
+          {settlementLayer.missingGps > 0 && <span className="text-xs text-muted-foreground">{settlementLayer.missingGps.toLocaleString()} settlements without GPS</span>}
+          {settlementLayer.named === 0 && <span className="text-xs text-muted-foreground">No settlements recorded in this selection</span>}
           <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground cursor-pointer">
             <Switch checked={showBufferZones} onCheckedChange={setShowBufferZones} className="scale-75" />
             Buffer Zones
@@ -1392,7 +1433,7 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
         <div className="flex items-center gap-2.5 px-3 py-1.5 text-[9px] text-muted-foreground flex-wrap border-t border-border/30 bg-muted/10">
           <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-blue-600 inline-block border border-white" style={{ borderRadius: "2px", transform: "rotate(45deg)" }} /> Community</span>
           <span className="flex items-center gap-1"><span className="w-3.5 h-3.5 rounded bg-red-700 inline-block text-center leading-[14px] text-[9px] text-white font-bold border-2 border-white shadow-sm">🏥</span> FLHF</span>
-          <span className="flex items-center gap-1"><span className="inline-block" style={{ width: 0, height: 0, borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: "8px solid #8B5CF6" }} /> Settlement</span>
+          <span className="flex items-center gap-1"><span className="geo-settlement-swatch" /> Settlement · {settlementLayer.pins.length.toLocaleString()}</span>
           <span className="border-l border-border/50 pl-2 ml-0.5" />
 
           {activeTheme === "flhf_catchment" && flhfSummaryData.slice(0, 8).map(a => (

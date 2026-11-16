@@ -3,8 +3,16 @@ export const AREA_INSPECT_EVENT = 'microplan-area-inspect';
 export function inspectMapArea(lat: number, lng: number) {
   window.dispatchEvent(new CustomEvent(AREA_INSPECT_EVENT,{detail:{lat,lng}}));
 }
+export function isBlankAreaClick(event: L.LeafletMouseEvent, container: HTMLElement) {
+  // Cluster/pin events may propagate after their DOM node was replaced.
+  // A known layer source is never a blank-area click, even without a target.
+  if ((event as L.LeafletMouseEvent & { layer?: L.Layer }).layer) return false;
+  const target = event.originalEvent?.target;
+  if (!(target instanceof Element)) return false;
+  return target === container || !target.closest('.leaflet-interactive,.leaflet-marker-icon,.leaflet-popup,.leaflet-control');
+}
 export function attachAreaInspection(map: L.Map) {
-  const inspect = (e: L.LeafletMouseEvent) => { if (e.originalEvent?.target === map.getContainer() || !(e.originalEvent?.target as Element)?.closest('.leaflet-interactive,.leaflet-marker-icon,.leaflet-popup,.leaflet-control')) inspectMapArea(e.latlng.lat,e.latlng.lng); };
+  const inspect = (e: L.LeafletMouseEvent) => { if (isBlankAreaClick(e,map.getContainer())) inspectMapArea(e.latlng.lat,e.latlng.lng); };
   map.on('click',inspect);
   const streets=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxNativeZoom:19,maxZoom:21,attribution:'© OpenStreetMap contributors'});
   const satellite=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxNativeZoom:19,maxZoom:21,attribution:'© Esri, Vantor, Earthstar Geographics, GIS User Community'});

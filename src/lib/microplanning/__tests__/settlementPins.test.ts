@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { settlementPinData, settlementPinContent } from '../settlementPins';
+import { settlementPinData, settlementPinContent, settlementLayerData } from '../settlementPins';
 const entry = { settlement_name:'East', community_name:'Community', settlement_latitude:11.751, settlement_longitude:11.961, estimated_total_population:100, cdd_names:'Musa', extra_metadata:{ame_microplan:{kind:'settlement',measure_scope:'settlement'}} };
 describe('settlement pins',()=>{
   it('uses settlement GPS and its own population/CDDs including confirmed zero',()=>{
@@ -20,5 +20,11 @@ describe('settlement pins',()=>{
     const el=settlementPinContent(pin);
     expect(el.querySelector('img')).toBeNull();
     expect(el.textContent).toContain('11.75100, 11.96100');
+  });
+  it('includes every valid scoped settlement and reports missing GPS without inventing a pin',()=>{
+    const layer=settlementLayerData([entry,{...entry,settlement_name:'West',settlement_latitude:11.752,estimated_total_population:150},{...entry,settlement_name:'Unlocated',settlement_latitude:null},{...entry,settlement_name:null}]);
+    expect(layer.pins.map(({pin})=>[pin.name,pin.lat,pin.population])).toEqual([['East',11.751,100],['West',11.752,150]]);
+    expect(layer.named).toBe(3);
+    expect(layer.missingGps).toBe(1);
   });
 });

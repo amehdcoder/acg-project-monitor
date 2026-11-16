@@ -2,8 +2,14 @@
 .geo-settlement-pin { background: transparent; border: 0; }
 .geo-settlement-pin > span { display: block; width: 22px; height: 22px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: hsl(var(--chart-secondary)); border: 2px solid hsl(var(--card)); box-shadow: 0 2px 5px hsl(var(--foreground) / .3); }
 .geo-settlement-pin > span::after { content: ''; display: block; width: 6px; height: 6px; margin: 6px; border-radius: 50%; background: hsl(var(--card)); }
+.geo-settlement-pane { z-index: 650; }
+.geo-settlement-cluster { display: grid; place-items: center; background: hsl(var(--chart-secondary)); color: hsl(var(--primary-foreground)); border: 3px solid hsl(var(--card)); border-radius: 50%; box-shadow: 0 2px 5px hsl(var(--foreground) / .3); font-size: 12px; font-weight: 700; }
+.geo-settlement-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: hsl(var(--chart-secondary)); border: 1px solid hsl(var(--card)); }
 .geo-settlement-tooltip.leaflet-tooltip { background: hsl(var(--card)); color: hsl(var(--foreground)); border: 1px solid hsl(var(--border)); }
-.geo-settlement-detail { font-size: 12px; line-height: 1.6; white-space: normal; overflow-wrap: anywhere; max-width: 240px; }
+.geo-settlement-popup .leaflet-popup-content-wrapper, .geo-settlement-popup .leaflet-popup-tip { background: hsl(var(--card)); color: hsl(var(--foreground)); }
+.geo-settlement-popup .leaflet-popup-content { max-width: min(240px, calc(100vw - 76px)); margin: 14px; }
+.geo-settlement-popup a.leaflet-popup-close-button { color: hsl(var(--foreground)); }
+.geo-settlement-detail { font-size: 12px; line-height: 1.6; white-space: normal; overflow-wrap: anywhere; max-width: min(240px, calc(100vw - 76px)); }
 .geo-settlement-detail strong { display: block; font-size: 14px; color: hsl(var(--foreground)); }
 .osiris-map-surface.maplibregl-map { position: absolute; inset: 0; width: 100%; height: 100%; }
 .osiris-map-surface canvas.maplibregl-canvas { max-width: none; }

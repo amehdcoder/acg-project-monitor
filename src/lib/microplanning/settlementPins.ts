@@ -34,3 +34,13 @@ export function settlementPinContent(pin: NonNullable<ReturnType<typeof settleme
   }
   return root;
 }
+
+/** Only the already-authorized map input can contribute pins or missing-GPS counts. */
+export function settlementLayerData<T extends SettlementPinEntry>(entries: T[]) {
+  const pins = entries.flatMap(entry => {
+    const pin = settlementPinData(entry);
+    return pin ? [{ entry, pin }] : [];
+  });
+  const named = entries.filter(entry => entry.settlement_name?.trim()).length;
+  return { pins, named, missingGps: named - pins.length };
+}
