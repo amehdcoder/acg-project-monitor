@@ -11,10 +11,10 @@ export function drawNigeriaAdminBoundaries(map: L.Map, data: NigeriaAdminBoundar
   }
   const palette = adminBoundaryPalette();
   const layers = L.layerGroup().addTo(map);
-  const add = (fc: NigeriaAdminBoundaries["states"], pane: string, color: string, weight: number, className: string) => L.geoJSON(fc as unknown as GeoJsonObject, {
-    pane, interactive: false,
-    style: { color, weight, fill: false, opacity: 1, lineCap: "round", lineJoin: "round", className, smoothFactor: 0 },
-  }).addTo(layers);
+  const add = (fc: NigeriaAdminBoundaries["states"], pane: string, color: string, weight: number, className: string) => {
+    const style: L.PolylineOptions = { color, weight, fill: false, opacity: 1, lineCap: "round", lineJoin: "round", className, smoothFactor: 0 };
+    return L.geoJSON(fc as unknown as GeoJsonObject, { pane, interactive: false, style }).addTo(layers);
+  };
   add(data.lgas, "admin-lga", palette.casing, 4.5, "geo-admin-lga-casing");
   add(data.lgas, "admin-lga", palette.lga, 2.2, "geo-admin-lga-line");
   add(data.states, "admin-state", palette.casing, 7, "geo-admin-state-casing");
