@@ -3,11 +3,35 @@ from copy import copy
 import re
 import openpyxl
 
+def finalize_workbook(w):
+    """Repair published forms too; retain stable field names for Kobo ingestion."""
+    s = w['survey']
+    cols = {c.value: c.column for c in s[1]}
+    def find(name):
+        return next(i for i in range(2, s.max_row + 1) if s.cell(i, cols['name']).value == name)
+    s.cell(find('group_eg0ly91'), cols['relevant'], "${Has_Settlements} = 'no'")
+    # Ask the unique-person total once, alongside the disability types, not
+    # again after CDD information and notes. Do not sum overlapping types.
+    total = find('settlement_pwd_total')
+    values = [c.value for c in s[total]]
+    styles = [copy(c._style) for c in s[total]]
+    s.delete_rows(total)
+    position = find('settlement_Albinism') + 1
+    s.insert_rows(position)
+    for col, (value, style) in enumerate(zip(values, styles), 1):
+        s.cell(position, col, value)._style = style
+    settings = w['settings']; cols = {c.value: c.column for c in settings[1]}
+    settings.cell(2, cols['version'], '202611162245')
+    settings.cell(2, cols['form_title'], 'Amehnities Geo Microplanning · Settlement Evidence · v2026.11.16e')
+    return w
+
 def update_workbook(w):
     s = w['survey']
     headers = [c.value for c in s[1]]
     rows = [dict(zip(headers, r)) for r in s.iter_rows(min_row=2, values_only=True)]
     by = {r['name']: r for r in rows if r.get('name')}
+    if 'settlement_schema_version' in by:
+        return finalize_workbook(w)
     first = next(i for i,r in enumerate(rows) if r.get('name') == 'group_eg0ly91')
     last = next(i for i,r in enumerate(rows) if r.get('name') == 'group_lz4vz64') + 2
     block = rows[first:last+1]
@@ -55,7 +79,7 @@ def update_workbook(w):
     settings=w['settings']; cols={c.value:c.column for c in settings[1]}
     settings.cell(2,cols['version'],'202611162207')
     settings.cell(2,cols['form_title'],'Amehnities Geo Microplanning · Settlement Evidence · v2026.11.16d')
-    return w
+    return finalize_workbook(w)
 
 if __name__ == '__main__':
     import sys

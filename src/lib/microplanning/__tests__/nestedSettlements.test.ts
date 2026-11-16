@@ -46,6 +46,18 @@ describe('nested settlement synchronization', () => {
     expect(()=>check({...detail(150,'flat','West'),settlement_Hearing:null})).toThrow('pwd_hearing is required');
     expect(()=>check({...detail(150,'flat','West'),settlement_cdd_repeat:[{settlement_CDD_Name:'CDD',settlement_CDD_Account_Number:'123'}]})).toThrow();
   });
+  it('accepts omitted parent conditions and the single disability total at its corrected Kobo group path for every settlement', () => {
+    const items = [detail(100, 'flat', 'East'), detail(150, 'riverine', 'West')].map((item) => {
+      const { settlement_pwd_total, ...fields } = item;
+      return { ...fields, 'settlement_repeat/settlement_group_eh6ih14/settlement_pwd_total': settlement_pwd_total };
+    });
+    const rows = expandNestedSettlements({ ...parent, terrain_type: null, accessibility: null, security_clearance: null }, { ...raw, settlement_repeat: items });
+    expect(rows.slice(1).map(row => [row.terrain_type, row.accessibility, row.security_clearance, row.pwd_total])).toEqual([
+      ['flat', 'seasonal', 'partial', 3], ['riverine', 'seasonal', 'partial', 3],
+    ]);
+    expect(rows[0].pwd_total).toBeNull();
+    expect(rows.reduce((total, row) => total + Number(row.pwd_total ?? 0), 0)).toBe(6);
+  });
   it('uses settlement Trachoma groups and mandatory 5–9 counts without adding the parent cohort', () => {
     const item={...detail(100,'flat','East'), settlement__0_5_Months:10,settlement__6_Months_6_Years:20,settlement__7_14_Years:30,settlement__15_Years:40,settlement_Trachoma_5_9_Male:7,settlement_Trachoma_5_9_Female:8};
     const rows=expandNestedSettlements({...parent,mda_type:'trachoma'},{...raw,settlement_repeat:[item]});
