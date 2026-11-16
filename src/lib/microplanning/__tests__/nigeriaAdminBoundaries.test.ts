@@ -22,8 +22,8 @@ describe("government-provenance Nigeria map reference", () => {
 
   it("retains the downloaded COD coordinates without simplification or axis swapping", () => {
     // Independently recorded from the standard OCHA archive, not computed from the bundled files.
-    expect(createHash("sha256").update(JSON.stringify(states.features.map(f => f.geometry))).digest("hex")).toBe("STATE_GEOMETRY_SHA");
-    expect(createHash("sha256").update(JSON.stringify(lgas.features.map(f => f.geometry))).digest("hex")).toBe("LGA_GEOMETRY_SHA");
+    expect(createHash("sha256").update(JSON.stringify(states.features.map(f => f.geometry))).digest("hex")).toBe("c686475c840db25dd9021f49744a17d73a80d7d8867aea9ff933f8cda0f73bad");
+    expect(createHash("sha256").update(JSON.stringify(lgas.features.map(f => f.geometry))).digest("hex")).toBe("db6c45311f0bb3de1ac1962c77b678c0b1caaf5036636edb8a5a98d161f7676c");
   });
 
   it("keeps all 774 LGAs linked to an existing official State P-code", () => {
