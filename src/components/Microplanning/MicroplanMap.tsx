@@ -1,4 +1,5 @@
 import { disposeMap } from "@/lib/microplanning/disposeMap";
+import { settlementPinData, settlementPinContent } from '@/lib/microplanning/settlementPins';
 import { attachAreaInspection } from "@/lib/microplanning/areaMapInteraction";
 import { useMicroplanMapBoundaries } from "@/hooks/useMicroplanMapBoundaries";
 import L from "leaflet";
@@ -45,6 +46,8 @@ interface MicroplanEntry {
   settlement_distance_to_flhf_km: number | null;
   cdd_from_community: boolean | null;
   cdd_names: string | null;
+  cdd_details?: unknown;
+  extra_metadata?: unknown;
   year_of_microplanning?: number | null;
   campaign_type?: string | null;
 }
@@ -221,6 +224,7 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
   const [showBufferZones, setShowBufferZones] = useState(true);
   const [showDistanceLines, setShowDistanceLines] = useState(true);
   const [showLabels, setShowLabels] = useState(true);
+  const [showSettlements, setShowSettlements] = useState(true);
   const [showSummaryPanel, setShowSummaryPanel] = useState(true);
   const [mapExpanded, setMapExpanded] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -624,7 +628,8 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
         : 5;
 
       // Community marker
-      if (cLat && cLng) {
+      const settlementPin = settlementPinData(entry);
+      if (cLat && cLng && !settlementPin?.nested) {
         const popLabel = entry.estimated_total_population ? entry.estimated_total_population.toLocaleString() : "";
         if (!detailed) {
           L.circleMarker([cLat, cLng], {
@@ -779,7 +784,18 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
       }
 
       // Settlement marker
-      if (sLat && sLng) {
+      if (showSettlements && settlementPin) {
+        const pin = L.marker([settlementPin.lat, settlementPin.lng], {
+          title: `Settlement: ${settlementPin.name}`,
+          icon: L.divIcon({ className: 'geo-settlement-pin', html: '<span></span>', iconSize: [26, 32], iconAnchor: [13, 30], popupAnchor: [0, -26] }),
+          zIndexOffset: 350,
+        }).addTo(group)
+          .bindTooltip(() => settlementPinContent(settlementPin), { direction: 'top', offset: [0, -24], className: 'geo-settlement-tooltip' })
+          .bindPopup(() => settlementPinContent(settlementPin), { maxWidth: 260 });
+        if (onEntryClick) pin.on('dblclick', () => onEntryClick(entry.id));
+        bounds.push([settlementPin.lat, settlementPin.lng]);
+      }
+      if (false && sLat && sLng) {
         let sC = "#8B5CF6";
         if (activeTheme === "distance") sC = getDistanceColor(entry.settlement_distance_to_flhf_km);
         if (activeTheme === "accessibility" && entry.accessibility) sC = ACCESS_COLORS[entry.accessibility]?.color || sC;
@@ -832,7 +848,7 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
       if (allBounds.length) map.fitBounds(allBounds, { padding: [40, 40], maxZoom: 13, animate: false });
     }
     return cancel;
-  }, [cascadedEntries, activeTheme, showBufferZones, showDistanceLines, showLabels, flhfAggregates, wardAggregates, maxPop, viewportRevision]);
+  }, [cascadedEntries, activeTheme, showBufferZones, showDistanceLines, showLabels, showSettlements, flhfAggregates, wardAggregates, maxPop, viewportRevision]);
 
   // ─── Popup builders ───
   const buildPopup = (e: MicroplanEntry, type: "community" | "settlement" = "community") => {
@@ -1215,6 +1231,10 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
 
         {/* Toggles */}
         <div className="flex items-center gap-4 flex-wrap">
+          <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground cursor-pointer">
+            <Switch aria-label="Settlement pins" checked={showSettlements} onCheckedChange={setShowSettlements} className="scale-75" />
+            Settlements
+          </label>
           <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground cursor-pointer">
             <Switch checked={showBufferZones} onCheckedChange={setShowBufferZones} className="scale-75" />
             Buffer Zones
