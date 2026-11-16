@@ -470,6 +470,13 @@
       "when": 1794769374203,
       "tag": "0066_bind_eye_photo_reads_to_report_permissions",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1794863372849,
+      "tag": "0067_microplan_mda_type",
+      "breakpoints": true
     }
   ]
 }
