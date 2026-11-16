@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Sync nested Kobo settlements to separate scoped rows with their own GPS, retain community-level counts only once, preserve updated MDA/banking/CDD fields, and verify retry/realtime dashboard readback.
+
 - [x] Update the latest downloadable Kobo XLSForm with settlements repeated inside each community and mandatory GPS for both levels; community-only entry remains possible. Five rule tests and 16 existing intake tests pass; full pyxform/ODK validation passes; unchanged MDA, banking, CDD and choice fields confirmed. Updated asset published through the existing Super Admin-only latest download. Kobo upload/redeployment remains the user's next step; no live submissions or dashboard ingestion changes were made.
 
 - [ ] Align every Geo Microplanning map's State/LGA outlines to a verified government-provenance Nigeria boundary source; retain detailed shared geometry, visible line hierarchy, offline availability and existing scoped records; verify geometry and signed-in desktop/mobile rendering.

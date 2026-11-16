@@ -17,6 +17,7 @@ import { corsHeaders as baseCors } from "npm:@supabase/supabase-js@2/cors";
 import { resolveCoordinates, validateRepeatDisaggregations, communityRepeatItems, mappedScope } from "../_shared/microplanRepeatItem.ts";
 import { extractKoboMicroplanSchema, koboMdaType } from "../_shared/koboMicroplanSchema.ts";
 import { normalizeMicroplanChoice } from "../_shared/microplanChoices.ts";
+import { expandNestedSettlements } from "../_shared/microplanSettlements.ts";
 
 const corsHeaders = {
   ...baseCors,
@@ -728,7 +729,13 @@ Deno.serve(async (req) => {
       for (const k of Object.keys(itemFields)) {
         if (!(k in schemaFields) && itemFields[k] == null && record[k] != null) delete itemFields[k];
       }
-      upserts.push(buildRecord(itemFields, `${koboUuid}_${idx}`, { lat: cLat, lng: cLng }));
+      try {
+        upserts.push(...expandNestedSettlements(
+          buildRecord(itemFields, `${koboUuid}_${idx}`, { lat: cLat, lng: cLng }), rawItem,
+        ));
+      } catch (error) {
+        rejectedItems.push({ index: idx, reason: error instanceof Error ? error.message : 'Invalid nested settlements' });
+      }
     });
 
   } else {
