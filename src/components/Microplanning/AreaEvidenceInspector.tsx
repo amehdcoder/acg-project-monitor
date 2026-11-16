@@ -9,12 +9,15 @@ import { areaRows, areaScope, evidenceVerdict, nearbyAreaRows, parseLandEvidence
 import { AREA_INSPECT_EVENT } from '@/lib/microplanning/areaMapInteraction';
 import { buildAreaWorkbook } from '@/lib/microplanning/areaWorkbook';
 import type { Boundary } from '@/lib/microplanning/osiris';
+import { loadNigeriaAdminBoundaries, selectAdminBoundaries, type NigeriaAdminBoundaries } from '@/lib/microplanning/nigeriaAdminBoundaries';
+import { drawNigeriaAdminBoundaries } from '@/lib/microplanning/leafletAdminBoundaries';
 
 export default function AreaEvidenceInspector({entries,scopeKey,allowReference}:{entries:AreaEntry[];scopeKey:string;allowReference:(row:{state:string;lga:string;ward:string})=>boolean}) {
   const [point,setPoint]=useState<{lat:number;lng:number}|null>(null),[boundaries,setBoundaries]=useState<Boundary[]>([]);
   const [rows,setRows]=useState<AreaRow[]>([]),[features,setFeatures]=useState<LandEvidence[]>([]),[status,setStatus]=useState(''),[busy,setBusy]=useState(false),[revision,setRevision]=useState(0);
   const [file,setFile]=useState<Blob|null>(null),[mapNode,setMapNode]=useState<HTMLDivElement|null>(null);
-  useEffect(()=>{const abort=new AbortController();fetch('/nigeria-lga.geojson',{signal:abort.signal}).then(r=>r.json()).then(d=>setBoundaries(d.features)).catch(()=>{});return()=>abort.abort();},[]);
+  const [adminData,setAdminData]=useState<NigeriaAdminBoundaries|null>(null);
+  useEffect(()=>{let live=true;loadNigeriaAdminBoundaries().then(data=>{if(live){setAdminData(data);setBoundaries(data.lgas.features);}}).catch(()=>{if(live)setStatus('State/LGA outlines unavailable — reconnect and reopen.');});return()=>{live=false;};},[]);
   useEffect(()=>{setPoint(null);setRows([]);setFeatures([]);setFile(null);},[scopeKey]);
   useEffect(()=>{const listener=(event:Event)=>{const p=(event as CustomEvent<{lat:number;lng:number}>).detail;if(Number.isFinite(p.lat)&&Number.isFinite(p.lng))setPoint(p);};window.addEventListener(AREA_INSPECT_EVENT,listener);return()=>window.removeEventListener(AREA_INSPECT_EVENT,listener);},[]);
   const scope=useMemo(()=>point?areaScope(point.lat,point.lng,entries,boundaries):undefined,[point,entries,boundaries]);
@@ -45,12 +48,13 @@ export default function AreaEvidenceInspector({entries,scopeKey,allowReference}:
   useEffect(()=>{
     if(!mapNode||!point||!scope)return;
     const m=L.map(mapNode,{maxZoom:21}).setView([point.lat,point.lng],17);
+    const adminLayers=adminData?drawNigeriaAdminBoundaries(m,selectAdminBoundaries(adminData,[scope.properties.state])):null;
     const imagery=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxNativeZoom:19,maxZoom:21,attribution:'© Esri, Vantor, Earthstar Geographics, GIS User Community'}).addTo(m);
     const labels=L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{maxNativeZoom:18,maxZoom:21,attribution:'© Esri reference labels'});
     L.control.layers({'Satellite imagery':imagery},{'Hybrid place labels':labels},{collapsed:false}).addTo(m);L.control.scale().addTo(m);
     L.circle([point.lat,point.lng],{radius:2000,fill:false}).addTo(m);L.circleMarker([point.lat,point.lng],{radius:6}).addTo(m);
-    const observer=new ResizeObserver(()=>m.invalidateSize());observer.observe(mapNode);return()=>{observer.disconnect();m.remove();};
-  },[mapNode,point,scope]);
+    const observer=new ResizeObserver(()=>m.invalidateSize());observer.observe(mapNode);return()=>{observer.disconnect();adminLayers?.remove();m.remove();};
+  },[mapNode,point,scope,adminData]);
   const download=()=>{if(!file)return;const url=URL.createObjectURL(file),a=document.createElement('a');a.href=url;a.download=`${scope?.properties.state}-${scope?.properties.lga}-area-evidence.xlsx`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);};
   return <Dialog open={Boolean(point)} onOpenChange={open=>{if(!open)setPoint(null);}}><DialogContent className="max-h-[90dvh] max-w-4xl overflow-y-auto"><DialogHeader><DialogTitle className="flex items-center gap-2"><MapPinned className="h-5 w-5 text-primary"/>Area evidence · {scope?.properties.lga||'Outside visible LGA scope'}</DialogTitle></DialogHeader>
     {!scope?<p className="text-sm text-muted-foreground">No permitted LGA with project map data contains this point. No area data is exported.</p>:<>

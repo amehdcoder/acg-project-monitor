@@ -1,5 +1,6 @@
 import { disposeMap } from "@/lib/microplanning/disposeMap";
 import { attachAreaInspection } from "@/lib/microplanning/areaMapInteraction";
+import { useMicroplanMapBoundaries } from "@/hooks/useMicroplanMapBoundaries";
 import L from "leaflet";
 import { renderBatches } from "@/lib/microplanning/renderBatches";
 import { useEffect, useRef, useState, useMemo, useCallback, memo } from "react";
@@ -430,6 +431,8 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
   }, []);
 
   // ─── Zoom to extent ───
+  useMicroplanMapBoundaries(mapInstanceRef, cascadedEntries.map(entry => entry.state));
+
   const zoomToExtent = useCallback(() => {
     const map = mapInstanceRef.current;
     if (!L || !map) return;

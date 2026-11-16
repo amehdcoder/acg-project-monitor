@@ -1,4 +1,6 @@
 import { disposeMap } from "@/lib/microplanning/disposeMap";
+import { drawNigeriaAdminBoundaries } from "@/lib/microplanning/leafletAdminBoundaries";
+import { loadNigeriaAdminBoundaries, selectAdminBoundaries } from "@/lib/microplanning/nigeriaAdminBoundaries";
 import { renderBatches } from "@/lib/microplanning/renderBatches";
 import { useTablePagination } from "@/hooks/useTablePagination";
 import DatasetPagination from "./DatasetPagination";
@@ -194,11 +196,18 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName, allocationRo
     }).addTo(map);
     mapRef.current = map;
     attachSv(map);
+    let live = true;
+    let removeBoundaries: (() => void) | undefined;
+    void loadNigeriaAdminBoundaries().then(data => {
+      if (live) removeBoundaries = drawNigeriaAdminBoundaries(map, selectAdminBoundaries(data, filtered.map(entry => entry.state))).remove;
+    }).catch(() => {
+      if (live) toast({ title: "State/LGA outlines unavailable", description: "Reconnect and reopen the map; coverage records are unchanged." });
+    });
 
     const geoEntries = filtered.filter(e => e.community_latitude && e.community_longitude);
     if (geoEntries.length === 0) {
       map.setView([9.06, 7.49], 6);
-      return () => { disposeMap(map); mapRef.current = null; };
+      return () => { live = false; removeBoundaries?.(); disposeMap(map); mapRef.current = null; };
     }
 
     const bounds: L.LatLngTuple[] = geoEntries.flatMap(e => e.community_latitude != null && e.community_longitude != null ? [[e.community_latitude, e.community_longitude] as L.LatLngTuple] : []);
@@ -300,7 +309,7 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName, allocationRo
       map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13, animate: false });
     }
 
-    return () => { cancel(); disposeMap(map); mapRef.current = null; };
+    return () => { live = false; removeBoundaries?.(); cancel(); disposeMap(map); mapRef.current = null; };
   }, [showMap, filtered, getTargetPop]);
 
   const getCoverageColor = (coverage: number) => {

@@ -1,5 +1,6 @@
 import { disposeMap } from "@/lib/microplanning/disposeMap";
 import { attachAreaInspection } from "@/lib/microplanning/areaMapInteraction";
+import { useMicroplanMapBoundaries } from "@/hooks/useMicroplanMapBoundaries";
 import { renderBatches } from "@/lib/microplanning/renderBatches";
 import { useState, useMemo, useEffect, useRef, useCallback, memo } from "react";
 import { deriveOnce } from "@/lib/microplanning/derivedCache";
@@ -320,6 +321,8 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
   }, []);
 
   // Draw route when origin/destination change
+  useMicroplanMapBoundaries(mapRef, entries.map(entry => entry.state));
+
   useEffect(() => {
     if (!mapRef.current || !routeLayerRef.current) return;
     routeLayerRef.current.clearLayers();
