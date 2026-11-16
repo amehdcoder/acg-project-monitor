@@ -452,11 +452,17 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
     if (!map || !showSettlements) return;
     const group = L.markerClusterGroup({
       clusterPane: 'settlements', maxClusterRadius: 38, chunkedLoading: true,
-      chunkInterval: 24, chunkDelay: 16, spiderfyOnMaxZoom: true,
+      chunkInterval: 24, chunkDelay: 16, spiderfyOnMaxZoom: false, zoomToBoundsOnClick: false,
       showCoverageOnHover: false, animate: false,
       iconCreateFunction: cluster => L.divIcon({
         className: 'geo-settlement-cluster', html: String(cluster.getChildCount()), iconSize: [36, 36],
       }),
+    });
+    group.on('clusterclick', event => {
+      if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent);
+      const cluster = event.layer as L.MarkerCluster;
+      if (cluster.getChildCount() <= 12 || map.getZoom() >= map.getMaxZoom()) cluster.spiderfy();
+      else cluster.zoomToBounds();
     });
     const markers = settlementLayer.pins.map(({ entry, pin }) => {
       const marker = L.marker([pin.lat, pin.lng], {
