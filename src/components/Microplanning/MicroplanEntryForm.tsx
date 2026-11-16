@@ -448,7 +448,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       trachoma_1_9_male: null, trachoma_1_9_female: null,
     };
     if ([submitData.trachoma_1_9_male, submitData.trachoma_1_9_female].some(value => value != null && (!Number.isSafeInteger(value) || value < 0 || value > 100000000))) {
-      toast({ title: "Invalid children 1–9 count", description: "Enter a whole number of zero or more for each sex, or leave it blank.", variant: "destructive" });
+      toast({ title: "Invalid children 5–9 count", description: "Enter a whole number of zero or more for each sex, or leave it blank.", variant: "destructive" });
       return;
     }
     try {
@@ -818,13 +818,13 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
               {tracTotal > 0 && <p className="text-[10px] text-muted-foreground">Auto-calculated: {tracTotal.toLocaleString()}</p>}
             </Field>
             <div className="col-span-full border-t border-border pt-3 mt-1">
-              <h4 className="text-xs font-semibold mb-3">Children 1–9 years · sex disaggregation (Optional)</h4>
+              <h4 className="text-xs font-semibold mb-3">Children 5–9 years · sex disaggregation (Optional)</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Field label="Male · 1–9 years">
-                  <Input aria-label="Male children 1–9 years" value={form.trachoma_1_9_male ?? ""} onChange={e => setNum("trachoma_1_9_male", e.target.value)} type="number" min={0} max={100000000} step={1} className="h-8 text-xs" />
+                <Field label="Male · 5–9 years">
+                  <Input aria-label="Male children 5–9 years" value={form.trachoma_1_9_male ?? ""} onChange={e => setNum("trachoma_1_9_male", e.target.value)} type="number" min={0} max={100000000} step={1} className="h-8 text-xs" />
                 </Field>
-                <Field label="Female · 1–9 years">
-                  <Input aria-label="Female children 1–9 years" value={form.trachoma_1_9_female ?? ""} onChange={e => setNum("trachoma_1_9_female", e.target.value)} type="number" min={0} max={100000000} step={1} className="h-8 text-xs" />
+                <Field label="Female · 5–9 years">
+                  <Input aria-label="Female children 5–9 years" value={form.trachoma_1_9_female ?? ""} onChange={e => setNum("trachoma_1_9_female", e.target.value)} type="number" min={0} max={100000000} step={1} className="h-8 text-xs" />
                 </Field>
               </div>
             </div>

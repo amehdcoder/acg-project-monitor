@@ -1601,6 +1601,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
   // Previously ~25 separate map/filter/reduce passes ran on EVERY render. With
   // millions of rows that froze the page; now it's one loop, recomputed only
   // when the filtered set actually changes.
+  const trachomaMode = isTrachomaTarget(targetPopulationFields);
   const kpis = useMemo(() => {
     let totalPop = 0, totalChildren04 = 0, totalChildren514 = 0, totalAdults15 = 0, totalHouseholds = 0, targetPop = 0;
     let geotagged = 0, hardToReach = 0, uniqueSettlements = 0, cddFromCommunity = 0;
@@ -1619,7 +1620,11 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
         if (v > 0) { disabilityStats[d.key].pop += v; disabilityStats[d.key].communities += 1; }
       }
       totalPwd += pwdTotalFor(e as any);
-      totalPop += e.estimated_total_population || 0;
+      // Trachoma-target projects: Total Population = all Trachoma age groups;
+      // the separate 5–9 years cohort is set aside and never added.
+      totalPop += trachomaMode
+        ? (e.trachoma_0_5_months || 0) + (e.trachoma_6m_6y || 0) + (e.trachoma_7_14y || 0) + (e.trachoma_15_plus || 0)
+        : e.estimated_total_population || 0;
       totalChildren04 += e.estimated_children_0_4 || 0;
       totalChildren514 += e.estimated_children_5_14 || 0;
       totalAdults15 += e.estimated_adults_15_plus || 0;
@@ -1664,7 +1669,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
       avgHouseholdsPerCommunity: count > 0 && totalHouseholds > 0 ? Math.round(totalHouseholds / count) : 0,
       accessStats, securityStats, terrainCounts, disabilityStats, totalPwd,
     };
-  }, [filtered, calcTargetPop]);
+  }, [filtered, calcTargetPop, trachomaMode]);
   const {
     totalPop, totalChildren04, totalChildren514, totalAdults15, totalHouseholds, targetPop,
     geotagged, geotaggedPct, hardToReach, uniqueStatesCount, uniqueLGAsCount, uniqueWardsCount,
