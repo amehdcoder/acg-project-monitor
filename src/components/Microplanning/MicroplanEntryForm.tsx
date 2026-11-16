@@ -509,6 +509,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
           <select className={nativeSelectClass} value={form.population_source} onChange={e => set("population_source", e.target.value)}>
             <option value="">Select source</option>
             <option value="census">National Census</option>
+            <option value="cdd_census_census_update">CDD Census/Census Update</option>
             <option value="projected">Census Projection</option>
             <option value="community_leader">Community Leader Estimate</option>
             <option value="health_facility">Health Facility Records</option>

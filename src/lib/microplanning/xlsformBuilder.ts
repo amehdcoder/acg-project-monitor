@@ -359,6 +359,7 @@ export async function buildMicroplanningXlsForm(
 
   for (const [n, l] of [
     ["census", "National Census"], ["projected", "Census Projection"],
+    ["cdd_census_census_update", "CDD Census/Census Update"],
     ["community_leader", "Community Leader Estimate"], ["health_facility", "Health Facility Records"],
     ["household_listing", "Household Listing"], ["survey", "Survey/Study"], ["other", "Other"],
   ]) pushChoice({ list_name: "population_source", name: n, label: l });

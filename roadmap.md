@@ -1,5 +1,7 @@
 # Roadmap
 
+- [x] Add CDD Census/Census Update to in-app, generated exports and latest Kobo population sources (including settlements), using the same cdd_census_census_update value. Published v2026.11.16f to latest download; full ODK validation, seven workbook tests and 13 focused sync tests pass. Signed-in phone/desktop light/dark selection persists after another field changes; exact downloaded workbook choice verified. Upload/redeploy on KoboToolbox remains required; no live records changed.
+
 - [x] Correct latest Kobo settlement form: parent terrain/access/security only for community-only entries; unique-person disability total once inside disability section. v2026.11.16e published to the Super Admin latest download, signed-in menu and exact hosted workbook verified; full ODK validation and six workbook tests pass, 239 Microplanning tests pass (3 optional checks skipped). Stable field names, choice codes and details_v1 keep the deployed receiver compatible without changes. Genuine delivery remains dependent on uploading/redeploying the workbook on KoboToolbox and making a real submission; no project records changed.
 
 - [ ] Add settlement map pin layer with own GPS, population/CDD hover and tap details; verify scoped real rows and mobile/desktop themes.

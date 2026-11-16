@@ -57,4 +57,12 @@ class SettlementDetails(unittest.TestCase):
         self.assertEqual([r[1] for r in self.w['survey'].iter_rows(min_row=2,values_only=True)], names)
         self.assertEqual(list(self.w['choices'].values), choices)
 
+    def test_cdd_census_source_is_available_for_parent_and_every_settlement(self):
+        self.assertEqual(self.by['Source_of_Population_Data']['type'], self.by['settlement_Source_of_Population_Data']['type'])
+        source_list=self.by['Source_of_Population_Data']['type'].split()[1]
+        headers=[c.value for c in self.w['choices'][1]]
+        matches=[dict(zip(headers,r)) for r in self.w['choices'].iter_rows(min_row=2,values_only=True) if dict(zip(headers,r)).get('list_name')==source_list and dict(zip(headers,r)).get('name')=='cdd_census_census_update']
+        self.assertEqual(len(matches),1)
+        self.assertEqual(matches[0]['name'],'cdd_census_census_update')
+
 if __name__=='__main__':unittest.main()
