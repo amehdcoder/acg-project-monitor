@@ -477,6 +477,13 @@
       "when": 1794863372849,
       "tag": "0067_microplan_mda_type",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1794864563005,
+      "tag": "0068_owner_record_functions_static_sql",
+      "breakpoints": true
     }
   ]
 }
