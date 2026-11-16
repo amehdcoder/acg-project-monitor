@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Correct latest Kobo settlement form: parent terrain/access/security only for community-only entries; unique-person disability total once inside disability section; validate, publish latest download and check existing sync compatibility.
+
 - [ ] Add settlement map pin layer with own GPS, population/CDD hover and tap details; verify scoped real rows and mobile/desktop themes.
 
 - [x] Add full settlement-specific Kobo population, households, disability, terrain/access/security, source, leadership, CDD banking and notes; versioned settlement measure scope prevents parent census duplication. Latest Super Admin download updated; full ODK validation and three workbook tests pass, 235 Microplanning tests pass. Live deployed receiver save/retry/remove/restore and GPS rejection verified, both settlement populations/CDD accounts read back with correct categories and disability; phone/desktop light/dark checks passed. Verification records removed. Upload/redeploy latest workbook on KoboToolbox to begin real collector submissions.
