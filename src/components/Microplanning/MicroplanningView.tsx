@@ -698,6 +698,7 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                   <span>{entry.state} / {entry.lga}</span>
                   <span>Ward: {entry.ward}</span>
                   <span>FLHF: {entry.flhf_name}</span>
+                  {entry.settlement_name && <span className="col-span-2 text-foreground font-medium break-words">Settlement: {entry.settlement_name}</span>}
                   <span>Pop: {entry.estimated_total_population?.toLocaleString() || "—"}</span>
                   <span className={pwdTotalFor(entry) >= PWD_FLAG ? "font-bold text-purple-700 dark:text-purple-300" : ""}>
                     PWD: {pwdTotalFor(entry) ? pwdTotalFor(entry).toLocaleString() : "—"}{pwdTotalFor(entry) >= PWD_FLAG ? " ⚑" : ""}
