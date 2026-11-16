@@ -652,7 +652,7 @@ Deno.serve(async (req) => {
       // Malformed values (non-numeric / negative / non-text) fail fast and the
       // item is rejected with a clear, auditable reason instead of writing junk.
       const validation = validateRepeatDisaggregations(item, {
-        requireDisaggregations: strictDisaggregations,
+        requireDisaggregations: strictDisaggregations && !(Array.isArray(item.settlement_repeat) && item.settlement_repeat.some((s: Record<string, unknown>) => s.settlement_schema_version === 'details_v1')),
       });
       if (!validation.success) {
         rejectedItems.push({
