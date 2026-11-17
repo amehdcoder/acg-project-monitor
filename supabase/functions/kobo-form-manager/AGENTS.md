@@ -1,0 +1,1 @@
+- Resolve saved Kobo credentials only on the server; count XLSForm upload as successful only after completed import and active matching deployment — why: secrets stay private and collectors never receive a falsely reported form version.
