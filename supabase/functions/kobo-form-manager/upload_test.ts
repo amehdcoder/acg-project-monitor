@@ -137,6 +137,7 @@ Deno.test("performKoboXlsformUpload — OVERWRITE flow targets destination/asset
 
   const deploy = calls.find((c) => c.path === "/api/v2/assets/existingUID/deployment/");
   assertEquals(deploy?.method, "PATCH", "existing deployment must be PATCHed, not POSTed");
+  assertEquals(deploy?.body.version_id, "v9", "PATCH active alone does not redeploy the newly imported schema");
 
   assertEquals(persisted.length, 1);
   assertEquals(persisted[0].version_id, "row-uuid");

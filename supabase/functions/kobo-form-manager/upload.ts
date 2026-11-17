@@ -208,7 +208,7 @@ export async function performKoboXlsformUpload(
     await deps.fetcher(server_url, `/api/v2/assets/${finalUid}/deployment/`, api_token, {
       method: finalAsset?.has_deployment ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ active: true }),
+      body: JSON.stringify({ active: true, ...(finalAsset?.version_id ? { version_id: finalAsset.version_id } : {}) }),
     });
     const deployment = await deps.fetcher(server_url, `/api/v2/assets/${finalUid}/deployment/?format=json`, api_token);
     if (deployment?.active !== true) return { ok: false, error: "Kobo deployment is not active", detail: "XLSForm imported, but Kobo has not enabled collection", status: 502 };

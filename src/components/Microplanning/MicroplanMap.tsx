@@ -480,13 +480,31 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
       };
       marker.on('tooltipopen', () => protectDetail(marker.getTooltip()?.getElement()));
       marker.on('popupopen', () => protectDetail(marker.getPopup()?.getElement()));
+      const positionTooltip = () => {
+        const tooltip = marker.getTooltip();
+        const element = tooltip?.getElement();
+        if (!tooltip || !element) return;
+        const area = map.getContainer().getBoundingClientRect();
+        const rect = element.getBoundingClientRect();
+        const dx = rect.left < area.left + 8 ? area.left + 8 - rect.left : rect.right > area.right - 8 ? area.right - 8 - rect.right : 0;
+        const dy = rect.top < area.top + 8 ? area.top + 8 - rect.top : rect.bottom > area.bottom - 8 ? area.bottom - 8 - rect.bottom : 0;
+        if (dx || dy) {
+          const point = map.latLngToContainerPoint(marker.getLatLng());
+          tooltip.setLatLng(map.containerPointToLatLng(point.add([dx, dy])));
+        }
+      };
+      const detailOpen = () => map.getContainer().classList.add('geo-settlement-detail-open');
+      const detailClose = () => { if (!map.getContainer().querySelector('.geo-settlement-tooltip, .geo-settlement-popup')) map.getContainer().classList.remove('geo-settlement-detail-open'); };
+      marker.on('tooltipopen', () => { detailOpen(); positionTooltip(); });
+      marker.on('popupopen', detailOpen);
+      marker.on('tooltipclose popupclose', detailClose);
       marker.on('add', () => marker.getElement()?.setAttribute('data-settlement-id', entry.id));
       if (onEntryClick) marker.on('dblclick', () => onEntryClick(entry.id));
       return marker;
     });
     group.addTo(map);
     group.addLayers(markers);
-    return () => { group.clearLayers(); map.removeLayer(group); };
+    return () => { group.clearLayers(); map.removeLayer(group); map.getContainer().classList.remove('geo-settlement-detail-open'); };
   }, [settlementLayer, showSettlements, onEntryClick]);
 
   // ─── Zoom to extent ───
