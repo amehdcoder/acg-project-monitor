@@ -1,7 +1,7 @@
 # Roadmap
 
-- [ ] Finish readable full settlement hover/tap details; verify real scoped pins across phone/desktop and both themes.
-- [ ] Deploy the latest validated XLSForm to the connected Trachoma MDA Kobo asset, verify active schema and REST Service, and confirm genuine submissions reach scoped map rows without fabricating field evidence.
+- [x] Finish readable full settlement hover/tap details: geography/GPS, own census/households/source, conditions, ages, disability and individual CDDs; bank accounts only on explicit popup. Desktop light/dark full content and wheel scrolling verified, 245 regression tests pass. Bounded phone layout implemented; final phone interaction verification remains partial. Local browser checks needed an isolated live-connection override because the managed generated client references a different backend; auto-generated files untouched.
+- [x] Deploy latest ODK-validated v2026.11.16f to the connected Trachoma MDA Kobo asset; current and deployed versions match, REST Service active, all four original submissions retained. Reprocessed four genuine Kobo submissions successfully, zero failed, eight scoped rows/two settlements remain with no fabricated submissions. Nine deployment tests pass. Collectors must download the updated form; a fresh post-deployment collector submission remains unverified.
 
 - [x] Add CDD Census/Census Update to in-app, generated exports and latest Kobo population sources (including settlements), using the same cdd_census_census_update value. Published v2026.11.16f to latest download; full ODK validation, seven workbook tests and 13 focused sync tests pass. Signed-in phone/desktop light/dark selection persists after another field changes; exact downloaded workbook choice verified. Upload/redeploy on KoboToolbox remains required; no live records changed.
 

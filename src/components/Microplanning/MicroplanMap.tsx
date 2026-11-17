@@ -478,7 +478,11 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
         L.DomEvent.disableClickPropagation(element);
         L.DomEvent.disableScrollPropagation(element);
       };
-      marker.on('tooltipopen', () => protectDetail(marker.getTooltip()?.getElement()));
+      marker.on('tooltipopen', () => {
+        const element = marker.getTooltip()?.getElement();
+        protectDetail(element);
+        if (element) element.onclick = () => marker.openPopup();
+      });
       marker.on('popupopen', () => protectDetail(marker.getPopup()?.getElement()));
       const positionTooltip = () => {
         const tooltip = marker.getTooltip();
