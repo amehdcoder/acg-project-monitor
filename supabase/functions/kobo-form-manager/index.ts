@@ -375,6 +375,12 @@ Deno.serve(async (req) => {
         submission_count: res.asset?.deployment__submission_count ?? 0,
         is_empty: res.fields.length === 0,
         fields: res.fields,
+        form_version: res.asset?.content?.settings?.version ?? res.asset?.settings?.version ?? null,
+        version_id: res.asset?.version_id ?? null,
+        deployed_version_id: res.asset?.deployed_version_id ?? null,
+        deployment_version_id: res.asset?.deployment?.version_id ?? null,
+        survey: Array.isArray(res.asset?.content?.survey) ? res.asset.content.survey : [],
+        choices: Array.isArray(res.asset?.content?.choices) ? res.asset.content.choices : [],
       });
     }
 
@@ -400,26 +406,12 @@ Deno.serve(async (req) => {
           detail: `The Kobo form already has ${res.asset?.deployment__submission_count} submissions. Refusing to overwrite.`,
         }, 409);
       }
-      const xlsx = buildMicroplanXlsxBytes();
-      const b64 = btoa(String.fromCharCode(...xlsx));
-      const importRes = await koboFetch(server_url, `/api/v2/imports/`, api_token, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          destination: `${stripTrailingSlash(server_url)}/api/v2/assets/${form_uid}/`,
-          base64Encoded: `base64:${b64}`,
-          name: "amehnities_microplanning.xlsx",
-          assetUid: form_uid,
-        }),
-      });
-      try {
-        await koboFetch(server_url, `/api/v2/assets/${form_uid}/deployment/`, api_token, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ active: true }),
-        });
-      } catch (_e) { /* may already be deployed */ }
-      return j({ ok: true, import: importRes });
+      const { data: latest, error: latestError } = await admin.from("microplan_xlsform_versions")
+        .select("xlsx_base64").eq("is_active", true).order("version_number", { ascending: false }).limit(1).maybeSingle();
+      if (latestError || !latest?.xlsx_base64) return j({ error: "No active XLSForm is available; save the latest validated form first" }, 409);
+      const { performKoboXlsformUpload } = await import("./upload.ts");
+      const result = await performKoboXlsformUpload({ server_url, form_uid, api_token, xlsx_base64: latest.xlsx_base64 }, { fetcher: koboFetch });
+      return j(result, result.ok ? 200 : result.status ?? 502);
     }
 
     if (action === "save_config") {
@@ -714,13 +706,18 @@ Deno.serve(async (req) => {
     if (action === "upload_xlsform_to_kobo") {
       const forbid = await ensureAdmin();
       if (forbid) return forbid;
-      const { server_url, api_token, xlsx_base64, form_uid, asset_name, version_id } = params;
+      const { server_url, api_token, form_uid } = await resolveCredentials(params);
+      const { xlsx_base64, asset_name, version_id } = params;
+      if (!server_url || !api_token || typeof xlsx_base64 !== "string" || !xlsx_base64 || xlsx_base64.length > 40 * 1024 * 1024) {
+        return j({ error: "Missing connection or invalid XLSForm" }, 400);
+      }
+      await assertSafeKoboUrl(server_url);
 
-      const { performKoboXlsformUpload, makeKoboFetcher } = await import("./upload.ts");
+      const { performKoboXlsformUpload } = await import("./upload.ts");
       const result = await performKoboXlsformUpload(
         { server_url, api_token, xlsx_base64, form_uid, asset_name, version_id },
         {
-          fetcher: makeKoboFetcher(),
+          fetcher: koboFetch,
           persistVersion: async (patch) => {
             await admin.from("microplan_xlsform_versions").update({
               kobo_asset_uid: patch.kobo_asset_uid,
@@ -734,6 +731,12 @@ Deno.serve(async (req) => {
       );
       if (!result.ok && "error" in result) {
         return j({ error: result.error, detail: result.detail, code: result.code }, result.status ?? 502);
+      }
+      if (result.ok && params.config_id) {
+        const { error } = await admin.from("kobo_form_configs").update({
+          form_status: "deployed", last_deployed_at: new Date().toISOString(),
+        }).eq("id", params.config_id);
+        if (error) return j({ error: "Kobo deployed, but connection status could not be saved", detail: error.message }, 500);
       }
       return j(result);
     }
@@ -982,7 +985,14 @@ Deno.serve(async (req) => {
       // submissions stream in without manual REST Service setup.
       const forbid = await ensureAdmin();
       if (forbid) return forbid;
-      const { server_url, form_uid, api_token, project_id, target } = params;
+      const { server_url, form_uid, api_token } = await resolveCredentials(params);
+      let { project_id } = params;
+      const { target } = params;
+      if (params.config_id) {
+        const { data: cfg, error } = await admin.from("kobo_form_configs").select("project_id").eq("id", params.config_id).maybeSingle();
+        if (error || !cfg) return j({ error: "Kobo project connection not found" }, 404);
+        project_id = cfg.project_id;
+      }
       const isLqas = target === "lqas";
       if (!server_url || !form_uid || !api_token) {
         return j({ error: "Missing server_url/form_uid/api_token" }, 400);

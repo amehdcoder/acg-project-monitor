@@ -27,7 +27,9 @@ const makeFetcher = (handler: (call: Call) => any): { fetcher: KoboFetchFn; call
   const calls: Call[] = [];
   const fetcher: KoboFetchFn = async (_server, path, _token, init = {}) => {
     const method = String(init.method ?? "GET").toUpperCase();
-    const body = init.body ? JSON.parse(String(init.body)) : undefined;
+    const contentType = new Headers(init.headers).get('Content-Type');
+    const body = init.body ? contentType === 'application/x-www-form-urlencoded'
+      ? Object.fromEntries(new URLSearchParams(String(init.body))) : JSON.parse(String(init.body)) : undefined;
     const call = { path, method, body };
     calls.push(call);
     return handler(call);
@@ -61,6 +63,7 @@ Deno.test("performKoboXlsformUpload — CREATE flow posts imports without destin
     if (c.path === "/api/v2/assets/aNEW123/deployment/") {
       return { deployed: true };
     }
+    if (c.path === "/api/v2/assets/aNEW123/deployment/?format=json") return { active: true, version_id: "v1" };
     throw new Error(`unexpected call ${c.method} ${c.path}`);
   });
 
@@ -78,6 +81,7 @@ Deno.test("performKoboXlsformUpload — CREATE flow posts imports without destin
   assertEquals(importCall.path, "/api/v2/imports/");
   assertEquals(importCall.body.destination, undefined, "CREATE must not send destination");
   assertEquals(importCall.body.assetUid, undefined, "CREATE must not send assetUid");
+  assertEquals(importCall.body.library, "false", "Kobo must receive form-encoded import fields rather than ignored JSON");
   assertStringIncludes(String(importCall.body.base64Encoded ?? ""), "base64:");
 
   // Deploy call uses POST for brand new (un-deployed) assets.
@@ -107,6 +111,7 @@ Deno.test("performKoboXlsformUpload — OVERWRITE flow targets destination/asset
     if (c.path === "/api/v2/assets/existingUID/deployment/") {
       return { updated: true };
     }
+    if (c.path === "/api/v2/assets/existingUID/deployment/?format=json") return { active: true, version_id: "v9" };
     throw new Error(`unexpected call ${c.method} ${c.path}`);
   });
 
@@ -132,6 +137,7 @@ Deno.test("performKoboXlsformUpload — OVERWRITE flow targets destination/asset
 
   const deploy = calls.find((c) => c.path === "/api/v2/assets/existingUID/deployment/");
   assertEquals(deploy?.method, "PATCH", "existing deployment must be PATCHed, not POSTed");
+  assertEquals(deploy?.body.version_id, "v9", "PATCH active alone does not redeploy the newly imported schema");
 
   assertEquals(persisted.length, 1);
   assertEquals(persisted[0].version_id, "row-uuid");
@@ -151,7 +157,7 @@ Deno.test("performKoboXlsformUpload — polling loop waits until status becomes 
       pollCount += 1;
       return { status: statuses[i++] ?? "complete", messages: { created: [{ uid: "polled" }] } };
     }
-    if (c.path.startsWith("/api/v2/assets/polled/")) return { name: "Polled", uid: "polled" };
+    if (c.path.startsWith("/api/v2/assets/polled/")) return { name: "Polled", uid: "polled", active: true };
     return {};
   });
 
@@ -193,4 +199,42 @@ Deno.test("performKoboXlsformUpload — missing required params short-circuits w
   );
   if (result.ok) throw new Error("expected failure");
   assertEquals(result.status, 400);
+});
+
+Deno.test("incomplete imports never redeploy the previous form or report success", async () => {
+  let clock = 0;
+  const { fetcher, calls } = makeFetcher(() => ({ status: "processing", url: "https://kf.kobotoolbox.org/api/v2/imports/pending/" }));
+  const result = await performKoboXlsformUpload({ ...baseParams, form_uid: "existingUID" }, { fetcher, now: () => clock, sleep: async () => { clock += 100; }, pollTimeoutMs: 200 });
+  assertEquals(result.ok, false);
+  assertEquals(calls.some(c => c.path.includes("/deployment/")), false);
+});
+
+Deno.test("failed imports never deploy and preserve Kobo validation failure", async () => {
+  const { fetcher, calls } = makeFetcher(() => ({ status: "error", messages: { errors: ["Invalid repeat"] } }));
+  const result = await performKoboXlsformUpload({ ...baseParams, form_uid: "existingUID" }, { fetcher });
+  if (result.ok) throw new Error("Import failure was reported as success");
+  assertStringIncludes(result.detail, "Invalid repeat");
+  assertEquals(calls.length, 1);
+});
+
+Deno.test("failed Kobo redeployment is never reported as ready for collection", async () => {
+  const { fetcher } = makeFetcher(c => {
+    if (c.path === "/api/v2/imports/") return { status: "complete" };
+    if (c.path.includes("deployment")) throw new Error("Deployment rejected");
+    return { has_deployment: true };
+  });
+  const result = await performKoboXlsformUpload({ ...baseParams, form_uid: "existingUID" }, { fetcher });
+  if (result.ok) throw new Error("Deployment failure was reported as success");
+  assertStringIncludes(result.detail, "Deployment rejected");
+});
+
+Deno.test("a stale deployed version is never reported as the latest form", async () => {
+  const { fetcher } = makeFetcher(c => {
+    if (c.path === "/api/v2/imports/") return { status: "complete" };
+    if (c.path.includes("deployment/?")) return { active: true, version_id: "old" };
+    return { has_deployment: true, version_id: "new" };
+  });
+  const result = await performKoboXlsformUpload({ ...baseParams, form_uid: "existingUID" }, { fetcher });
+  if (result.ok) throw new Error("Wrong deployed version was reported as success");
+  assertEquals(result.error, "Kobo is serving a different form version");
 });

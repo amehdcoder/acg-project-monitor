@@ -234,6 +234,8 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
   const framedEntriesRef = useRef<MicroplanEntry[] | null>(null);
   const [exportingPDF, setExportingPDF] = useState(false);
   const fullscreenRef = useRef<HTMLDivElement>(null);
+  const onEntryClickRef = useRef(onEntryClick);
+  onEntryClickRef.current = onEntryClick;
 
   // Target Pop disaggregation config (shared, per-project; GiveWell defaults to 5–14 yrs)
   const { fields: targetPopFields, calcTargetPop } = useTargetPopFields(projectName);
@@ -470,16 +472,46 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
         pane: 'settlements', title: `Settlement: ${pin.name}`, alt: `Settlement: ${pin.name}`,
         icon: L.divIcon({ className: 'geo-settlement-pin', html: '<span></span>', iconSize: [26, 32], iconAnchor: [13, 30], popupAnchor: [0, -26] }),
         zIndexOffset: 2500,
-      }).bindTooltip(() => settlementPinContent(pin), { direction: 'auto', offset: [0, -16], className: 'geo-settlement-tooltip' })
-        .bindPopup(() => settlementPinContent(pin), { maxWidth: 260, className: 'geo-settlement-popup', autoPanPadding: [24, 24] });
+      }).bindTooltip(() => settlementPinContent(pin), { direction: 'auto', offset: [0, -16], opacity: 1, interactive: true, className: 'geo-settlement-tooltip' })
+        .bindPopup(() => settlementPinContent(pin, 'popup'), { minWidth: 0, maxWidth: 360, className: 'geo-settlement-popup', autoPanPadding: [24, 24] });
+      marker.on('popupopen', () => marker.closeTooltip());
+      const protectDetail = (element: HTMLElement | undefined) => {
+        if (!element) return;
+        L.DomEvent.disableClickPropagation(element);
+        L.DomEvent.disableScrollPropagation(element);
+      };
+      marker.on('tooltipopen', () => {
+        const element = marker.getTooltip()?.getElement();
+        protectDetail(element);
+        if (element) element.onclick = () => marker.openPopup();
+      });
+      marker.on('popupopen', () => protectDetail(marker.getPopup()?.getElement()));
+      const positionTooltip = () => {
+        const tooltip = marker.getTooltip();
+        const element = tooltip?.getElement();
+        if (!tooltip || !element) return;
+        const area = map.getContainer().getBoundingClientRect();
+        const rect = element.getBoundingClientRect();
+        const dx = rect.left < area.left + 8 ? area.left + 8 - rect.left : rect.right > area.right - 8 ? area.right - 8 - rect.right : 0;
+        const dy = rect.top < area.top + 8 ? area.top + 8 - rect.top : rect.bottom > area.bottom - 8 ? area.bottom - 8 - rect.bottom : 0;
+        if (dx || dy) {
+          const point = map.latLngToContainerPoint(marker.getLatLng());
+          tooltip.setLatLng(map.containerPointToLatLng(point.add([dx, dy])));
+        }
+      };
+      const detailOpen = () => map.getContainer().classList.add('geo-settlement-detail-open');
+      const detailClose = () => { if (!map.getContainer().querySelector('.geo-settlement-tooltip, .geo-settlement-popup')) map.getContainer().classList.remove('geo-settlement-detail-open'); };
+      marker.on('tooltipopen', () => { detailOpen(); positionTooltip(); });
+      marker.on('popupopen', detailOpen);
+      marker.on('tooltipclose popupclose', detailClose);
       marker.on('add', () => marker.getElement()?.setAttribute('data-settlement-id', entry.id));
-      if (onEntryClick) marker.on('dblclick', () => onEntryClick(entry.id));
+      marker.on('dblclick', () => onEntryClickRef.current?.(entry.id));
       return marker;
     });
     group.addTo(map);
     group.addLayers(markers);
-    return () => { group.clearLayers(); map.removeLayer(group); };
-  }, [settlementLayer, showSettlements, onEntryClick]);
+    return () => { group.clearLayers(); map.removeLayer(group); map.getContainer().classList.remove('geo-settlement-detail-open'); };
+  }, [settlementLayer, showSettlements]);
 
   // ─── Zoom to extent ───
   useMicroplanMapBoundaries(mapInstanceRef, cascadedEntries.map(entry => entry.state));

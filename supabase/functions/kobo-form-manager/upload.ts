@@ -1,7 +1,7 @@
 // Pure Kobo XLSForm upload orchestration — extracted from index.ts so it can
 // be unit-tested with a mocked fetcher (no real Kobo API required).
 //
-// Handles: create vs overwrite decision, polling, best-effort (re)deploy, and
+// Handles: create vs overwrite decision, bounded polling, verified (re)deploy, and
 // consistent error surface for the frontend toast layer.
 
 export type KoboErrCode =
@@ -133,7 +133,7 @@ export type KoboUploadResult =
  * - No `form_uid` → CREATE: `/api/v2/imports/` without destination.
  * - With `form_uid` → OVERWRITE: destination + assetUid pointing at asset.
  * - Polls `importRes.url` until `status ∈ {complete, error}` or timeout.
- * - Best-effort (re)deploy so the asset is live for KoboCollect.
+ * - Only a completed import and confirmed active deployment count as success.
  */
 export async function performKoboXlsformUpload(
   params: KoboUploadParams,
@@ -149,9 +149,10 @@ export async function performKoboXlsformUpload(
   const pollTimeoutMs = deps.pollTimeoutMs ?? 15_000;
   const pollIntervalMs = deps.pollIntervalMs ?? 1_500;
 
-  const importBody: Record<string, unknown> = {
+  const importBody: Record<string, string> = {
     base64Encoded: `base64:${xlsx_base64}`,
     name: asset_name || `amehnities_microplanning_${new Date().toISOString().slice(0, 10)}.xlsx`,
+    library: "false",
   };
   if (form_uid) {
     importBody.destination = `${stripTrailingSlash(server_url)}/api/v2/assets/${form_uid}/`;
@@ -162,8 +163,8 @@ export async function performKoboXlsformUpload(
   try {
     importRes = await deps.fetcher(server_url, `/api/v2/imports/`, api_token, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(importBody),
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams(importBody).toString(),
     });
   } catch (e) {
     const err = e as KoboApiError;
@@ -180,6 +181,7 @@ export async function performKoboXlsformUpload(
   let status: string = importRes?.status ?? "created";
   let finalAsset: any = null;
   let finalUid: string | null = form_uid ?? null;
+  let finalImport: any = importRes;
   const started = now();
 
   while (importUrl && now() - started < pollTimeoutMs && !["complete", "error"].includes(status)) {
@@ -187,24 +189,35 @@ export async function performKoboXlsformUpload(
     try {
       const path = importUrl.replace(/^https?:\/\/[^/]+/, "");
       const poll = await deps.fetcher(server_url, path, api_token);
+      finalImport = poll;
       status = poll?.status ?? status;
       finalUid = poll?.messages?.updated?.[0]?.uid
         ?? poll?.messages?.created?.[0]?.uid
         ?? finalUid;
-    } catch { break; }
+    } catch (e) {
+      return { ok: false, error: "Kobo import could not be verified", detail: (e as Error).message, status: 502 };
+    }
   }
 
-  if (finalUid) {
-    try {
-      finalAsset = await deps.fetcher(server_url, `/api/v2/assets/${finalUid}/?format=json`, api_token);
-    } catch { /* ignore */ }
-    try {
-      await deps.fetcher(server_url, `/api/v2/assets/${finalUid}/deployment/`, api_token, {
-        method: finalAsset?.has_deployment ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ active: true }),
-      });
-    } catch { /* ignore */ }
+  if (status === "error") return { ok: false, error: "Kobo import failed", detail: JSON.stringify(finalImport?.messages ?? "Kobo rejected the XLSForm"), status: 422 };
+  if (status !== "complete") return { ok: false, error: "Kobo import is still processing", detail: "Import has not completed; the previous deployment was left untouched. Check Kobo before retrying.", status: 504, code: "timeout" };
+  finalUid = finalImport?.messages?.updated?.[0]?.uid ?? finalImport?.messages?.created?.[0]?.uid ?? finalUid;
+  if (!finalUid) return { ok: false, error: "Kobo asset not found after import", detail: "Import completed without a target asset", status: 502 };
+  try {
+    finalAsset = await deps.fetcher(server_url, `/api/v2/assets/${finalUid}/?format=json`, api_token);
+    await deps.fetcher(server_url, `/api/v2/assets/${finalUid}/deployment/`, api_token, {
+      method: finalAsset?.has_deployment ? "PATCH" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ active: true, ...(finalAsset?.version_id ? { version_id: finalAsset.version_id } : {}) }),
+    });
+    const deployment = await deps.fetcher(server_url, `/api/v2/assets/${finalUid}/deployment/?format=json`, api_token);
+    if (deployment?.active !== true) return { ok: false, error: "Kobo deployment is not active", detail: "XLSForm imported, but Kobo has not enabled collection", status: 502 };
+    finalAsset = await deps.fetcher(server_url, `/api/v2/assets/${finalUid}/?format=json`, api_token);
+    if (deployment.version_id && finalAsset.version_id && deployment.version_id !== finalAsset.version_id) {
+      return { ok: false, error: "Kobo is serving a different form version", detail: "The latest imported schema is not the deployed version", status: 502 };
+    }
+  } catch (e) {
+    return { ok: false, error: "Kobo deployment failed", detail: (e as Error).message, status: 502 };
   }
 
   const koboVersionId = finalAsset?.version_id ?? finalAsset?.deployed_version_id ?? null;
@@ -233,7 +246,7 @@ export async function performKoboXlsformUpload(
   }
 
   return {
-    ok: status !== "error",
+    ok: true,
     status,
     form_uid: finalUid,
     form_title: finalAsset?.name ?? null,

@@ -21,7 +21,7 @@ interface VersionRow {
   sha256: string | null;
   survey_row_count: number;
   choices_row_count: number;
-  validation_report: { ok?: boolean; errors?: any[]; warnings?: any[] } | null;
+  validation_report: { ok?: boolean; odk_valid?: boolean; errors?: any[]; warnings?: any[] } | null;
   kobo_asset_uid: string | null;
   kobo_version_id: string | null;
   kobo_server_url: string | null;
@@ -131,7 +131,7 @@ const XlsFormVersionsDialog = ({ open, onClose }: Props) => {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-sm">Version {v.version_number}</span>
                       {v.is_active && <Badge className="bg-emerald-600 hover:bg-emerald-700">Active</Badge>}
-                      {vr.ok
+                      {vr.ok || vr.odk_valid
                         ? <Badge variant="outline" className="text-emerald-700 border-emerald-500"><CheckCircle2 className="h-3 w-3 mr-1" />Valid</Badge>
                         : errCount > 0
                           ? <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />{errCount} error{errCount === 1 ? "" : "s"}</Badge>
