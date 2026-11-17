@@ -149,9 +149,10 @@ export async function performKoboXlsformUpload(
   const pollTimeoutMs = deps.pollTimeoutMs ?? 15_000;
   const pollIntervalMs = deps.pollIntervalMs ?? 1_500;
 
-  const importBody: Record<string, unknown> = {
+  const importBody: Record<string, string> = {
     base64Encoded: `base64:${xlsx_base64}`,
     name: asset_name || `amehnities_microplanning_${new Date().toISOString().slice(0, 10)}.xlsx`,
+    library: "false",
   };
   if (form_uid) {
     importBody.destination = `${stripTrailingSlash(server_url)}/api/v2/assets/${form_uid}/`;
@@ -162,8 +163,8 @@ export async function performKoboXlsformUpload(
   try {
     importRes = await deps.fetcher(server_url, `/api/v2/imports/`, api_token, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(importBody),
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams(importBody).toString(),
     });
   } catch (e) {
     const err = e as KoboApiError;

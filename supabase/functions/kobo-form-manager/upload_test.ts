@@ -27,7 +27,9 @@ const makeFetcher = (handler: (call: Call) => any): { fetcher: KoboFetchFn; call
   const calls: Call[] = [];
   const fetcher: KoboFetchFn = async (_server, path, _token, init = {}) => {
     const method = String(init.method ?? "GET").toUpperCase();
-    const body = init.body ? JSON.parse(String(init.body)) : undefined;
+    const contentType = new Headers(init.headers).get('Content-Type');
+    const body = init.body ? contentType === 'application/x-www-form-urlencoded'
+      ? Object.fromEntries(new URLSearchParams(String(init.body))) : JSON.parse(String(init.body)) : undefined;
     const call = { path, method, body };
     calls.push(call);
     return handler(call);
@@ -79,6 +81,7 @@ Deno.test("performKoboXlsformUpload — CREATE flow posts imports without destin
   assertEquals(importCall.path, "/api/v2/imports/");
   assertEquals(importCall.body.destination, undefined, "CREATE must not send destination");
   assertEquals(importCall.body.assetUid, undefined, "CREATE must not send assetUid");
+  assertEquals(importCall.body.library, "false", "Kobo must receive form-encoded import fields rather than ignored JSON");
   assertStringIncludes(String(importCall.body.base64Encoded ?? ""), "base64:");
 
   // Deploy call uses POST for brand new (un-deployed) assets.

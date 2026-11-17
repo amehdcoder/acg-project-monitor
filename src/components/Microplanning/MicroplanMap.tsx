@@ -470,7 +470,7 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
         pane: 'settlements', title: `Settlement: ${pin.name}`, alt: `Settlement: ${pin.name}`,
         icon: L.divIcon({ className: 'geo-settlement-pin', html: '<span></span>', iconSize: [26, 32], iconAnchor: [13, 30], popupAnchor: [0, -26] }),
         zIndexOffset: 2500,
-      }).bindTooltip(() => settlementPinContent(pin), { direction: 'auto', offset: [0, -16], interactive: true, className: 'geo-settlement-tooltip' })
+      }).bindTooltip(() => settlementPinContent(pin), { direction: 'auto', offset: [0, -16], opacity: 1, interactive: true, className: 'geo-settlement-tooltip' })
         .bindPopup(() => settlementPinContent(pin, 'popup'), { minWidth: 0, maxWidth: 360, className: 'geo-settlement-popup', autoPanPadding: [24, 24] });
       marker.on('popupopen', () => marker.closeTooltip());
       const protectDetail = (element: HTMLElement | undefined) => {

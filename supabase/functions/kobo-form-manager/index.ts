@@ -410,13 +410,14 @@ Deno.serve(async (req) => {
       const b64 = btoa(String.fromCharCode(...xlsx));
       const importRes = await koboFetch(server_url, `/api/v2/imports/`, api_token, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
           destination: `${stripTrailingSlash(server_url)}/api/v2/assets/${form_uid}/`,
           base64Encoded: `base64:${b64}`,
           name: "amehnities_microplanning.xlsx",
           assetUid: form_uid,
-        }),
+          library: "false",
+        }).toString(),
       });
       try {
         await koboFetch(server_url, `/api/v2/assets/${form_uid}/deployment/`, api_token, {
