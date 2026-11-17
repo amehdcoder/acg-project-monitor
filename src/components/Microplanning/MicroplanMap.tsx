@@ -234,6 +234,8 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
   const framedEntriesRef = useRef<MicroplanEntry[] | null>(null);
   const [exportingPDF, setExportingPDF] = useState(false);
   const fullscreenRef = useRef<HTMLDivElement>(null);
+  const onEntryClickRef = useRef(onEntryClick);
+  onEntryClickRef.current = onEntryClick;
 
   // Target Pop disaggregation config (shared, per-project; GiveWell defaults to 5–14 yrs)
   const { fields: targetPopFields, calcTargetPop } = useTargetPopFields(projectName);
@@ -503,13 +505,13 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
       marker.on('popupopen', detailOpen);
       marker.on('tooltipclose popupclose', detailClose);
       marker.on('add', () => marker.getElement()?.setAttribute('data-settlement-id', entry.id));
-      if (onEntryClick) marker.on('dblclick', () => onEntryClick(entry.id));
+      marker.on('dblclick', () => onEntryClickRef.current?.(entry.id));
       return marker;
     });
     group.addTo(map);
     group.addLayers(markers);
     return () => { group.clearLayers(); map.removeLayer(group); map.getContainer().classList.remove('geo-settlement-detail-open'); };
-  }, [settlementLayer, showSettlements, onEntryClick]);
+  }, [settlementLayer, showSettlements]);
 
   // ─── Zoom to extent ───
   useMicroplanMapBoundaries(mapInstanceRef, cascadedEntries.map(entry => entry.state));

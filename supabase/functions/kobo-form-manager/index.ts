@@ -406,27 +406,12 @@ Deno.serve(async (req) => {
           detail: `The Kobo form already has ${res.asset?.deployment__submission_count} submissions. Refusing to overwrite.`,
         }, 409);
       }
-      const xlsx = buildMicroplanXlsxBytes();
-      const b64 = btoa(String.fromCharCode(...xlsx));
-      const importRes = await koboFetch(server_url, `/api/v2/imports/`, api_token, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          destination: `${stripTrailingSlash(server_url)}/api/v2/assets/${form_uid}/`,
-          base64Encoded: `base64:${b64}`,
-          name: "amehnities_microplanning.xlsx",
-          assetUid: form_uid,
-          library: "false",
-        }).toString(),
-      });
-      try {
-        await koboFetch(server_url, `/api/v2/assets/${form_uid}/deployment/`, api_token, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ active: true }),
-        });
-      } catch (_e) { /* may already be deployed */ }
-      return j({ ok: true, import: importRes });
+      const { data: latest, error: latestError } = await admin.from("microplan_xlsform_versions")
+        .select("xlsx_base64").eq("is_active", true).order("version_number", { ascending: false }).limit(1).maybeSingle();
+      if (latestError || !latest?.xlsx_base64) return j({ error: "No active XLSForm is available; save the latest validated form first" }, 409);
+      const { performKoboXlsformUpload } = await import("./upload.ts");
+      const result = await performKoboXlsformUpload({ server_url, form_uid, api_token, xlsx_base64: latest.xlsx_base64 }, { fetcher: koboFetch });
+      return j(result, result.ok ? 200 : result.status ?? 502);
     }
 
     if (action === "save_config") {
