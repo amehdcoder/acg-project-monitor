@@ -470,8 +470,16 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
         pane: 'settlements', title: `Settlement: ${pin.name}`, alt: `Settlement: ${pin.name}`,
         icon: L.divIcon({ className: 'geo-settlement-pin', html: '<span></span>', iconSize: [26, 32], iconAnchor: [13, 30], popupAnchor: [0, -26] }),
         zIndexOffset: 2500,
-      }).bindTooltip(() => settlementPinContent(pin), { direction: 'auto', offset: [0, -16], className: 'geo-settlement-tooltip' })
-        .bindPopup(() => settlementPinContent(pin), { maxWidth: 260, className: 'geo-settlement-popup', autoPanPadding: [24, 24] });
+      }).bindTooltip(() => settlementPinContent(pin), { direction: 'auto', offset: [0, -16], interactive: true, className: 'geo-settlement-tooltip' })
+        .bindPopup(() => settlementPinContent(pin, 'popup'), { minWidth: 0, maxWidth: 360, className: 'geo-settlement-popup', autoPanPadding: [24, 24] });
+      marker.on('popupopen', () => marker.closeTooltip());
+      const protectDetail = (element: HTMLElement | undefined) => {
+        if (!element) return;
+        L.DomEvent.disableClickPropagation(element);
+        L.DomEvent.disableScrollPropagation(element);
+      };
+      marker.on('tooltipopen', () => protectDetail(marker.getTooltip()?.getElement()));
+      marker.on('popupopen', () => protectDetail(marker.getPopup()?.getElement()));
       marker.on('add', () => marker.getElement()?.setAttribute('data-settlement-id', entry.id));
       if (onEntryClick) marker.on('dblclick', () => onEntryClick(entry.id));
       return marker;
