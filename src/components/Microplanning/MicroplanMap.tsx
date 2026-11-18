@@ -1,5 +1,6 @@
 import { disposeMap } from "@/lib/microplanning/disposeMap";
-import { settlementPinData, settlementPinContent, settlementLayerData } from '@/lib/microplanning/settlementPins';
+import { settlementPinData, settlementLayerData } from '@/lib/microplanning/settlementPins';
+import { attachSettlementDetails } from '@/lib/microplanning/settlementMapDetails';
 import { attachAreaInspection } from "@/lib/microplanning/areaMapInteraction";
 import { useMicroplanMapBoundaries } from "@/hooks/useMicroplanMapBoundaries";
 import L from "leaflet";
@@ -467,50 +468,21 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
       if (cluster.getChildCount() <= 12 || map.getZoom() >= map.getMaxZoom()) cluster.spiderfy();
       else cluster.zoomToBounds();
     });
+    const detachDetails: (() => void)[] = [];
     const markers = settlementLayer.pins.map(({ entry, pin }) => {
       const marker = L.marker([pin.lat, pin.lng], {
         pane: 'settlements', title: `Settlement: ${pin.name}`, alt: `Settlement: ${pin.name}`,
         icon: L.divIcon({ className: 'geo-settlement-pin', html: '<span></span>', iconSize: [26, 32], iconAnchor: [13, 30], popupAnchor: [0, -26] }),
         zIndexOffset: 2500,
-      }).bindTooltip(() => settlementPinContent(pin), { direction: 'auto', offset: [0, -16], opacity: 1, interactive: true, className: 'geo-settlement-tooltip' })
-        .bindPopup(() => settlementPinContent(pin, 'popup'), { minWidth: 0, maxWidth: 360, className: 'geo-settlement-popup', autoPanPadding: [24, 24] });
-      marker.on('popupopen', () => marker.closeTooltip());
-      const protectDetail = (element: HTMLElement | undefined) => {
-        if (!element) return;
-        L.DomEvent.disableClickPropagation(element);
-        L.DomEvent.disableScrollPropagation(element);
-      };
-      marker.on('tooltipopen', () => {
-        const element = marker.getTooltip()?.getElement();
-        protectDetail(element);
-        if (element) element.onclick = () => marker.openPopup();
       });
-      marker.on('popupopen', () => protectDetail(marker.getPopup()?.getElement()));
-      const positionTooltip = () => {
-        const tooltip = marker.getTooltip();
-        const element = tooltip?.getElement();
-        if (!tooltip || !element) return;
-        const area = map.getContainer().getBoundingClientRect();
-        const rect = element.getBoundingClientRect();
-        const dx = rect.left < area.left + 8 ? area.left + 8 - rect.left : rect.right > area.right - 8 ? area.right - 8 - rect.right : 0;
-        const dy = rect.top < area.top + 8 ? area.top + 8 - rect.top : rect.bottom > area.bottom - 8 ? area.bottom - 8 - rect.bottom : 0;
-        if (dx || dy) {
-          const point = map.latLngToContainerPoint(marker.getLatLng());
-          tooltip.setLatLng(map.containerPointToLatLng(point.add([dx, dy])));
-        }
-      };
-      const detailOpen = () => map.getContainer().classList.add('geo-settlement-detail-open');
-      const detailClose = () => { if (!map.getContainer().querySelector('.geo-settlement-tooltip, .geo-settlement-popup')) map.getContainer().classList.remove('geo-settlement-detail-open'); };
-      marker.on('tooltipopen', () => { detailOpen(); positionTooltip(); });
-      marker.on('popupopen', detailOpen);
-      marker.on('tooltipclose popupclose', detailClose);
+      detachDetails.push(attachSettlementDetails(map, marker, pin));
       marker.on('add', () => marker.getElement()?.setAttribute('data-settlement-id', entry.id));
       marker.on('dblclick', () => onEntryClickRef.current?.(entry.id));
       return marker;
     });
     group.addTo(map);
     group.addLayers(markers);
-    return () => { group.clearLayers(); map.removeLayer(group); map.getContainer().classList.remove('geo-settlement-detail-open'); };
+    return () => { detachDetails.forEach(detach => detach()); group.clearLayers(); map.removeLayer(group); };
   }, [settlementLayer, showSettlements]);
 
   // ─── Zoom to extent ───
@@ -1336,7 +1308,9 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
 
         {/* Map + Summary Panel */}
         <div className={`flex ${showSummaryPanel ? "flex-col lg:flex-row" : ""}`}>
-          <div ref={mapRef} className={`${mapHeight} ${showSummaryPanel ? "lg:flex-1" : "w-full"} relative z-0`} />
+          <div className={`${mapHeight} ${showSummaryPanel ? "lg:flex-1" : "w-full"} relative z-0 min-w-0`}>
+            <div ref={mapRef} className="geo-settlement-map h-full w-full relative" />
+          </div>
           {streetViewPanel}
 
           {/* Summary panel */}

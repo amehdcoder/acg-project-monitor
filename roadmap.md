@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Finish remaining settlement phone tap/scroll/close and layer checks on real saved data; confirm the connected latest Kobo deployment and genuine submission delivery without creating field evidence.
+
 - [x] Finish readable full settlement hover/tap details: geography/GPS, own census/households/source, conditions, ages, disability and individual CDDs; bank accounts only on explicit popup. Desktop light/dark full content and wheel scrolling verified, 245 regression tests pass. Bounded phone layout implemented; final phone interaction verification remains partial. Local browser checks needed an isolated live-connection override because the managed generated client references a different backend; auto-generated files untouched.
 - [x] Deploy latest ODK-validated v2026.11.16f to the connected Trachoma MDA Kobo asset; current and deployed versions match, REST Service active, all four original submissions retained. Reprocessed four genuine Kobo submissions successfully, zero failed, eight scoped rows/two settlements remain with no fabricated submissions. Nine deployment tests pass. Collectors must download the updated form; a fresh post-deployment collector submission remains unverified.
 
