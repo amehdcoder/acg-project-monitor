@@ -155,3 +155,28 @@ export function settlementLayerData<T extends SettlementPinEntry>(entries: T[]) 
   const named = entries.filter(entry => entry.settlement_name?.trim()).length;
   return { pins, named, missingGps: named - pins.length };
 }
+const distanceKm = (a: [number, number], b: [number, number]) => {
+  const rad = Math.PI / 180;
+  const dLat = (b[0] - a[0]) * rad, dLng = (b[1] - a[1]) * rad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * rad) * Math.cos(b[0] * rad) * Math.sin(dLng / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(h));
+};
+const median = (values: number[]) => {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+};
+
+/**
+ * Zoom target for settlement pins. Points far from the main group (likely GPS captured
+ * elsewhere) stay on the map but do not stretch the zoom to a national view.
+ */
+export function settlementFocusPoints(points: Array<[number, number]>) {
+  if (points.length < 4) return { focus: points, outliers: [] as Array<[number, number]> };
+  const centre: [number, number] = [median(points.map(p => p[0])), median(points.map(p => p[1]))];
+  const distances = points.map(p => distanceKm(centre, p));
+  const limit = Math.max(75, median(distances) * 4);
+  const focus = points.filter((_, i) => distances[i] <= limit);
+  if (focus.length < points.length / 2) return { focus: points, outliers: [] as Array<[number, number]> };
+  return { focus, outliers: points.filter((_, i) => distances[i] > limit) };
+}
