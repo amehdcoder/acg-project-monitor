@@ -37,6 +37,7 @@ import CommunityRiskBadge from "./CommunityRiskBadge";
 import TrachomaChildrenKpi from "./TrachomaChildrenKpi";
 import { isTrachomaTarget } from "@/lib/microplanning/trachomaChildren";
 import CommunityRiskRanking from "./CommunityRiskRanking";
+import GpsQualityCheck from "./GpsQualityCheck";
 import { useCommunityRiskCache } from "@/hooks/useCommunityRiskCache";
 import GpsResolveCell from "./GpsResolveCell";
 import DrillBreadcrumb from "./DrillBreadcrumb";
@@ -2799,6 +2800,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
               </CardContent>
             </Card>
           </div>
+          <GpsQualityCheck entries={filtered} projectName={selectedProjectName} />
           <CommunityRiskRanking entries={filtered} risks={communityRisks} />
           <PlanningHeatmaps entries={filtered as never} />
           <PlanningAnalyses entries={filtered} calcTargetPop={calcTargetPop} targetLabel={targetPopulationLabel} />
