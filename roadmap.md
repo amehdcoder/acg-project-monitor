@@ -1,6 +1,6 @@
 # Roadmap
 
-- [ ] Finish remaining settlement phone tap/scroll/close and layer checks on real saved data; confirm the connected latest Kobo deployment and genuine submission delivery without creating field evidence.
+- [x] Settlement phone/desktop light/dark checks done on 46 real settlements: zoom focuses main group (far-GPS points flagged, not moved), tap/hover details, scrolling, no blank-area inspection. Samia A/B GPS needs field re-capture.
 
 - [x] Finish readable full settlement hover/tap details: geography/GPS, own census/households/source, conditions, ages, disability and individual CDDs; bank accounts only on explicit popup. Desktop light/dark full content and wheel scrolling verified, 245 regression tests pass. Bounded phone layout implemented; final phone interaction verification remains partial. Local browser checks needed an isolated live-connection override because the managed generated client references a different backend; auto-generated files untouched.
 - [x] Deploy latest ODK-validated v2026.11.16f to the connected Trachoma MDA Kobo asset; current and deployed versions match, REST Service active, all four original submissions retained. Reprocessed four genuine Kobo submissions successfully, zero failed, eight scoped rows/two settlements remain with no fabricated submissions. Nine deployment tests pass. Collectors must download the updated form; a fresh post-deployment collector submission remains unverified.
@@ -9,7 +9,7 @@
 
 - [x] Correct latest Kobo settlement form: parent terrain/access/security only for community-only entries; unique-person disability total once inside disability section. v2026.11.16e published to the Super Admin latest download, signed-in menu and exact hosted workbook verified; full ODK validation and six workbook tests pass, 239 Microplanning tests pass (3 optional checks skipped). Stable field names, choice codes and details_v1 keep the deployed receiver compatible without changes. Genuine delivery remains dependent on uploading/redeploying the workbook on KoboToolbox and making a real submission; no project records changed.
 
-- [ ] Fix missing settlement layer: make scoped GPS pins discoverable, stable during map redraws and show each settlement's own population/CDD on hover and tap; verify real saved settlements, layer controls, phone/desktop light/dark and linked realtime changes.
+- [x] Fix missing settlement layer: make scoped GPS pins discoverable, stable during map redraws and show each settlement's own population/CDD on hover and tap; verify real saved settlements, layer controls, phone/desktop light/dark and linked realtime changes.
 
 - [x] Add full settlement-specific Kobo population, households, disability, terrain/access/security, source, leadership, CDD banking and notes; versioned settlement measure scope prevents parent census duplication. Latest Super Admin download updated; full ODK validation and three workbook tests pass, 235 Microplanning tests pass. Live deployed receiver save/retry/remove/restore and GPS rejection verified, both settlement populations/CDD accounts read back with correct categories and disability; phone/desktop light/dark checks passed. Verification records removed. Upload/redeploy latest workbook on KoboToolbox to begin real collector submissions.
 
