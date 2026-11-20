@@ -1,5 +1,6 @@
 import { disposeMap } from "@/lib/microplanning/disposeMap";
 import { drawFlhfCatchments } from "@/lib/microplanning/flhfCatchments";
+import { attachGeoFeatures } from "@/lib/microplanning/geoFeatures";
 import { settlementPinData, settlementLayerData, settlementFocusPoints } from '@/lib/microplanning/settlementPins';
 import { attachSettlementDetails } from '@/lib/microplanning/settlementMapDetails';
 import { attachAreaInspection } from "@/lib/microplanning/areaMapInteraction";
@@ -487,11 +488,18 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
     return () => { detachDetails.forEach(detach => detach()); group.clearLayers(); map.removeLayer(group); };
   }, [settlementLayer, showSettlements]);
 
+  // Satellite imagery + public roads, rivers, forests and deserts.
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    return map ? attachGeoFeatures(map) : undefined;
+  }, []);
+
   // FLHF catchment areas with "H" facility symbology.
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
-    return drawFlhfCatchments(map, cascadedEntries, { points: true });
+    const a = drawFlhfCatchments(map, cascadedEntries, { points: true });
+    return a;
   }, [cascadedEntries]);
 
   // ─── Zoom to extent ───

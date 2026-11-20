@@ -1,5 +1,6 @@
 import { disposeMap } from "@/lib/microplanning/disposeMap";
 import { drawFlhfCatchments } from "@/lib/microplanning/flhfCatchments";
+import { attachGeoFeatures } from "@/lib/microplanning/geoFeatures";
 import { drawNigeriaAdminBoundaries } from "@/lib/microplanning/leafletAdminBoundaries";
 import { loadNigeriaAdminBoundaries, selectAdminBoundaries } from "@/lib/microplanning/nigeriaAdminBoundaries";
 import { renderBatches } from "@/lib/microplanning/renderBatches";
@@ -286,13 +287,14 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName, allocationRo
 
     // FLHF catchment areas + "H" facility markers
     geoEntries.forEach(e => { if (e.flhf_latitude && e.flhf_longitude) bounds.push([e.flhf_latitude, e.flhf_longitude]); });
+    const removeFeatures = attachGeoFeatures(map);
     const removeCatchments = drawFlhfCatchments(map, geoEntries, { points: true });
 
     if (bounds.length > 0) {
       map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13, animate: false });
     }
 
-    return () => { live = false; removeCatchments(); removeBoundaries?.(); cancel(); disposeMap(map); mapRef.current = null; };
+    return () => { live = false; removeCatchments(); removeFeatures(); removeBoundaries?.(); cancel(); disposeMap(map); mapRef.current = null; };
   }, [showMap, filtered, getTargetPop]);
 
   const getCoverageColor = (coverage: number) => {

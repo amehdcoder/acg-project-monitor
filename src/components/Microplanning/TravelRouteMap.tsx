@@ -1,5 +1,6 @@
 import { disposeMap } from "@/lib/microplanning/disposeMap";
 import { drawFlhfCatchments } from "@/lib/microplanning/flhfCatchments";
+import { attachGeoFeatures } from "@/lib/microplanning/geoFeatures";
 import { attachAreaInspection } from "@/lib/microplanning/areaMapInteraction";
 import { useMicroplanMapBoundaries } from "@/hooks/useMicroplanMapBoundaries";
 import { renderBatches } from "@/lib/microplanning/renderBatches";
@@ -319,6 +320,12 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
       disposeMap(map);
       mapRef.current = null;
     };
+  }, []);
+
+  // Satellite imagery + public roads, rivers, forests and deserts.
+  useEffect(() => {
+    const map = mapRef.current;
+    return map ? attachGeoFeatures(map) : undefined;
   }, []);
 
   // FLHF catchment areas, community points and "H" facility markers.
