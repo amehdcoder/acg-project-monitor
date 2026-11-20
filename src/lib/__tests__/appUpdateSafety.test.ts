@@ -48,23 +48,23 @@ describe("safe, responsive app updates", () => {
     vi.stubGlobal("fetch", fetcher);
     const mgr = await import("@/lib/appUpdateManager");
     const pending = mgr.checkForAppUpdate({ force: true });
-    await vi.advanceTimersByTimeAsync(14001);
+    await vi.advanceTimersByTimeAsync(7001);
     expect((await pending).status).toBe("error");
     expect(fetcher.mock.calls.length).toBe(2);
     expect(replace).not.toHaveBeenCalled();
   });
 
   it("overlapping manual/poll checks share one request", async () => {
-    let release: ((value: Response) => void) | undefined;
-    const fetcher = vi.fn(() => new Promise<Response>(resolve => { release = resolve; }));
+    const releases: ((value: Response) => void)[] = [];
+    const fetcher = vi.fn(() => new Promise<Response>(resolve => { releases.push(resolve); }));
     vi.stubGlobal("fetch", fetcher);
     const mgr = await import("@/lib/appUpdateManager");
     const a = mgr.checkForAppUpdate({ force: true });
     const b = mgr.checkForAppUpdate({ force: true });
     expect(a).toBe(b);
-    release?.(response());
+    releases.forEach(release => release(response()));
     await a;
-    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(fetcher).toHaveBeenCalledTimes(2); // One manifest and one parallel shell, shared by both clicks.
   });
 
   it("forced updates cannot navigate or delete caches offline", async () => {
@@ -124,5 +124,37 @@ describe("safe, responsive app updates", () => {
       ? { ok: false } as Response : response("next", '<h1>Changed content</h1><script src="/assets/index-current.js"></script>')));
     const mgr = await import("@/lib/appUpdateManager");
     expect((await mgr.checkForAppUpdate({ force: true })).updateAvailable).toBe(false);
+  });
+
+  it("reuses the checked shell when installing instead of fetching HTML twice", async () => {
+    const fetcher = vi.fn(async () => response());
+    vi.stubGlobal('fetch', fetcher);
+    const mgr = await import('@/lib/appUpdateManager');
+    await mgr.checkForAppUpdate({ force: true });
+    expect(await mgr.hardReloadToLatest()).toBe(true);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(replace).toHaveBeenCalledTimes(1);
+  });
+
+  it("a pending background check cannot overwrite installation state", async () => {
+    let release: ((value: Response) => void) | undefined;
+    vi.stubGlobal('fetch', vi.fn((url: string) => String(url).includes('version.json')
+      ? new Promise<Response>(resolve => { release = resolve; }) : Promise.resolve(response())));
+    const mgr = await import('@/lib/appUpdateManager');
+    const check = mgr.checkForAppUpdate({ force: true });
+    await mgr.hardReloadToLatest();
+    release?.(response('development'));
+    await check;
+    expect(mgr.getAppUpdateState().status).toBe('updating');
+    expect(replace).toHaveBeenCalledTimes(1);
+  });
+
+  it("new submissions and data events never mark a release available", async () => {
+    const mgr = await import('@/lib/appUpdateManager');
+    window.dispatchEvent(new CustomEvent('microplan-entry-saved', { detail: { id: 'new-submission' } }));
+    window.dispatchEvent(new CustomEvent('eye-report-updated'));
+    window.dispatchEvent(new CustomEvent('amehnities:form-progress-changed'));
+    expect(mgr.getAppUpdateState().updateAvailable).toBe(false);
+    expect(replace).not.toHaveBeenCalled();
   });
 });

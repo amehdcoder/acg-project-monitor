@@ -48,4 +48,25 @@ describe("Update button actions", () => {
     fireEvent.click(screen.getByRole("button"));
     await waitFor(() => expect(mocks.apply).toHaveBeenCalledTimes(2));
   });
+
+  it("installs a known release immediately without waiting for another check", async () => {
+    mocks.state = { status: "available", updateAvailable: true, error: null };
+    mocks.check.mockImplementation(() => new Promise(() => {}));
+    mocks.apply.mockResolvedValue(true);
+    render(<AppUpdateButton />);
+    fireEvent.click(screen.getByRole("button"));
+    expect(mocks.apply).toHaveBeenCalledTimes(1);
+    expect(mocks.check).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByRole("button")).toBeEnabled());
+  });
+
+  it("a previously verified release retries installation after a failed background check", async () => {
+    mocks.state = { status: "error", updateAvailable: true, error: "Check timed out" };
+    mocks.apply.mockResolvedValue(true);
+    render(<AppUpdateButton />);
+    fireEvent.click(screen.getByRole("button"));
+    expect(mocks.apply).toHaveBeenCalledTimes(1);
+    expect(mocks.check).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByRole("button")).toBeEnabled());
+  });
 });

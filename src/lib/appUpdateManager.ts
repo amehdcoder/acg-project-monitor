@@ -30,6 +30,18 @@ const listeners = new Set<() => void>();
 let swUpdater: ((signal: AbortSignal) => Promise<void>) | null = null;
 let checkPromise: Promise<AppUpdateState> | null = null;
 let applyPromise: Promise<boolean> | null = null;
+let operationGeneration = 0;
+let shellProbe: { at: number; promise: Promise<string> } | null = null;
+
+// Share only a recent network-fetched shell, never cached page/data content.
+// Manual checks and installation must not download the same HTML twice.
+const fetchLatestShell = (): Promise<string> => {
+  if (shellProbe && Date.now() - shellProbe.at < 15_000) return shellProbe.promise;
+  const promise = probe(`/?__probe=${Date.now()}`, res => res.text());
+  shellProbe = { at: Date.now(), promise };
+  void promise.catch(() => { if (shellProbe?.promise === promise) shellProbe = null; });
+  return promise;
+};
 
 const withTimeout = async <T>(task: Promise<T>, ms: number, message: string): Promise<T> => {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -163,7 +175,7 @@ const htmlBuildId = (html: string): string | null => {
 
 const fetchHtmlBuildId = async (): Promise<string | null> => {
   try {
-    return htmlBuildId(await probe(`/?__probe=${Date.now()}`, res => res.text()));
+    return htmlBuildId(await fetchLatestShell());
   } catch (e) {
     console.error("[UpdateManager] Failed to fetch HTML for update check", e);
     return null;
@@ -188,6 +200,7 @@ export const checkForAppUpdate = (opts: { force?: boolean; source?: "version" | 
 const runUpdateCheck = async (opts: { force?: boolean; source?: "version" | "html" }) => {
   if (!opts.force && !isAutoUpdateEnabled()) return state;
   if (!opts.force && isPreviewHost) return state;
+  const generation = operationGeneration;
   setState({ status: "checking", error: null });
   if(navigator.onLine===false){setState({status:"error",error:"Connect to the internet to check for updates. Your saved work is still available."});return state;}
 
@@ -202,11 +215,15 @@ const runUpdateCheck = async (opts: { force?: boolean; source?: "version" | "htm
     let latestBuildId: string | null;
     let currentBuildId: string;
 
+    // Run shell verification alongside the manifest, not after a slow failed
+    // request. A manual check remains bounded to one network timeout.
+    if (opts.force) shellProbe = null;
+    const htmlProbe = !isPreviewHost ? fetchHtmlBuildId() : null;
     latestBuildId = await fetchVersionBuildId();
     currentBuildId = CURRENT_BUILD_ID;
     if (!latestBuildId && !isPreviewHost) {
       source = "html";
-      latestBuildId = await fetchHtmlBuildId();
+      latestBuildId = await htmlProbe;
       // If the HTML probe genuinely fails, treat it as "unknown" and DO NOT flag
       // an update — a transient network blip must never surface the banner.
       if (!latestBuildId) {
@@ -223,11 +240,12 @@ const runUpdateCheck = async (opts: { force?: boolean; source?: "version" | "htm
     // A stale manifest must not conceal changed compiled assets on a manual check.
     if(opts.force&&!isPreviewHost&&latestBuildId===currentBuildId){
       const running=htmlBuildId(document.documentElement.outerHTML);
-      const latest=await fetchHtmlBuildId();
+      const latest=await htmlProbe;
       if(!latest)throw new Error("Couldn't verify the latest app. Please retry when your connection is stable.");
       if(running&&latest!==running){source="html";currentBuildId=running;latestBuildId=latest;}
     }
     const changed = latestBuildId !== currentBuildId;
+    if (generation !== operationGeneration) return state;
     setState({
       status: changed ? "available" : "current",
       updateAvailable: changed,
@@ -246,6 +264,7 @@ const runUpdateCheck = async (opts: { force?: boolean; source?: "version" | "htm
     return state;
 
   } catch (error: unknown) {
+    if (generation !== operationGeneration) return state;
     setState({
       status: "error",
       lastCheckedAt: Date.now(),
@@ -297,12 +316,14 @@ export const hardReloadToLatest = (_opts: { force?: boolean } = {}): Promise<boo
 };
 
 const applyLatest = async (): Promise<boolean> => {
+  operationGeneration++;
   setState({ status: "updating", error: null });
   const controller=new AbortController();
   try {
     // Even a manual/forced request must not strand an offline user. Validate
     // the actual HTML shell, not merely a reachable JSON/404 fallback page.
-    const html = await probe(`/?__reload_probe=${Date.now()}`, res => res.text());
+    if (!navigator.onLine) throw new Error("Connect to the internet to update. Your saved work is still available.");
+    const html = await fetchLatestShell();
     if (!/<script[^>]+src=/i.test(html) || !/id=["']root["']/i.test(html)) {
       throw new Error("The latest app couldn't be loaded. Your current app and saved work are unchanged.");
     }
@@ -315,7 +336,7 @@ const applyLatest = async (): Promise<boolean> => {
     if (typeof caches !== "undefined") {
       await withTimeout(caches.delete("html-cache"), 2000, "Cache refresh timed out").catch(() => {});
     }
-    if (navigator.onLine === false) throw new Error("Connection lost. Reconnect and tap Update again; your saved work is protected.");
+    if (!navigator.onLine) throw new Error("Connection lost. Reconnect and tap Update again; your saved work is protected.");
     try { localStorage.removeItem(SNOOZE_KEY); } catch { /* optional metadata */ }
     const url = new URL(window.location.href);
     url.searchParams.delete("__app_update");

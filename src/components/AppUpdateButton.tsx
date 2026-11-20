@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { RefreshCw, Sparkles, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -40,12 +41,18 @@ const AppUpdateButton = () => {
   const handleClick = async () => {
     if (clickInFlight.current || getAppUpdateState().status === "updating") return;
     clickInFlight.current = true;
-    setInstalling(true);
-    setStatusText("Checking…");
-    const toastId = toast.loading("Checking for updates…");
+    const knownUpdate = getAppUpdateState().updateAvailable;
+    // Paint acknowledgement before starting network or installation work.
+    flushSync(() => {
+      setInstalling(true);
+      setStatusText(knownUpdate ? "Updating…" : "Checking…");
+    });
+    const toastId = toast.loading(knownUpdate ? "Applying update…" : "Checking for updates…");
     try {
-      const next = await checkForAppUpdate({ force: true });
-      if (next.status === "error") throw new Error(next.error || "Couldn't check for updates. Please try again.");
+      // The banner already verified a release. Do not make the user wait for
+      // another manifest check (or an unrelated background poll) to install it.
+      const next = knownUpdate ? getAppUpdateState() : await checkForAppUpdate({ force: true });
+      if (!knownUpdate && next.status === "error") throw new Error(next.error || "Couldn't check for updates. Please try again.");
       if (!next.updateAvailable) {
         setStatusText("Up to date");
         toast.success("You're on the latest version", { id: toastId });
@@ -94,7 +101,7 @@ const AppUpdateButton = () => {
       {/* Always render a readable label so the control is fully visible on
           every screen width — including small Android and iPhone widths. */}
       <span>
-        {isBusy ? busyLabel : statusText || "Update"}
+        {isBusy ? busyLabel : hasUpdate ? "Update" : statusText || "Update"}
       </span>
     </Button>
   );
