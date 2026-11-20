@@ -1,126 +1,81 @@
 import { useEffect, useMemo, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { Building2, MapPin, Map as MapIcon, TrendingUp, CalendarDays, Sparkles } from "lucide-react";
-import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from "recharts";
-import { aggregate, totals, t, type EyeReportRow } from "@/lib/eyeReport/definition";
+import { Building2, MapPin, Map as MapIcon, TrendingUp } from "lucide-react";
+import { ResponsiveContainer, ComposedChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { Button } from "@/components/ui/button";
+import type { EyeReportRow } from "@/lib/eyeReport/definition";
+import { FACILITY_TREND_DEFAULTS, buildFacilityTrend, filterFacilityTrend, type TrendGrain } from "@/lib/eyeReport/facilityTrend";
 
-const C = { blue: "hsl(var(--eye-blue))", teal: "hsl(var(--eye-teal))", violet: "hsl(var(--eye-violet))", orange: "hsl(var(--eye-orange))", gold: "hsl(var(--eye-gold))" };
-type Grain = "day" | "week" | "month";
-
-const weekStart = (iso: string) => { const d = new Date(`${iso}T00:00:00Z`); const w = (d.getUTCDay() + 6) % 7; d.setUTCDate(d.getUTCDate() - w); return d.toISOString().slice(0, 10); };
-const bucketOf = (iso: string, g: Grain) => (g === "day" ? iso : g === "week" ? weekStart(iso) : iso.slice(0, 7));
-const nextBucket = (b: string, g: Grain) => {
-  if (g === "month") { const [y, m] = b.split("-").map(Number); return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`; }
-  const d = new Date(`${b}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + (g === "day" ? 1 : 7)); return d.toISOString().slice(0, 10);
-};
-const fmt = (b: string, g: Grain) => {
-  const d = new Date(g === "month" ? `${b}-01T00:00:00Z` : `${b}T00:00:00Z`);
-  return d.toLocaleDateString("en-GB", g === "month" ? { month: "short", year: "2-digit", timeZone: "UTC" } : { day: "numeric", month: "short", timeZone: "UTC" });
-};
-const Sel = ({ icon: Icon, label, ...p }: React.SelectHTMLAttributes<HTMLSelectElement> & { icon: typeof MapPin; label: string }) => (
-  <label className="block">
-    <span className="mb-1 flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground"><Icon className="h-3.5 w-3.5" /> {label}</span>
-    <select {...p} className="h-10 w-full rounded-xl border-2 border-eye-blue/20 bg-background px-2 text-sm font-medium focus:border-eye-blue focus:outline-none disabled:opacity-50" />
+const C = { blue: "hsl(var(--eye-blue))", teal: "hsl(var(--eye-teal))", orange: "hsl(var(--eye-orange))", grid: "hsl(var(--border))", text: "hsl(var(--muted-foreground))", paper: "hsl(var(--card))", ink: "hsl(var(--card-foreground))" };
+const formatDate = (date: string, grain: TrendGrain, full = false) => new Date(`${date}${grain === "month" ? "-01" : ""}T00:00:00Z`).toLocaleDateString("en-GB", { ...(grain !== "month" ? { day: "numeric" as const } : {}), month: "short", ...(full || grain === "month" ? { year: "numeric" as const } : {}), timeZone: "UTC" });
+const Selector = ({ icon: Icon, label, ...props }: React.SelectHTMLAttributes<HTMLSelectElement> & { icon: typeof MapPin; label: string }) => (
+  <label className="block min-w-0">
+    <span className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Icon className="h-3.5 w-3.5" />{label}</span>
+    <select {...props} className="h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50" />
   </label>
 );
 
-/** Submission trend for one State → LGA → facility at a time, animated as the selection changes. */
 export default function EyeFacilityTrend({ rows }: { rows: EyeReportRow[] }) {
-  const states = useMemo(() => [...new Set(rows.map((r) => r.state).filter(Boolean) as string[])].sort(), [rows]);
-  const [state, setState] = useState("");
-  const [lga, setLga] = useState("");
-  const [fac, setFac] = useState("");
-  const [grain, setGrain] = useState<Grain>("week");
-  const lgas = useMemo(() => [...new Set(rows.filter((r) => r.state === state).map((r) => r.lga).filter(Boolean) as string[])].sort(), [rows, state]);
-  const facs = useMemo(() => [...new Set(rows.filter((r) => r.state === state && r.lga === lga).map((r) => r.facility_name))].sort(), [rows, state, lga]);
-
-  // Pre-select the first available State → LGA → facility so the chart is never blank.
-  useEffect(() => { if (!state && states[0]) setState(states[0]); }, [states, state]);
-  useEffect(() => { if (state && !lgas.includes(lga)) setLga(lgas[0] ?? ""); }, [lgas, lga, state]);
-  useEffect(() => { if (lga && !facs.includes(fac)) setFac(facs[0] ?? ""); }, [facs, fac, lga]);
-
-  const facRows = useMemo(() => rows.filter((r) => r.state === state && r.lga === lga && r.facility_name === fac).sort((a, b) => a.report_date.localeCompare(b.report_date)), [rows, state, lga, fac]);
-  const series = useMemo(() => {
-    if (!facRows.length) return [];
-    const by = new Map<string, EyeReportRow[]>();
-    for (const r of facRows) { const k = bucketOf(r.report_date, grain); by.set(k, [...(by.get(k) ?? []), r]); }
-    const out: { label: string; Submissions: number; Consulted: number; Surgeries: number }[] = [];
-    let b = bucketOf(facRows[0].report_date, grain); const last = bucketOf(facRows[facRows.length - 1].report_date, grain);
-    for (let i = 0; i < 400 && b <= last; i++, b = nextBucket(b, grain)) {
-      const list = by.get(b) ?? []; const tt = totals(aggregate(list).summary);
-      out.push({ label: fmt(b, grain), Submissions: new Set(list.map((r) => r.report_date)).size, Consulted: t(tt.consulted), Surgeries: t(tt.surgeries) });
-    }
-    return out;
-  }, [facRows, grain]);
-  const days = new Set(facRows.map((r) => r.report_date)).size;
-  const peak = series.reduce((m, s) => Math.max(m, s.Submissions), 0);
-  const gaps = series.filter((s) => s.Submissions === 0).length;
-  const lastDate = facRows[facRows.length - 1]?.report_date;
-
-  return (
-    <section className="relative overflow-hidden rounded-2xl border bg-card shadow-sm">
-      <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-eye-blue via-eye-teal to-eye-orange" />
-      <div className="p-4 sm:p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h3 className="flex items-center gap-2 text-base font-extrabold"><TrendingUp className="h-5 w-5 text-eye-teal" /> Facility submission trend</h3>
-            <p className="text-xs text-muted-foreground">Pick a State, then an LGA, then a health facility to watch its reporting over time.</p>
-          </div>
-          <div className="inline-flex rounded-full bg-muted p-1 text-xs font-semibold">
-            {(["day", "week", "month"] as Grain[]).map((g) => (
-              <button key={g} onClick={() => setGrain(g)} className={`rounded-full px-3 py-1.5 capitalize transition-colors ${grain === g ? "bg-eye-blue text-primary-foreground shadow" : "text-muted-foreground"}`}>{g === "day" ? "Daily" : g === "week" ? "Weekly" : "Monthly"}</button>
-            ))}
-          </div>
+  const [state, setState] = useState(FACILITY_TREND_DEFAULTS.state);
+  const [lga, setLga] = useState(FACILITY_TREND_DEFAULTS.lga);
+  const [facility, setFacility] = useState(FACILITY_TREND_DEFAULTS.facility);
+  const [grain, setGrain] = useState<TrendGrain>(FACILITY_TREND_DEFAULTS.grain);
+  const states = useMemo(() => [...new Set(rows.map(r => r.state).filter(Boolean) as string[])].sort(), [rows]);
+  const lgas = useMemo(() => [...new Set(filterFacilityTrend(rows, state, "", "").map(r => r.lga).filter(Boolean) as string[])].sort(), [rows, state]);
+  const facilities = useMemo(() => [...new Set(filterFacilityTrend(rows, state, lga, "").map(r => r.facility_name).filter(Boolean))].sort(), [rows, state, lga]);
+  useEffect(() => { if (state && !states.includes(state)) setState(""); }, [state, states]);
+  useEffect(() => { if (lga && !lgas.includes(lga)) setLga(""); }, [lga, lgas]);
+  useEffect(() => { if (facility && !facilities.includes(facility)) setFacility(""); }, [facility, facilities]);
+  const selected = useMemo(() => filterFacilityTrend(rows, state, lga, facility), [rows, state, lga, facility]);
+  const series = useMemo(() => buildFacilityTrend(selected, grain), [selected, grain]);
+  const dates = useMemo(() => [...new Set(selected.map(r => r.report_date))].sort(), [selected]);
+  const peak = series.reduce((value, point) => Math.max(value, point.Submissions), 0);
+  const lastDate = dates.at(-1);
+  const gapLabel = grain === "day" ? "Days without a report" : grain === "week" ? "Weeks without a report" : "Months without a report";
+  return <section aria-label="Facility submission trend" className="border-y border-border bg-card py-5 sm:py-6">
+    <div className="px-4 sm:px-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h3 className="flex items-center gap-2 text-base font-semibold"><TrendingUp className="h-5 w-5 text-eye-blue" />Facility submission trend</h3>
+          <p className="mt-1 text-sm text-muted-foreground">{state || "All States"} · {lga || "All LGAs"} · {facility || "All health facilities"}</p>
         </div>
-
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <Sel icon={MapIcon} label="1 · State" value={state} onChange={(e) => setState(e.target.value)} disabled={!states.length}>{states.length ? states.map((s) => <option key={s}>{s}</option>) : <option value="">No reports yet</option>}</Sel>
-          <Sel icon={MapPin} label="2 · LGA" value={lga} onChange={(e) => setLga(e.target.value)} disabled={!lgas.length}>{lgas.map((s) => <option key={s}>{s}</option>)}</Sel>
-          <Sel icon={Building2} label="3 · Health facility" value={fac} onChange={(e) => setFac(e.target.value)} disabled={!facs.length}>{facs.map((s) => <option key={s}>{s}</option>)}</Sel>
+        <div role="group" aria-label="Trend interval" className="flex rounded-md border border-border p-0.5">
+          {(["day", "week", "month"] as TrendGrain[]).map(g => <Button key={g} size="sm" variant={grain === g ? "secondary" : "ghost"} aria-pressed={grain === g} onClick={() => setGrain(g)} className="h-8 rounded-sm px-3 text-xs">{g === "day" ? "Daily" : g === "week" ? "Weekly" : "Monthly"}</Button>)}
         </div>
-
-        <AnimatePresence mode="wait">
-          <motion.div key={`${fac}|${grain}`} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.35 }}>
-            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {[
-                { l: "Days reported", v: days, cls: "from-eye-blue to-eye-deep", I: CalendarDays },
-                { l: `Busiest ${grain}`, v: peak, cls: "from-eye-teal to-eye-blue", I: Sparkles },
-                { l: `${grain === "day" ? "Days" : grain === "week" ? "Weeks" : "Months"} with no report`, v: gaps, cls: gaps ? "from-eye-orange to-eye-rose" : "from-status-success to-eye-teal", I: TrendingUp },
-                { l: "Last report", v: lastDate ? new Date(`${lastDate}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : "—", cls: "from-eye-violet to-eye-blue", I: Building2 },
-              ].map((k, i) => (
-                <motion.div key={k.l} initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.08 * i }} className={`rounded-xl bg-gradient-to-br ${k.cls} p-3 text-primary-foreground`}>
-                  <k.I className="h-4 w-4 opacity-80" />
-                  <p className="mt-1 text-xl font-extrabold tabular-nums">{k.v}</p>
-                  <p className="text-[11px] font-semibold opacity-90">{k.l}</p>
-                </motion.div>
-              ))}
-            </div>
-            <div className="mt-4 h-72">
-              {series.length ? (
-                <ResponsiveContainer>
-                  <ComposedChart data={series} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="eyeSubFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={C.teal} stopOpacity={0.55} /><stop offset="100%" stopColor={C.teal} stopOpacity={0.03} /></linearGradient>
-                      <linearGradient id="eyeSubStroke" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stopColor={C.blue} /><stop offset="100%" stopColor={C.teal} /></linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
-                    <XAxis dataKey="label" fontSize={11} minTickGap={16} />
-                    <YAxis yAxisId="s" fontSize={11} allowDecimals={false} />
-                    <YAxis yAxisId="p" orientation="right" fontSize={11} allowDecimals={false} />
-                    <Tooltip contentStyle={{ borderRadius: 12 }} />
-                    <Legend />
-                    <Area yAxisId="s" type="monotone" dataKey="Submissions" name="Days submitted" stroke="url(#eyeSubStroke)" strokeWidth={3.5} fill="url(#eyeSubFill)" dot={{ r: 3.5, fill: C.blue }} activeDot={{ r: 6 }} animationDuration={1400} animationEasing="ease-out" />
-                    <Line yAxisId="p" type="monotone" dataKey="Consulted" stroke={C.orange} strokeWidth={2} dot={false} animationDuration={1800} animationBegin={300} />
-                    <Line yAxisId="p" type="monotone" dataKey="Surgeries" stroke={C.violet} strokeWidth={2} strokeDasharray="5 4" dot={false} animationDuration={1800} animationBegin={500} />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex h-full items-center justify-center rounded-xl border-2 border-dashed text-sm text-muted-foreground">No submissions for this facility yet.</div>
-              )}
-            </div>
-          </motion.div>
-        </AnimatePresence>
       </div>
-    </section>
-  );
+      <div className="mt-5 grid gap-3 sm:grid-cols-3">
+        <Selector icon={MapIcon} label="State" value={state} onChange={e => { setState(e.target.value); setLga(""); setFacility(""); }}><option value="">All States</option>{states.map(s => <option key={s}>{s}</option>)}</Selector>
+        <Selector icon={MapPin} label="LGA" value={lga} onChange={e => { setLga(e.target.value); setFacility(""); }}><option value="">All LGAs</option>{lgas.map(s => <option key={s}>{s}</option>)}</Selector>
+        <Selector icon={Building2} label="Health facility" value={facility} onChange={e => setFacility(e.target.value)}><option value="">All health facilities</option>{facilities.map(s => <option key={s}>{s}</option>)}</Selector>
+      </div>
+      <dl className="my-6 grid grid-cols-2 gap-x-5 gap-y-4 border-y border-border py-4 sm:grid-cols-4">
+        {[
+          { label: "Facility submissions", value: selected.length.toLocaleString() },
+          { label: `Peak ${grain === "day" ? "daily" : grain === "week" ? "weekly" : "monthly"} submissions`, value: peak.toLocaleString() },
+          { label: gapLabel, value: series.filter(s => !s.Submissions).length.toLocaleString() },
+          { label: "Latest report", value: lastDate ? formatDate(lastDate, "day", true) : "—" },
+        ].map(k => <div key={k.label}><dt className="text-xs text-muted-foreground">{k.label}</dt><dd className="mt-1 text-xl font-semibold tabular-nums text-foreground">{k.value}</dd></div>)}
+      </dl>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"><span>Facility submissions · left axis</span><span>Consultations / surgeries · right axis</span></div>
+      <div className="h-72 w-full sm:h-80" aria-label="Facility submissions, consultations and surgeries over time">
+        {series.length ? <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={series} margin={{ top: 10, right: 0, left: 0, bottom: 8 }}>
+            <CartesianGrid vertical={false} stroke={C.grid} />
+            <XAxis dataKey="date" tickFormatter={date => formatDate(date, grain)} tick={{ fontSize: 11, fill: C.text }} axisLine={{ stroke: C.grid }} tickLine={false} minTickGap={36} tickMargin={12} />
+            <YAxis yAxisId="submissions" width={38} tick={{ fontSize: 11, fill: C.text }} axisLine={false} tickLine={false} allowDecimals={false} />
+            <YAxis yAxisId="patients" orientation="right" width={42} tick={{ fontSize: 11, fill: C.text }} axisLine={false} tickLine={false} allowDecimals={false} tickFormatter={n => Intl.NumberFormat("en", { notation: "compact" }).format(n)} />
+            <Tooltip labelFormatter={date => formatDate(String(date), grain, true)} contentStyle={{ background: C.paper, borderColor: C.grid, color: C.ink, borderRadius: 4, fontSize: 12 }} formatter={(value: number) => value.toLocaleString()} />
+            <Line yAxisId="submissions" dataKey="Submissions" name="Facility submissions" type="linear" stroke={C.blue} strokeWidth={3} dot={series.length <= 45 ? { r: 2.5 } : false} activeDot={{ r: 5 }} isAnimationActive={false} />
+            <Line yAxisId="patients" dataKey="Consulted" name="Consultations" type="linear" stroke={C.teal} strokeWidth={2} dot={false} isAnimationActive={false} />
+            <Line yAxisId="patients" dataKey="Surgeries" type="linear" stroke={C.orange} strokeWidth={2} strokeDasharray="5 4" dot={false} isAnimationActive={false} />
+          </ComposedChart>
+        </ResponsiveContainer> : <div className="flex h-full items-center justify-center border border-dashed border-border text-sm text-muted-foreground">No submissions in this selection.</div>}
+      </div>
+      <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 border-t border-border pt-3 text-xs">
+        <span className="flex items-center gap-2"><span className="h-0.5 w-5 bg-eye-blue" />Facility submissions</span>
+        <span className="flex items-center gap-2"><span className="h-0.5 w-5 bg-eye-teal" />Consultations</span>
+        <span className="flex items-center gap-2"><span className="w-5 border-t-2 border-dashed border-eye-orange" />Surgeries</span>
+        <span className="text-muted-foreground">{dates.length ? `${formatDate(dates[0], "day", true)} – ${formatDate(lastDate || dates[0], "day", true)}` : "No reporting dates"}</span>
+      </div>
+    </div>
+  </section>;
 }
