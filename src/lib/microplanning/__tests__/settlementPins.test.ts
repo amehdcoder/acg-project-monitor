@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { settlementPinData, settlementPinContent, settlementLayerData } from '../settlementPins';
+import { settlementPinData, settlementPinContent, settlementLayerData, settlementFocusPoints } from '../settlementPins';
 const entry = { settlement_name:'East', community_name:'Community', settlement_latitude:11.751, settlement_longitude:11.961, estimated_total_population:100, cdd_names:'Musa', extra_metadata:{ame_microplan:{kind:'settlement',measure_scope:'settlement'}} };
 describe('settlement pins',()=>{
   it('uses settlement GPS and its own population/CDDs including confirmed zero',()=>{
@@ -38,5 +38,16 @@ describe('settlement pins',()=>{
   it('does not invent settlement conditions, households or disability from inherited parent measures',()=>{
     const pin=settlementPinData({...entry,extra_metadata:null,number_of_households:20,terrain_type:'flat',pwd_total:3,cdd_details:[{name:'Parent CDD'}]});
     expect(pin).toMatchObject({households:null,terrain:null,disability:[],cdds:[]});
+  });
+});describe('settlement zoom focus',()=>{
+  it('keeps Abuja-recorded points out of the Yobe zoom target but reports them',()=>{
+    const yobe:Array<[number,number]>=[[13.30,11.20],[13.31,11.21],[13.29,11.19],[13.32,11.22],[13.28,11.18],[13.33,11.23]];
+    const abuja:Array<[number,number]>=[[9.056,7.499],[9.057,7.498]];
+    const r=settlementFocusPoints([...yobe,...abuja]);
+    expect(r.focus).toEqual(yobe);
+    expect(r.outliers).toEqual(abuja);
+  });
+  it('keeps every point when settlements are genuinely spread or few',()=>{
+    expect(settlementFocusPoints([[13.3,11.2],[9.05,7.5]]).outliers).toEqual([]);
   });
 });

@@ -1238,7 +1238,7 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
           <Button variant="outline" size="sm" className="min-h-11 gap-1.5" onClick={zoomToSettlements} disabled={!settlementLayer.pins.length} title="Zoom to settlement GPS locations">
             <MapPin className="h-4 w-4" /> Zoom to settlements
           </Button>
-          {settlementFocus.outliers.length > 0 && <span className="text-xs font-medium text-warning" title="These pins remain on the map at their recorded GPS; check whether the coordinates were captured on site.">{settlementFocus.outliers.length.toLocaleString()} settlement GPS {settlementFocus.outliers.length === 1 ? 'point is' : 'points are'} far from the rest</span>}
+          {settlementFocus.outliers.length > 0 && <span className="text-xs font-medium text-status-warning" title="These pins remain on the map at their recorded GPS; check whether the coordinates were captured on site.">{settlementFocus.outliers.length.toLocaleString()} settlement GPS {settlementFocus.outliers.length === 1 ? 'point is' : 'points are'} far from the rest</span>}
           {settlementLayer.missingGps > 0 && <span className="text-xs text-muted-foreground">{settlementLayer.missingGps.toLocaleString()} settlements without GPS</span>}
           {settlementLayer.named === 0 && <span className="text-xs text-muted-foreground">No settlements recorded in this selection</span>}
           <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground cursor-pointer">
