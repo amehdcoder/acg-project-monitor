@@ -491,7 +491,7 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
-    return drawFlhfCatchments(map, cascadedEntries, { points: false });
+    return drawFlhfCatchments(map, cascadedEntries, { points: true });
   }, [cascadedEntries]);
 
   // ─── Zoom to extent ───

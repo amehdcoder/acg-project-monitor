@@ -286,7 +286,7 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName, allocationRo
 
     // FLHF catchment areas + "H" facility markers
     geoEntries.forEach(e => { if (e.flhf_latitude && e.flhf_longitude) bounds.push([e.flhf_latitude, e.flhf_longitude]); });
-    const removeCatchments = drawFlhfCatchments(map, geoEntries, { points: false });
+    const removeCatchments = drawFlhfCatchments(map, geoEntries, { points: true });
 
     if (bounds.length > 0) {
       map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13, animate: false });

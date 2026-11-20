@@ -115,7 +115,7 @@ function StateMap({ group, lgas, states, espen }: { group: StateGroup; lgas: Adm
     const b = adminLayers.bounds;
     if (b.isValid()) m.fitBounds(b, { padding: [10, 10] }); else m.setView([9.1, 8.7], 6);
     map.current = m;
-    const removeCatchments = drawFlhfCatchments(m, group.points.map((p) => p.entry as never), { points: false });
+    const removeCatchments = drawFlhfCatchments(m, group.points.map((p) => p.entry as never), { points: true });
     const ro = new ResizeObserver(() => m.invalidateSize());
     ro.observe(el.current);
     return () => { removeCatchments(); detachInspection(); ro.disconnect(); adminLayers.remove(); m.remove(); map.current = null; };

@@ -79,7 +79,8 @@ export interface CatchmentLayerOptions { points?: boolean; legend?: boolean; fit
 export function drawFlhfCatchments(map: L.Map, entries: readonly CatchmentEntry[], opts: CatchmentLayerOptions = {}): () => void {
   const { points = true, legend = true, fit = false } = opts;
   const catchments = buildCatchments(entries);
-  if (!catchments.length) return () => {};
+  const unassigned = points ? entries.filter(e => !String(e.flhf_name ?? "").trim()) : [];
+  if (!catchments.length && !unassigned.length) return () => {};
   if (!map.getPane("flhfAreas")) { const p = map.createPane("flhfAreas"); p.style.zIndex = "405"; }
   if (!map.getPane("flhfMarks")) { const p = map.createPane("flhfMarks"); p.style.zIndex = "640"; }
   const group = L.layerGroup();
@@ -93,7 +94,7 @@ export function drawFlhfCatchments(map: L.Map, entries: readonly CatchmentEntry[
       outline.forEach(p => bounds.extend(p));
     }
     if (points) for (const p of c.communities) {
-      L.circleMarker([p.lat, p.lng], { pane: "flhfMarks", radius: 3.4, color: "#ffffff", weight: 0.8, fillColor: "#B3261E", fillOpacity: 0.95 })
+      L.circleMarker([p.lat, p.lng], { pane: "flhfMarks", radius: 4.5, color: "#ffffff", weight: 1.2, fillColor: "#B3261E", fillOpacity: 0.95 })
         .bindTooltip(`${esc(p.name || "Community")} · ${esc(c.name)}`, { direction: "top" }).addTo(group);
     }
     if (c.facility) {
@@ -102,6 +103,13 @@ export function drawFlhfCatchments(map: L.Map, entries: readonly CatchmentEntry[
         icon: L.divIcon({ className: "flhf-h-icon", html: `<span style="--flhf:${c.color}">H</span>`, iconSize: [26, 26], iconAnchor: [13, 13] }),
       }).bindTooltip(`<b>${esc(c.name)}</b><br/>Frontline Health Facility`, { direction: "top", offset: [0, -12] }).addTo(group);
     }
+  }
+  for (const e of unassigned) {
+    const s = ok(e.settlement_latitude, e.settlement_longitude);
+    const lat = s ? e.settlement_latitude : e.community_latitude, lng = s ? e.settlement_longitude : e.community_longitude;
+    if (!ok(lat, lng)) continue;
+    L.circleMarker([lat!, lng!], { pane: "flhfMarks", radius: 4.5, color: "#ffffff", weight: 1.2, fillColor: "#B3261E", fillOpacity: 0.95 })
+      .bindTooltip(`${esc(String((s && e.settlement_name) || e.community_name || "Community"))} · FLHF not recorded`, { direction: "top" }).addTo(group);
   }
   group.addTo(map);
   let control: L.Control | null = null;
