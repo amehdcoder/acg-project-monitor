@@ -2800,7 +2800,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
               </CardContent>
             </Card>
           </div>
-          <GpsQualityCheck entries={filtered} projectName={selectedProjectName} />
+          <GpsQualityCheck key={`${user?.id}:${selectedProjectId}`} entries={filtered} projectName={selectedProjectName} projectId={selectedProjectId || 'all-projects'} userId={user?.id || 'signed-out'} />
           <CommunityRiskRanking entries={filtered} risks={communityRisks} />
           <PlanningHeatmaps entries={filtered as never} />
           <PlanningAnalyses entries={filtered} calcTargetPop={calcTargetPop} targetLabel={targetPopulationLabel} />

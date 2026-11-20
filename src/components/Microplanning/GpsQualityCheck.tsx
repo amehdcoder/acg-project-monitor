@@ -1,10 +1,12 @@
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Download, Loader2, MapPinCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { type GpsQualityEntry, type GpsQualityReport, type GpsStatus } from "@/lib/microplanning/gpsQuality";
 import { loadNigeriaAdminBoundaries } from "@/lib/microplanning/nigeriaAdminBoundaries";
 import { toast } from "@/hooks/use-toast";
+import { gpsQualitySignature, matchingGpsQuality, type SavedGpsQuality } from '@/lib/microplanning/gpsQualityCache';
+import { cacheGetForUser, cacheSetForUser } from '@/lib/programmeModule/offlineReadCache';
 
 const LABEL: Record<GpsStatus, string> = {
   inside: "Inside recorded LGA", border: "Within 1 km of LGA line", near_border: "1–5 km across LGA line",
@@ -18,8 +20,12 @@ const TONE: Record<GpsStatus, string> = {
 };
 const ACTION = (s: GpsStatus) => s === "border" || s === "near_border" ? "Accepted (boundary precision)" : s === "swapped" ? "Swap latitude/longitude" : s === "unknown_lga" ? "Check LGA spelling" : "Re-capture GPS on site";
 
-function GpsQualityCheck({ entries, projectName }: { entries: GpsQualityEntry[]; projectName?: string | null }) {
+function GpsQualityCheck({ entries, projectName, projectId, userId }: { entries: GpsQualityEntry[]; projectName?: string | null; projectId: string; userId: string }) {
   const [open, setOpen] = useState(false);
+  const [started, setStarted] = useState(false);
+  const signature = useMemo(() => gpsQualitySignature(entries), [entries]);
+  const latestEntries = useRef(entries);
+  latestEntries.current = entries;
   const [report, setReport] = useState<GpsQualityReport | null>(null);
   const [error, setError] = useState(false);
   const [show, setShow] = useState(50);
@@ -29,7 +35,7 @@ function GpsQualityCheck({ entries, projectName }: { entries: GpsQualityEntry[];
   const [exporting, setExporting] = useState(false);
   const [prepared, setPrepared] = useState<Blob | null>(null);
   useEffect(() => {
-    if (!open) return;
+    if (!started) return;
     let live = true; setReport(null); setError(false); setPrepared(null); setExporting(false); exportLock.current = false; setShow(50);
     const current = new Worker(new URL('../../lib/microplanning/gpsQuality.worker.ts', import.meta.url), { type: 'module' });
     worker.current = current;
@@ -41,14 +47,26 @@ function GpsQualityCheck({ entries, projectName }: { entries: GpsQualityEntry[];
     };
     current.onmessage = ({ data }) => {
       if (!live) return;
-      if (data.kind === 'report') setReport(data.report);
+      if (data.kind === 'report') {
+        setReport(data.report);
+        void cacheSetForUser(userId, `gps-quality:${projectId}`, { signature, report: data.report });
+      }
       if (data.kind === 'workbook') { setPrepared(new Blob([data.buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })); setExporting(false); exportLock.current = false; }
       if (data.kind === 'error') fail(data.message);
     };
     current.onerror = () => fail('Please reopen the section and try again.');
-    loadNigeriaAdminBoundaries().then(b => { if (live) current.postMessage({ kind: 'analyse', entries, lgas: b.lgas.features }); }).catch(() => live && setError(true));
+    const snapshot = latestEntries.current;
+    // Only exact current authorized inputs may hydrate; never reuse another
+    // user's report or a report from a wider/different filter scope.
+    cacheGetForUser<SavedGpsQuality>(userId, `gps-quality:${projectId}`).then(async saved => {
+      if (!live) return;
+      const cached = matchingGpsQuality(saved, signature);
+      if (cached) { setReport(cached); return; }
+      const b = await loadNigeriaAdminBoundaries();
+      if (live) current.postMessage({ kind: 'analyse', entries: snapshot, lgas: b.lgas.features });
+    }).catch(() => live && setError(true));
     return () => { live = false; generation.current++; current.terminate(); worker.current = null; };
-  }, [open, entries, projectName]);
+  }, [started, signature, userId, projectId]);
   const download = () => {
     if (!prepared) return;
     const filename = `GPS_quality_${(projectName || 'project').replace(/[^\w-]+/g, '_')}.xlsx`;
@@ -75,7 +93,7 @@ function GpsQualityCheck({ entries, projectName }: { entries: GpsQualityEntry[];
   };
   const issues = report?.findings.filter((f) => f.status !== "border" && f.status !== "near_border") ?? [];
   return <section className="rounded-xl border border-border bg-card" aria-label="GPS quality check">
-    <Button variant="ghost" aria-expanded={open} onClick={() => setOpen((v) => !v)} className="flex h-auto w-full items-center justify-between gap-3 whitespace-normal px-4 py-3 text-left">
+    <Button variant="ghost" aria-expanded={open} onClick={() => { setStarted(true); setOpen((v) => !v); }} className="flex h-auto w-full items-center justify-between gap-3 whitespace-normal px-4 py-3 text-left">
       <span className="flex items-center gap-2 text-sm font-semibold"><MapPinCheck className="h-4 w-4 text-primary" />GPS quality check
         <span className="hidden text-xs font-normal text-muted-foreground sm:inline">· every point tested against official State/LGA boundaries</span></span>
       <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
