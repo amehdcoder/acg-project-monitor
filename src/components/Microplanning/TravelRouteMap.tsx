@@ -1,4 +1,5 @@
 import { disposeMap } from "@/lib/microplanning/disposeMap";
+import { drawFlhfCatchments } from "@/lib/microplanning/flhfCatchments";
 import { attachAreaInspection } from "@/lib/microplanning/areaMapInteraction";
 import { useMicroplanMapBoundaries } from "@/hooks/useMicroplanMapBoundaries";
 import { renderBatches } from "@/lib/microplanning/renderBatches";
@@ -319,6 +320,13 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
       mapRef.current = null;
     };
   }, []);
+
+  // FLHF catchment areas, community points and "H" facility markers.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    return drawFlhfCatchments(map, entries, { points: true });
+  }, [entries]);
 
   // Draw route when origin/destination change
   useMicroplanMapBoundaries(mapRef, entries.map(entry => entry.state));

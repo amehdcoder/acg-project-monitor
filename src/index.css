@@ -1733,3 +1733,19 @@ html[data-lbr-fit="on"][data-lbr-device="ios"] .lbr-type button { min-height: 44
 .project-qr-camera { width: 100%; aspect-ratio: 1; background: hsl(var(--muted)); }
 .project-qr-camera video { width: 100% !important; height: 100% !important; object-fit: cover; }
 .project-join-shell { overscroll-behavior: contain; touch-action: pan-x pan-y; scrollbar-color: hsl(var(--primary)) hsl(var(--muted)); }
+
+/* FLHF catchment areas + "H" facility symbology (shared by all Geo Microplanning maps) */
+.flhf-h-icon { background: transparent; border: 0; }
+.flhf-h-icon span { display:flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:9999px;
+  background:#1D4E9E; color:#fff; font:800 14px/1 system-ui, sans-serif; border:2.5px solid #fff;
+  box-shadow:0 0 0 2px var(--flhf, #1D4E9E), 0 2px 6px rgba(0,0,0,.35); }
+.flhf-legend { background:hsl(var(--card)); color:hsl(var(--card-foreground)); border:1px solid hsl(var(--border));
+  border-radius:8px; padding:8px 10px; font-size:11px; max-width:210px; box-shadow:0 2px 8px rgba(0,0,0,.15); }
+.flhf-legend > b { display:block; margin-bottom:4px; font-size:12px; }
+.flhf-legend-row { display:flex; align-items:center; gap:6px; margin:2px 0; }
+.flhf-legend-row span:last-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.flhf-legend-row i { width:18px; height:11px; border-radius:2px; opacity:.7; flex:none; }
+.flhf-legend-row em { width:8px; height:8px; margin:0 5px; border-radius:9999px; background:#B3261E; border:1px solid #fff; flex:none; }
+.flhf-legend-h { display:inline-flex; width:18px; height:18px; border-radius:9999px; background:#1D4E9E; color:#fff;
+  font-weight:800; font-size:10px; align-items:center; justify-content:center; flex:none; }
+.flhf-legend-more { color:hsl(var(--muted-foreground)); font-style:italic; }

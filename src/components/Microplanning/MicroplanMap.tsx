@@ -1,4 +1,5 @@
 import { disposeMap } from "@/lib/microplanning/disposeMap";
+import { drawFlhfCatchments } from "@/lib/microplanning/flhfCatchments";
 import { settlementPinData, settlementLayerData, settlementFocusPoints } from '@/lib/microplanning/settlementPins';
 import { attachSettlementDetails } from '@/lib/microplanning/settlementMapDetails';
 import { attachAreaInspection } from "@/lib/microplanning/areaMapInteraction";
@@ -485,6 +486,13 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
     group.addLayers(markers);
     return () => { detachDetails.forEach(detach => detach()); group.clearLayers(); map.removeLayer(group); };
   }, [settlementLayer, showSettlements]);
+
+  // FLHF catchment areas with "H" facility symbology.
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    return drawFlhfCatchments(map, cascadedEntries, { points: false });
+  }, [cascadedEntries]);
 
   // ─── Zoom to extent ───
   useMicroplanMapBoundaries(mapInstanceRef, cascadedEntries.map(entry => entry.state));

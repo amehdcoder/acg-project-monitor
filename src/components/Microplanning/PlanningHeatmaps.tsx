@@ -1,4 +1,5 @@
 import { memo, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { drawFlhfCatchments } from "@/lib/microplanning/flhfCatchments";
 import { attachAreaInspection } from "@/lib/microplanning/areaMapInteraction";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -114,9 +115,10 @@ function StateMap({ group, lgas, states, espen }: { group: StateGroup; lgas: Adm
     const b = adminLayers.bounds;
     if (b.isValid()) m.fitBounds(b, { padding: [10, 10] }); else m.setView([9.1, 8.7], 6);
     map.current = m;
+    const removeCatchments = drawFlhfCatchments(m, group.points.map((p) => p.entry as never), { points: false });
     const ro = new ResizeObserver(() => m.invalidateSize());
     ro.observe(el.current);
-    return () => { detachInspection(); ro.disconnect(); adminLayers.remove(); m.remove(); map.current = null; };
+    return () => { removeCatchments(); detachInspection(); ro.disconnect(); adminLayers.remove(); m.remove(); map.current = null; };
   }, [visible, lgas, states]);
 
   useEffect(() => {

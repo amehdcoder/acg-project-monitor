@@ -1,4 +1,5 @@
 import { disposeMap } from "@/lib/microplanning/disposeMap";
+import { drawFlhfCatchments } from "@/lib/microplanning/flhfCatchments";
 import { drawNigeriaAdminBoundaries } from "@/lib/microplanning/leafletAdminBoundaries";
 import { loadNigeriaAdminBoundaries, selectAdminBoundaries } from "@/lib/microplanning/nigeriaAdminBoundaries";
 import { renderBatches } from "@/lib/microplanning/renderBatches";
@@ -283,33 +284,15 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName, allocationRo
       }
     });
 
-    // Add FLHF markers
-    const flhfMap = new Map<string, CoverageEntry>();
-    geoEntries.forEach(e => {
-      if (e.flhf_latitude && e.flhf_longitude && !flhfMap.has(e.flhf_name)) {
-        flhfMap.set(e.flhf_name, e);
-      }
-    });
-    flhfMap.forEach((e, name) => {
-      const lat = e.flhf_latitude;
-      const lng = e.flhf_longitude;
-      if (lat == null || lng == null) return;
-      bounds.push([lat, lng]);
-      L.marker([lat, lng], {
-        icon: L.divIcon({
-          className: "coverage-flhf-icon",
-          html: `<div style="background:#2563eb;color:white;width:22px;height:22px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);">🏥</div>`,
-          iconSize: [22, 22],
-          iconAnchor: [11, 11],
-        }),
-      }).bindPopup(`<b>${name}</b><br/><span style="font-size:11px;color:#6b7280;">Health Facility</span>`).addTo(map);
-    });
+    // FLHF catchment areas + "H" facility markers
+    geoEntries.forEach(e => { if (e.flhf_latitude && e.flhf_longitude) bounds.push([e.flhf_latitude, e.flhf_longitude]); });
+    const removeCatchments = drawFlhfCatchments(map, geoEntries, { points: false });
 
     if (bounds.length > 0) {
       map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13, animate: false });
     }
 
-    return () => { live = false; removeBoundaries?.(); cancel(); disposeMap(map); mapRef.current = null; };
+    return () => { live = false; removeCatchments(); removeBoundaries?.(); cancel(); disposeMap(map); mapRef.current = null; };
   }, [showMap, filtered, getTargetPop]);
 
   const getCoverageColor = (coverage: number) => {
