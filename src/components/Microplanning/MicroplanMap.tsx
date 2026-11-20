@@ -67,11 +67,7 @@ type ThematicLayer = "none" | "flhf_catchment" | "distance" | "accessibility" | 
 
 // ─── GRID3-Style Color Palettes ───
 const FLHF_COLORS = [
-  "#2E86AB", "#A23B72", "#F18F01", "#C73E1D", "#3B1F2B",
-  "#44BBA4", "#E94F37", "#393E41", "#8D6A9F", "#44AF69",
-  "#F8961E", "#577590", "#43AA8B", "#F94144", "#90BE6D",
-  "#F3722C", "#277DA1", "#F9C74F", "#4D908E", "#F9844A",
-  "#43AA8B", "#F8961E", "#577590", "#90BE6D",
+  "#1AA3E6", "#A6DE5F", "#E32B2B", "#0A22C9", "#F5B800", "#B5EAD9", "#8E0F14", "#7FD1F5", "#5FB83A", "#F27B7B", "#4256E0", "#FFD95A",
 ];
 
 const TERRAIN_ICONS: Record<string, { emoji: string; color: string }> = {
@@ -85,39 +81,39 @@ const TERRAIN_ICONS: Record<string, { emoji: string; color: string }> = {
 };
 
 const ACCESS_COLORS: Record<string, { color: string; label: string }> = {
-  accessible: { color: "#059669", label: "Accessible" },
-  hard_to_reach: { color: "#D97706", label: "Hard to Reach" },
-  inaccessible: { color: "#DC2626", label: "Inaccessible" },
+  accessible: { color: "#0A22C9", label: "Accessible" },
+  hard_to_reach: { color: "#F5B800", label: "Hard to Reach" },
+  inaccessible: { color: "#E32B2B", label: "Inaccessible" },
   seasonal: { color: "#7C3AED", label: "Seasonal" },
 };
 
 const SECURITY_COLORS: Record<string, { color: string; label: string }> = {
-  cleared: { color: "#059669", label: "Cleared" },
-  partial: { color: "#D97706", label: "Partial" },
-  not_cleared: { color: "#DC2626", label: "Not Cleared" },
+  cleared: { color: "#0A22C9", label: "Cleared" },
+  partial: { color: "#F5B800", label: "Partial" },
+  not_cleared: { color: "#E32B2B", label: "Not Cleared" },
   unknown: { color: "#6B7280", label: "Unknown" },
 };
 
 const DISTANCE_BANDS = [
-  { max: 2, color: "#065F46", label: "< 2 km" },
-  { max: 5, color: "#059669", label: "2–5 km" },
-  { max: 10, color: "#D97706", label: "5–10 km" },
-  { max: 20, color: "#EA580C", label: "10–20 km" },
-  { max: Infinity, color: "#DC2626", label: "> 20 km" },
+  { max: 2, color: "#0A22C9", label: "< 2 km" },
+  { max: 5, color: "#1AA3E6", label: "2–5 km" },
+  { max: 10, color: "#A6DE5F", label: "5–10 km" },
+  { max: 20, color: "#E32B2B", label: "10–20 km" },
+  { max: Infinity, color: "#8E0F14", label: "> 20 km" },
 ];
 
 const CATCHMENT_BUFFERS = [
-  { radiusKm: 2, color: "#059669", opacity: 0.10, label: "2 km", dash: "4 6" },
-  { radiusKm: 5, color: "#2563EB", opacity: 0.06, label: "5 km", dash: "6 8" },
-  { radiusKm: 10, color: "#D97706", opacity: 0.03, label: "10 km", dash: "8 10" },
+  { radiusKm: 2, color: "#0A22C9", opacity: 0.10, label: "2 km", dash: "4 6" },
+  { radiusKm: 5, color: "#1AA3E6", opacity: 0.06, label: "5 km", dash: "6 8" },
+  { radiusKm: 10, color: "#F5B800", opacity: 0.03, label: "10 km", dash: "8 10" },
 ];
 
 const POP_DENSITY_CLASSES = [
-  { max: 1000, color: "#D1FAE5", label: "< 1k" },
-  { max: 3000, color: "#6EE7B7", label: "1k–3k" },
-  { max: 5000, color: "#FBBF24", label: "3k–5k" },
-  { max: 8000, color: "#EA580C", label: "5k–8k" },
-  { max: Infinity, color: "#B91C1C", label: "> 8k" },
+  { max: 1000, color: "#B5EAD9", label: "< 1k" },
+  { max: 3000, color: "#1AA3E6", label: "1k–3k" },
+  { max: 5000, color: "#A6DE5F", label: "3k–5k" },
+  { max: 8000, color: "#E32B2B", label: "5k–8k" },
+  { max: Infinity, color: "#8E0F14", label: "> 8k" },
 ];
 
 const getDistanceColor = (km: number | null) => {

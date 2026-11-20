@@ -14,8 +14,7 @@ export interface CatchmentEntry {
 }
 
 export const CATCHMENT_PALETTE = [
-  "#F4A261", "#90BE6D", "#4D96FF", "#E76F51", "#B388EB", "#2A9D8F",
-  "#F9C74F", "#F28482", "#43AA8B", "#9C89B8", "#FFB4A2", "#577590",
+  "#1AA3E6", "#A6DE5F", "#E32B2B", "#0A22C9", "#F5B800", "#B5EAD9", "#8E0F14", "#7FD1F5", "#5FB83A", "#F27B7B", "#4256E0", "#FFD95A",
 ];
 
 export interface Catchment {

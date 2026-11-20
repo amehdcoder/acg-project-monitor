@@ -259,7 +259,7 @@ function StateMap({ group, lgas, states, espen }: { group: StateGroup; lgas: Adm
 }
 const StateMapMemo = memo(StateMap);
 const EXTRA = [
-  { id: "catchment", title: "Health facility catchment areas", description: "Landblocks coloured by the FLHF each settlement reports to.", colors: ["#1F77B4", "#FF7F0E", "#2CA02C", "#D62728", "#9467BD"] },
+  { id: "catchment", title: "Health facility catchment areas", description: "Landblocks coloured by the FLHF each settlement reports to.", colors: ["#1AA3E6", "#A6DE5F", "#E32B2B", "#0A22C9", "#F5B800"] },
   ...ESPEN_MAPS.map((m) => ({ id: m.id, title: m.title, description: m.description, colors: m.colors })),
 ];
 

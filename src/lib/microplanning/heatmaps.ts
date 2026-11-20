@@ -18,25 +18,25 @@ export interface HeatEntry {
 export interface Category { key: string; label: string; color: string; weight: number }
 
 // WHO-style palette: WHO blue, green, amber, orange, red, neutral grey.
-export const WHO = { blue: "#009ADE", navy: "#0B3C5D", green: "#3A9A3F", amber: "#F2A900", orange: "#E8702A", red: "#C8102E", grey: "#8A9BA8", teal: "#00A6A6", brown: "#8C6D46", olive: "#7A8B2E" };
+export const WHO = { blue: "#1AA3E6", navy: "#0A22C9", green: "#0A22C9", amber: "#F5B800", orange: "#F28C28", red: "#E32B2B", grey: "#8A9BA8", teal: "#B5EAD9", brown: "#8C6D46", olive: "#A6DE5F" };
 
 export const THEMES: Record<HeatTheme, { title: string; field: keyof HeatEntry | null; categories: Category[]; heatNote: string }> = {
   accessibility: {
     title: "Accessibility", field: "accessibility", heatNote: "Heat = concentration of hard-to-reach communities",
     categories: [
-      { key: "accessible", label: "Accessible", color: "#6DAA4F", weight: 0.1 },
-      { key: "seasonal", label: "Seasonal", color: "#E3C84A", weight: 0.5 },
-      { key: "hard_to_reach", label: "Hard to reach", color: "#E8888A", weight: 0.8 },
-      { key: "inaccessible", label: "Inaccessible", color: "#B71C1C", weight: 1 },
+      { key: "accessible", label: "Accessible", color: "#0A22C9", weight: 0.1 },
+      { key: "seasonal", label: "Seasonal", color: "#A6DE5F", weight: 0.5 },
+      { key: "hard_to_reach", label: "Hard to reach", color: "#F5B800", weight: 0.8 },
+      { key: "inaccessible", label: "Inaccessible", color: "#E32B2B", weight: 1 },
       { key: "unset", label: "Not recorded", color: "#C3C9CF", weight: 0 },
     ],
   },
   security: {
     title: "Security clearance", field: "security_clearance", heatNote: "Heat = concentration of insecure communities",
     categories: [
-      { key: "cleared", label: "Cleared", color: "#6DAA4F", weight: 0.1 },
-      { key: "partial", label: "Partially cleared", color: "#E3C84A", weight: 0.6 },
-      { key: "not_cleared", label: "Not cleared", color: "#B71C1C", weight: 1 },
+      { key: "cleared", label: "Cleared", color: "#0A22C9", weight: 0.1 },
+      { key: "partial", label: "Partially cleared", color: "#F5B800", weight: 0.6 },
+      { key: "not_cleared", label: "Not cleared", color: "#E32B2B", weight: 1 },
       { key: "unknown", label: "Unknown", color: "#C3C9CF", weight: 0.35 },
     ],
   },
@@ -56,8 +56,8 @@ export const THEMES: Record<HeatTheme, { title: string; field: keyof HeatEntry |
   population: {
     title: "Population density", field: null, heatNote: "Heat = population weight per community",
     categories: [
-      { key: "p1", label: "< 500", color: "#BFE3F5", weight: 0.15 },
-      { key: "p2", label: "500 – 1,999", color: "#5BBDE8", weight: 0.35 },
+      { key: "p1", label: "< 500", color: "#B5EAD9", weight: 0.15 },
+      { key: "p2", label: "500 – 1,999", color: "#1AA3E6", weight: 0.35 },
       { key: "p3", label: "2,000 – 4,999", color: WHO.blue, weight: 0.6 },
       { key: "p4", label: "5,000 – 9,999", color: WHO.orange, weight: 0.85 },
       { key: "p5", label: "10,000+", color: WHO.red, weight: 1 },
@@ -65,7 +65,7 @@ export const THEMES: Record<HeatTheme, { title: string; field: keyof HeatEntry |
   },
 };
 
-export const HEAT_GRADIENT = { 0.15: "#BFE3F5", 0.35: "#009ADE", 0.6: "#F2A900", 0.8: "#E8702A", 1: "#C8102E" };
+export const HEAT_GRADIENT = { 0.15: "#B5EAD9", 0.35: "#1AA3E6", 0.55: "#A6DE5F", 0.75: "#F5B800", 0.9: "#E32B2B", 1: "#8E0F14" };
 
 const num = (v: unknown) => (v == null || v === "" ? NaN : Number(v));
 const inNigeria = (lat: number, lng: number) => lat >= 4 && lat <= 14 && lng >= 2.6 && lng <= 14.8;
@@ -155,8 +155,8 @@ export function groupByState(entries: HeatEntry[], lgaFeatures: { properties: { 
 }
 
 // ESPEN/Crosscut population density classes (pop/km²) and bivariate palette.
-export const DENSITY_COLORS = ["#E8C4CB", "#E07A80", "#A6192E"];
-export const BIVARIATE = { low: ["#8CC56A", "#E3D46A", "#E8888A"], high: ["#2E7D32", "#B5A21E", "#B71C1C"] };
+export const DENSITY_COLORS = ["#B5EAD9", "#1AA3E6", "#0A22C9"];
+export const BIVARIATE = { low: ["#B5EAD9", "#A6DE5F", "#F5B800"], high: ["#1AA3E6", "#0A22C9", "#E32B2B"] };
 /** 0 = reachable, 1 = seasonal / hard to reach, 2 = inaccessible, null = not recorded. */
 export function accessClass(e: HeatEntry): 0 | 1 | 2 | null {
   const k = categoryOf(e, "accessibility").key;
