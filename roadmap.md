@@ -1,5 +1,7 @@
 # Roadmap
 
+- [x] Upgrade GPS findings download to a colourful four-sheet WHO-inspired workbook with embedded boundary map, legend, source and verification guidance. Analysis/compression use a cancellable section worker; map drawing yields and prepared-file delivery retains mobile activation. Real Accelerate download verified (two findings, original GPS, nonempty PNG, no formula errors); desktop/phone layout and Coverage navigation checked without page errors. All 257 Microplanning tests pass (three optional tests skipped), build OK. Native iOS share-sheet and physical Excel printing remain unverified.
+
 - [x] Settlement phone/desktop light/dark checks done on 46 real settlements: zoom focuses main group (far-GPS points flagged, not moved), tap/hover details, scrolling, no blank-area inspection. Samia A/B GPS needs field re-capture.
 
 - [x] Finish readable full settlement hover/tap details: geography/GPS, own census/households/source, conditions, ages, disability and individual CDDs; bank accounts only on explicit popup. Desktop light/dark full content and wheel scrolling verified, 245 regression tests pass. Bounded phone layout implemented; final phone interaction verification remains partial. Local browser checks needed an isolated live-connection override because the managed generated client references a different backend; auto-generated files untouched.
