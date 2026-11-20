@@ -8,10 +8,11 @@ import { MILESTONES, meanMilestones, recoveryStatus, remoteGoodOutcome, type Vis
 import { importTrajectories, loadTrajectories } from "@/lib/eyeReport/trajectoryStore";
 import { savedTrajectories } from "@/lib/eyeReport/trajectoryStore";
 import { supabase } from "@/integrations/supabase/client";
+import type { FacilityNormalizer } from "@/lib/eyeReport/facilityNames";
 const colors = ["hsl(var(--eye-blue))","hsl(var(--eye-teal))","hsl(var(--eye-orange))","hsl(var(--eye-violet))","hsl(var(--eye-rose))","hsl(var(--eye-deep))"];
 const statusTone = { "Full Recovery":"bg-eye-mint text-eye-teal", "Partial Improvement":"bg-eye-gold/20 text-eye-ink", "Unchanged":"bg-muted text-muted-foreground", "Deteriorated":"bg-destructive/10 text-destructive", "Awaiting follow-up":"bg-eye-sky text-eye-blue" };
-interface Props {projectId:string;userId:string;canReport:boolean;reports:EyeReportRow[];period:{year:string;month:string;from:string;to:string};dhis:DhisOutcomeEvidence|null}
-export default function VisualAcuityTrajectory({projectId,userId,canReport,reports,period,dhis}:Props) {
+interface Props {projectId:string;userId:string;canReport:boolean;reports:EyeReportRow[];period:{year:string;month:string;from:string;to:string};dhis:DhisOutcomeEvidence|null;normalizeFacility:FacilityNormalizer}
+export default function VisualAcuityTrajectory({projectId,userId,canReport,reports,period,dhis,normalizeFacility}:Props) {
   const [rows,setRows]=useState<VisualTrajectory[]>([]),[unavailable,setUnavailable]=useState(false),[busy,setBusy]=useState(false);
   const [lga,setLga]=useState("all"),[facility,setFacility]=useState("all"),[compare,setCompare]=useState<"cohort"|"facility"|"lga"|"episode">("cohort"),[episode,setEpisode]=useState("");
   const file=useRef<HTMLInputElement>(null);
@@ -25,7 +26,8 @@ export default function VisualAcuityTrajectory({projectId,userId,canReport,repor
     return()=>{active=false;clearTimeout(timer);void supabase.removeChannel(channel);window.removeEventListener("online",refresh);window.removeEventListener("eye-tracker-synced",refresh);};
   },[load,projectId,userId]);
   const periodMatch=(date:string)=>(period.year==="all"||date.startsWith(period.year))&&(period.month==="all"||Number(date.slice(5,7))===Number(period.month))&&(!period.from||date>=period.from)&&(!period.to||date<=period.to);
-  const eligible=rows.filter((r)=>periodMatch(r.surgery_date));
+  const normalizedRows=useMemo(()=>rows.map(normalizeFacility),[rows,normalizeFacility]);
+  const eligible=normalizedRows.filter((r)=>periodMatch(r.surgery_date));
   const lgas=[...new Set(eligible.map((r)=>r.lga))].sort();
   const facilities=[...new Set(eligible.filter((r)=>lga==="all"||r.lga===lga).map((r)=>r.facility_name))].sort();
   const filtered=eligible.filter((r)=>(lga==="all"||r.lga===lga)&&(facility==="all"||r.facility_name===facility));

@@ -17,6 +17,7 @@ import {
 } from "@/lib/eyeReport/definition";
 import { deleteReport, loadReportAttachments } from "@/lib/eyeReport/store";
 import { useEyeDataset } from "@/lib/eyeReport/useEyeDataset";
+import { createFacilityNormalizer } from "@/lib/eyeReport/facilityNames";
 import { exportAggregated, exportDailyReport } from "@/lib/eyeReport/exportExcel";
 import EyeDailyReportForm, { type EyeFacility } from "./EyeDailyReportForm";
 import EyeFacilityTrend from "./EyeFacilityTrend";
@@ -36,7 +37,9 @@ const Sel = (p: React.SelectHTMLAttributes<HTMLSelectElement>) => <select {...p}
 export default function EyeReportDashboard({ projectId, projectName, facilities, userId, canReport, canManage, onClose }: Props) {
   const reportData = useEyeDataset<EyeReportRow>(userId, projectId, "eye_daily_reports");
   const patientData = useEyeDataset<EyePatientRow>(userId, projectId, "eye_daily_patients");
-  const rows = reportData.rows, patients = patientData.rows;
+  const normalizeFacility = useMemo(() => createFacilityNormalizer([...reportData.rows, ...patientData.rows], facilities, projectId), [reportData.rows, patientData.rows, facilities, projectId]);
+  const rows = useMemo(() => reportData.rows.map(normalizeFacility), [reportData.rows, normalizeFacility]);
+  const patients = useMemo(() => patientData.rows.map(normalizeFacility), [patientData.rows, normalizeFacility]);
   const loading = reportData.loading || patientData.loading;
   const refreshing = reportData.refreshing || patientData.refreshing;
   const fromCache = reportData.fromCache || patientData.fromCache;
@@ -111,7 +114,7 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
   const edit = async (r: EyeReportRow) => {
     if (!navigator.onLine) { toast.error("Connect to the internet to edit this report — its source documents must load first."); return; }
     setOpening(r.id);
-    try { setForm({ open: true, existing: { ...r, attachments: await loadReportAttachments(r.id) } }); }
+    try { setForm({ open: true, existing: { ...(reportData.rows.find(raw => raw.id === r.id) ?? r), attachments: await loadReportAttachments(r.id) } }); }
     catch (e) { toast.error(e instanceof Error ? e.message : "Could not open the report"); }
     finally { setOpening(null); }
   };
@@ -120,7 +123,7 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
     try { await deleteReport(projectId, r.id); void load(); toast.success("Report deleted"); } catch (e) { toast.error(e instanceof Error ? e.message : "Delete failed"); }
   };
 
-  if (form.open) return <EyeDailyReportForm projectId={projectId} projectName={projectName} facilities={facilities} mode={{ kind: "user", userId }} existing={form.existing} existingPatients={patients.filter((p) => p.report_id === form.existing?.id)} wgOnly={form.wgOnly} otherReports={rows} onClose={() => setForm({ open: false })} onSaved={() => void load()} />;
+  if (form.open) return <EyeDailyReportForm projectId={projectId} projectName={projectName} facilities={facilities} mode={{ kind: "user", userId }} existing={form.existing} existingPatients={patientData.rows.filter((p) => p.report_id === form.existing?.id)} wgOnly={form.wgOnly} otherReports={reportData.rows} onClose={() => setForm({ open: false })} onSaved={() => void load()} />;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-eye-sky">
@@ -176,7 +179,7 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
           <DeferredEyeSection label="Eye Health reporting map"><Suspense fallback={<p className="py-6 text-sm text-muted-foreground">Loading map…</p>}><EyeReportMap rows={filtered} sex={sex} projectId={projectId} unavailable={unavailable} /></Suspense></DeferredEyeSection>
         </CollapsibleEyeSection>
         <CollapsibleEyeSection title="Visual Acuity Trajectory" hint="Baseline to 180-day recovery paths from real tracker episodes" icon={Activity}>
-          <DeferredEyeSection label="Visual Acuity Trajectory"><Suspense fallback={<p className="py-6 text-sm text-muted-foreground">Loading measured outcomes…</p>}><VisualAcuityTrajectory projectId={projectId} userId={userId} canReport={canReport} reports={filtered} period={{ year, month, from, to }} dhis={dhisOutcomes} /></Suspense></DeferredEyeSection>
+          <DeferredEyeSection label="Visual Acuity Trajectory"><Suspense fallback={<p className="py-6 text-sm text-muted-foreground">Loading measured outcomes…</p>}><VisualAcuityTrajectory projectId={projectId} userId={userId} canReport={canReport} reports={filtered} period={{ year, month, from, to }} dhis={dhisOutcomes} normalizeFacility={normalizeFacility} /></Suspense></DeferredEyeSection>
         </CollapsibleEyeSection>
         <EyeFacilityTrend rows={rows} />
 
@@ -263,7 +266,7 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
               </tr>); })}</tbody>
           </table></div>
         </section>
-        {canManage && !unavailable && !loading && <EyeDhis2Exchange projectId={projectId} rows={rows} onPulled={setDhisOutcomes} />}
+        {canManage && !unavailable && !loading && <EyeDhis2Exchange projectId={projectId} rows={reportData.rows} onPulled={setDhisOutcomes} />}
       </main>
     </div>
   );
