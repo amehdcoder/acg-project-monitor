@@ -57,6 +57,15 @@ export default defineConfig(({ mode }) => {
       process.env.VITE_SUPABASE_PROJECT_ID || "vhuixgcjmrmfowzrulac"
     ),
   },
+  // Every worker in this app is started with `new Worker(url, { type: "module" })`,
+  // so worker chunks must be emitted as ES modules. The default "iife" format
+  // cannot emit the code-split chunk a worker creates when it lazily imports a
+  // module (e.g. gpsQuality.worker.ts loading its Excel builder on demand), and
+  // Rollup fails the whole build with "UMD and IIFE output formats are not
+  // supported for code-splitting builds".
+  worker: {
+    format: "es",
+  },
   plugins: [
     react(),
     appVersionPlugin(buildId),
