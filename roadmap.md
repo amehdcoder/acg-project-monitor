@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Automatically unify Eye Health dashboard facility spelling variants across filters, performance, trends, WG-SS, maps, exports and trajectories on realtime data changes. Confirmed BMZ has 14 Gumel reports under five name variants and 15 Hadejia reports under two variants. Preserve original reports and totals; match within project/geography, respect distinct facility IDs, and leave ambiguous matches separate. Implementation and verification parked at the user's credit-budget stop.
+
 - [x] Upgrade GPS findings download to a colourful four-sheet WHO-inspired workbook with embedded boundary map, legend, source and verification guidance. Analysis/compression use a cancellable section worker; map drawing yields and prepared-file delivery retains mobile activation. Real Accelerate download verified (two findings, original GPS, nonempty PNG, no formula errors); desktop/phone layout and Coverage navigation checked without page errors. All 257 Microplanning tests pass (three optional tests skipped), build OK. Native iOS share-sheet and physical Excel printing remain unverified.
 
 - [x] Settlement phone/desktop light/dark checks done on 46 real settlements: zoom focuses main group (far-GPS points flagged, not moved), tap/hover details, scrolling, no blank-area inspection. Samia A/B GPS needs field re-capture.
