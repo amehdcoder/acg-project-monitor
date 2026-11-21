@@ -1,3 +1,4 @@
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 /**
  * Automated reconciliation report.
  *
@@ -148,7 +149,7 @@ export default function ChecklistReconciliation({ cache, canExport = true }: Pro
     ])]
       .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
       .join("\n");
-    const url = URL.createObjectURL(new Blob([lines], { type: "text/csv;charset=utf-8" }));
+    const url = URL.createObjectURL(new Blob([sanitizeCsvText(lines)], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
     a.href = url;
     a.download = `kobo-reconciliation-${new Date().toISOString().slice(0, 10)}.csv`;

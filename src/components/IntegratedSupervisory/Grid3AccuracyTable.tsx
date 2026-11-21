@@ -1,3 +1,4 @@
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 /**
  * GRID3 Coordinate Accuracy Audit (WHO-standard supervisory register).
  *
@@ -402,7 +403,7 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
     const csv = [head, ...lines]
       .map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(","))
       .join("\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+    const url = URL.createObjectURL(new Blob([sanitizeCsvText(csv)], { type: "text/csv;charset=utf-8;" }));
     const a = document.createElement("a");
     a.href = url;
     a.download = `grid3-coordinate-accuracy-audit-${radiusM / 1000}km-${new Date().toISOString().slice(0, 10)}.csv`;

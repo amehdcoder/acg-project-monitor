@@ -1,3 +1,4 @@
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 /**
  * KPI drill-down dialog for the Medicine Accountability dashboard.
  *
@@ -33,7 +34,7 @@ function DrillTableView({ table }: { table: DrillTable }) {
       table.columns.map((c) => esc(c.label)).join(","),
       ...rows.map((r) => table.columns.map((c) => esc((r as any)[c.key])).join(",")),
     ].join("\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const url = URL.createObjectURL(new Blob([sanitizeCsvText(csv)], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
     a.href = url;
     a.download = `${table.id}-drilldown-${new Date().toISOString().slice(0, 10)}.csv`;

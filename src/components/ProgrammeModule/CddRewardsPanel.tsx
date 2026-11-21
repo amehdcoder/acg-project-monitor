@@ -1,3 +1,4 @@
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 // CDD recognition & rewards — leaderboard derived from confirmed case-search
 // output. Presentation only: every figure is computed from the cases already
 // in the register.
@@ -62,7 +63,7 @@ const CddRewardsPanel = ({ cdds, cases, facilityName, ledger = [] }: Props) => {
     const csv = [head, ...lines]
       .map((l) => l.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","))
       .join("\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const url = URL.createObjectURL(new Blob([sanitizeCsvText(csv)], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
     a.href = url;
     a.download = `cdd-rewards-${period === "cycle" ? currentCycleStart() : "all-time"}.csv`;

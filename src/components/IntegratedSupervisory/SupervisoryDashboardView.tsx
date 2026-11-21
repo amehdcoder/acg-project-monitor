@@ -1,3 +1,4 @@
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 /**
  * Looker Studio–style report builder for KoboToolbox submissions.
  * Everything drives off the flat schema in koboSchema.ts so the dashboard sees
@@ -448,7 +449,7 @@ export default function SupervisoryDashboardView({ cache, onRefresh, syncing }:
         return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
       }).join(","),
     )].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
+    const blob = new Blob([sanitizeCsvText(csv)], { type: "text/csv" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = `${docTitle.replace(/\s+/g, "_").toLowerCase()}.csv`;

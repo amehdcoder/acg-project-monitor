@@ -1,3 +1,4 @@
+import { escapeHtmlText } from "@/lib/security/escapeHtml";
 /**
  * Geospatial panels for the Integrated Supervisory Checklist.
  *
@@ -245,7 +246,7 @@ function GeoMap({
       }) as L.PathOptions,
       onEachFeature: (f: any, lyr: L.Layer) => {
         const st = s(f?.properties?.state), lg = s(f?.properties?.lga);
-        (lyr as L.Path).bindTooltip(`${lg}${st ? `, ${st}` : ""}`, { sticky: true, direction: "top" });
+        (lyr as L.Path).bindTooltip(`${escapeHtmlText(lg)}${escapeHtmlText(st ? `, ${st}` : "")}`, { sticky: true, direction: "top" });
         (lyr as L.Path).on("mouseover", () => (lyr as L.Path).setStyle({ fillOpacity: 0.75, weight: 2 }));
         (lyr as L.Path).on("mouseout", () => (lyr as L.Path).setStyle({ fillOpacity: scoped ? 0.55 : 0.45, weight: scoped ? 1.4 : 0.9 }));
         try { bounds.extend((lyr as any).getBounds()); } catch { /* noop */ }

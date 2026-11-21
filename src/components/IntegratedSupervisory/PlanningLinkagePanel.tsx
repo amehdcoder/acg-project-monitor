@@ -1,3 +1,4 @@
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 /**
  * Planning ↔ Distribution linkage — the end-to-end cycle.
  *
@@ -112,7 +113,7 @@ export default function PlanningLinkagePanel({
       }
     });
 
-    const blob = new Blob([`\uFEFF${lines.join("\n")}`], { type: "text/csv;charset=utf-8" });
+    const blob = new Blob([sanitizeCsvText(`\uFEFF${lines.join("\n")}`)], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = `planning-coverage-${(projectName || "project").replace(/\W+/g, "-").toLowerCase()}-${new Date().toISOString().slice(0, 10)}.csv`;

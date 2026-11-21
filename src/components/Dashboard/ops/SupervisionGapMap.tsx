@@ -1,3 +1,4 @@
+import { escapeHtmlText } from "@/lib/security/escapeHtml";
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -104,9 +105,9 @@ export default function SupervisionGapMap({ points, height = 360, className }: S
       const m = L.marker([p.lat, p.lng], { icon });
       m.bindPopup(
         `<div style="font-family:inherit;min-width:160px;padding:2px;">
-           <div style="font-weight:900;font-size:13px;color:#0f172a;">${p.name}</div>
+           <div style="font-weight:900;font-size:13px;color:#0f172a;">${escapeHtmlText(p.name)}</div>
            ${p.sub ? `<div style="font-size:10px;color:#64748b;margin-bottom:4px;">${p.sub}</div>` : ""}
-           <div style="font-size:11px;font-weight:800;color:${color};">${p.visited ? "Visited during supervision" : "Not visited during supervision"}</div>
+           <div style="font-size:11px;font-weight:800;color:${escapeHtmlText(color)};">${escapeHtmlText(p.visited ? "Visited during supervision" : "Not visited during supervision")}</div>
          </div>`,
       );
       group.addLayer(m);

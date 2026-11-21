@@ -1,3 +1,4 @@
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 /**
  * Human Patterns & Social Networks — Medicine Allocation & Accountability.
  *
@@ -158,7 +159,7 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
         d.matchScore.toFixed(2), d.causes.map((c) => `${c.cause}: ${c.label}`).join(" | "),
       ].map(csvCell).join(","));
     }
-    const blob = new Blob([`\uFEFF${lines.join("\n")}`], { type: "text/csv;charset=utf-8" });
+    const blob = new Blob([sanitizeCsvText(`\uFEFF${lines.join("\n")}`)], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = `human-patterns-diagnosis-${new Date().toISOString().slice(0, 10)}.csv`;

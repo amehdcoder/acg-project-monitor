@@ -1,3 +1,4 @@
+import { escapeHtmlText } from "@/lib/security/escapeHtml";
 import L from "leaflet";
 
 /** Minimal entry shape shared by every Geo Microplanning map. */
@@ -88,7 +89,7 @@ export function drawFlhfCatchments(map: L.Map, entries: readonly CatchmentEntry[
     const outline = catchmentOutline(c);
     if (outline.length >= 3) {
       L.polygon(outline, { pane: "flhfAreas", color: c.color, weight: 1.6, opacity: 0.9, fillColor: c.color, fillOpacity: 0.28, smoothFactor: 1.5 })
-        .bindTooltip(`<b>${esc(c.name)}</b><br/>${c.communities.length} communities / settlements`, { sticky: true, className: "flhf-catchment-tip" })
+        .bindTooltip(`<b>${esc(c.name)}</b><br/>${escapeHtmlText(c.communities.length)} communities / settlements`, { sticky: true, className: "flhf-catchment-tip" })
         .addTo(group);
       outline.forEach(p => bounds.extend(p));
     }

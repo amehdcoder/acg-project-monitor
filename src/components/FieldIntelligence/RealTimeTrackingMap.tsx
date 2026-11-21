@@ -1,3 +1,4 @@
+import { escapeHtmlText } from "@/lib/security/escapeHtml";
 import { useState, useEffect, useRef, useCallback } from "react";
 import L from "leaflet";
 import { useLeafletStreetView } from "@/components/maps/LeafletStreetView";
@@ -175,11 +176,11 @@ const RealTimeTrackingMap = ({ projectId, formId: _formId, realtimeKey }: Props)
       marker.bindPopup(`
         <div style="min-width:180px">
           <strong>${escHtml(c.name)}</strong><br/>
-          <span style="color:${color}">●</span> ${escHtml(c.status.charAt(0).toUpperCase() + c.status.slice(1))}<br/>
-          📊 ${c.submissionCount} submissions today<br/>
-          📍 ${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}<br/>
+          <span style="color:${escapeHtmlText(color)}">●</span> ${escHtml(c.status.charAt(0).toUpperCase() + c.status.slice(1))}<br/>
+          📊 ${escapeHtmlText(c.submissionCount)} submissions today<br/>
+          📍 ${escapeHtmlText(c.lat.toFixed(5))}, ${escapeHtmlText(c.lng.toFixed(5))}<br/>
           ${c.accuracy ? `🎯 ±${Math.round(c.accuracy)}m accuracy<br/>` : ""}
-          🕐 Last seen: ${format(new Date(c.lastSeen), "h:mm a")}
+          🕐 Last seen: ${escapeHtmlText(format(new Date(c.lastSeen), "h:mm a"))}
         </div>
       `);
 

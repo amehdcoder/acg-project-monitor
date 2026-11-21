@@ -1,3 +1,4 @@
+import { escapeHtmlText } from "@/lib/security/escapeHtml";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Maximize2, Minimize2, Gauge } from "lucide-react";
 import L from "leaflet";
@@ -870,14 +871,14 @@ const CESSurveyMap = ({
             dashArray: uncertain ? "6 3" : b.inferred ? "2 2" : undefined,
           }).addTo(lg);
           const label = correctedLabels[b.id] ?? (b.name ? `Building · ${b.name}` : `Building (${b.sizeClass})`);
-          poly.bindTooltip(`${uncertain ? "QA · " : ""}${label} · ${Math.round((b.confidence ?? 0) * 100)}%`, { sticky: true });
+          poly.bindTooltip(`${escapeHtmlText(uncertain ? "QA · " : "")}${escapeHtmlText(label)} · ${escapeHtmlText(Math.round((b.confidence ?? 0) * 100))}%`, { sticky: true });
           poly.bindPopup(
             `<div style="font-size:12px;min-width:160px">
-              <div style="font-weight:700;margin-bottom:4px">${label}</div>
-              <div><strong>Confidence:</strong> ${Math.round((b.confidence ?? 0) * 100)}%</div>
-              <div><strong>Footprint:</strong> ${Math.round(b.areaM2)} m²</div>
-              <div><strong>Class:</strong> ${b.sizeClass} (k-means)</div>
-              <div style="opacity:.7;margin-top:2px">${b.inferred ? "Inferred (unsupervised)" : "OSM-tagged"}</div>
+              <div style="font-weight:700;margin-bottom:4px">${escapeHtmlText(label)}</div>
+              <div><strong>Confidence:</strong> ${escapeHtmlText(Math.round((b.confidence ?? 0) * 100))}%</div>
+              <div><strong>Footprint:</strong> ${escapeHtmlText(Math.round(b.areaM2))} m²</div>
+              <div><strong>Class:</strong> ${escapeHtmlText(b.sizeClass)} (k-means)</div>
+              <div style="opacity:.7;margin-top:2px">${escapeHtmlText(b.inferred ? "Inferred (unsupervised)" : "OSM-tagged")}</div>
             </div>`,
           );
           if (labelMode && onFeatureLabel) poly.on("click", () => onFeatureLabel({ id: b.id, type: "building", originalLabel: label, confidence: b.confidence, geometry: { ring: b.ring, center: b.center, areaM2: b.areaM2 } }));
@@ -903,14 +904,14 @@ const CESSurveyMap = ({
             dashArray: uncertain ? "7 4" : r.inferred ? "5 4" : undefined,
           }).addTo(lg);
           const display = correctedLabels[r.id] ?? r.name ?? r.ref ?? `${r.cls} road`;
-          line.bindTooltip(`${display} · ${Math.round((r.confidence ?? 0) * 100)}%`, { sticky: !r.name, permanent: !!r.name && (roadWidth[r.cls] ?? 0) >= 2.5, direction: "center", className: "ces-road-label" });
+          line.bindTooltip(`${escapeHtmlText(display)} · ${escapeHtmlText(Math.round((r.confidence ?? 0) * 100))}%`, { sticky: !r.name, permanent: !!r.name && (roadWidth[r.cls] ?? 0) >= 2.5, direction: "center", className: "ces-road-label" });
           line.bindPopup(
             `<div style="font-size:12px;min-width:160px">
-              <div style="font-weight:700;margin-bottom:4px">${display}</div>
-              <div><strong>Confidence:</strong> ${Math.round((r.confidence ?? 0) * 100)}%</div>
-              <div><strong>Class:</strong> ${r.cls}</div>
-              <div><strong>Buffer:</strong> ${r.bufferM} m</div>
-              <div style="opacity:.7;margin-top:2px">${r.inferred ? "Inferred from line geometry (ML)" : "OSM-tagged"}</div>
+              <div style="font-weight:700;margin-bottom:4px">${escapeHtmlText(display)}</div>
+              <div><strong>Confidence:</strong> ${escapeHtmlText(Math.round((r.confidence ?? 0) * 100))}%</div>
+              <div><strong>Class:</strong> ${escapeHtmlText(r.cls)}</div>
+              <div><strong>Buffer:</strong> ${escapeHtmlText(r.bufferM)} m</div>
+              <div style="opacity:.7;margin-top:2px">${escapeHtmlText(r.inferred ? "Inferred from line geometry (ML)" : "OSM-tagged")}</div>
             </div>`,
           );
           if (labelMode && onFeatureLabel) line.on("click", () => onFeatureLabel({ id: r.id, type: "road", originalLabel: display, confidence: r.confidence, geometry: { points: r.points, class: r.cls, name: r.name ?? null, ref: r.ref ?? null } }));
@@ -937,7 +938,7 @@ const CESSurveyMap = ({
             : L.polyline(w.points.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], opts);
           layer.addTo(lg);
           const label = correctedLabels[w.id] ?? w.name ?? `Waterway (${w.cls})`;
-          layer.bindTooltip(`${label} · ${Math.round((w.confidence ?? 0) * 100)}%`, { sticky: true });
+          layer.bindTooltip(`${escapeHtmlText(label)} · ${escapeHtmlText(Math.round((w.confidence ?? 0) * 100))}%`, { sticky: true });
           if (labelMode && onFeatureLabel) layer.on("click", () => onFeatureLabel({ id: w.id, type: "waterway", originalLabel: label, confidence: w.confidence, geometry: { points: w.points, class: w.cls, isPolygon: w.isPolygon } }));
         });
       }
@@ -1050,7 +1051,7 @@ const CESSurveyMap = ({
         [[livePosition.lat, livePosition.lng], [start.lat, start.lng]] as L.LatLngExpression[],
         { color: closureColor, weight: 2, opacity: 0.85, dashArray: "4 6" },
       )
-        .bindTooltip(`Closure: ${closureM} to start vertex`, { permanent: false, sticky: true })
+        .bindTooltip(`Closure: ${escapeHtmlText(closureM)} to start vertex`, { permanent: false, sticky: true })
         .addTo(lg);
     }
 
@@ -1075,7 +1076,7 @@ const CESSurveyMap = ({
         opacity: 0.55,
         dashArray: "1 4",
       })
-        .bindTooltip(`GPS trail · ${gpsTrail.length} fixes`, { permanent: false, sticky: true })
+        .bindTooltip(`GPS trail · ${escapeHtmlText(gpsTrail.length)} fixes`, { permanent: false, sticky: true })
         .addTo(lg);
     }
 

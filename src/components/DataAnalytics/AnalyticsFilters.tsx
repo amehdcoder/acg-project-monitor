@@ -1,3 +1,4 @@
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 import { useState, useEffect, useMemo } from "react";
 import {
   Filter,
@@ -273,7 +274,7 @@ const AnalyticsFilters = ({
         const rows = flattenedSubmissions.map((s, i) => buildRow(s, i));
         const csvHeaders = headers.map(escapeCsvValue).join(",");
         const csvRows = rows.map((row) => row.map(escapeCsvValue).join(","));
-        content = [csvHeaders, ...csvRows].join("\n");
+        content = sanitizeCsvText([csvHeaders, ...csvRows].join("\n"));
         mimeType = "text/csv;charset=utf-8";
         extension = "csv";
       } else if (format === "json") {

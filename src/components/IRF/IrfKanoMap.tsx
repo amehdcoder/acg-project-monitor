@@ -1,3 +1,4 @@
+import { escapeHtmlText } from "@/lib/security/escapeHtml";
 import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -75,7 +76,7 @@ export default function IrfKanoMap({ lgaValues, points }: Props) {
         }),
         onEachFeature: (f: any, lyr) => {
           const v = matchValue(f.properties.lga, lgaValues);
-          lyr.bindTooltip(`<strong>${f.properties.lga}</strong><br/>${v.toLocaleString()} reached`, { sticky: true });
+          lyr.bindTooltip(`<strong>${escapeHtmlText(f.properties.lga)}</strong><br/>${escapeHtmlText(v.toLocaleString())} reached`, { sticky: true });
           lyr.on("mouseover", () => (lyr as any).setStyle({ weight: 2.5, color: "#fff" }));
           lyr.on("mouseout", () => layerRef.current?.resetStyle(lyr as any));
         },
@@ -106,7 +107,7 @@ export default function IrfKanoMap({ lgaValues, points }: Props) {
         fillColor: p.corrected ? "#f59e0b" : "#ef4444", fillOpacity: 0.95,
       })
         .bindTooltip(
-          `${p.label || "Report"} · ${p.reach.toLocaleString()} reached${p.corrected ? "<br/><em>Placed within reported LGA</em>" : ""}`,
+          `${escapeHtmlText(p.label || "Report")} · ${escapeHtmlText(p.reach.toLocaleString())} reached${p.corrected ? "<br/><em>Placed within reported LGA</em>" : ""}`,
         )
         .addTo(grp);
     });

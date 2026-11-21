@@ -1,3 +1,4 @@
+import { escapeHtmlText } from "@/lib/security/escapeHtml";
 import { useState, useEffect, useRef, useCallback } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -322,12 +323,12 @@ const DigitalTwinView = ({ projectId, formId }: Props) => {
       marker.bindPopup(`
         <div style="min-width:200px">
           <strong>🏗️ Environment Zone</strong><br/>
-          📊 ${snap.submissions} submissions<br/>
-          👥 ${snap.collectors.length} collectors<br/>
-          🎯 ±${snap.avgAccuracy}m avg accuracy<br/>
-          ✅ ${snap.geofenceCompliance}% geofence compliance<br/>
-          📋 Forms: ${snap.formNames.slice(0, 3).join(", ")}<br/>
-          ${snap.lastActivity ? `🕐 Last: ${format(new Date(snap.lastActivity), "MMM d, h:mm a")}` : ""}
+          📊 ${escapeHtmlText(snap.submissions)} submissions<br/>
+          👥 ${escapeHtmlText(snap.collectors.length)} collectors<br/>
+          🎯 ±${escapeHtmlText(snap.avgAccuracy)}m avg accuracy<br/>
+          ✅ ${escapeHtmlText(snap.geofenceCompliance)}% geofence compliance<br/>
+          📋 Forms: ${escapeHtmlText(snap.formNames.slice(0, 3).join(", "))}<br/>
+          ${escapeHtmlText(snap.lastActivity ? `🕐 Last: ${format(new Date(snap.lastActivity), "MMM d, h:mm a")}` : "")}
         </div>
       `);
     });
@@ -387,9 +388,9 @@ const DigitalTwinView = ({ projectId, formId }: Props) => {
 
       if (isLatest && entry.timestamp) {
         marker.bindPopup(`
-          <strong>${entry.formName}</strong><br/>
-          ${format(new Date(entry.timestamp), "MMM d, h:mm a")}<br/>
-          ${entry.withinGeofence ? "✅ In Geofence" : "❌ Outside Geofence"}
+          <strong>${escapeHtmlText(entry.formName)}</strong><br/>
+          ${escapeHtmlText(format(new Date(entry.timestamp), "MMM d, h:mm a"))}<br/>
+          ${escapeHtmlText(entry.withinGeofence ? "✅ In Geofence" : "❌ Outside Geofence")}
         `).openPopup();
       }
     });

@@ -1,3 +1,4 @@
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 /**
  * Level 0 cascade panel — Federal → State → LGA balance ladder plus the
  * State-dispatch vs EDO/Logistic-Officer-confirmed verification ledger.
@@ -52,7 +53,7 @@ export default function CascadeVerificationPanel({
     [cascade.rows, status, q]);
 
   const download = () => {
-    const blob = new Blob([cascadeCsv(rows)], { type: "text/csv;charset=utf-8" });
+    const blob = new Blob([sanitizeCsvText(cascadeCsv(rows))], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;

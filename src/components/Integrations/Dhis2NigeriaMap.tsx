@@ -1,3 +1,4 @@
+import { escapeHtmlText } from "@/lib/security/escapeHtml";
 import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -141,7 +142,7 @@ export default function Dhis2NigeriaMap({ analytics }: { analytics: Analytics })
       onEachFeature: (feature: any, featureLayer) => {
         const state = String(feature?.properties?.state ?? ""); const lga = String(feature?.properties?.lga ?? "");
         const cell = model.cells.get(lgaKey(state, lga)) ?? stateTotals.get(clean(state)) ?? nationalTotal;
-        (featureLayer as L.Path).bindTooltip(`<div style="min-width:150px"><strong>${escapeHtml(lga)}</strong><br><span>${escapeHtml(state)}</span><hr style="margin:5px 0;border:0;border-top:1px solid #e2e8f0"><strong>${cell ? fmt(cell.value) : "No data"}</strong>${cell ? `<br><small>${escapeHtml(cell.label)}</small>` : ""}</div>`, { sticky: true, direction: "top" });
+        (featureLayer as L.Path).bindTooltip(`<div style="min-width:150px"><strong>${escapeHtml(lga)}</strong><br><span>${escapeHtml(state)}</span><hr style="margin:5px 0;border:0;border-top:1px solid #e2e8f0"><strong>${escapeHtmlText(cell ? fmt(cell.value) : "No data")}</strong>${cell ? `<br><small>${escapeHtml(cell.label)}</small>` : ""}</div>`, { sticky: true, direction: "top" });
         featureLayer.on({
           mouseover: () => { (featureLayer as L.Path).setStyle({ weight: 2, color: "hsl(var(--foreground))" }); (featureLayer as any).bringToFront?.(); },
           mouseout: () => layer.resetStyle(featureLayer as any),

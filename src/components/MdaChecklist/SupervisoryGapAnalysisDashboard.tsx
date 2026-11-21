@@ -49,6 +49,7 @@ import {
   MapPinned, AlertTriangle, AlertOctagon, Users2, ShieldCheck,
   UserCog, Bell, Download, ArrowUp, ArrowDown, CheckCircle2,
 } from "lucide-react";
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 
 // ───────────────────────── Types ─────────────────────────
 export interface MdaSubmissionLite {
@@ -479,7 +480,7 @@ export default function SupervisoryGapAnalysisDashboard({
       ]),
     ];
     const csv = rows.map((r) => r.map((c) => `"${(c ?? "").toString().replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob([sanitizeCsvText(csv)], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = `supervisory-gap-analysis-${round}.csv`;

@@ -1,3 +1,4 @@
+import { escapeHtmlText } from "@/lib/security/escapeHtml";
 import { useState, useEffect, useCallback, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -177,10 +178,10 @@ const SocialNetworkMap = ({ projectId, formId }: Props) => {
       }).addTo(layer);
 
       marker.bindPopup(`
-        <strong>${n.name}</strong><br/>
-        🔗 ${n.connections} connections<br/>
-        📊 ${n.submissions} submissions<br/>
-        📍 ${n.lat.toFixed(4)}, ${n.lng.toFixed(4)}
+        <strong>${escapeHtmlText(n.name)}</strong><br/>
+        🔗 ${escapeHtmlText(n.connections)} connections<br/>
+        📊 ${escapeHtmlText(n.submissions)} submissions<br/>
+        📍 ${escapeHtmlText(n.lat.toFixed(4))}, ${escapeHtmlText(n.lng.toFixed(4))}
       `);
     });
 

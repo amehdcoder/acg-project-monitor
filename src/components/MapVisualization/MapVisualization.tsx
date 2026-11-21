@@ -1,3 +1,4 @@
+import { escapeHtmlText } from "@/lib/security/escapeHtml";
 import { useEffect, useRef, useState, useCallback } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -352,7 +353,7 @@ const MapVisualization = ({
         fillOpacity: 0.1,
         dashArray: "8, 6",
       });
-      polygon.bindTooltip(gf.name, {
+      polygon.bindTooltip(escapeHtmlText(gf.name), {
         permanent: false,
         direction: "center",
         className: "geofence-tooltip",

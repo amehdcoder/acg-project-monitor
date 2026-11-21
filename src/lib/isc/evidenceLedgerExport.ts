@@ -5,6 +5,7 @@
  */
 import jsPDF from "jspdf";
 import type { EvidenceLedger, EvidenceFact } from "./evidencePatterns";
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 
 const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
@@ -48,7 +49,7 @@ export function exportEvidenceLedgerCSV(ledger: EvidenceLedger, filename?: strin
   }
 
   download(
-    new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8" }),
+    new Blob([sanitizeCsvText("\uFEFF" + lines.join("\n"))], { type: "text/csv;charset=utf-8" }),
     filename || `mda-evidence-ledger-${stamp()}.csv`,
   );
 }

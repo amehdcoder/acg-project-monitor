@@ -1,3 +1,4 @@
+import { escapeHtmlText } from "@/lib/security/escapeHtml";
 import { useEffect, useMemo, useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, Tooltip, Popup, GeoJSON } from "react-leaflet";
 import { StreetViewLayer } from "@/components/maps/LeafletStreetView";
@@ -234,7 +235,7 @@ export default function MdaSupervisoryMap({ submissions, formName, monitoringPer
     const r = rollupByState.get(norm);
     const status = norm ? statusForState(norm) : "not_visited";
     layer.bindTooltip(
-      `<strong>${norm}</strong><br/>${STATUS_STYLE[status].label}` +
+      `<strong>${escapeHtmlText(norm)}</strong><br/>${escapeHtmlText(STATUS_STYLE[status].label)}` +
         (r ? `<br/>Visits: ${r.visits} · LGAs: ${r.lgas.size}` : ""),
       { sticky: true }
     );

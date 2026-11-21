@@ -1,3 +1,4 @@
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 // Livelihood & economic empowerment targeting.
 //
 // Set up an opportunity with the number of places available, then let the
@@ -337,7 +338,7 @@ const LivelihoodPanel = ({
     ];
     const csv = [head, ...rows]
       .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const url = URL.createObjectURL(new Blob([sanitizeCsvText(csv)], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
     a.href = url;
     a.download = `livelihood-shortlist-${opportunity?.title || "list"}.csv`;

@@ -10,6 +10,7 @@ import {
 import type { DrillReport, MedicineAlert } from "./medicineDrilldown";
 import { KPI_DOCS } from "./medicineKpiDocs";
 import type { ReconIssue, ReconStats } from "./reconciliationReport";
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 
 const stamp = () => new Date().toISOString().slice(0, 10);
 const r0 = (n: number) => Math.round(n);
@@ -223,7 +224,7 @@ const docNotes = () =>
 
 export function exportAccountabilityCsv(b: ExportBundle) {
   const csv = sectionsToCsv("Medicine Accountability & Cascade Tracking", b.scope, dashboardSections(b));
-  download(new Blob([csv], { type: "text/csv;charset=utf-8" }), `medicine-accountability-${stamp()}.csv`);
+  download(new Blob([sanitizeCsvText(csv)], { type: "text/csv;charset=utf-8" }), `medicine-accountability-${stamp()}.csv`);
 }
 
 export function exportAccountabilityPdf(b: ExportBundle) {
@@ -266,7 +267,7 @@ function reconSections(b: ReconBundle): Section[] {
 
 export function exportReconciliationCsv(b: ReconBundle) {
   const csv = sectionsToCsv("Kobo ↔ Flattened Data Reconciliation", b.scope, reconSections(b));
-  download(new Blob([csv], { type: "text/csv;charset=utf-8" }), `kobo-reconciliation-${stamp()}.csv`);
+  download(new Blob([sanitizeCsvText(csv)], { type: "text/csv;charset=utf-8" }), `kobo-reconciliation-${stamp()}.csv`);
 }
 
 export function exportReconciliationPdf(b: ReconBundle) {

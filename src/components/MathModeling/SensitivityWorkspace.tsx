@@ -50,6 +50,7 @@ import {
   type ModelSpec, type OutputMetric, type ParamRange,
   type SensitivityConfig, type SensitivityMethod, type SensitivityResult,
 } from "@/lib/sensitivity/engine";
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 
 // Publication-grade colour palette (semantic-token compatible HSL)
 const PALETTE = [
@@ -220,7 +221,7 @@ export function SensitivityWorkspace(props: Props) {
       r.method.toUpperCase(),
     ]);
     const csv = [header, ...rows].map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
-    triggerDownload(new Blob([csv], { type: "text/csv" }), `sensitivity_${result.method}_${stamp()}.csv`);
+    triggerDownload(new Blob([sanitizeCsvText(csv)], { type: "text/csv" }), `sensitivity_${result.method}_${stamp()}.csv`);
   };
 
   const exportXLSX = () => {

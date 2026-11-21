@@ -4,6 +4,7 @@
  */
 import jsPDF from "jspdf";
 import type { ImprovementSummary, PairedParticipant, PairedTTest } from "./analytics";
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 
 export interface KoboExportContext {
   formTitle: string;
@@ -51,7 +52,7 @@ export function exportKoboCSV(ctx: KoboExportContext) {
     p.delta?.toFixed(1) ?? "", p.trend === "incomplete" ? "Awaiting pair" : p.trend,
   ]);
   const csv = [...meta, header, ...body].map((r) => r.map(esc).join(",")).join("\n");
-  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const url = URL.createObjectURL(new Blob([sanitizeCsvText(csv)], { type: "text/csv;charset=utf-8" }));
   const a = document.createElement("a");
   a.href = url; a.download = `${fileBaseFor(ctx.groupLabel, stamp)}.csv`; a.click();
   URL.revokeObjectURL(url);

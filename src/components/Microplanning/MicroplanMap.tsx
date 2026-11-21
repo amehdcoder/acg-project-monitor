@@ -1,3 +1,4 @@
+import { escapeHtmlText } from "@/lib/security/escapeHtml";
 import { disposeMap } from "@/lib/microplanning/disposeMap";
 import { drawFlhfCatchments } from "@/lib/microplanning/flhfCatchments";
 import { attachGeoFeatures } from "@/lib/microplanning/geoFeatures";
@@ -605,14 +606,14 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
               dashArray: agg.hardToReach > 0 ? "8 4" : undefined,
             }).addTo(group).bindTooltip(
               `<div style="font-family:system-ui;min-width:180px;padding:4px">
-                <strong style="font-size:13px;color:${color}">${flhf}</strong><br/>
-                <span style="font-size:11px;color:#6B7280">${agg.ward}, ${agg.lga}, ${agg.state}</span>
+                <strong style="font-size:13px;color:${escapeHtmlText(color)}">${escapeHtmlText(flhf)}</strong><br/>
+                <span style="font-size:11px;color:#6B7280">${escapeHtmlText(agg.ward)}, ${escapeHtmlText(agg.lga)}, ${escapeHtmlText(agg.state)}</span>
                 <hr style="margin:4px 0;border-color:#E5E7EB"/>
                 <table style="font-size:11px;width:100%">
-                  <tr><td style="color:#6B7280">Communities</td><td style="text-align:right;font-weight:700">${agg.count}</td></tr>
-                  <tr><td style="color:#6B7280">Total Pop</td><td style="text-align:right;font-weight:700">${agg.totalPop.toLocaleString()}</td></tr>
-                  <tr><td style="color:#6B7280">Target Pop</td><td style="text-align:right;font-weight:700;color:#2563EB">${agg.targetPop.toLocaleString()}</td></tr>
-                  <tr><td style="color:#6B7280">Avg Distance</td><td style="text-align:right;font-weight:700">${agg.avgDist.toFixed(1)} km</td></tr>
+                  <tr><td style="color:#6B7280">Communities</td><td style="text-align:right;font-weight:700">${escapeHtmlText(agg.count)}</td></tr>
+                  <tr><td style="color:#6B7280">Total Pop</td><td style="text-align:right;font-weight:700">${escapeHtmlText(agg.totalPop.toLocaleString())}</td></tr>
+                  <tr><td style="color:#6B7280">Target Pop</td><td style="text-align:right;font-weight:700;color:#2563EB">${escapeHtmlText(agg.targetPop.toLocaleString())}</td></tr>
+                  <tr><td style="color:#6B7280">Avg Distance</td><td style="text-align:right;font-weight:700">${escapeHtmlText(agg.avgDist.toFixed(1))} km</td></tr>
                 </table>
               </div>`,
               { direction: "top", sticky: true }
@@ -801,7 +802,7 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
               L.circle([fLat, fLng], {
                 radius: buf.radiusKm * 1000, color: buf.color, weight: 1.5,
                 opacity: 0.5, fillColor: buf.color, fillOpacity: buf.opacity, dashArray: buf.dash,
-              }).addTo(group).bindTooltip(`${entry.flhf_name} — ${buf.label}`, { direction: "center" });
+              }).addTo(group).bindTooltip(`${escapeHtmlText(entry.flhf_name)} — ${escapeHtmlText(buf.label)}`, { direction: "center" });
             });
           }
           const bgColor = (activeTheme === "flhf_catchment" && flhfAgg) ? flhfAgg.color : "#DC2626";

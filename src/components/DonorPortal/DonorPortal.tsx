@@ -14,9 +14,10 @@ import {
 } from "recharts";
 import { Users, HeartHandshake, Stethoscope, Home, ArrowRightLeft, MessageSquareHeart, LogOut, Download, FileText } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 
 function downloadReportCsv(report: DonorReport, projectName: string) {
-  const blob = new Blob([reportCsv(report)], { type: "text/csv;charset=utf-8" });
+  const blob = new Blob([sanitizeCsvText(reportCsv(report))], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

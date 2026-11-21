@@ -1,3 +1,4 @@
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 // Case tracking — the journey of every case-search case, from the CDD's
 // finding in the community through clinician review and lesion staging to
 // registration at a facility with a Case ID.
@@ -77,7 +78,7 @@ const CaseTrackingPanel = ({ cases, facilityName, cddName }: Props) => {
       c.accepted_at ? c.accepted_at.slice(0, 10) : "", code || "",
       CASE_STATUS_LABEL[c.status],
     ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","));
-    const blob = new Blob([[head.join(","), ...lines].join("\n")], { type: "text/csv" });
+    const blob = new Blob([sanitizeCsvText([head.join(","), ...lines].join("\n"))], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;

@@ -5,6 +5,7 @@
  * A "Level" of LGA ignores the Ward column; a Level of Ward targets one ward.
  */
 import { geoNorm, type LgaNode } from "./geoAllocation";
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 
 export interface AllocationCsvRow {
   level: "LGA" | "Ward";
@@ -107,7 +108,7 @@ export function downloadAllocationCsvTemplate(tree: LgaNode[], medicine: string,
       lines.push(["Ward", L.state, L.lga, w.ward, medicine, unit, ""].map((v) => esc(String(v))).join(","));
     }
   }
-  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+  const blob = new Blob([sanitizeCsvText(lines.join("\n"))], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

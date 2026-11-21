@@ -13,6 +13,7 @@ import {
   flattenRepeats, getFlat, resolveValue,
   type HubField, type HubSchema,
 } from "@/lib/koboHub/schema";
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 
 const PAGE = 25;
 const META: HubField[] = [
@@ -28,7 +29,7 @@ function csv(rows: Record<string, unknown>[], headers: { key: string; label: str
     ...rows.map((r) => headers.map((h) => esc(r[h.key])).join(",")),
   ].join("\n");
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([body], { type: "text/csv;charset=utf-8" }));
+  a.href = URL.createObjectURL(new Blob([sanitizeCsvText(body)], { type: "text/csv;charset=utf-8" }));
   a.download = `${name.replace(/[^\w.-]+/g, "_")}.csv`;
   a.click();
   URL.revokeObjectURL(a.href);

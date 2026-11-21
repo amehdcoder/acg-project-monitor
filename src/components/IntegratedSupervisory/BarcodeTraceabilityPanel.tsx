@@ -1,3 +1,4 @@
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 /**
  * Barcode / QR traceability panel — unit-level chain of custody built from the
  * scanner question captured at every tier of the medicine cascade.
@@ -49,7 +50,7 @@ export default function BarcodeTraceabilityPanel({ trace }: { trace: BarcodeSumm
         r.balance, r.variance, r.firstSeen, r.lastSeen, r.scans, r.facilities.join("; "), traceStatusLabel[r.status],
       ].map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")),
     ].join("\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const url = URL.createObjectURL(new Blob([sanitizeCsvText(csv)], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
     a.href = url;
     a.download = `barcode-traceability-${new Date().toISOString().slice(0, 10)}.csv`;

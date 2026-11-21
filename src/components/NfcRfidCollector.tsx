@@ -10,6 +10,7 @@ import {
   Radio, Clock, Trash2, Download,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 
 interface TagReading {
   id: string;
@@ -117,7 +118,7 @@ const NfcRfidCollector = () => {
       "Type,Serial Number,Timestamp,Data",
       ...readings.map(r => `${r.type},${r.serialNumber},${r.timestamp},"${JSON.stringify(r.data).replace(/"/g, '""')}"`)
     ].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
+    const blob = new Blob([sanitizeCsvText(csv)], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;

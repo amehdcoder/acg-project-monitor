@@ -1,3 +1,4 @@
+import { escapeHtmlText } from "@/lib/security/escapeHtml";
 import { useState, useEffect, useRef, useCallback } from "react";
 import L from "leaflet";
 import { useLeafletStreetView } from "@/components/maps/LeafletStreetView";
@@ -116,13 +117,13 @@ const RouteOptimizerMap = ({ projectId, formId, forms }: Props) => {
     geofenceTargets.forEach((t, i) => {
       const polygon = L.polygon(t.polygon, { color: "#10b981", weight: 2, fillOpacity: 0.15, dashArray: "6,4" })
         .addTo(routeLayerRef.current!);
-      polygon.bindTooltip(t.name, { permanent: false, direction: "center" });
+      polygon.bindTooltip(escapeHtmlText(t.name), { permanent: false, direction: "center" });
       const icon = L.divIcon({
         className: "route-stop-icon",
         html: `<div style="background:#10b981;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:14px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);">${i + 1}</div>`,
         iconSize: [28, 28], iconAnchor: [14, 14],
       });
-      L.marker(t.center, { icon }).addTo(routeLayerRef.current!).bindPopup(`<strong>${t.name}</strong><br/>Stop #${i + 1}`);
+      L.marker(t.center, { icon }).addTo(routeLayerRef.current!).bindPopup(`<strong>${escapeHtmlText(t.name)}</strong><br/>Stop #${escapeHtmlText(i + 1)}`);
     });
 
     // Draw routes
@@ -135,7 +136,7 @@ const RouteOptimizerMap = ({ projectId, formId, forms }: Props) => {
           opacity: r.id === nav.selectedRouteId ? 0.9 : 0.4,
           dashArray: r.id === nav.selectedRouteId ? undefined : "8,6",
         }).addTo(routeLayerRef.current!);
-        line.bindTooltip(r.label, { sticky: true });
+        line.bindTooltip(escapeHtmlText(r.label), { sticky: true });
         line.on("click", () => nav.selectRoute(r.id));
       }
     });
@@ -145,7 +146,7 @@ const RouteOptimizerMap = ({ projectId, formId, forms }: Props) => {
     if (selectedRoute && selectedRoute.directions[nav.activeStep]) {
       const stepCoord = selectedRoute.directions[nav.activeStep].coordinates;
       L.circleMarker(stepCoord, { radius: 12, fillColor: "#ef4444", fillOpacity: 0.8, color: "#fff", weight: 3 })
-        .addTo(routeLayerRef.current).bindPopup(`<strong>Step ${nav.activeStep + 1}</strong><br/>${selectedRoute.directions[nav.activeStep].instruction}`).openPopup();
+        .addTo(routeLayerRef.current).bindPopup(`<strong>Step ${escapeHtmlText(nav.activeStep + 1)}</strong><br/>${escapeHtmlText(selectedRoute.directions[nav.activeStep].instruction)}`).openPopup();
     }
 
     // Fit bounds
@@ -169,7 +170,7 @@ const RouteOptimizerMap = ({ projectId, formId, forms }: Props) => {
         iconSize: [24, 24], iconAnchor: [12, 12],
       });
       L.marker(poi.coordinates, { icon }).addTo(poiLayerRef.current!)
-        .bindPopup(`<strong>${poi.name}</strong><br/><em>${poi.category}</em>`);
+        .bindPopup(`<strong>${escapeHtmlText(poi.name)}</strong><br/><em>${escapeHtmlText(poi.category)}</em>`);
     });
   }, [nav.pois, nav.showPois]);
 
@@ -185,7 +186,7 @@ const RouteOptimizerMap = ({ projectId, formId, forms }: Props) => {
         iconSize: [20, 20], iconAnchor: [10, 10],
       });
       L.marker(inc.coordinates, { icon }).addTo(trafficLayerRef.current!)
-        .bindPopup(`<strong>${inc.title}</strong><br/>${inc.description}<br/><em>Severity: ${inc.severity}</em>`);
+        .bindPopup(`<strong>${escapeHtmlText(inc.title)}</strong><br/>${escapeHtmlText(inc.description)}<br/><em>Severity: ${escapeHtmlText(inc.severity)}</em>`);
     });
   }, [nav.trafficIncidents, nav.showTraffic]);
 
@@ -201,7 +202,7 @@ const RouteOptimizerMap = ({ projectId, formId, forms }: Props) => {
         iconSize: [32, 32], iconAnchor: [16, 16],
       });
       L.marker(zone.coordinates, { icon }).addTo(speedLayerRef.current!)
-        .bindPopup(`<strong>${zone.label}</strong>${zone.enforcement ? "<br/>⚠️ Speed camera" : ""}`);
+        .bindPopup(`<strong>${escapeHtmlText(zone.label)}</strong>${zone.enforcement ? "<br/>⚠️ Speed camera" : ""}`);
     });
   }, [nav.speedZones, nav.showSpeedAlerts]);
 

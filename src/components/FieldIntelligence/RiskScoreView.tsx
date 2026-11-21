@@ -1,3 +1,4 @@
+import { escapeHtmlText } from "@/lib/security/escapeHtml";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -383,17 +384,17 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
       L.marker([score.lat, score.lng], { icon }).addTo(layerRef.current!)
         .bindPopup(`
           <div style="min-width:220px">
-            <strong>${score.overallRisk >= 70 ? "🔴" : score.overallRisk >= 40 ? "🟡" : "🟢"} ${score.name}</strong><br/>
-            <strong>Risk Score: ${score.overallRisk}/100</strong><br/>
+            <strong>${escapeHtmlText(score.overallRisk >= 70 ? "🔴" : score.overallRisk >= 40 ? "🟡" : "🟢")} ${escapeHtmlText(score.name)}</strong><br/>
+            <strong>Risk Score: ${escapeHtmlText(score.overallRisk)}/100</strong><br/>
             <hr style="margin:4px 0"/>
-            📊 Submission Anomaly: ${score.factors.submissionAnomaly}%<br/>
-            🚫 Geofence Violations: ${score.factors.geofenceViolation}%<br/>
-            🌙 Off-Hours Activity: ${score.factors.offHoursActivity}%<br/>
-            👥 Cluster Density: ${score.factors.clusterDensity}%<br/>
-            🌦️ Weather Risk: ${score.factors.weather}%${score.weather ? ` (${score.weather.description}, ${score.weather.temp}°C, ${score.weather.windSpeed}km/h)` : ""}<br/>
+            📊 Submission Anomaly: ${escapeHtmlText(score.factors.submissionAnomaly)}%<br/>
+            🚫 Geofence Violations: ${escapeHtmlText(score.factors.geofenceViolation)}%<br/>
+            🌙 Off-Hours Activity: ${escapeHtmlText(score.factors.offHoursActivity)}%<br/>
+            👥 Cluster Density: ${escapeHtmlText(score.factors.clusterDensity)}%<br/>
+            🌦️ Weather Risk: ${escapeHtmlText(score.factors.weather)}%${escapeHtmlText(score.weather ? ` (${score.weather.description}, ${score.weather.temp}°C, ${score.weather.windSpeed}km/h)` : "")}<br/>
             <hr style="margin:4px 0"/>
-            📋 ${score.submissions} submissions • ${score.collectors} collectors<br/>
-            ${score.lastActivity ? `🕐 Last: ${format(new Date(score.lastActivity), "MMM d, h:mm a")}` : ""}
+            📋 ${escapeHtmlText(score.submissions)} submissions • ${escapeHtmlText(score.collectors)} collectors<br/>
+            ${escapeHtmlText(score.lastActivity ? `🕐 Last: ${format(new Date(score.lastActivity), "MMM d, h:mm a")}` : "")}
           </div>
         `);
     });

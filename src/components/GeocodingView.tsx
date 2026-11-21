@@ -11,6 +11,7 @@ import {
   MapPin, Navigation, Globe, Plus, Trash2, Loader2, Locate, Copy, Download, Network, Upload,
 } from "lucide-react";
 import GeocodingMap from "./GeocodingMap";
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 
 interface GeoRow {
   id: string;
@@ -192,7 +193,7 @@ export default function GeocodingView() {
       .filter((r) => r.lat != null)
       .map((r) => `"${r.address}",${r.lat},${r.lng},"${r.resolved ?? ""}","${r.source ?? ""}"`)
       .join("\n");
-    const blob = new Blob([header + body], { type: "text/csv" });
+    const blob = new Blob([sanitizeCsvText(header + body)], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;

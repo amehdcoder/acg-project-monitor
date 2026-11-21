@@ -1,3 +1,4 @@
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,7 @@ function PivotDialog({ r, onClose }: { r: VizResult | null; onClose: () => void 
     const head = [...rows.map((d) => dimLabel(a, d)), ...p.colKeys.map((k) => k.map((id) => nameOf(a, id)).join(" / ") || "Value"), "Total"];
     const body = p.rowKeys.map((rk) => [...rk.map((id) => nameOf(a, id)), ...p.colKeys.map((c) => p.cell(rk, c) ?? ""), p.rowTotal(rk)]);
     const csv = [head, ...body].map((l) => l.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    const url = URL.createObjectURL(new Blob([sanitizeCsvText(csv)], { type: "text/csv" }));
     Object.assign(document.createElement("a"), { href: url, download: `${r?.viz.name ?? "pivot"}.csv` }).click();
     URL.revokeObjectURL(url);
   };

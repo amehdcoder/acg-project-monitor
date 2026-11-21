@@ -1,3 +1,4 @@
+import { escapeHtmlText } from "@/lib/security/escapeHtml";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -27,6 +28,7 @@ import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { fetchAllRowsKeyset } from "@/lib/fetchAllRowsKeyset";
 import { linkedCommunityKey } from "@/lib/mda/dashboardData";
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 
 /**
  * Household Coverage Survey Map
@@ -698,7 +700,7 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
             const name = f?.properties?.lga;
             const st = f?.properties?.state;
             if (name) {
-              lyr.bindTooltip(String(name), { sticky: true, direction: "top", className: "hcs-lga-tip" });
+              lyr.bindTooltip(escapeHtmlText(String(name)), { sticky: true, direction: "top", className: "hcs-lga-tip" });
               lyr.on("click", () => {
                 setSelectedVisit(null);
                 setSelectedLga(String(name));
@@ -760,14 +762,14 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
         const o = outcomeFor(p.status);
         const m = L.marker([p.lat, p.lng], { icon: pinIcon(o), riseOnHover: true, keyboard: true });
         (m as any).__outcome = o.key;
-        m.bindTooltip(`${p.hh} — ${o.label}${p.community ? ` · ${p.community}` : ""}`, { direction: "top", offset: [0, -32] });
+        m.bindTooltip(`${escapeHtmlText(p.hh)} — ${escapeHtmlText(o.label)}${escapeHtmlText(p.community ? ` · ${p.community}` : "")}`, { direction: "top", offset: [0, -32] });
         m.bindPopup(
           `<div style="font-size:12px;min-width:140px">
-            <strong>${p.hh}</strong> · <span style="color:${o.color};font-weight:600">${o.label}</span><br/>
+            <strong>${escapeHtmlText(p.hh)}</strong> · <span style="color:${escapeHtmlText(o.color)};font-weight:600">${escapeHtmlText(o.label)}</span><br/>
             ${p.community ? `<span>${p.community}</span><br/>` : ""}
             ${p.commodity ? `<span>Commodity: ${p.commodity}</span><br/>` : ""}
-            <span style="color:#64748b">${p.at ? new Date(p.at).toLocaleString() : ""}</span><br/>
-            <span style="color:#64748b">${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</span>
+            <span style="color:#64748b">${escapeHtmlText(p.at ? new Date(p.at).toLocaleString() : "")}</span><br/>
+            <span style="color:#64748b">${escapeHtmlText(p.lat.toFixed(5))}, ${escapeHtmlText(p.lng.toFixed(5))}</span>
           </div>`,
         );
         // Clicking a marker pans/zooms and switches to satellite (#8).
@@ -953,7 +955,7 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
         p.at ? new Date(p.at).toISOString() : "",
       ].map(esc).join(","));
     }
-    const blob = new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob([sanitizeCsvText("\ufeff" + lines.join("\n"))], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;

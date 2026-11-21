@@ -1,3 +1,4 @@
+import { escapeHtmlText } from "@/lib/security/escapeHtml";
 import { useEffect, useMemo, useState } from "react";
 import { MapContainer, TileLayer, GeoJSON, CircleMarker, Tooltip } from "react-leaflet";
 import type { Layer } from "leaflet";
@@ -83,10 +84,10 @@ export default function JigawaLgaMap({ lgaData, points = [] }: Props) {
     const bandColor = visits > 0 ? readinessBand(comp).color : "#94a3b8";
     (layer as any).bindTooltip(
       `<div style="font-family:system-ui;font-size:12px;line-height:1.35">
-        <div style="font-weight:700;color:${BMZ_DARK}">${feature.properties.lga} LGA</div>
-        <div>Visits: <b>${visits}</b></div>
-        <div>Avg compliance: <b>${visits > 0 ? comp + "%" : "—"}</b></div>
-        <div>Band: <b style="color:${bandColor}">${band}</b></div>
+        <div style="font-weight:700;color:${escapeHtmlText(BMZ_DARK)}">${escapeHtmlText(feature.properties.lga)} LGA</div>
+        <div>Visits: <b>${escapeHtmlText(visits)}</b></div>
+        <div>Avg compliance: <b>${escapeHtmlText(visits > 0 ? comp + "%" : "—")}</b></div>
+        <div>Band: <b style="color:${escapeHtmlText(bandColor)}">${escapeHtmlText(band)}</b></div>
       </div>`,
       { sticky: true, direction: "top", opacity: 0.95 },
     );

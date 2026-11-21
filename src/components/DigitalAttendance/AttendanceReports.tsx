@@ -1,3 +1,4 @@
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -69,7 +70,7 @@ export default function AttendanceReports({ sessions, participants, records }: P
         r.remarks || "",
       ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")),
     ].join("\n");
-    download(`attendance_${from}_to_${to}.csv`, csv, "text/csv");
+    download(`attendance_${from}_to_${to}.csv`, sanitizeCsvText(csv), "text/csv");
   }
 
   function exportPDF() {

@@ -1,3 +1,4 @@
+import { escapeHtmlText } from "@/lib/security/escapeHtml";
 import { disposeMap } from "@/lib/microplanning/disposeMap";
 import { drawFlhfCatchments } from "@/lib/microplanning/flhfCatchments";
 import { attachGeoFeatures } from "@/lib/microplanning/geoFeatures";
@@ -372,8 +373,8 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
         })
           .bindPopup(
             `<div style="font-family:system-ui;min-width:170px;">
-              <p style="font-weight:700;font-size:13px;margin:0 0 2px;color:${isStart ? "#4285F4" : isLast ? "#EA4335" : "#1a73e8"};">${label}</p>
-              <p style="font-weight:600;font-size:14px;margin:2px 0;">${stop.name}</p>
+              <p style="font-weight:700;font-size:13px;margin:0 0 2px;color:${escapeHtmlText(isStart ? "#4285F4" : isLast ? "#EA4335" : "#1a73e8")};">${escapeHtmlText(label)}</p>
+              <p style="font-weight:600;font-size:14px;margin:2px 0;">${escapeHtmlText(stop.name)}</p>
               ${stop.meta.lga ? `<p style="font-size:11px;color:#5f6368;margin:0;">${stop.meta.lga}, ${stop.meta.state}</p>` : ""}
             </div>`
           )
@@ -416,9 +417,9 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
         })
           .bindPopup(
             `<div style="font-family:system-ui;min-width:160px;">
-              <p style="font-weight:700;font-size:14px;margin:0 0 4px;">${loc.name}</p>
-              <p style="font-size:11px;color:#5f6368;margin:0;">${label}</p>
-              <p style="font-size:11px;color:#5f6368;margin:2px 0 0;">${loc.meta.lga}, ${loc.meta.state}</p>
+              <p style="font-weight:700;font-size:14px;margin:0 0 4px;">${escapeHtmlText(loc.name)}</p>
+              <p style="font-size:11px;color:#5f6368;margin:0;">${escapeHtmlText(label)}</p>
+              <p style="font-size:11px;color:#5f6368;margin:2px 0 0;">${escapeHtmlText(loc.meta.lga)}, ${escapeHtmlText(loc.meta.state)}</p>
               ${loc.meta.population ? `<p style="font-size:11px;color:#5f6368;margin:2px 0 0;">Pop: ${loc.meta.population.toLocaleString()}</p>` : ""}
             </div>`
           )
@@ -466,9 +467,9 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
             <div style="width:10px;height:10px;background:#4285F4;border-radius:50%;"></div>
             <span style="font-weight:700;font-size:13px;">Your location</span>
           </div>
-          <p style="font-weight:600;font-size:14px;margin:4px 0 2px;">${origin.name}</p>
-          <p style="font-size:11px;color:#5f6368;margin:0;">${origin.type === "flhf" ? "Health Facility" : origin.type === "community" ? "Community" : "Settlement"}</p>
-          <p style="font-size:11px;color:#5f6368;margin:2px 0 0;">${origin.meta.lga}, ${origin.meta.state}</p>
+          <p style="font-weight:600;font-size:14px;margin:4px 0 2px;">${escapeHtmlText(origin.name)}</p>
+          <p style="font-size:11px;color:#5f6368;margin:0;">${escapeHtmlText(origin.type === "flhf" ? "Health Facility" : origin.type === "community" ? "Community" : "Settlement")}</p>
+          <p style="font-size:11px;color:#5f6368;margin:2px 0 0;">${escapeHtmlText(origin.meta.lga)}, ${escapeHtmlText(origin.meta.state)}</p>
         </div>`
       )
       .addTo(layer);
@@ -496,9 +497,9 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
             <svg width="12" height="16" viewBox="0 0 28 40"><path d="M14 0C6.268 0 0 6.268 0 14C0 24.5 14 40 14 40S28 24.5 28 14C28 6.268 21.732 0 14 0Z" fill="#EA4335"/></svg>
             <span style="font-weight:700;font-size:13px;">Destination</span>
           </div>
-          <p style="font-weight:600;font-size:14px;margin:4px 0 2px;">${destination.name}</p>
-          <p style="font-size:11px;color:#5f6368;margin:0;">${destination.type === "flhf" ? "Health Facility" : destination.type === "community" ? "Community" : "Settlement"}</p>
-          <p style="font-size:11px;color:#5f6368;margin:2px 0 0;">${destination.meta.lga}, ${destination.meta.state}</p>
+          <p style="font-weight:600;font-size:14px;margin:4px 0 2px;">${escapeHtmlText(destination.name)}</p>
+          <p style="font-size:11px;color:#5f6368;margin:0;">${escapeHtmlText(destination.type === "flhf" ? "Health Facility" : destination.type === "community" ? "Community" : "Settlement")}</p>
+          <p style="font-size:11px;color:#5f6368;margin:2px 0 0;">${escapeHtmlText(destination.meta.lga)}, ${escapeHtmlText(destination.meta.state)}</p>
           ${destination.meta.population ? `<p style="font-size:11px;color:#5f6368;margin:2px 0 0;">Population: ${destination.meta.population.toLocaleString()}</p>` : ""}
         </div>`
       )

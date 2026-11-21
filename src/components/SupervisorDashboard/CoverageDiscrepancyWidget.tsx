@@ -1,3 +1,4 @@
+import { escapeHtmlText } from "@/lib/security/escapeHtml";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -117,12 +118,12 @@ const CoverageDiscrepancyWidget = () => {
       })
         .bindPopup(
           `<div style="min-width:200px;font-family:inherit;font-size:12px">
-            <div style="font-weight:700;margin-bottom:4px">${d.rollup.community_name ?? "—"}</div>
-            <div style="color:#6b7280;margin-bottom:6px">${d.rollup.ward ?? ""} · ${d.rollup.lga ?? ""} · ${d.rollup.state ?? ""}</div>
-            <div>Target-pop coverage: <b>${d.targetPopCoveragePct.toFixed(1)}%</b></div>
-            <div>CES therapeutic: <b>${d.cesTherapeuticPct.toFixed(1)}%</b></div>
-            <div>Geographic (CES): <b>${d.geographicPct.toFixed(1)}%</b></div>
-            <div style="margin-top:4px;color:#7f1d1d">z=${d.z.toFixed(2)}, p=${d.pValue.toFixed(3)}</div>
+            <div style="font-weight:700;margin-bottom:4px">${escapeHtmlText(d.rollup.community_name ?? "—")}</div>
+            <div style="color:#6b7280;margin-bottom:6px">${escapeHtmlText(d.rollup.ward ?? "")} · ${escapeHtmlText(d.rollup.lga ?? "")} · ${escapeHtmlText(d.rollup.state ?? "")}</div>
+            <div>Target-pop coverage: <b>${escapeHtmlText(d.targetPopCoveragePct.toFixed(1))}%</b></div>
+            <div>CES therapeutic: <b>${escapeHtmlText(d.cesTherapeuticPct.toFixed(1))}%</b></div>
+            <div>Geographic (CES): <b>${escapeHtmlText(d.geographicPct.toFixed(1))}%</b></div>
+            <div style="margin-top:4px;color:#7f1d1d">z=${escapeHtmlText(d.z.toFixed(2))}, p=${escapeHtmlText(d.pValue.toFixed(3))}</div>
           </div>`,
         )
         .addTo(map);

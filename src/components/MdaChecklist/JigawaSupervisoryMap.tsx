@@ -1,3 +1,4 @@
+import { escapeHtmlText } from "@/lib/security/escapeHtml";
 import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -267,7 +268,7 @@ export default function JigawaSupervisoryMap({ submissions, formName }: Props) {
         onEachFeature: (feature: any, lyr: L.Layer) => {
           const label = prettyLga(feature?.properties?.lga || "");
           const v = visits.get(norm(feature?.properties?.lga)) || 0;
-          lyr.bindTooltip(`<strong>${label}</strong><br/>${v} supervisory visit${v === 1 ? "" : "s"}`, { sticky: true });
+          lyr.bindTooltip(`<strong>${escapeHtmlText(label)}</strong><br/>${escapeHtmlText(v)} supervisory visit${escapeHtmlText(v === 1 ? "" : "s")}`, { sticky: true });
           (lyr as L.Path).on("mouseover", () => (lyr as L.Path).setStyle({ weight: 3.2, color: "#134e4a" }));
           (lyr as L.Path).on("mouseout", () => (lyr as L.Path).setStyle({ weight: 1.8, color: "#0f766e" }));
           try { bounds.extend((lyr as any).getBounds()); } catch { /* noop */ }
@@ -288,7 +289,7 @@ export default function JigawaSupervisoryMap({ submissions, formName }: Props) {
         fillColor: p.outsideJigawaBounds ? "#f97316" : "#ef4444",
         fillOpacity: 0.95,
       }).bindPopup(
-        `<div style="font-size:12px"><strong>${p.lga ? prettyLga(p.lga) : "Captured GPS"}</strong><br/>` +
+        `<div style="font-size:12px"><strong>${escapeHtmlText(p.lga ? prettyLga(p.lga) : "Captured GPS")}</strong><br/>` +
           `By: ${p.submitter}<br/>${p.at ? new Date(p.at).toLocaleString() : ""}<br/>` +
           `${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}<br/>Source: ${p.source}${p.outsideJigawaBounds ? "<br/><strong>Outside strict Jigawa bounds</strong>" : ""}</div>`,
       );

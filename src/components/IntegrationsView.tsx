@@ -34,6 +34,7 @@ import { Badge } from "@/components/ui/badge";
 import GoogleAccountConnect from "@/components/Integrations/GoogleAccountConnect";
 import Dhis2IntegrationsHub from "@/components/Integrations/Dhis2IntegrationsHub";
 import ApiWebhooksPanel from "@/components/Integrations/ApiWebhooksPanel";
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 
 interface Form {
   id: string;
@@ -400,7 +401,7 @@ const IntegrationsView = () => {
 
       if (format === "csv") {
         const csvContent = XLSX.utils.sheet_to_csv(worksheet);
-        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const blob = new Blob([sanitizeCsvText(csvContent)], { type: "text/csv;charset=utf-8;" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;

@@ -1,3 +1,4 @@
+import { escapeHtmlText } from "@/lib/security/escapeHtml";
 import { useEffect, useMemo, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -99,8 +100,8 @@ export default function GeocodingMap({ points }: { points: GeoPoint[] }) {
            <strong>${escapeHtml(p.address || "Point")}</strong><br/>
            <span style="font-size:11px;color:#666">
              ${p.resolved ? `${escapeHtml(p.resolved)}<br/>` : ""}
-             ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}<br/>
-             <span style="color:${color};font-weight:600">${escapeHtml(p.source || "Unknown")}</span>
+             ${escapeHtmlText(p.lat.toFixed(5))}, ${escapeHtmlText(p.lng.toFixed(5))}<br/>
+             <span style="color:${escapeHtmlText(color)};font-weight:600">${escapeHtml(p.source || "Unknown")}</span>
            </span>
          </div>`,
       );

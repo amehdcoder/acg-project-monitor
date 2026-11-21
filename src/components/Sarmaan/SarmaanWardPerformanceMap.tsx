@@ -1,3 +1,4 @@
+import { escapeHtmlText } from "@/lib/security/escapeHtml";
 // SARMAAN ACSM — Ward Performance Map.
 // ---------------------------------------------------------------------------
 // A real Leaflet map of Kano State showing the State outline and every LGA
@@ -99,7 +100,7 @@ export default function SarmaanWardPerformanceMap({ lgaScores, wardPoints }: Pro
       L.circleMarker([w.lat, w.lng], {
         radius: 7, color: "#ffffff", weight: 2, fillColor: w.color, fillOpacity: 1,
       })
-        .bindTooltip(`<b>${w.ward}</b> · ${w.lga} LGA<br/>Ward performance: <b>${w.score}%</b>`, { direction: "top" })
+        .bindTooltip(`<b>${escapeHtmlText(w.ward)}</b> · ${escapeHtmlText(w.lga)} LGA<br/>Ward performance: <b>${escapeHtmlText(w.score)}%</b>`, { direction: "top" })
         .addTo(layer);
     });
   };

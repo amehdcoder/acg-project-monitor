@@ -1,3 +1,4 @@
+import { escapeHtmlText } from "@/lib/security/escapeHtml";
 import { useState, useEffect, useRef, useCallback } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -199,8 +200,8 @@ const IndoorTrackingView = ({ projectId, formId }: Props) => {
       }).addTo(layer).bindPopup(`
         <div style="min-width:160px">
           <strong>🏢 ${escHtml(zone.name)}</strong><br/>
-          📊 ${zone.submissions} submissions<br/>
-          👥 ${zone.collectors.length} collector${zone.collectors.length !== 1 ? "s" : ""}<br/>
+          📊 ${escapeHtmlText(zone.submissions)} submissions<br/>
+          👥 ${escapeHtmlText(zone.collectors.length)} collector${escapeHtmlText(zone.collectors.length !== 1 ? "s" : "")}<br/>
         </div>
       `);
     });
@@ -252,8 +253,8 @@ const IndoorTrackingView = ({ projectId, formId }: Props) => {
           <strong>${escHtml(p.name)}</strong><br/>
           🏢 Floor ${escHtml(p.floor)}<br/>
           📋 ${escHtml(p.formName)}<br/>
-          🎯 ±${Math.round(p.accuracy)}m accuracy<br/>
-          🕐 ${p.timestamp ? format(new Date(p.timestamp), "MMM d, h:mm a") : "N/A"}
+          🎯 ±${escapeHtmlText(Math.round(p.accuracy))}m accuracy<br/>
+          🕐 ${escapeHtmlText(p.timestamp ? format(new Date(p.timestamp), "MMM d, h:mm a") : "N/A")}
         </div>
       `);
     });

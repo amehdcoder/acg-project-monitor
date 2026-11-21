@@ -1,3 +1,4 @@
+import { escapeHtmlText } from "@/lib/security/escapeHtml";
 import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -330,14 +331,14 @@ export default function HouseholdSurveyCoverageMap({
     const markers: L.Marker[] = [];
     for (const p of filteredPoints) {
       const m = L.marker([p.lat, p.lng], { icon: dotIcon(p.treated) });
-      m.bindTooltip(`${p.hh} · ${p.treated ? "Treated" : "Not treated"}${p.community ? ` — ${p.community}` : ""}`, { direction: "top", offset: [0, -8] });
+      m.bindTooltip(`${escapeHtmlText(p.hh)} · ${escapeHtmlText(p.treated ? "Treated" : "Not treated")}${escapeHtmlText(p.community ? ` — ${p.community}` : "")}`, { direction: "top", offset: [0, -8] });
       m.bindPopup(
         `<div style="font-size:12px;min-width:170px">
-          <div style="font-weight:700;margin-bottom:2px">${p.hh}</div>
-          <div style="color:${p.treated ? GREEN : RED};font-weight:600;margin-bottom:4px">${p.treated ? "✓ Therapeutic coverage" : "✕ No therapeutic coverage"}</div>
-          <div>${p.community || "—"}</div>
-          <div style="color:#64748b">${[p.ward, p.lga, p.state].filter(Boolean).join(" · ")}</div>
-          <div style="margin-top:4px">Swallowed <b>${p.swallowed}</b> of <b>${p.offered}</b> offered${p.offered ? ` (${p.coverage.toFixed(0)}%)` : ""}</div>
+          <div style="font-weight:700;margin-bottom:2px">${escapeHtmlText(p.hh)}</div>
+          <div style="color:${escapeHtmlText(p.treated ? GREEN : RED)};font-weight:600;margin-bottom:4px">${escapeHtmlText(p.treated ? "✓ Therapeutic coverage" : "✕ No therapeutic coverage")}</div>
+          <div>${escapeHtmlText(p.community || "—")}</div>
+          <div style="color:#64748b">${escapeHtmlText([p.ward, p.lga, p.state].filter(Boolean).join(" · "))}</div>
+          <div style="margin-top:4px">Swallowed <b>${escapeHtmlText(p.swallowed)}</b> of <b>${escapeHtmlText(p.offered)}</b> offered${p.offered ? ` (${p.coverage.toFixed(0)}%)` : ""}</div>
           ${p.accuracy != null ? `<div style="color:#64748b">GPS ±${p.accuracy.toFixed(0)} m</div>` : ""}
         </div>`,
       );

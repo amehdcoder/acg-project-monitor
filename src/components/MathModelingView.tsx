@@ -1,3 +1,4 @@
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -265,7 +266,7 @@ const MathModelingView = () => {
       const esc = (s: string) => `"${String(s).replace(/"/g, '""')}"`;
       const rows = ["timestamp,compartment,announcement"]
         .concat(announcementLog.map(a => [esc(a.ts), esc(a.key), esc(a.text)].join(",")));
-      blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8" });
+      blob = new Blob([sanitizeCsvText(rows.join("\n"))], { type: "text/csv;charset=utf-8" });
       filename = `chart-announcements-${stamp}.csv`;
     } else {
       const lines = announcementLog.map(a => `[${a.ts}] (${a.key}) ${a.text}`);

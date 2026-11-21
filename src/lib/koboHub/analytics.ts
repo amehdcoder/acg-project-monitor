@@ -9,6 +9,7 @@ import {
   getFlat, resolveValue, findRepeatArray,
   type HubField, type HubSchema, type HubRepeatBlock,
 } from "./schema";
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 
 export type Row = Record<string, unknown>;
 const s = (v: unknown) => String(v ?? "").trim();
@@ -360,7 +361,7 @@ export function toCsv(rows: Record<string, unknown>[]): string {
 }
 
 export function downloadCsv(name: string, rows: Record<string, unknown>[]) {
-  const blob = new Blob([toCsv(rows)], { type: "text/csv;charset=utf-8" });
+  const blob = new Blob([sanitizeCsvText(toCsv(rows))], { type: "text/csv;charset=utf-8" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = `${name}-${new Date().toISOString().slice(0, 10)}.csv`;

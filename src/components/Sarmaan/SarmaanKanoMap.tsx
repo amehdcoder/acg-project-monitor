@@ -1,3 +1,4 @@
+import { escapeHtmlText } from "@/lib/security/escapeHtml";
 // SARMAAN ACSM — Kano supervision map.
 // ---------------------------------------------------------------------------
 // Renders Kano State + LGA administrative boundaries (bundled GeoJSON) on an
@@ -73,7 +74,7 @@ export default function SarmaanKanoMap({ points }: Props) {
           },
           onEachFeature: (f, layer) => {
             const name = f.properties?.name;
-            if (name) layer.bindTooltip(name, { sticky: true, direction: "top", className: "sarmaan-lga-tip" });
+            if (name) layer.bindTooltip(escapeHtmlText(name), { sticky: true, direction: "top", className: "sarmaan-lga-tip" });
           },
         }).addTo(map);
         L.geoJSON(b.state, {
@@ -107,15 +108,15 @@ export default function SarmaanKanoMap({ points }: Props) {
         .bindPopup(
           `<div style="font-family:system-ui;font-size:12px;min-width:170px">
              <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-               <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.color}"></span>
-               <b style="color:#0B5E30;font-size:13px">${p.ward || "Ward"}</b>
+               <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${escapeHtmlText(p.color)}"></span>
+               <b style="color:#0B5E30;font-size:13px">${escapeHtmlText(p.ward || "Ward")}</b>
              </div>
-             <div style="color:#64748B;margin-bottom:6px">${p.lga || "LGA"} LGA · Kano State</div>
+             <div style="color:#64748B;margin-bottom:6px">${escapeHtmlText(p.lga || "LGA")} LGA · Kano State</div>
              <div style="display:flex;align-items:center;justify-content:space-between;border-top:1px solid #E2E8F0;padding-top:6px">
                <span style="color:#475569">Overall ACSM score</span>
-               <span style="background:${p.color};color:#fff;font-weight:700;border-radius:6px;padding:1px 7px">${p.score}%</span>
+               <span style="background:${escapeHtmlText(p.color)};color:#fff;font-weight:700;border-radius:6px;padding:1px 7px">${escapeHtmlText(p.score)}%</span>
              </div>
-             <div style="margin-top:5px;color:#64748B;font-size:11px">${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}</div>
+             <div style="margin-top:5px;color:#64748B;font-size:11px">${escapeHtmlText(p.lat.toFixed(4))}, ${escapeHtmlText(p.lng.toFixed(4))}</div>
            </div>`,
         )
         .addTo(layer);

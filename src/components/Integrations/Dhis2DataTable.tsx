@@ -1,3 +1,4 @@
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,7 +66,7 @@ export default function Dhis2DataTable({ connId, items }: { connId: string; item
 
   const exportCsv = () => {
     const csv = [headers, ...rows.map((row) => row.cells)].map((l) => l.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const url = URL.createObjectURL(new Blob(["\ufeff" + csv], { type: "text/csv" }));
+    const url = URL.createObjectURL(new Blob([sanitizeCsvText("\ufeff" + csv)], { type: "text/csv" }));
     Object.assign(document.createElement("a"), { href: url, download: `${name}.csv` }).click();
     URL.revokeObjectURL(url);
   };

@@ -1,3 +1,4 @@
+import { escapeHtmlText } from "@/lib/security/escapeHtml";
 import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -182,7 +183,7 @@ const SatelliteImageryView = () => {
       if (data.length > 0) {
         const { lat, lon, display_name } = data[0];
         mapRef.current?.setView([parseFloat(lat), parseFloat(lon)], 15, { animate: true });
-        L.marker([parseFloat(lat), parseFloat(lon)]).addTo(mapRef.current!).bindPopup(`<strong>${display_name}</strong>`).openPopup();
+        L.marker([parseFloat(lat), parseFloat(lon)]).addTo(mapRef.current!).bindPopup(`<strong>${escapeHtmlText(display_name)}</strong>`).openPopup();
         toast({ title: "Location Found", description: display_name.slice(0, 80) });
       } else {
         toast({ title: "Not Found", description: "No results for that search.", variant: "destructive" });

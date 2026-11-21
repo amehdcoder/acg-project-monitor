@@ -1,3 +1,4 @@
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 import { Fragment } from "react";
 import { INDICATOR_AREA_LABEL } from "@/lib/programmeModule/nationalIndicators";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -209,7 +210,7 @@ export default function HealthExchangePanel({ projectId, canManage }: Props) {
         period: iso, observations,
         defaults: { FREQ: "M", REF_AREA: active?.org_unit_id || "NG", ...(active?.default_dimensions ?? {}) },
       };
-      const content = sdmxExportFormat === "sdmx-json" ? buildSdmxJson(input) : buildSdmxCsv(input);
+      const content = sdmxExportFormat === "sdmx-json" ? buildSdmxJson(input) : sanitizeCsvText(buildSdmxCsv(input));
       const blob = new Blob([content], { type: sdmxExportFormat === "sdmx-json" ? "application/json" : "text/csv" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");

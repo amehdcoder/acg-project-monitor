@@ -1,8 +1,9 @@
 import jsPDF from "jspdf";
+import { sanitizeCsvText } from "@/lib/security/csvSafe";
 
 export function downloadCSV(rows: Record<string, any>[], filename: string) {
   if (rows.length === 0) {
-    const blob = new Blob([""], { type: "text/csv" });
+    const blob = new Blob([sanitizeCsvText("")], { type: "text/csv" });
     triggerDownload(blob, filename);
     return;
   }
@@ -13,7 +14,7 @@ export function downloadCSV(rows: Record<string, any>[], filename: string) {
     return /[",\n]/.test(s) ? `"${s}"` : s;
   };
   const csv = [headers.join(","), ...rows.map((r) => headers.map((h) => escape(r[h])).join(","))].join("\n");
-  triggerDownload(new Blob([csv], { type: "text/csv;charset=utf-8" }), filename);
+  triggerDownload(new Blob([sanitizeCsvText(csv)], { type: "text/csv;charset=utf-8" }), filename);
 }
 
 export function downloadGeoJSON(featureCollection: any, filename: string) {

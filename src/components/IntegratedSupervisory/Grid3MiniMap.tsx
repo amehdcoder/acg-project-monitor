@@ -1,3 +1,4 @@
+import { escapeHtmlText } from "@/lib/security/escapeHtml";
 /**
  * Mini map preview for a GRID3 coordinate-accuracy exception.
  *
@@ -46,12 +47,12 @@ export default function Grid3MiniMap({
 
     L.marker([capture.lat, capture.lng], { icon: pin("#E11D48") })
       .addTo(map)
-      .bindTooltip(`Captured — ${capture.label}`, { direction: "top", offset: [0, -8] });
+      .bindTooltip(`Captured — ${escapeHtmlText(capture.label)}`, { direction: "top", offset: [0, -8] });
 
     if (registry) {
       L.marker([registry.lat, registry.lng], { icon: pin("#10B981") })
         .addTo(map)
-        .bindTooltip(`GRID3 registry — ${registry.label}`, { direction: "top", offset: [0, -8] });
+        .bindTooltip(`GRID3 registry — ${escapeHtmlText(registry.label)}`, { direction: "top", offset: [0, -8] });
       L.polyline(
         [[capture.lat, capture.lng], [registry.lat, registry.lng]],
         { color: "#F59E0B", weight: 2, dashArray: "6 6" },
