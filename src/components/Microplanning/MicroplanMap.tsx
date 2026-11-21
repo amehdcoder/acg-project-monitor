@@ -606,14 +606,14 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
               dashArray: agg.hardToReach > 0 ? "8 4" : undefined,
             }).addTo(group).bindTooltip(
               `<div style="font-family:system-ui;min-width:180px;padding:4px">
-                <strong style="font-size:13px;color:${escapeHtmlText(color)}">${escapeHtmlText(flhf)}</strong><br/>
-                <span style="font-size:11px;color:#6B7280">${escapeHtmlText(agg.ward)}, ${escapeHtmlText(agg.lga)}, ${escapeHtmlText(agg.state)}</span>
+                <strong style="font-size:13px;color:hsl(var(--foreground))">${escapeHtmlText(flhf)}</strong><br/>
+                <span style="font-size:11px;color:hsl(var(--muted-foreground))">${escapeHtmlText(agg.ward)}, ${escapeHtmlText(agg.lga)}, ${escapeHtmlText(agg.state)}</span>
                 <hr style="margin:4px 0;border-color:#E5E7EB"/>
                 <table style="font-size:11px;width:100%">
-                  <tr><td style="color:#6B7280">Communities</td><td style="text-align:right;font-weight:700">${escapeHtmlText(agg.count)}</td></tr>
-                  <tr><td style="color:#6B7280">Total Pop</td><td style="text-align:right;font-weight:700">${escapeHtmlText(agg.totalPop.toLocaleString())}</td></tr>
-                  <tr><td style="color:#6B7280">Target Pop</td><td style="text-align:right;font-weight:700;color:#2563EB">${escapeHtmlText(agg.targetPop.toLocaleString())}</td></tr>
-                  <tr><td style="color:#6B7280">Avg Distance</td><td style="text-align:right;font-weight:700">${escapeHtmlText(agg.avgDist.toFixed(1))} km</td></tr>
+                  <tr><td style="color:hsl(var(--muted-foreground))">Communities</td><td style="text-align:right;font-weight:700">${escapeHtmlText(agg.count)}</td></tr>
+                  <tr><td style="color:hsl(var(--muted-foreground))">Total Pop</td><td style="text-align:right;font-weight:700">${escapeHtmlText(agg.totalPop.toLocaleString())}</td></tr>
+                  <tr><td style="color:hsl(var(--muted-foreground))">Target Pop</td><td style="text-align:right;font-weight:700;color:hsl(var(--chart-primary))">${escapeHtmlText(agg.targetPop.toLocaleString())}</td></tr>
+                  <tr><td style="color:hsl(var(--muted-foreground))">Avg Distance</td><td style="text-align:right;font-weight:700">${escapeHtmlText(agg.avgDist.toFixed(1))} km</td></tr>
                 </table>
               </div>`,
               { direction: "top", sticky: true }
@@ -867,25 +867,25 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
     const name = type === "community" ? e.community_name : (e.settlement_name || "Settlement");
     const dist = type === "community" ? e.community_distance_to_flhf_km : e.settlement_distance_to_flhf_km;
     const typeBadge = type === "community"
-      ? `<span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:9px;font-weight:700;background:#2563EB20;color:#2563EB;margin-bottom:4px">🏘 COMMUNITY</span>`
-      : `<span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:9px;font-weight:700;background:#8B5CF620;color:#8B5CF6;margin-bottom:4px">▼ SETTLEMENT</span>`;
-    const ab = e.accessibility ? `<span style="display:inline-block;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:600;background:${ACCESS_COLORS[e.accessibility]?.color || '#6B7280'}20;color:${ACCESS_COLORS[e.accessibility]?.color || '#6B7280'}">${e.accessibility.replace(/_/g, " ")}</span>` : "";
-    const sb = e.security_clearance ? `<span style="display:inline-block;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:600;background:${SECURITY_COLORS[e.security_clearance]?.color || '#6B7280'}20;color:${SECURITY_COLORS[e.security_clearance]?.color || '#6B7280'}">${e.security_clearance.replace(/_/g, " ")}</span>` : "";
+      ? `<span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:9px;font-weight:700;background:#2563EB20;color:hsl(var(--chart-primary));margin-bottom:4px">🏘 COMMUNITY</span>`
+      : `<span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:9px;font-weight:700;background:#8B5CF620;color:hsl(var(--chart-primary));margin-bottom:4px">▼ SETTLEMENT</span>`;
+    const ab = e.accessibility ? `<span style="display:inline-block;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:600;background:${ACCESS_COLORS[e.accessibility]?.color || '#6B7280'}20;color:hsl(var(--foreground))">${e.accessibility.replace(/_/g, " ")}</span>` : "";
+    const sb = e.security_clearance ? `<span style="display:inline-block;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:600;background:${SECURITY_COLORS[e.security_clearance]?.color || '#6B7280'}20;color:hsl(var(--foreground))">${e.security_clearance.replace(/_/g, " ")}</span>` : "";
     return `<div style="min-width:240px;font-family:system-ui;font-size:12px">
       ${typeBadge}
       <div style="font-size:15px;font-weight:700;margin-bottom:2px">${name}</div>
-      ${type === "community" && e.settlement_name ? `<span style="color:#666;font-size:11px">Settlement: ${e.settlement_name}</span><br/>` : ""}
+      ${type === "community" && e.settlement_name ? `<span style="color:hsl(var(--muted-foreground));font-size:11px">Settlement: ${e.settlement_name}</span><br/>` : ""}
       <hr style="margin:6px 0;border-color:#eee"/>
       <div style="line-height:1.8">
         <b>FLHF:</b> 🏥 ${e.flhf_name}<br/>
         <b>Location:</b> ${e.ward}, ${e.lga}, ${e.state}<br/>
-        ${e.estimated_total_population ? `<b>Pop:</b> <span style="font-weight:700;color:#2563EB">${e.estimated_total_population.toLocaleString()}</span>` : ""}
+        ${e.estimated_total_population ? `<b>Pop:</b> <span style="font-weight:700;color:hsl(var(--chart-primary))">${e.estimated_total_population.toLocaleString()}</span>` : ""}
         ${(e as any).number_of_households ? ` · <b>HH:</b> ${(e as any).number_of_households.toLocaleString()}` : ""}<br/>
         ${dist != null ? `<b>Dist to FLHF:</b> <span style="font-weight:600">${dist} km</span><br/>` : ""}
         ${ab ? `<div style="margin:3px 0">${ab}</div>` : ""}
         ${e.terrain_type ? `<b>Terrain:</b> ${TERRAIN_ICONS[e.terrain_type]?.emoji || ""} ${e.terrain_type}<br/>` : ""}
         ${sb ? `<div style="margin:3px 0">${sb}</div>` : ""}
-        ${e.cdd_from_community != null ? `<b>CDD Local:</b> <span style="color:${e.cdd_from_community ? '#059669' : '#DC2626'};font-weight:600">${e.cdd_from_community ? "Yes ✓" : "No ✗"}</span>` : ""}
+        ${e.cdd_from_community != null ? `<b>CDD Local:</b> <span style="color:hsl(var(--foreground));font-weight:600">${e.cdd_from_community ? "Yes ✓" : "No ✗"}</span>` : ""}
         ${e.year_of_microplanning ? `<br/><b>Year:</b> ${e.year_of_microplanning}` : ""}
         ${e.campaign_type ? ` · <b>Campaign:</b> ${e.campaign_type}` : ""}
       </div></div>`;
@@ -893,17 +893,17 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
 
   const buildFlhfPopup = (e: MicroplanEntry, agg: any) => {
     return `<div style="min-width:260px;font-family:system-ui">
-      <span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:9px;font-weight:700;background:#DC262620;color:#DC2626;margin-bottom:4px">🏥 HEALTH FACILITY</span>
+      <span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:9px;font-weight:700;background:#DC262620;color:hsl(var(--chart-primary));margin-bottom:4px">🏥 HEALTH FACILITY</span>
       <div style="font-size:16px;font-weight:800;margin-bottom:2px">${e.flhf_name}</div>
-      <div style="font-size:11px;color:#6B7280;margin-bottom:6px">${e.ward} · ${e.lga} · ${e.state}</div>
+      <div style="font-size:11px;color:hsl(var(--muted-foreground));margin-bottom:6px">${e.ward} · ${e.lga} · ${e.state}</div>
       <hr style="margin:4px 0;border-color:#eee"/>
       ${agg ? `<table style="font-size:12px;width:100%;line-height:2">
-        <tr><td style="color:#6B7280">Communities served</td><td style="text-align:right;font-weight:700">${agg.count}</td></tr>
-        <tr><td style="color:#6B7280">Total population</td><td style="text-align:right;font-weight:700">${agg.totalPop.toLocaleString()}</td></tr>
-        <tr><td style="color:#6B7280">Target pop</td><td style="text-align:right;font-weight:700;color:#2563EB">${agg.targetPop.toLocaleString()}</td></tr>
-        <tr><td style="color:#6B7280">Households</td><td style="text-align:right;font-weight:700">${agg.households.toLocaleString()}</td></tr>
-        <tr><td style="color:#6B7280">Avg distance</td><td style="text-align:right;font-weight:700">${agg.avgDist.toFixed(1)} km</td></tr>
-        <tr><td style="color:#6B7280">Hard to reach</td><td style="text-align:right;font-weight:700;color:${agg.hardToReach > 0 ? '#DC2626' : '#059669'}">${agg.hardToReach} / ${agg.count}</td></tr>
+        <tr><td style="color:hsl(var(--muted-foreground))">Communities served</td><td style="text-align:right;font-weight:700">${agg.count}</td></tr>
+        <tr><td style="color:hsl(var(--muted-foreground))">Total population</td><td style="text-align:right;font-weight:700">${agg.totalPop.toLocaleString()}</td></tr>
+        <tr><td style="color:hsl(var(--muted-foreground))">Target pop</td><td style="text-align:right;font-weight:700;color:hsl(var(--chart-primary))">${agg.targetPop.toLocaleString()}</td></tr>
+        <tr><td style="color:hsl(var(--muted-foreground))">Households</td><td style="text-align:right;font-weight:700">${agg.households.toLocaleString()}</td></tr>
+        <tr><td style="color:hsl(var(--muted-foreground))">Avg distance</td><td style="text-align:right;font-weight:700">${agg.avgDist.toFixed(1)} km</td></tr>
+        <tr><td style="color:hsl(var(--muted-foreground))">Hard to reach</td><td style="text-align:right;font-weight:700;color:hsl(var(--foreground))">${agg.hardToReach} / ${agg.count}</td></tr>
       </table>` : ""}
     </div>`;
   };

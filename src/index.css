@@ -146,6 +146,16 @@
 .geo-console .geo-secondary-metrics, .geo-console .geo-breakdowns > div, .geo-console .geo-map-panel { border-radius: 4px; box-shadow: var(--geo-console-shadow); }
 .geo-console .geo-breakdowns > div > div > div:first-child { color: hsl(var(--foreground)); border-bottom: 1px solid hsl(var(--border)); }
 .geo-console .geo-secondary-metrics p + p { color: hsl(var(--chart-primary)); }
+.geo-console .geo-correlation-positive-strong { background: hsl(var(--chart-secondary)); color: hsl(var(--primary-foreground)); }
+.geo-console .geo-correlation-positive-medium { background: hsl(var(--chart-secondary) / .7); color: hsl(var(--primary-foreground)); }
+.geo-console .recharts-default-tooltip { background: hsl(var(--popover)) !important; color: hsl(var(--popover-foreground)) !important; border-color: hsl(var(--border)) !important; }
+.geo-console .recharts-tooltip-item { color: hsl(var(--popover-foreground)) !important; }
+.geo-console .leaflet-tooltip, .geo-console .leaflet-popup-content-wrapper, .geo-console .leaflet-popup-tip { background: hsl(var(--card)); color: hsl(var(--foreground)); border-color: hsl(var(--border)); }
+.geo-console .leaflet-popup-close-button { color: hsl(var(--foreground)); }
+.geo-console .leaflet-tooltip-left::before { border-left-color: hsl(var(--card)); }
+.geo-console .leaflet-tooltip-right::before { border-right-color: hsl(var(--card)); }
+.geo-console .leaflet-tooltip-top::before { border-top-color: hsl(var(--card)); }
+.geo-console .leaflet-tooltip-bottom::before { border-bottom-color: hsl(var(--card)); }
 .geo-console table { color: hsl(var(--foreground)); }
 .geo-console .geo-tabstrip { background: transparent; }
 .geo-console .geo-tabstrip button[aria-pressed="true"] { color: hsl(var(--chart-secondary)); border-bottom-color: hsl(var(--chart-secondary)); }

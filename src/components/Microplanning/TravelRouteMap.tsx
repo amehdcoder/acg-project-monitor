@@ -373,9 +373,9 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
         })
           .bindPopup(
             `<div style="font-family:system-ui;min-width:170px;">
-              <p style="font-weight:700;font-size:13px;margin:0 0 2px;color:${escapeHtmlText(isStart ? "#4285F4" : isLast ? "#EA4335" : "#1a73e8")};">${escapeHtmlText(label)}</p>
+              <p style="font-weight:700;font-size:13px;margin:0 0 2px;color:hsl(var(--chart-primary));">${escapeHtmlText(label)}</p>
               <p style="font-weight:600;font-size:14px;margin:2px 0;">${escapeHtmlText(stop.name)}</p>
-              ${stop.meta.lga ? `<p style="font-size:11px;color:#5f6368;margin:0;">${stop.meta.lga}, ${stop.meta.state}</p>` : ""}
+              ${stop.meta.lga ? `<p style="font-size:11px;color:hsl(var(--muted-foreground));margin:0;">${stop.meta.lga}, ${stop.meta.state}</p>` : ""}
             </div>`
           )
           .addTo(layer);
@@ -418,9 +418,9 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
           .bindPopup(
             `<div style="font-family:system-ui;min-width:160px;">
               <p style="font-weight:700;font-size:14px;margin:0 0 4px;">${escapeHtmlText(loc.name)}</p>
-              <p style="font-size:11px;color:#5f6368;margin:0;">${escapeHtmlText(label)}</p>
-              <p style="font-size:11px;color:#5f6368;margin:2px 0 0;">${escapeHtmlText(loc.meta.lga)}, ${escapeHtmlText(loc.meta.state)}</p>
-              ${loc.meta.population ? `<p style="font-size:11px;color:#5f6368;margin:2px 0 0;">Pop: ${loc.meta.population.toLocaleString()}</p>` : ""}
+              <p style="font-size:11px;color:hsl(var(--muted-foreground));margin:0;">${escapeHtmlText(label)}</p>
+              <p style="font-size:11px;color:hsl(var(--muted-foreground));margin:2px 0 0;">${escapeHtmlText(loc.meta.lga)}, ${escapeHtmlText(loc.meta.state)}</p>
+              ${loc.meta.population ? `<p style="font-size:11px;color:hsl(var(--muted-foreground));margin:2px 0 0;">Pop: ${loc.meta.population.toLocaleString()}</p>` : ""}
             </div>`
           )
           .addTo(layer);
@@ -468,8 +468,8 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
             <span style="font-weight:700;font-size:13px;">Your location</span>
           </div>
           <p style="font-weight:600;font-size:14px;margin:4px 0 2px;">${escapeHtmlText(origin.name)}</p>
-          <p style="font-size:11px;color:#5f6368;margin:0;">${escapeHtmlText(origin.type === "flhf" ? "Health Facility" : origin.type === "community" ? "Community" : "Settlement")}</p>
-          <p style="font-size:11px;color:#5f6368;margin:2px 0 0;">${escapeHtmlText(origin.meta.lga)}, ${escapeHtmlText(origin.meta.state)}</p>
+          <p style="font-size:11px;color:hsl(var(--muted-foreground));margin:0;">${escapeHtmlText(origin.type === "flhf" ? "Health Facility" : origin.type === "community" ? "Community" : "Settlement")}</p>
+          <p style="font-size:11px;color:hsl(var(--muted-foreground));margin:2px 0 0;">${escapeHtmlText(origin.meta.lga)}, ${escapeHtmlText(origin.meta.state)}</p>
         </div>`
       )
       .addTo(layer);
@@ -498,9 +498,9 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
             <span style="font-weight:700;font-size:13px;">Destination</span>
           </div>
           <p style="font-weight:600;font-size:14px;margin:4px 0 2px;">${escapeHtmlText(destination.name)}</p>
-          <p style="font-size:11px;color:#5f6368;margin:0;">${escapeHtmlText(destination.type === "flhf" ? "Health Facility" : destination.type === "community" ? "Community" : "Settlement")}</p>
-          <p style="font-size:11px;color:#5f6368;margin:2px 0 0;">${escapeHtmlText(destination.meta.lga)}, ${escapeHtmlText(destination.meta.state)}</p>
-          ${destination.meta.population ? `<p style="font-size:11px;color:#5f6368;margin:2px 0 0;">Population: ${destination.meta.population.toLocaleString()}</p>` : ""}
+          <p style="font-size:11px;color:hsl(var(--muted-foreground));margin:0;">${escapeHtmlText(destination.type === "flhf" ? "Health Facility" : destination.type === "community" ? "Community" : "Settlement")}</p>
+          <p style="font-size:11px;color:hsl(var(--muted-foreground));margin:2px 0 0;">${escapeHtmlText(destination.meta.lga)}, ${escapeHtmlText(destination.meta.state)}</p>
+          ${destination.meta.population ? `<p style="font-size:11px;color:hsl(var(--muted-foreground));margin:2px 0 0;">Population: ${destination.meta.population.toLocaleString()}</p>` : ""}
         </div>`
       )
       .addTo(layer);

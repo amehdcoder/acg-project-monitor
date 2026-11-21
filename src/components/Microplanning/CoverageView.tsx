@@ -249,23 +249,23 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName, allocationRo
       const popupHtml = `
         <div style="min-width:200px;font-family:inherit;">
           <div style="font-weight:700;font-size:14px;margin-bottom:6px;">${escapeHtmlText(e.community_name)}</div>
-          ${e.settlement_name ? `<div style="font-size:11px;color:#6b7280;margin-bottom:4px;">Settlement: ${escapeHtmlText(e.settlement_name)}</div>` : ""}
-          <div style="font-size:11px;color:#6b7280;margin-bottom:8px;">${escapeHtmlText(e.ward)} · ${escapeHtmlText(e.lga)} · ${escapeHtmlText(e.state)}</div>
+          ${e.settlement_name ? `<div style="font-size:11px;color:hsl(var(--muted-foreground));margin-bottom:4px;">Settlement: ${escapeHtmlText(e.settlement_name)}</div>` : ""}
+          <div style="font-size:11px;color:hsl(var(--muted-foreground));margin-bottom:8px;">${escapeHtmlText(e.ward)} · ${escapeHtmlText(e.lga)} · ${escapeHtmlText(e.state)}</div>
           <div style="display:flex;gap:8px;margin-bottom:6px;">
             <div style="flex:1;background:${isMissed ? '#fef2f2' : coverage >= 80 ? '#ecfdf5' : '#fffbeb'};padding:6px 8px;border-radius:8px;text-align:center;">
-              <div style="font-size:10px;color:#6b7280;">Coverage</div>
-              <div style="font-size:16px;font-weight:800;color:${color};">${target > 0 ? coverage.toFixed(1) + '%' : 'N/A'}</div>
+              <div style="font-size:10px;color:hsl(var(--muted-foreground));">Coverage</div>
+              <div style="font-size:16px;font-weight:800;color:hsl(var(--foreground));">${target > 0 ? coverage.toFixed(1) + '%' : 'N/A'}</div>
             </div>
             <div style="flex:1;background:#f3f4f6;padding:6px 8px;border-radius:8px;text-align:center;">
-              <div style="font-size:10px;color:#6b7280;">Treated</div>
+              <div style="font-size:10px;color:hsl(var(--muted-foreground));">Treated</div>
               <div style="font-size:14px;font-weight:700;">${treated.toLocaleString()}</div>
             </div>
             <div style="flex:1;background:#f3f4f6;padding:6px 8px;border-radius:8px;text-align:center;">
-              <div style="font-size:10px;color:#6b7280;">Target</div>
+              <div style="font-size:10px;color:hsl(var(--muted-foreground));">Target</div>
               <div style="font-size:14px;font-weight:700;">${target.toLocaleString()}</div>
             </div>
           </div>
-          ${isMissed ? '<div style="background:#fef2f2;border:1px solid #fecaca;padding:4px 8px;border-radius:6px;font-size:11px;color:#991b1b;text-align:center;font-weight:600;">⚠️ MISSED — No treatment recorded</div>' : ''}
+          ${isMissed ? '<div style="background:hsl(var(--muted));border:1px solid hsl(var(--border));padding:4px 8px;border-radius:6px;font-size:11px;color:hsl(var(--chart-danger));text-align:center;font-weight:600;">⚠️ MISSED — No treatment recorded</div>' : ''}
         </div>
       `;
       marker.bindPopup(popupHtml, { maxWidth: 300 });

@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Sweep every Geo Microplanning presentation path for readable text, including differently built map popups, chart tooltips, tables, dialogs, forms and exports; keep other app pages and all records/access/settings unchanged.
+
 - [x] Correct Geo dashboard contrast: complete scoped dark theme, brighter semantic/status ink, readable tables and medicine controls, subdued banner surfaces and map-root OSIRIS colors. Eight regressions passed; 59 rendered labels/controls passed 4.5:1 contrast checks under both surrounding themes, dropdown and 390px layout checked without page errors. Signed-in real-data check remains blocked by the available account's Access Restricted result; no permissions or records changed.
 
 - [x] Match the supplied Geo UI reference with a scoped dark GIS console, vivid indicators and an on-demand map beside operational panels. Live project values, desktop/phone layouts, Security theme and map teardown verified; 19 regression tests passed, no page errors. Records and access unchanged.
