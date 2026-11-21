@@ -4,6 +4,19 @@
 
 Preparation only. No backend connection, records, user accounts, files, function deployments or production settings have changed.
 
+### Safe migration request: 2026-11-21 05:50 UTC
+
+The user authorized proceeding safely. Cloud readiness was checked and database/auth are responding. No other accessible owned Lovable project was found in this workspace, and no candidate database backup was found in the mounted uploads. These checks do not prove backups or destination connections do not exist elsewhere. The separate destination-connected project link was requested; its chat must verify its own backend identity and run the read-only inventory. This chat remains bound to Cloud, and linking an organization does not change that binding.
+
+Next user actions, before data movement:
+
+1. Supply the separate destination-connected Lovable project link; if none exists, connect the destination in a project without Cloud. Do not remove this project's database.
+2. Start the supported Cloud export under **More → Database → Manage → Settings → Export project data → Export data → Database → Export → Start export** and retain the downloaded result securely. Do not paste account hashes or credentials into chat.
+3. Download private storage files separately, preserving bucket/path associations, and obtain the destination's database and file backups through its authorized administrator.
+4. Verify isolated restores and compare both copies using the existing read-only assessment before reviewing any merge or cutover.
+
+No database export was started by this chat; no backup, isolated restore or destination access was verified. All production data and connections remain untouched.
+
 The user supplied the destination project address on 2026-11-21. Destination reference for migration tooling: `xcewvdoywubzdhzepchg`. The user confirmed it already contains Amehnities data. Authorized access remains unverified. An address is not a credential and does not authorize inspection or restoration. Do not restore the Cloud export into this nonempty destination or apply migrations until its existing records, accounts, files and schema are inventoried and backed up, with a reviewed collision strategy tested separately. Preserve destination-only data; compare overlapping IDs, account identities, edits and media paths before deciding how to reconcile conflicts. Do not assume either copy is complete or that matching emails have matching user IDs. Production remains connected to Cloud.
 
 ## Source inventory
