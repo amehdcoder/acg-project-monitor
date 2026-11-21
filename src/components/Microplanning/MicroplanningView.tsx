@@ -2545,23 +2545,24 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
             );
           })()}
 
-          {/* ===== FIONET-STYLE KPI DASHBOARD ===== */}
+          {/* Reference-inspired indicator cards; existing scoped calculations are unchanged. */}
           {/* Primary project metrics */}
-          <div className="geo-primary-metrics grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3" aria-label="Project indicators">
+          <div className="geo-primary-metrics grid grid-cols-2 sm:grid-cols-3 2xl:grid-cols-6 gap-3" aria-label="Project indicators">
             {[
-              { label: "Communities", value: new Set(filtered.map(e => [e.state, e.lga, e.ward, e.flhf_name, e.community_name].join("||"))).size.toLocaleString(), icon: Building2, tone: "geo-metric-blue" },
-              { label: "Total Population", value: totalPop.toLocaleString(), icon: Users, tone: "geo-metric-blue" },
-              { label: "Target Population", value: targetPop.toLocaleString(), icon: Target, tone: "geo-metric-teal" },
-              { label: "Health Facilities", value: String(uniqueFLHFs), icon: Heart, tone: "geo-metric-violet" },
-              { label: "Households", value: totalHouseholds.toLocaleString(), icon: Home, tone: "geo-metric-amber" },
-              { label: "Geotagged", value: `${geotagged}/${filtered.length}`, icon: Globe, tone: geotaggedPct >= 70 ? "geo-metric-teal" : geotaggedPct >= 40 ? "geo-metric-amber" : "geo-metric-red" },
+              { label: "Communities", value: new Set(filtered.map(e => [e.state, e.lga, e.ward, e.flhf_name, e.community_name].join("||"))).size.toLocaleString(), icon: Building2, tone: "geo-metric-blue", detail: "Recorded communities" },
+              { label: "Total Population", value: totalPop.toLocaleString(), icon: Users, tone: "geo-metric-blue", detail: "Population in selected area" },
+              { label: "Target Population", value: targetPop.toLocaleString(), icon: Target, tone: "geo-metric-teal", detail: targetPopulationLabel },
+              { label: "Health Facilities", value: String(uniqueFLHFs), icon: Heart, tone: "geo-metric-teal", detail: "Frontline health facilities" },
+              { label: "Households", value: totalHouseholds.toLocaleString(), icon: Home, tone: "geo-metric-amber", detail: "Recorded households" },
+              { label: "Geotagged", value: `${geotagged}/${filtered.length}`, icon: Globe, tone: geotaggedPct >= 70 ? "geo-metric-teal" : geotaggedPct >= 40 ? "geo-metric-amber" : "geo-metric-red", detail: `${geotaggedPct.toFixed(0)}% with GPS coordinates` },
             ].map(kpi => (
               <div key={kpi.label} className={`geo-metric ${kpi.tone}`}>
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-xs font-medium text-muted-foreground pt-1">{kpi.label}</p>
-                  <span className="geo-metric-icon shrink-0"><kpi.icon className="h-4 w-4" strokeWidth={1.7} /></span>
+                <div className="geo-metric-heading">
+                  <span className="geo-metric-icon" aria-hidden="true"><kpi.icon className="h-5 w-5" strokeWidth={1.8} /></span>
+                  <p className="geo-metric-label">{kpi.label}</p>
                 </div>
-                <p className="text-2xl font-semibold tabular-nums text-foreground leading-tight mt-3 break-words">{kpi.value}</p>
+                <p className="geo-metric-value">{kpi.value}</p>
+                <p className="geo-metric-detail">{kpi.detail}</p>
               </div>
             ))}
           </div>
