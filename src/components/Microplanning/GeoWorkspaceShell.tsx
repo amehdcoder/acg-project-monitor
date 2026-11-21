@@ -15,15 +15,15 @@ const GeoWorkspaceShell = ({ onSwitchToFullApp, projectIds }: Props) => {
   const { microplanAccess, loadingAccess } = usePageAccess();
   return (
     <div className="flex h-[100dvh] flex-col bg-background">
-      <header className="z-40 border-b border-primary/20 bg-primary text-primary-foreground shadow-lg">
+      <header className="z-40 border-b border-border bg-card text-foreground">
         <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-foreground/15">
+            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-chart-secondary/10 text-chart-secondary">
               <MapPinned className="h-6 w-6" />
             </div>
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-wide text-primary-foreground/75">Amehnities</p>
-              <h1 className="font-report-display text-xl font-bold sm:text-2xl">Geo Microplanning workspace</h1>
+              <p className="font-report-display text-base font-semibold">Amehnities</p>
+              <p className="font-report text-xs text-muted-foreground">Geospatial workspace</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -32,14 +32,14 @@ const GeoWorkspaceShell = ({ onSwitchToFullApp, projectIds }: Props) => {
                 <LayoutGrid className="h-4 w-4" /> Switch to full app
               </Button>
             ) : (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-foreground/15 px-3 py-1.5 text-xs font-semibold">
+              <span className="inline-flex items-center gap-1.5 text-muted-foreground text-xs font-medium">
                 <Lock className="h-3.5 w-3.5" /> Geo Microplanning only
               </span>
             )}
-            <span className="hidden text-xs text-primary-foreground/80 sm:inline">
+            <span className="hidden text-xs text-muted-foreground sm:inline">
               {[profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || profile?.email}
             </span>
-            <Button variant="ghost" size="sm" onClick={() => void signOut()} className="gap-1.5 text-primary-foreground hover:bg-primary-foreground/15">
+            <Button variant="ghost" size="sm" onClick={() => void signOut()} className="gap-1.5">
               <LogOut className="h-4 w-4" /><span className="hidden sm:inline">Sign out</span>
             </Button>
           </div>

@@ -19,7 +19,7 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Map as MapIcon, MapPin, ZoomIn, BarChart3, Maximize2, Minimize2, FileText, Loader2, Settings2, Focus, X, ChevronDown } from "lucide-react";
+import { Map as MapIcon, MapPin, ZoomIn, BarChart3, Maximize2, Minimize2, FileText, Loader2, Settings2, Focus, X, ChevronDown, Building2, CircleDashed, Ruler, Layers, Route, Search, Accessibility, ShieldCheck, Mountain, Users, UserCheck, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
@@ -1143,18 +1143,18 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
   };
 
   // ─── Theme Buttons ───
-  const themeButtons: { key: ThematicLayer; label: string; icon: string }[] = [
-    { key: "flhf_catchment", label: "FLHF Areas", icon: "🏥" },
-    { key: "catchment_buffers", label: "Buffers", icon: "🎯" },
-    { key: "distance", label: "Distance", icon: "📏" },
-    { key: "pop_density", label: "Pop Density", icon: "🗺️" },
-    { key: "distance_choropleth", label: "Dist Map", icon: "📐" },
-    { key: "coverage_gap", label: "Coverage Gap", icon: "🔍" },
-    { key: "accessibility", label: "Access", icon: "🚧" },
-    { key: "security", label: "Security", icon: "🛡️" },
-    { key: "terrain", label: "Terrain", icon: "⛰️" },
-    { key: "population", label: "Population", icon: "👥" },
-    { key: "cdd_origin", label: "CDD Origin", icon: "👤" },
+  const themeButtons: { key: ThematicLayer; label: string; icon: LucideIcon }[] = [
+    { key: "flhf_catchment", label: "FLHF Areas", icon: Building2 },
+    { key: "catchment_buffers", label: "Buffers", icon: CircleDashed },
+    { key: "distance", label: "Distance", icon: Ruler },
+    { key: "pop_density", label: "Pop Density", icon: Layers },
+    { key: "distance_choropleth", label: "Dist Map", icon: Route },
+    { key: "coverage_gap", label: "Coverage Gap", icon: Search },
+    { key: "accessibility", label: "Access", icon: Accessibility },
+    { key: "security", label: "Security", icon: ShieldCheck },
+    { key: "terrain", label: "Terrain", icon: Mountain },
+    { key: "population", label: "Population", icon: Users },
+    { key: "cdd_origin", label: "CDD Origin", icon: UserCheck },
   ];
 
   // ─── FLHF Summary Table ───
@@ -1196,52 +1196,53 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
   }, [mapExpanded, isFullscreen, showSummaryPanel]);
 
   return (
-    <Card className={`border-border/50 overflow-hidden ${isFullscreen ? "rounded-none border-0 h-screen overflow-auto bg-background" : ""}`} ref={(el) => { (exportContainerRef as any).current = el; (fullscreenRef as any).current = el; }}>
-      <CardHeader className="pb-2 px-3 pt-3 space-y-2">
+    <Card className={`geo-map-panel border-border shadow-none overflow-hidden ${isFullscreen ? "rounded-none border-0 h-screen overflow-auto bg-background" : ""}`} ref={(el) => { (exportContainerRef as any).current = el; (fullscreenRef as any).current = el; }}>
+      <CardHeader className="pb-3 px-4 pt-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle className="flex min-w-0 flex-wrap items-center gap-2">
-            <MapIcon className="h-4 w-4 text-primary" />
-            Geo-enabled Microplan Map
-            <Badge variant="outline" className="text-[9px] ml-1">{cascadedEntries.length} entries</Badge>
+          <CardTitle className="flex min-w-0 flex-wrap items-center gap-2 text-base font-semibold">
+            <MapIcon className="h-4 w-4 text-chart-secondary" />
+            Microplanning Map
+            <Badge variant="secondary" className="text-xs font-normal tabular-nums">{cascadedEntries.length.toLocaleString()} entries</Badge>
           </CardTitle>
           <div className="flex items-center gap-1">
-            <Button variant="outline" size="sm" className="h-7 text-[10px] px-2" onClick={zoomToExtent} title="Zoom to full extent">
+            <Button variant="outline" size="sm" className="h-9 text-xs px-2" onClick={zoomToExtent} title="Zoom to full extent">
               <Focus className="h-3.5 w-3.5 mr-1" />
               Extent
             </Button>
-            <Button variant="outline" size="sm" className="h-7 text-[10px] px-2" onClick={handleExportPDF} disabled={exportingPDF} title="Export as PDF report">
+            <Button variant="outline" size="sm" className="h-9 text-xs px-2" onClick={handleExportPDF} disabled={exportingPDF} title="Export as PDF report">
               {exportingPDF ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <FileText className="h-3.5 w-3.5 mr-1" />}
               PDF Report
             </Button>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowSummaryPanel(p => !p)} title="Toggle summary panel">
+            <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Toggle map summary" aria-pressed={showSummaryPanel} onClick={() => setShowSummaryPanel(p => !p)} title="Toggle summary panel">
               <BarChart3 className="h-3.5 w-3.5" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setMapExpanded(p => !p)} title="Expand map">
+            <Button variant="ghost" size="icon" className="h-9 w-9" aria-label={mapExpanded ? "Reduce map" : "Expand map"} onClick={() => setMapExpanded(p => !p)} title={mapExpanded ? "Reduce map" : "Expand map"}>
               {mapExpanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
             </Button>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={toggleFullscreen} title="Fullscreen">
+            <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Fullscreen map" onClick={toggleFullscreen} title="Fullscreen">
               {isFullscreen ? <Minimize2 className="h-3.5 w-3.5 text-primary" /> : <Maximize2 className="h-3.5 w-3.5 text-primary" />}
             </Button>
           </div>
         </div>
 
         {/* Thematic layer buttons */}
-        <div className="flex gap-1 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
+        <div className="geo-map-themes flex gap-1.5 overflow-x-auto pb-2" role="group" aria-label="Map theme">
           {themeButtons.map(t => (
             <Button
               key={t.key}
               variant={activeTheme === t.key ? "default" : "outline"}
               size="sm"
-              className="text-[10px] h-7 px-2 flex-shrink-0 min-h-[28px]"
+              aria-pressed={activeTheme === t.key}
+              className="text-xs h-9 px-3 gap-1.5 flex-shrink-0"
               onClick={() => setActiveTheme(prev => prev === t.key ? "none" : t.key)}
             >
-              {t.icon} {t.label}
+              <t.icon className="h-3.5 w-3.5" strokeWidth={1.7} /> {t.label}
             </Button>
           ))}
         </div>
 
         {/* Toggles */}
-        <div className="flex items-center gap-4 flex-wrap">
+        <div className="geo-map-toggles flex items-center gap-4 flex-wrap border-y border-border py-2">
           <label className="flex min-h-11 items-center gap-2 text-xs font-semibold text-foreground cursor-pointer">
             <Switch aria-label="Settlement pins" checked={showSettlements} onCheckedChange={setShowSettlements} />
             <span className="geo-settlement-swatch" aria-hidden="true" />
@@ -1253,16 +1254,16 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
           {settlementFocus.outliers.length > 0 && <span className="text-xs font-medium text-status-warning" title="These pins remain on the map at their recorded GPS; check whether the coordinates were captured on site.">{settlementFocus.outliers.length.toLocaleString()} settlement GPS {settlementFocus.outliers.length === 1 ? 'point is' : 'points are'} far from the rest</span>}
           {settlementLayer.missingGps > 0 && <span className="text-xs text-muted-foreground">{settlementLayer.missingGps.toLocaleString()} settlements without GPS</span>}
           {settlementLayer.named === 0 && <span className="text-xs text-muted-foreground">No settlements recorded in this selection</span>}
-          <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground cursor-pointer">
-            <Switch checked={showBufferZones} onCheckedChange={setShowBufferZones} className="scale-75" />
+          <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+            <Switch aria-label="Buffer zones" checked={showBufferZones} onCheckedChange={setShowBufferZones} />
             Buffer Zones
           </label>
-          <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground cursor-pointer">
-            <Switch checked={showDistanceLines} onCheckedChange={setShowDistanceLines} className="scale-75" />
+          <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+            <Switch aria-label="Distance lines" checked={showDistanceLines} onCheckedChange={setShowDistanceLines} />
             Distance Lines
           </label>
-          <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground cursor-pointer">
-            <Switch checked={showLabels} onCheckedChange={setShowLabels} className="scale-75" />
+          <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+            <Switch aria-label="Map labels" checked={showLabels} onCheckedChange={setShowLabels} />
             Labels
           </label>
           {/* Target Pop config */}
@@ -1300,21 +1301,21 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
 
       <CardContent className="p-0">
         {/* CDD Analytics */}
-        <div className="px-3 py-1.5 border-b border-border/30 flex items-center gap-3 flex-wrap text-[10px]">
-          <span className="font-semibold text-muted-foreground">👤 CDD:</span>
+        <div className="px-4 py-2.5 border-b border-border flex items-center gap-3 flex-wrap text-xs">
+          <span className="font-semibold text-muted-foreground">CDD origin</span>
           <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-emerald-600 inline-block" />
+            <span className="w-2 h-2 rounded-full bg-status-success inline-block" />
             Local: <b>{cddStats.from}</b> ({cddStats.pctFrom}%)
           </span>
           <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-red-600 inline-block" />
+            <span className="w-2 h-2 rounded-full bg-status-danger inline-block" />
             External: <b>{cddStats.ext}</b>
           </span>
           {cddStats.total > 0 && (
             <div className="flex-1 min-w-[60px] max-w-[140px] h-1.5 bg-muted rounded-full overflow-hidden">
               <div className="h-full flex">
-                <div className="bg-emerald-600 h-full" style={{ width: `${cddStats.pctFrom}%` }} />
-                <div className="bg-red-600 h-full" style={{ width: `${100 - cddStats.pctFrom - (cddStats.total ? (cddStats.unknown / cddStats.total) * 100 : 0)}%` }} />
+                <div className="bg-status-success h-full" style={{ width: `${cddStats.pctFrom}%` }} />
+                <div className="bg-status-danger h-full" style={{ width: `${100 - cddStats.pctFrom - (cddStats.total ? (cddStats.unknown / cddStats.total) * 100 : 0)}%` }} />
               </div>
             </div>
           )}
@@ -1329,7 +1330,7 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
 
           {/* Summary panel */}
           {showSummaryPanel && (
-            <div className="lg:w-[320px] border-t lg:border-t-0 lg:border-l border-border/30 overflow-auto max-h-[400px] lg:max-h-none bg-background">
+            <div className={`${mapHeight} geo-map-summary lg:w-[340px] shrink-0 border-t lg:border-t-0 lg:border-l border-border overflow-auto max-h-[400px] lg:max-h-none bg-background`}>
               <div className="p-3 space-y-3">
                 <div className="space-y-1">
                   <h3 className="text-xs font-bold text-foreground">
@@ -1347,7 +1348,7 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
                     </div>
                     <div className="bg-muted/30 rounded p-2" title={targetPopLabel}>
                       <p className="text-[9px] text-muted-foreground">Target Pop <span className="opacity-60">({targetPopFields.length}f)</span></p>
-                      <p className="text-sm font-bold text-emerald-600">{summaryTotals.target.toLocaleString()}</p>
+                      <p className="text-sm font-bold text-chart-secondary">{summaryTotals.target.toLocaleString()}</p>
                     </div>
                     <div className="bg-muted/30 rounded p-2">
                       <p className="text-[9px] text-muted-foreground">Communities</p>
@@ -1380,8 +1381,8 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
                               <span className="inline-block w-2 h-2 rounded-sm mr-1 flex-shrink-0" style={{ background: a.color }} />
                               <span className="truncate max-w-[100px] inline-block align-middle">{a.name}</span>
                             </TableCell>
-                            <TableCell className="py-1 px-1.5 text-right tabular-nums">{a.totalPop.toLocaleString()}</TableCell>
-                            <TableCell className="py-1 px-1.5 text-right tabular-nums">{a.targetPop.toLocaleString()}</TableCell>
+                            <TableCell className="py-1 px-1.5 text-right tabular-nums whitespace-nowrap">{a.totalPop.toLocaleString()}</TableCell>
+                            <TableCell className="py-1 px-1.5 text-right tabular-nums whitespace-nowrap">{a.targetPop.toLocaleString()}</TableCell>
                             <TableCell className="py-1 px-1.5 text-right">{a.count}</TableCell>
                           </TableRow>
                         ))}

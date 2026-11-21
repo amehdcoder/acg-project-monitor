@@ -32,7 +32,7 @@
 .geo-admin-load-notice { max-width: 230px; padding: 6px 8px; background: hsl(var(--card)); color: hsl(var(--foreground)); border: 1px solid hsl(var(--border)); font-size: 11px; }
 .geo-admin-label { font: 700 10px system-ui; letter-spacing: 0; color: hsl(var(--map-admin-lga)); text-shadow: 0 0 3px hsl(var(--map-admin-casing)), 0 0 3px hsl(var(--map-admin-casing)); white-space: nowrap; transform: translate(-50%, -50%); }
 
-/* Geo workspace: restrained public-health command surface. */
+/* Geo workspace: instrument-panel hierarchy; colours remain theme-aware. */
 .geo-workspace {
   --geo-blue: var(--chart-primary);
   --geo-teal: var(--chart-secondary);
@@ -40,16 +40,22 @@
   --geo-amber: var(--chart-highlight);
   --geo-red: var(--chart-danger);
   --geo-shadow: 0 2px 8px hsl(var(--foreground) / .035);
+  --geo-surface: var(--card);
+  --geo-divider: var(--border);
   letter-spacing: 0;
 }
-.geo-command { border-bottom: 1px solid hsl(var(--border)); padding: 8px 0 18px; }
+.geo-command { border-bottom: 1px solid hsl(var(--geo-divider)); padding: 8px 0 20px; }
 .geo-command-icon { background: hsl(var(--geo-teal) / .1); color: hsl(var(--geo-teal)); border: 1px solid hsl(var(--geo-teal) / .2); }
-.geo-navigation { padding: 12px 0; border-bottom: 1px solid hsl(var(--border)); }
-.geo-tabstrip { background: hsl(var(--muted) / .7); padding: 4px; border-radius: 8px; }
-.geo-tabstrip button { flex-shrink: 0; border-radius: 5px; height: 38px; transition: color .15s, background-color .15s; }
-.geo-tabstrip button[aria-pressed="true"] { background: hsl(var(--geo-teal)); color: hsl(var(--card)); box-shadow: var(--geo-shadow); }
+.geo-command-actions { padding-top: 4px; }
+.geo-sync-status { min-width: 0; }
+.geo-navigation { padding: 10px 0; border-bottom: 1px solid hsl(var(--geo-divider)); min-width: 0; }
+.geo-tabstrip { gap: 4px; background: hsl(var(--geo-surface)); padding: 0; border-radius: 0; scrollbar-width: thin; }
+.geo-tabstrip button { flex-shrink: 0; border-radius: 0; height: 44px; padding: 0 12px; border-bottom: 3px solid transparent; color: hsl(var(--muted-foreground)); transition: color .15s, background-color .15s; }
+.geo-tabstrip button span { display: inline; font-size: 12px; }
+.geo-tabstrip button[aria-pressed="true"] { background: hsl(var(--geo-teal) / .08); color: hsl(var(--geo-teal)); border-bottom-color: hsl(var(--geo-teal)); box-shadow: none; font-weight: 700; }
+.geo-tabstrip button:hover { background: hsl(var(--muted)); }
 .geo-services > div { border-radius: 8px; border-color: hsl(var(--border)); box-shadow: none; background: hsl(var(--card)); padding: 14px; }
-.geo-metric { --geo-tone: var(--geo-blue); background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-top: 3px solid hsl(var(--geo-tone)); border-radius: 8px; padding: 12px; min-width: 0; box-shadow: var(--geo-shadow); }
+.geo-metric { --geo-tone: var(--geo-blue); background: hsl(var(--geo-surface)); border: 1px solid hsl(var(--geo-divider)); border-top: 3px solid hsl(var(--geo-tone)); border-radius: 6px; padding: 14px; min-width: 0; box-shadow: none; }
 .geo-metric-icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; color: hsl(var(--geo-tone)); background: hsl(var(--geo-tone) / .09); }
 .geo-metric-blue { --geo-tone: var(--geo-blue); }
 .geo-metric-teal { --geo-tone: var(--geo-teal); }
@@ -59,16 +65,44 @@
 .geo-secondary-metrics { background: hsl(var(--card)); border-top: 1px solid hsl(var(--border)); border-bottom: 1px solid hsl(var(--border)); }
 .geo-secondary-metrics > div { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .geo-secondary-metrics > div > div { padding: 10px 8px; }
-.geo-breakdowns > div { border-radius: 8px; box-shadow: none; }
+.geo-secondary-metrics > div + div { border-left: 1px solid hsl(var(--geo-divider)); }
+.geo-secondary-metrics p:first-child { font-size: 10px; text-transform: none; letter-spacing: 0; }
+.geo-secondary-metrics p + p { margin-top: 4px; font-size: 16px; font-weight: 600; }
+.geo-breakdowns > div { border-radius: 6px; box-shadow: none; }
+.geo-breakdowns > div > div { padding: 14px; }
+.geo-breakdowns p.uppercase { font-size: 12px; color: hsl(var(--foreground)); text-transform: none; letter-spacing: 0; }
+.geo-breakdowns button { min-height: 32px; }
+.geo-workspace :is(button, [role="combobox"]) { letter-spacing: 0; }
+.geo-workspace table thead { background: hsl(var(--muted) / .65); }
 .geo-workspace table { font-size: 12px; }
 .geo-workspace th { letter-spacing: 0; }
+.geo-workspace table tbody tr { transition: background-color .12s; }
+.geo-workspace .leaflet-container { font-family: Manrope, system-ui, sans-serif; }
+.geo-workspace .leaflet-bar { border: 1px solid hsl(var(--border)); box-shadow: var(--geo-shadow); }
+.geo-workspace .leaflet-bar a { background: hsl(var(--card)); color: hsl(var(--foreground)); }
 .geo-exportbar { border-top: 1px solid hsl(var(--border)); padding-top: 12px; }
+.geo-map-panel > div:first-child > div:first-child > div:first-child { text-transform: none; letter-spacing: 0; }
+.geo-map-toggles button[role="switch"] { height: 24px; min-height: 24px; width: 44px; min-width: 44px; flex-shrink: 0; border-radius: 12px; }
+.geo-map-toggles button[role="switch"] > span { width: 20px; height: 20px; min-height: 20px; }
+.geo-map-summary td { overflow-wrap: normal; word-break: normal; }
+.geo-map-summary th { font-size: 10px; text-transform: none; }
+.geo-map-summary tbody td { font-size: 11px; }
+.geo-filterbar [role="combobox"] { min-width: 0; }
 @media (max-width: 640px) {
   .geo-command { padding-bottom: 12px; }
   .geo-tabstrip { width: 100%; }
-  .geo-tabstrip button { height: 44px; }
-  .geo-metric { padding: 10px; }
+  .geo-tabstrip button { height: 52px; }
+  .geo-command-actions > button, .geo-command-actions > [role="combobox"] { min-height: 52px; }
+  .geo-metric { padding: 12px; }
+  .geo-breakdowns button { min-height: 44px; }
+  .geo-filterbar > [role="combobox"] { width: calc(50% - 4px); height: 52px; }
+  .geo-filterbar input { height: 52px; }
+  .geo-exportbar > button { white-space: normal; height: auto; min-height: 44px; }
+  .geo-map-toggles label { min-height: 44px; }
   .geo-navigation > div:first-child { flex-basis: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .geo-workspace *, .geo-workspace *::before, .geo-workspace *::after { transition: none !important; animation: none !important; }
 }
 
 .overview-hub { --overview-tone: var(--pc-blue); --overview-soft: var(--pc-blue-soft); }

@@ -2442,25 +2442,27 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
   };
 
   return (
-    <div className={entryOnly ? "space-y-4 py-2" : "geo-workspace space-y-4 py-2"}>
+    <div className={entryOnly ? "space-y-4 py-2" : "geo-workspace min-w-0 space-y-5 py-2 font-report"}>
       {!entryOnly && !isUsingDemoData && <AreaEvidenceInspector entries={displayEntries} scopeKey={entriesKey} allowReference={allowAreaReference} />}
       {/* Header */}
       <div className="geo-command flex flex-col items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-3">
-            <div className="geo-command-icon p-2.5 rounded-lg">
-              <MapPin className="h-6 w-6" strokeWidth={1.6} />
-            </div>
-            {entryOnly ? "Microplan Entry Form" : "Geo-enabled Microplanning"}
-          </h1>
-          <p className="text-xs text-muted-foreground mt-1.5 ml-14">
-            {entryOnly ? "Add new community-level microplanning entries" : `${selectedProjectName || "Project workspace"} · Nigeria · Programme planning`}
-          </p>
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="geo-command-icon shrink-0 p-3 rounded-lg">
+            <MapIcon className="h-6 w-6" strokeWidth={1.6} />
+          </div>
+          <div className="min-w-0">
+            <h1 className="font-report-display text-xl sm:text-2xl font-semibold text-foreground leading-tight">
+              {entryOnly ? "Microplan Entry Form" : "Geo Microplanning"}
+            </h1>
+            <p className="text-xs text-muted-foreground mt-1.5 break-words">
+              {entryOnly ? "Add new community-level microplanning entries" : `${selectedProjectName || "Project workspace"} · Nigeria`}
+            </p>
+          </div>
         </div>
-        <div className="flex items-center gap-2 flex-wrap w-full">
+        <div className="geo-command-actions flex items-center gap-2 flex-wrap w-full">
           {projects.length > 0 && (
             <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-              <SelectTrigger className="w-[180px] h-9 text-xs border-primary/20 shadow-sm">
+              <SelectTrigger aria-label="Microplanning project" className="w-full sm:w-[240px] h-10 text-xs bg-card border-border">
                 <SelectValue placeholder="Select project" />
               </SelectTrigger>
               <SelectContent>
@@ -2472,7 +2474,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="outline" className="gap-1.5" title="Workspace settings">
+              <Button size="sm" variant="outline" className="h-10 gap-1.5 bg-card" title="Workspace settings">
                 <ShieldCheck className="h-3.5 w-3.5" /> Manage <ChevronDown className="h-3 w-3" />
               </Button>
             </DropdownMenuTrigger>
@@ -2485,10 +2487,10 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
               {role === "super_admin" && <DropdownMenuItem asChild><a href={geoMicroplanXlsform.url} download={geoMicroplanXlsform.original_filename}><FileSpreadsheet className="h-4 w-4 mr-2" /> KoboToolbox XLSForm (latest)</a></DropdownMenuItem>}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button size="sm" onClick={() => { setEditingEntry(null); setShowForm(true); }} className="shadow-sm font-semibold">
+          <Button size="sm" onClick={() => { setEditingEntry(null); setShowForm(true); }} className="h-10 font-semibold">
             <Plus className="h-3.5 w-3.5 mr-1" /> Add Entry
           </Button>
-          <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto sm:ml-auto">
+          <div className="geo-sync-status flex items-center gap-2 flex-wrap w-full sm:w-auto sm:ml-auto">
             <KoboSyncStatusChip projectId={selectedProjectId || null} onNewSuccess={fetchEntries} />
             <TabSyncStatus projectId={selectedProjectId || null} table="microplan_entries" syncEventStatus="microplan_sync" onResync={fetchEntries} />
           </div>
@@ -2545,7 +2547,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
 
           {/* ===== FIONET-STYLE KPI DASHBOARD ===== */}
           {/* Primary project metrics */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
+          <div className="geo-primary-metrics grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3" aria-label="Project indicators">
             {[
               { label: "Communities", value: new Set(filtered.map(e => [e.state, e.lga, e.ward, e.flhf_name, e.community_name].join("||"))).size.toLocaleString(), icon: Building2, tone: "geo-metric-blue" },
               { label: "Total Population", value: totalPop.toLocaleString(), icon: Users, tone: "geo-metric-blue" },
@@ -2556,10 +2558,10 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
             ].map(kpi => (
               <div key={kpi.label} className={`geo-metric ${kpi.tone}`}>
                 <div className="flex items-start justify-between gap-2">
-                  <p className="text-[11px] font-medium text-muted-foreground pt-1">{kpi.label}</p>
+                  <p className="text-xs font-medium text-muted-foreground pt-1">{kpi.label}</p>
                   <span className="geo-metric-icon shrink-0"><kpi.icon className="h-4 w-4" strokeWidth={1.7} /></span>
                 </div>
-                <p className="text-xl font-bold tabular-nums text-foreground leading-tight mt-2 break-words">{kpi.value}</p>
+                <p className="text-2xl font-semibold tabular-nums text-foreground leading-tight mt-3 break-words">{kpi.value}</p>
               </div>
             ))}
           </div>
@@ -2926,34 +2928,34 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
 
 
           {/* Dataset filters */}
-          <div className="geo-navigation flex items-center gap-2 flex-wrap">
+          <div className="geo-navigation geo-filterbar flex items-center gap-2 flex-wrap" role="search" aria-label="Filter microplanning records">
             <div className="relative flex-1 min-w-[180px]">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search communities, FLHF..." className="pl-8 h-8 text-xs" />
+              <Input aria-label="Search communities and health facilities" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search communities, FLHF..." className="pl-8 h-10 text-xs bg-card" />
             </div>
             <Select value={filterState} disabled={lensLockState} onValueChange={(value) => { setFilterState(value); setFilterLga("all"); setFilterWard("all"); }}>
-              <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue placeholder="All States" /></SelectTrigger>
+              <SelectTrigger aria-label="Filter by State" className="w-[140px] h-10 text-xs bg-card"><SelectValue placeholder="All States" /></SelectTrigger>
               <SelectContent>
                 {!lensLockState && <SelectItem value="all">All States</SelectItem>}
                 {uniqueStates.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={filterLga} disabled={lensLockLga} onValueChange={(value) => { setFilterLga(value); setFilterWard("all"); }}>
-              <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue placeholder="All LGAs" /></SelectTrigger>
+              <SelectTrigger aria-label="Filter by LGA" className="w-[140px] h-10 text-xs bg-card"><SelectValue placeholder="All LGAs" /></SelectTrigger>
               <SelectContent>
                 {!lensLockLga && <SelectItem value="all">All LGAs</SelectItem>}
                 {uniqueLgas.map((lga) => <SelectItem key={lga} value={lga}>{lga}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={filterWard} disabled={lensLockWard} onValueChange={setFilterWard}>
-              <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue placeholder="All Wards" /></SelectTrigger>
+              <SelectTrigger aria-label="Filter by Ward" className="w-[140px] h-10 text-xs bg-card"><SelectValue placeholder="All Wards" /></SelectTrigger>
               <SelectContent>
                 {!lensLockWard && <SelectItem value="all">All Wards</SelectItem>}
                 {uniqueWards.map((ward) => <SelectItem key={ward} value={ward}>{ward}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={filterAccessibility} onValueChange={setFilterAccessibility}>
-              <SelectTrigger className="w-[140px] h-8 text-xs"><SelectValue placeholder="Accessibility" /></SelectTrigger>
+              <SelectTrigger aria-label="Filter by accessibility" className="w-[150px] h-10 text-xs bg-card"><SelectValue placeholder="Accessibility" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Access</SelectItem>
                 <SelectItem value="accessible">Accessible</SelectItem>

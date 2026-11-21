@@ -228,3 +228,8 @@
 - [x] LQAS Global Standard phase 2: saved rounds and lots from the microplan, two-threshold decision rule, risk flags, supervisors.
 - [x] LQAS round phone form + printed pack, Kobo results linked to lots, automatic mop-up, reports tab.
 - [ ] LQAS live Kobo submission test — waits on a real field submission from KoboCollect.
+
+## Geo Microplanning presentation polish
+- [x] Refine workspace hierarchy, metrics, navigation, filters and map controls without changing data or access; 21 regression tests passed.
+- [x] Verify isolated sample-data maps on desktop and phone, including themes, summary, expansion and settlement controls.
+- [ ] Verify real-data dashboard navigation — the available signed-in account returns Access Restricted; existing permissions were not changed.
