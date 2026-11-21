@@ -1322,7 +1322,7 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
         </div>
 
         {/* Map + Summary Panel */}
-        <div className={`flex ${showSummaryPanel ? "flex-col lg:flex-row" : ""}`}>
+        <div className={`geo-map-body flex ${showSummaryPanel ? "flex-col lg:flex-row" : ""}`}>
           <div className={`${mapHeight} ${showSummaryPanel ? "lg:flex-1" : "w-full"} relative z-0 min-w-0`}>
             <div ref={mapRef} className="geo-settlement-map h-full w-full relative" />
           </div>

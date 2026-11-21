@@ -2442,7 +2442,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
   };
 
   return (
-    <div className={entryOnly ? "space-y-4 py-2" : "geo-workspace min-w-0 space-y-5 py-2 font-report"}>
+    <div className={entryOnly ? "space-y-4 py-2" : "geo-workspace geo-console min-w-0 space-y-4 font-report"}>
       {!entryOnly && !isUsingDemoData && <AreaEvidenceInspector entries={displayEntries} scopeKey={entriesKey} allowReference={allowAreaReference} />}
       {/* Header */}
       <div className="geo-command flex flex-col items-start justify-between gap-4">
@@ -2490,6 +2490,11 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
           <Button size="sm" onClick={() => { setEditingEntry(null); setShowForm(true); }} className="h-10 font-semibold">
             <Plus className="h-3.5 w-3.5 mr-1" /> Add Entry
           </Button>
+          {!entryOnly && canOpenView("map") && (
+            <Button size="sm" variant="outline" className="h-10 gap-1.5" aria-pressed={activeView === "map"} onClick={() => setActiveView(activeView === "map" ? "list" : "map")}>
+              <MapIcon className="h-4 w-4" /> Map
+            </Button>
+          )}
           <div className="geo-sync-status flex items-center gap-2 flex-wrap w-full sm:w-auto sm:ml-auto">
             <KoboSyncStatusChip projectId={selectedProjectId || null} onNewSuccess={fetchEntries} />
             <TabSyncStatus projectId={selectedProjectId || null} table="microplan_entries" syncEventStatus="microplan_sync" onResync={fetchEntries} />
@@ -2591,6 +2596,18 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
           </div>
 
           {/* Row 3: Breakdown panels — Accessibility, Security, Terrain, CDD (click to filter) */}
+          <div className={`geo-operational-grid ${renderedView === "map" ? "has-map" : ""}`}>
+          {renderedView === "map" && (
+            <MicroplanMap
+              entries={filtered}
+              projectName={selectedProjectName}
+              onEntryClick={(id) => {
+                if (lensReadOnly) { blockLensWrite(); return; }
+                const entry = entries.find(e => e.id === id);
+                if (entry) { setEditingEntry(entry); setShowForm(true); }
+              }}
+            />
+          )}
           <div className="geo-breakdowns grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 items-stretch gap-3">
             {/* Accessibility */}
             <Card className="border-border/40 shadow-sm h-full">
@@ -2802,6 +2819,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
                 </div>
               </CardContent>
             </Card>
+          </div>
           </div>
           <GpsQualityCheck key={`${user?.id}:${selectedProjectId}`} entries={filtered} projectName={selectedProjectName} projectId={selectedProjectId || 'all-projects'} userId={user?.id || 'signed-out'} />
           <CommunityRiskRanking entries={filtered} risks={communityRisks} />
@@ -3042,19 +3060,6 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
               onChange={handleImport}
             />
           </div>
-
-          {/* Map View */}
-          {renderedView === "map" && (
-            <MicroplanMap
-              entries={filtered}
-              projectName={selectedProjectName}
-              onEntryClick={(id) => {
-                if (lensReadOnly) { blockLensWrite(); return; }
-                const entry = entries.find(e => e.id === id);
-                if (entry) { setEditingEntry(entry); setShowForm(true); }
-              }}
-            />
-          )}
 
           {/* List View — Planning table is admin (or lens-granted) only */}
           {renderedView === "list" && canOpenView("list") && (
