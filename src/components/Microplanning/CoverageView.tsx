@@ -252,15 +252,15 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName, allocationRo
           ${e.settlement_name ? `<div style="font-size:11px;color:hsl(var(--muted-foreground));margin-bottom:4px;">Settlement: ${escapeHtmlText(e.settlement_name)}</div>` : ""}
           <div style="font-size:11px;color:hsl(var(--muted-foreground));margin-bottom:8px;">${escapeHtmlText(e.ward)} · ${escapeHtmlText(e.lga)} · ${escapeHtmlText(e.state)}</div>
           <div style="display:flex;gap:8px;margin-bottom:6px;">
-            <div style="flex:1;background:${isMissed ? '#fef2f2' : coverage >= 80 ? '#ecfdf5' : '#fffbeb'};padding:6px 8px;border-radius:8px;text-align:center;">
+            <div style="flex:1;background:hsl(var(--muted));padding:6px 8px;border-radius:8px;text-align:center;">
               <div style="font-size:10px;color:hsl(var(--muted-foreground));">Coverage</div>
               <div style="font-size:16px;font-weight:800;color:hsl(var(--foreground));">${target > 0 ? coverage.toFixed(1) + '%' : 'N/A'}</div>
             </div>
-            <div style="flex:1;background:#f3f4f6;padding:6px 8px;border-radius:8px;text-align:center;">
+            <div style="flex:1;background:hsl(var(--muted));padding:6px 8px;border-radius:8px;text-align:center;">
               <div style="font-size:10px;color:hsl(var(--muted-foreground));">Treated</div>
               <div style="font-size:14px;font-weight:700;">${treated.toLocaleString()}</div>
             </div>
-            <div style="flex:1;background:#f3f4f6;padding:6px 8px;border-radius:8px;text-align:center;">
+            <div style="flex:1;background:hsl(var(--muted));padding:6px 8px;border-radius:8px;text-align:center;">
               <div style="font-size:10px;color:hsl(var(--muted-foreground));">Target</div>
               <div style="font-size:14px;font-weight:700;">${target.toLocaleString()}</div>
             </div>

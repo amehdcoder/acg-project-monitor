@@ -738,7 +738,7 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
             L.marker([cLat, cLng], {
               icon: L.divIcon({
                 className: "comm-lbl",
-                html: `<div style="font-size:9px;font-weight:600;color:#1E293B;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 5px #fff;white-space:nowrap;max-width:100px;overflow:hidden;text-overflow:ellipsis;text-align:center">${entry.community_name}${popLabel ? ` <span style='color:#6B7280;font-weight:400'>(${popLabel})</span>` : ""}</div>`,
+                html: `<div style="font-size:9px;font-weight:600;color:#1E293B;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 5px #fff;white-space:nowrap;max-width:100px;overflow:hidden;text-overflow:ellipsis;text-align:center">${entry.community_name}${popLabel ? ` <span style='color:#1E293B;font-weight:400'>(${popLabel})</span>` : ""}</div>`,
                 iconSize: [100, 14], iconAnchor: [50, -radius - 4],
               }), interactive: false,
             }).addTo(group);
@@ -780,7 +780,7 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
               icon: L.divIcon({
                 className: "dist-lbl",
                 html: `<div style="
-                  background:${lc};color:#fff;font-size:9px;padding:2px 6px;
+                  background:hsl(var(--card));color:hsl(var(--foreground));border:2px solid ${lc};font-size:9px;padding:2px 6px;
                   border-radius:10px;font-weight:700;white-space:nowrap;
                   box-shadow:0 2px 8px rgba(0,0,0,0.35),0 0 0 2px rgba(255,255,255,0.6);
                   letter-spacing:0.3px;
@@ -817,7 +817,7 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
             icon: L.divIcon({
               className: "flhf-icon",
               html: `<div style="
-                background:${bgColor};color:#fff;width:32px;height:32px;
+                background:hsl(var(--card));color:hsl(var(--foreground));width:32px;height:32px;
                 border-radius:6px;display:flex;align-items:center;justify-content:center;
                 font-size:16px;font-weight:bold;
                 border:3px solid #fff;
@@ -833,7 +833,7 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
               icon: L.divIcon({
                 className: "flhf-lbl",
                 html: `<div style="
-                  background:${bgColor};color:#fff;font-size:10px;font-weight:700;
+                  background:hsl(var(--card));color:hsl(var(--foreground));border:2px solid ${bgColor};font-size:10px;font-weight:700;
                   padding:2px 8px;border-radius:10px;white-space:nowrap;
                   box-shadow:0 2px 6px rgba(0,0,0,0.3);text-align:center;
                   max-width:140px;overflow:hidden;text-overflow:ellipsis;

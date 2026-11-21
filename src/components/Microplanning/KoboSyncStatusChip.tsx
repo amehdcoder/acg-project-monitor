@@ -112,7 +112,7 @@ const KoboSyncStatusChip = ({ projectId, onNewSuccess }: Props) => {
       return {
         icon: <Radio className="h-3 w-3" />,
         label: "Awaiting Kobo",
-        cls: "bg-slate-100 text-slate-700 border-slate-200",
+        cls: "bg-muted text-foreground border-border",
       };
     }
     const ago = formatDistanceToNow(new Date(latest.created_at), { addSuffix: true });
@@ -120,20 +120,20 @@ const KoboSyncStatusChip = ({ projectId, onNewSuccess }: Props) => {
       return {
         icon: <CheckCircle2 className="h-3 w-3" />,
         label: isFreshSuccess ? "Synced just now" : `Synced ${ago}`,
-        cls: "bg-emerald-50 text-emerald-700 border-emerald-200",
+        cls: "bg-muted text-foreground border-status-success/40",
       };
     }
     if (latest.status === "pending") {
       return {
         icon: <Clock className="h-3 w-3 animate-pulse" />,
         label: `Sync pending ${ago}`,
-        cls: "bg-amber-50 text-amber-800 border-amber-200",
+        cls: "bg-muted text-foreground border-status-warning/40",
       };
     }
     return {
       icon: <AlertTriangle className="h-3 w-3" />,
       label: `Validation failed ${ago}`,
-      cls: "bg-rose-50 text-rose-700 border-rose-200",
+      cls: "bg-muted text-foreground border-status-danger/40",
     };
   }, [latest, isFreshSuccess]);
 
