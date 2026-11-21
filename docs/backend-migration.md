@@ -4,7 +4,7 @@
 
 Preparation only. No backend connection, records, user accounts, files, function deployments or production settings have changed.
 
-The destination project and authorized access have not been provided. Migration cannot safely start by changing the app's connection settings: an empty destination would make existing records and accounts unavailable.
+The user supplied the destination project address on 2026-11-21. Destination reference for migration tooling: `xcewvdoywubzdhzepchg`. Authorized access and whether the project already contains data remain unverified. An address is not a credential and does not authorize inspection or restoration. Migration cannot safely start by changing the app's connection settings: an empty destination would make existing records and accounts unavailable.
 
 ## Source inventory
 
@@ -28,7 +28,7 @@ This is a code-reference inventory, not verification that all values are configu
 
 ## Required inputs
 
-- Identify the destination project and confirm whether it already contains data. Never restore over an existing project without a reviewed collision/backup strategy.
+- Destination identified; confirm whether it already contains data. Never restore over an existing project without a reviewed collision/backup strategy.
 - Authorize destination management through a supported connection; never paste passwords or private keys into chat.
 - Export the running Cloud database using **More → Database → Manage → Settings → Export project data → Export data → Database → Export → Start export**. Download the result from the emailed link or **More → Storage**. Exports are limited to one every 24 hours and require the backend to be running.
 - Download storage files separately from **More → Storage**, preserving bucket/path associations. Database exports do not include these files.
