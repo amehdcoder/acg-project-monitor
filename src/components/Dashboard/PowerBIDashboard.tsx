@@ -1,3 +1,4 @@
+import { escapeHtmlText } from "@/lib/security/escapeHtml";
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -653,8 +654,8 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       m.set(l.key, {
         fill: concordanceFill(l.therapConcordance),
         popupHtml: `<div style="min-width:210px;font-family:inherit;padding:4px;">
-            <div style="font-weight:900;font-size:14px;color:#0f172a;">${l.lga} LGA</div>
-            <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">${l.state} State</div>
+            <div style="font-weight:900;font-size:14px;color:#0f172a;">${escapeHtmlText(l.lga)} LGA</div>
+            <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">${escapeHtmlText(l.state)} State</div>
             <div style="background:#f8fafc;padding:8px;border-radius:8px;border:1px solid #e2e8f0;">
               ${row("Concordance (overall)", l.therapConcordance)}
               ${row("Therapeutic concordance", l.therapConcordance)}
@@ -680,7 +681,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       m.set(l.key, {
         fill: cov >= thr ? "#16a34a" : "#f59e0b",
         opacity: 0.78,
-        popupHtml: `<div style="font-family:inherit;padding:4px;min-width:160px;"><div style="font-weight:900;color:#0f172a;">${l.lga}</div><div style="font-size:11px;color:#64748b;">${l.state}</div><div style="margin-top:4px;font-weight:900;color:${cov >= thr ? "#16a34a" : "#b45309"};">${Math.round(cov)}% (target ≥${thr}%)</div></div>`,
+        popupHtml: `<div style="font-family:inherit;padding:4px;min-width:160px;"><div style="font-weight:900;color:#0f172a;">${escapeHtmlText(l.lga)}</div><div style="font-size:11px;color:#64748b;">${escapeHtmlText(l.state)}</div><div style="margin-top:4px;font-weight:900;color:${cov >= thr ? "#16a34a" : "#b45309"};">${Math.round(cov)}% (target ≥${thr}%)</div></div>`,
       });
     });
     return m;

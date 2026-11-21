@@ -46,20 +46,20 @@ const createPopupContent = (marker: MapMarker): string => {
     : '';
 
   const locationItems: string[] = [];
-  if (marker.state) locationItems.push(`<div class="popup-row"><span class="popup-label">State:</span> <span class="popup-value">${marker.state}</span></div>`);
-  if (marker.lga) locationItems.push(`<div class="popup-row"><span class="popup-label">LGA:</span> <span class="popup-value">${marker.lga}</span></div>`);
-  if (marker.ward) locationItems.push(`<div class="popup-row"><span class="popup-label">Ward:</span> <span class="popup-value">${marker.ward}</span></div>`);
-  if (marker.community) locationItems.push(`<div class="popup-row"><span class="popup-label">Community:</span> <span class="popup-value">${marker.community}</span></div>`);
-  if (marker.facility) locationItems.push(`<div class="popup-row"><span class="popup-label">Facility:</span> <span class="popup-value">${marker.facility}</span></div>`);
+  if (marker.state) locationItems.push(`<div class="popup-row"><span class="popup-label">State:</span> <span class="popup-value">${escapeHtmlText(marker.state)}</span></div>`);
+  if (marker.lga) locationItems.push(`<div class="popup-row"><span class="popup-label">LGA:</span> <span class="popup-value">${escapeHtmlText(marker.lga)}</span></div>`);
+  if (marker.ward) locationItems.push(`<div class="popup-row"><span class="popup-label">Ward:</span> <span class="popup-value">${escapeHtmlText(marker.ward)}</span></div>`);
+  if (marker.community) locationItems.push(`<div class="popup-row"><span class="popup-label">Community:</span> <span class="popup-value">${escapeHtmlText(marker.community)}</span></div>`);
+  if (marker.facility) locationItems.push(`<div class="popup-row"><span class="popup-label">Facility:</span> <span class="popup-value">${escapeHtmlText(marker.facility)}</span></div>`);
 
   const metaItems: string[] = [];
-  if (marker.formName) metaItems.push(`<div class="popup-meta">📄 ${marker.formName}</div>`);
-  if (marker.submitterName) metaItems.push(`<div class="popup-meta">👤 ${marker.submitterName}</div>`);
+  if (marker.formName) metaItems.push(`<div class="popup-meta">📄 ${escapeHtmlText(marker.formName)}</div>`);
+  if (marker.submitterName) metaItems.push(`<div class="popup-meta">👤 ${escapeHtmlText(marker.submitterName)}</div>`);
   if (marker.submittedAt) metaItems.push(`<div class="popup-meta">📅 ${formatDate(marker.submittedAt)}</div>`);
 
   return `
     <div class="marker-popup">
-      <div class="popup-title">${marker.title}</div>
+      <div class="popup-title">${escapeHtmlText(marker.title)}</div>
       <div class="popup-source">${sourceBadge}${accuracyBadge}</div>
       ${locationItems.length > 0 ? `<div class="popup-location">${locationItems.join('')}</div>` : ''}
       ${metaItems.length > 0 ? `<div class="popup-meta-section">${metaItems.join('')}</div>` : ''}

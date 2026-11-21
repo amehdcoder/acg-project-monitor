@@ -159,12 +159,12 @@ const SatelliteImageryView = () => {
 
       const popupContent = `
         <div style="min-width:180px">
-          <strong>${loc.name}</strong><br/>
+          <strong>${escapeHtmlText(loc.name)}</strong><br/>
           <span style="color:${color};font-weight:600">${labelMap[loc.type]}</span><br/>
           <span style="font-size:11px;color:#666">
-            ${loc.state} → ${loc.lga} → ${loc.ward}<br/>
+            ${escapeHtmlText(loc.state)} → ${escapeHtmlText(loc.lga)} → ${escapeHtmlText(loc.ward)}<br/>
             ${loc.population ? `Pop: ${loc.population.toLocaleString()}<br/>` : ""}
-            ${loc.accessibility ? `Access: ${loc.accessibility}<br/>` : ""}
+            ${loc.accessibility ? `Access: ${escapeHtmlText(loc.accessibility)}<br/>` : ""}
             ${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}
           </span>
         </div>

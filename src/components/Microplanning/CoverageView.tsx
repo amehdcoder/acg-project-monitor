@@ -1,3 +1,4 @@
+import { escapeHtmlText } from "@/lib/security/escapeHtml";
 import { disposeMap } from "@/lib/microplanning/disposeMap";
 import { drawFlhfCatchments } from "@/lib/microplanning/flhfCatchments";
 import { attachGeoFeatures } from "@/lib/microplanning/geoFeatures";
@@ -247,9 +248,9 @@ const CoverageView = ({ entries, onRefresh, projectId, projectName, allocationRo
 
       const popupHtml = `
         <div style="min-width:200px;font-family:inherit;">
-          <div style="font-weight:700;font-size:14px;margin-bottom:6px;">${e.community_name}</div>
-          ${e.settlement_name ? `<div style="font-size:11px;color:#6b7280;margin-bottom:4px;">Settlement: ${e.settlement_name}</div>` : ""}
-          <div style="font-size:11px;color:#6b7280;margin-bottom:8px;">${e.ward} · ${e.lga} · ${e.state}</div>
+          <div style="font-weight:700;font-size:14px;margin-bottom:6px;">${escapeHtmlText(e.community_name)}</div>
+          ${e.settlement_name ? `<div style="font-size:11px;color:#6b7280;margin-bottom:4px;">Settlement: ${escapeHtmlText(e.settlement_name)}</div>` : ""}
+          <div style="font-size:11px;color:#6b7280;margin-bottom:8px;">${escapeHtmlText(e.ward)} · ${escapeHtmlText(e.lga)} · ${escapeHtmlText(e.state)}</div>
           <div style="display:flex;gap:8px;margin-bottom:6px;">
             <div style="flex:1;background:${isMissed ? '#fef2f2' : coverage >= 80 ? '#ecfdf5' : '#fffbeb'};padding:6px 8px;border-radius:8px;text-align:center;">
               <div style="font-size:10px;color:#6b7280;">Coverage</div>
