@@ -2442,7 +2442,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
   };
 
   return (
-    <div className={entryOnly ? "space-y-4 py-2" : "geo-workspace geo-console min-w-0 space-y-4 font-report"}>
+    <div className={entryOnly ? "space-y-4 py-2" : "dark geo-workspace geo-console min-w-0 space-y-4 font-report"}>
       {!entryOnly && !isUsingDemoData && <AreaEvidenceInspector entries={displayEntries} scopeKey={entriesKey} allowReference={allowAreaReference} />}
       {/* Header */}
       <div className="geo-command flex flex-col items-start justify-between gap-4">

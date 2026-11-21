@@ -314,7 +314,7 @@ export default function GeoMedicineAllocationTable({
           <div className="flex items-center gap-1.5 rounded-md bg-white/15 px-2 py-1">
             <span className="text-[10px] font-semibold uppercase tracking-wide">Medicine</span>
             <Select value={medicine} onValueChange={pickMedicine} disabled={readOnly}>
-              <SelectTrigger className="h-7 w-[320px] text-xs bg-white/95 text-foreground border-0">
+              <SelectTrigger className="h-7 w-[320px] text-xs bg-card text-card-foreground border-border">
                 <SelectValue placeholder="Select NTD medicine" />
               </SelectTrigger>
               <SelectContent className="max-h-80">
@@ -329,7 +329,7 @@ export default function GeoMedicineAllocationTable({
           <div className="flex items-center gap-1.5 rounded-md bg-white/15 px-2 py-1">
             <span className="text-[10px] font-semibold uppercase tracking-wide">Unit</span>
             <Select value={unit} onValueChange={setUnit} disabled={readOnly}>
-              <SelectTrigger className="h-7 w-28 text-xs bg-white/95 text-foreground border-0">
+              <SelectTrigger className="h-7 w-28 text-xs bg-card text-card-foreground border-border">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -344,12 +344,12 @@ export default function GeoMedicineAllocationTable({
             <span className="text-[10px] font-semibold uppercase tracking-wide">Buffer %</span>
             <Input type="number" min={0} max={100} value={bufferPct}
               onChange={(e) => setBufferPct(Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
-              className="h-7 w-16 text-xs text-center bg-white/90 text-foreground border-0" />
+              className="h-7 w-16 text-xs text-center bg-card text-card-foreground border-border" />
           </div>
           <div className="relative">
-            <Search className="h-3.5 w-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-sky-900/60" />
+            <Search className="h-3.5 w-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search LGA or ward…"
-              className="h-8 w-52 pl-7 text-xs bg-white/90 text-foreground border-0" />
+              className="h-8 w-52 pl-7 text-xs bg-card text-card-foreground border-border" />
           </div>
           {/* Rounding rules */}
           <Popover>
@@ -538,7 +538,7 @@ export default function GeoMedicineAllocationTable({
                           value={lgaTotals[L.key] ?? ""}
                           onChange={(e) => setLga(L.key, e.target.value)}
                           placeholder="LGA total"
-                          className="h-8 text-xs text-right font-bold border-sky-400/70 focus-visible:ring-sky-500 bg-white dark:bg-background"
+                          className="h-8 text-xs text-right font-bold border-border bg-background text-foreground"
                         />
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums font-bold text-sky-800 dark:text-sky-300">{n0(L.allocation)}</td>
@@ -567,7 +567,7 @@ export default function GeoMedicineAllocationTable({
                               value={wardTotals[w.key] ?? ""}
                               onChange={(e) => setWard(w.key, e.target.value)}
                               placeholder="Ward total"
-                              className="h-7 text-xs text-right border-violet-300/70 focus-visible:ring-violet-500"
+                              className="h-7 text-xs text-right border-border bg-background text-foreground"
                             />
                           </td>
                           <td className="px-3 py-1.5 text-right tabular-nums font-semibold">{n0(alloc)}</td>

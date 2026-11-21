@@ -1,5 +1,7 @@
 # Roadmap
 
+- [x] Correct Geo dashboard contrast: complete scoped dark theme, brighter semantic/status ink, readable tables and medicine controls, subdued banner surfaces and map-root OSIRIS colors. Eight regressions passed; 59 rendered labels/controls passed 4.5:1 contrast checks under both surrounding themes, dropdown and 390px layout checked without page errors. Signed-in real-data check remains blocked by the available account's Access Restricted result; no permissions or records changed.
+
 - [x] Match the supplied Geo UI reference with a scoped dark GIS console, vivid indicators and an on-demand map beside operational panels. Live project values, desktop/phone layouts, Security theme and map teardown verified; 19 regression tests passed, no page errors. Records and access unchanged.
 
 - [ ] Proceed with the requested safe migration (2026-11-21 05:50 UTC): Cloud readiness rechecked successfully; no other accessible owned project in this workspace and no candidate database backup uploads found. At 05:51 UTC the destination-access answer repeated the database address, not a separate Lovable project link; authorized destination access is still unavailable. Await the separate destination-connected project link and supported source/destination database exports plus separate private-file backups. Authorization to proceed does not satisfy these safety gates; no imports, production switch or Cloud removal performed.

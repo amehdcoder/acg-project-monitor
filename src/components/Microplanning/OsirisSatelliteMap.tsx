@@ -17,7 +17,7 @@ const StreetViewPanel = lazy(() => import("@/components/maps/GoogleStreetViewPan
 type Dimension="security"|"accessibility"|"terrain"|"population"|"cdd";
 const themes: {id:Dimension;label:string}[]=[{id:"security",label:"Security clearance"},{id:"accessibility",label:"Accessibility"},{id:"terrain",label:"Terrain types"},{id:"population",label:"Recorded population"},{id:"cdd",label:"CDD assignments"}];
 const empty={type:"FeatureCollection" as const,features:[]};
-function token(name:string){const el=document.createElement("span");el.style.color=`hsl(var(${name}))`;document.body.appendChild(el);const color=getComputedStyle(el).color;el.remove();return color;}
+function token(name:string, host:HTMLElement){const el=document.createElement("span");el.style.color=`hsl(var(${name}))`;host.appendChild(el);const color=getComputedStyle(el).color;el.remove();return color;}
 function boundsOf(boundaries:Boundary[]){const b=new maplibregl.LngLatBounds();const visit=(v:unknown)=>{if(!Array.isArray(v))return;if(typeof v[0]==="number"&&typeof v[1]==="number"){b.extend([v[0],v[1]]);return;}v.forEach(visit);};boundaries.forEach(f=>visit(f.geometry.coordinates));return b;}
 export default function OsirisSatelliteMap({entries,projectName}:{entries:IntelEntry[];projectName?:string}){
   const states=useMemo(()=>[...new Set(entries.map(e=>String(e.state??"").trim()).filter(Boolean))].sort(),[entries]);
@@ -73,7 +73,7 @@ export default function OsirisSatelliteMap({entries,projectName}:{entries:IntelE
     setReady(false);
     try{m=new maplibregl.Map({container:holder.current,style:{version:8,sources:{imagery:{type:"raster",tiles:["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],tileSize:256,maxzoom:19,attribution:"© Esri, Vantor, Earthstar Geographics, GIS User Community"},elevation:{type:"raster-dem",url:"https://tiles.mapterhorn.com/tilejson.json",encoding:"terrarium",tileSize:512,maxzoom:12,attribution:'<a href="https://mapterhorn.com/attribution">© Mapterhorn</a>'}},layers:[{id:"satellite",type:"raster",source:"imagery"}]},center:[8.7,9.1],zoom:5,pitch:45,maxZoom:20,maxPitch:70,canvasContextAttributes:{antialias:false},refreshExpiredTiles:false,renderWorldCopies:false});}
     catch{setError("3D rendering is unavailable on this device. Existing Geo maps remain available.");return;}
-    map.current=m;const palette={blue:token('--chart-primary'),teal:token('--chart-secondary'),red:token('--status-danger'),amber:token('--status-warning'),green:token('--status-success'),neutral:token('--muted-foreground'),line:token('--primary-foreground')};
+    map.current=m;const palette={blue:token('--chart-primary',holder.current),teal:token('--chart-secondary',holder.current),red:token('--status-danger',holder.current),amber:token('--status-warning',holder.current),green:token('--status-success',holder.current),neutral:token('--muted-foreground',holder.current),line:token('--primary-foreground',holder.current)};
     const adminPalette=adminBoundaryPalette();
     m.addControl(new maplibregl.AttributionControl({customAttribution:NIGERIA_ADMIN_ATTRIBUTION}),'bottom-right');
     m.addControl(new maplibregl.NavigationControl({visualizePitch:true}),'bottom-right');m.addControl(new maplibregl.ScaleControl(),'bottom-left');
