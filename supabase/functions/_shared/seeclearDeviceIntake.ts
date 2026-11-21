@@ -26,6 +26,24 @@ const dataUrlToBytes = (dataUrl: string): { bytes: Uint8Array; contentType: stri
   return { bytes, contentType: m[1] };
 };
 
+const ALLOWED_PHOTO_TYPES: Record<string, string> = {
+  "image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png", "image/webp": "webp", "image/heic": "heic", "image/heif": "heif",
+};
+const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
+const MAX_PHOTOS = 20;
+const SLOT_RE = /^[A-Za-z0-9_-]{1,64}$/;
+const ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Fields a device may supply; everything else is server-controlled. */
+const DEVICE_FIELDS = [
+  "date_of_visit", "state", "lga", "ward", "community", "facility_name", "facility_level", "ownership",
+  "functional_status", "is_functional", "staff_on_duty", "focal_name", "focal_designation", "focal_phone",
+  "team_members", "gps_lat", "gps_lng", "gps_accuracy", "general", "hr_score", "hr_max", "infra_score",
+  "infra_max", "equipment", "equip_score", "equip_max", "essential_supplies", "complete_records",
+  "referral_compliance", "referrals_made", "referrals_completed", "readiness_score", "overall_score",
+  "challenges", "recommendations", "remarks", "officer_signature", "incharge_signature", "critical_gap",
+] as const;
+
 /** Store device-captured evidence photos and return slot -> storage path. */
 async function storeEvidence(
   recordId: string,
@@ -34,12 +52,20 @@ async function storeEvidence(
   if (!photos) return {};
   const db = admin();
   const out: Record<string, string> = {};
-  for (const [slot, value] of Object.entries(photos)) {
-    if (!value) continue;
-    if (!value.startsWith("data:")) { out[slot] = value; continue; }
+  if (!ID_RE.test(recordId)) return {};
+  for (const [slot, value] of Object.entries(photos).slice(0, MAX_PHOTOS)) {
+    if (!value || typeof value !== "string" || !SLOT_RE.test(slot)) continue;
+    // Only server-issued paths for this record may be referenced, never arbitrary values.
+    if (!value.startsWith("data:")) {
+      if (value.startsWith(`device/${recordId}/`) && !value.includes("..")) out[slot] = value;
+      continue;
+    }
+    // Reject oversize payloads before decoding (base64 is ~4/3 of bytes).
+    if (value.length > Math.ceil(MAX_PHOTO_BYTES * 4 / 3) + 100) continue;
     const parsed = dataUrlToBytes(value);
     if (!parsed) continue;
-    const ext = parsed.contentType.split("/")[1]?.split("+")[0] || "jpg";
+    const ext = ALLOWED_PHOTO_TYPES[parsed.contentType.toLowerCase()];
+    if (!ext || parsed.bytes.byteLength > MAX_PHOTO_BYTES) continue;
     const path = `device/${recordId}/${slot}.${ext}`;
     const { error } = await db.storage
       .from("seeclear-evidence")
@@ -125,16 +151,27 @@ export async function intakeSeeClearRecord(
   ctx: { collectorUserId: string; deviceId: string; label: string },
 ): Promise<{ ok: boolean; reason?: string }> {
   const db = admin();
+  if (!ID_RE.test(String(record.id ?? ""))) return { ok: false, reason: "invalid_id" };
   const evidence = await storeEvidence(record.id, record.photos);
-  const submittedAt = record.submittedAt || new Date().toISOString();
+  const submittedAtRaw = record.submittedAt ? new Date(record.submittedAt) : new Date();
+  const submittedAt = Number.isNaN(submittedAtRaw.getTime()) ? new Date().toISOString() : submittedAtRaw.toISOString();
+
+  const source = (record.data && typeof record.data === "object") ? record.data : {};
+  const picked: Record<string, unknown> = {};
+  for (const key of DEVICE_FIELDS) if (key in source) picked[key] = (source as Record<string, unknown>)[key];
+  // Prior evidence may only reference this record's own stored files.
+  const priorEvidence: Record<string, string> = {};
+  for (const [slot, path] of Object.entries((source as any).evidence ?? {})) {
+    if (SLOT_RE.test(slot) && typeof path === "string" && path.startsWith(`device/${record.id}/`) && !path.includes("..")) priorEvidence[slot] = path;
+  }
 
   const row = {
-    ...record.data,
+    ...picked,
     id: record.id,
     submission_uuid: record.id,
     monitor_id: ctx.collectorUserId,
     source: "device",
-    evidence: { ...(record.data.evidence ?? {}), ...evidence },
+    evidence: { ...priorEvidence, ...evidence },
     status: "sent",
     client_submitted_at: submittedAt,
   };

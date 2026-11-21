@@ -141,6 +141,8 @@ function distilLesson(payload: {
   return null;
 }
 
+import { verifyPolicyIds } from "../_shared/aiPolicyAccess.ts";
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -164,14 +166,17 @@ Deno.serve(async (req) => {
     const questionClass = String(route?.questionClass ?? "general").slice(0, 40);
     const tier = ["fast", "balanced", "deep"].includes(String(route?.tier)) ? String(route.tier) : "balanced";
     const routeModel = String(route?.model ?? "").slice(0, 80);
-    const reviewQueueId = typeof body?.reviewQueueId === "string" && /^[0-9a-f-]{36}$/i.test(body.reviewQueueId)
+    const requestedReviewQueueId = typeof body?.reviewQueueId === "string" && /^[0-9a-f-]{36}$/i.test(body.reviewQueueId)
       ? body.reviewQueueId : null;
     const citationCount = Number(body?.citations ?? 0);
     const followupCount = Number(body?.followups ?? 0);
 
-    const policyIds: string[] = Array.isArray(body?.policyIds)
+    const claimedPolicyIds: string[] = Array.isArray(body?.policyIds)
       ? body.policyIds.filter((p: unknown) => typeof p === "string" && /^[0-9a-f-]{36}$/i.test(p)).slice(0, 12)
       : [];
+    // Only reward guidance the server itself signed for this user's answer.
+    const policyIds: string[] = await verifyPolicyIds(guard.userId, claimedPolicyIds, body?.policyToken)
+      ? claimedPolicyIds : [];
 
     const { reward, signals } = shapeReward({
       rating,
@@ -187,6 +192,17 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
       { auth: { persistSession: false } },
     );
+
+    // Resolving review-queue items is an administrator action.
+    let reviewQueueId: string | null = null;
+    if (requestedReviewQueueId) {
+      const [{ data: isAdmin }, { data: isOwner }] = await Promise.all([
+        admin.rpc("is_admin", { _user_id: guard.userId }),
+        admin.rpc("is_owner", { _user_id: guard.userId }),
+      ]);
+      if (!isAdmin && !isOwner) return json({ error: "Only administrators can resolve review items." }, 403);
+      reviewQueueId = requestedReviewQueueId;
+    }
 
     const { error: insertError } = await admin.from("ai_chat_feedback").insert({
       user_id: guard.userId,

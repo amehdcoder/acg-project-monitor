@@ -188,6 +188,8 @@ export interface FeedbackPayload {
   citations: number;
   followups: number;
   policyIds: string[];
+  /** Server signature proving the policy IDs came from the assistant. */
+  policyToken?: string | null;
   regenerated?: boolean;
   route?: RouteInfo;
   /** Set when the feedback comes from the admin review queue. */

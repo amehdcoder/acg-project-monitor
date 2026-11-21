@@ -130,7 +130,8 @@ Deno.serve(async (req) => {
       // Replace prior chunks for the same source so re-indexing is idempotent.
       const sourceIds = [...new Set(rows.map((r) => r.source_id).filter(Boolean))] as string[];
       if (sourceIds.length) {
-        await admin.from("ai_memory_embeddings").delete().in("source_id", sourceIds);
+        // Only replace the caller's own earlier chunks for these sources.
+        await admin.from("ai_memory_embeddings").delete().in("source_id", sourceIds).eq("created_by", userId);
       }
 
       const { error } = await admin.from("ai_memory_embeddings").insert(rows);

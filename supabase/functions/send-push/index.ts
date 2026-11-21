@@ -144,6 +144,25 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Only notify people the sender is genuinely connected to: a shared
+    // project, or an existing conversation the recipient started.
+    const [{ data: senderProjects }, { data: priorReply }] = await Promise.all([
+      admin.from("user_project_assignments").select("project_id").eq("user_id", msg.sender_id),
+      admin.from("proximity_messages").select("id").eq("sender_id", msg.recipient_id).eq("recipient_id", msg.sender_id).limit(1),
+    ]);
+    const projectIds = (senderProjects ?? []).map((r: any) => r.project_id).filter(Boolean);
+    let connected = (priorReply ?? []).length > 0;
+    if (!connected && projectIds.length) {
+      const { data: shared } = await admin
+        .from("user_project_assignments")
+        .select("project_id")
+        .eq("user_id", msg.recipient_id)
+        .in("project_id", projectIds)
+        .limit(1);
+      connected = (shared ?? []).length > 0;
+    }
+    if (!connected) return ok();
+
     const { data: sender } = await admin
       .from("profiles")
       .select("first_name, last_name, email")
@@ -152,7 +171,7 @@ Deno.serve(async (req) => {
 
     await sendToUsers([msg.recipient_id], {
       title: displayName(sender),
-      body: msg.body?.trim() || "New message",
+      body: (msg.body?.trim() || "New message").slice(0, 160),
       tag: `direct-${msg.sender_id}`,
       url: `/?tab=project-chat`,
     });

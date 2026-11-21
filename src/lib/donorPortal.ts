@@ -2,6 +2,7 @@
 // receive row-level beneficiary data — the server-side RPCs group counts and
 // the report tables expose only submitted programme reporting artefacts.
 
+import { neutralizeFormula, csvCell } from "@/lib/security/csvSafe";
 import { supabase } from "@/integrations/supabase/client";
 import { defaultLogframe, type ProjectLogframe } from "./programmeModule/logframe";
 
@@ -238,8 +239,8 @@ export function reportTotal(report: DonorReport): number {
 /** Donor-friendly CSV export of one programme report (Excel-safe, RFC-4180 quoting). */
 export function reportCsv(report: DonorReport): string {
   const esc = (v: string | number | null | undefined) => {
-    const s = v == null ? "" : String(v);
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    const s = neutralizeFormula(v);
+    return /[",\n\r']/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const lines = [
     ["Period", "Year", "Status", "Submitted"].map(esc).join(","),

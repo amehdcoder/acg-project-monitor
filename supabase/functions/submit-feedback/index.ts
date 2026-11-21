@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
   // GET ?project_id=… → public-safe project name for the form header.
   if (req.method === "GET") {
     const pid = new URL(req.url).searchParams.get("project_id") || "";
-    if (!pid) return json({ error: "project_id required" }, 400);
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pid)) return json({ error: "project_id required" }, 400);
     const { data } = await supabase
       .from("projects")
       .select("name")

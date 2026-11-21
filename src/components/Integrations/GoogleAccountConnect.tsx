@@ -46,6 +46,9 @@ export function GoogleAccountConnect() {
   useEffect(() => {
     refresh();
     const onMsg = (ev: MessageEvent) => {
+      let fnOrigin = "";
+      try { fnOrigin = new URL(import.meta.env.VITE_SUPABASE_URL).origin; } catch { /* ignore */ }
+      if (ev.origin !== fnOrigin && ev.origin !== window.location.origin) return;
       if (ev?.data?.type === "google-oauth") refresh();
     };
     window.addEventListener("message", onMsg);

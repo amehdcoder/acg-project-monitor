@@ -87,19 +87,19 @@ export default function AttendanceReports({ sessions, participants, records }: P
         .present{color:#059669}.absent{color:#e11d48}.late{color:#d97706}.excused{color:#0284c7}.not_marked{color:#64748b}
       </style></head><body>
       <h1>Attendance Report</h1>
-      <div class="meta">Date range: ${from} – ${to} · ${rows.length} records · Generated ${new Date().toLocaleString()}</div>
+      <div class="meta">Date range: ${esc(from)} – ${esc(to)} · ${rows.length} records · Generated ${new Date().toLocaleString()}</div>
       <table><thead><tr>
         <th>Activity</th><th>Date</th><th>Location</th><th>PID</th><th>Participant</th><th>Sex</th><th>Organization</th><th>Status</th>
       </tr></thead><tbody>
       ${rows.map(({ r, p, s }) => `<tr>
         <td>${esc(s!.activity_name)}</td>
-        <td>${s!.session_date}</td>
+        <td>${esc(s!.session_date)}</td>
         <td>${esc(s!.location || "")}</td>
-        <td>${p!.participant_code}</td>
+        <td>${esc(p!.participant_code)}</td>
         <td>${esc(p!.full_name)}</td>
         <td>${esc(p!.sex || "")}</td>
         <td>${esc(p!.organization || "")}</td>
-        <td class="${r.status}">${STATUS_META[r.status]?.label || r.status}</td>
+        <td class="${esc(r.status)}">${esc(STATUS_META[r.status]?.label || r.status)}</td>
       </tr>`).join("")}
       </tbody></table>
       <script>window.print()</script>

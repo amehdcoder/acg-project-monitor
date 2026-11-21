@@ -13,6 +13,7 @@ import { format } from "date-fns";
 import iconUrl from "leaflet/dist/images/marker-icon.png";
 import iconRetinaUrl from "leaflet/dist/images/marker-icon-2x.png";
 import shadowUrl from "leaflet/dist/images/marker-shadow.png";
+const escHtml = (v: unknown) => String(v ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch] as string));
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({ iconUrl, iconRetinaUrl, shadowUrl });
 
@@ -197,7 +198,7 @@ const IndoorTrackingView = ({ projectId, formId }: Props) => {
         dashArray: "4,4",
       }).addTo(layer).bindPopup(`
         <div style="min-width:160px">
-          <strong>🏢 ${zone.name}</strong><br/>
+          <strong>🏢 ${escHtml(zone.name)}</strong><br/>
           📊 ${zone.submissions} submissions<br/>
           👥 ${zone.collectors.length} collector${zone.collectors.length !== 1 ? "s" : ""}<br/>
         </div>
@@ -248,9 +249,9 @@ const IndoorTrackingView = ({ projectId, formId }: Props) => {
 
       marker.bindPopup(`
         <div style="min-width:180px">
-          <strong>${p.name}</strong><br/>
-          🏢 Floor ${p.floor}<br/>
-          📋 ${p.formName}<br/>
+          <strong>${escHtml(p.name)}</strong><br/>
+          🏢 Floor ${escHtml(p.floor)}<br/>
+          📋 ${escHtml(p.formName)}<br/>
           🎯 ±${Math.round(p.accuracy)}m accuracy<br/>
           🕐 ${p.timestamp ? format(new Date(p.timestamp), "MMM d, h:mm a") : "N/A"}
         </div>

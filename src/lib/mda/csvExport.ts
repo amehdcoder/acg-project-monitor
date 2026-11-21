@@ -1,3 +1,4 @@
+import { neutralizeFormula, csvCell } from "@/lib/security/csvSafe";
 /**
  * MDA analyses / drill-down CSV export
  * ────────────────────────────────────────────────────────────────────────
@@ -52,8 +53,8 @@ function displayValue(q: CsvQuestion, raw: any): string {
 }
 
 function esc(v: any): string {
-  const s = String(v ?? "");
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  const s = neutralizeFormula(v ?? "");
+  return /[",\n\r']/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
 export function toCsv(headers: string[], rows: (string | number)[][]): string {
@@ -107,3 +108,4 @@ export function slugify(s: string): string {
     .replace(/^-+|-+$/g, "")
     .slice(0, 60) || "export";
 }
+

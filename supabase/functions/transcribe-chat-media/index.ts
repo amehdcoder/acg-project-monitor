@@ -53,11 +53,6 @@ Deno.serve(async (req) => {
       return json({ error: "Message not found." }, 404);
     }
 
-    // Already transcribed → return cached result.
-    if (message.transcription && message.transcription.trim()) {
-      return json({ transcription: message.transcription, cached: true });
-    }
-
     // Membership / admin check.
     const [{ data: membership }, { data: isAdmin }] = await Promise.all([
       admin
@@ -70,6 +65,11 @@ Deno.serve(async (req) => {
     ]);
     if (!membership && !isAdmin) {
       return json({ error: "You don't have access to this chat." }, 403);
+    }
+
+    // Already transcribed → return cached result (only after access is confirmed).
+    if (message.transcription && message.transcription.trim()) {
+      return json({ transcription: message.transcription, cached: true });
     }
 
     if (!message.attachment_url) {

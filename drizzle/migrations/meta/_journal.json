@@ -491,6 +491,13 @@
       "when": 1795240710726,
       "tag": "0069_restrict_definer_function_results",
       "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "7",
+      "when": 1795255615162,
+      "tag": "0070_restrict_server_only_lookup_functions",
+      "breakpoints": true
     }
   ]
 }

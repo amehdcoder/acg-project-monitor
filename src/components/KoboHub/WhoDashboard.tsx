@@ -5,6 +5,7 @@
  * every panel can be retitled, rebound, resized, recoloured, reordered,
  * duplicated or deleted, and new panels added. Layout persists per connection.
  */
+import { neutralizeFormula, csvCell } from "@/lib/security/csvSafe";
 import { useMemo, useState } from "react";
 import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Area, AreaChart,
@@ -255,13 +256,13 @@ export default function WhoDashboard({
   };
 
   const exportCsv = () => {
-    const lines: string[] = [`"${dash.name}"`, ""];
+    const lines: string[] = [csvCell(dash.name), ""];
     for (const w of dash.widgets) {
       if (w.kind === "text") continue;
       const r = computeWidget(rows, schema, w);
-      lines.push(`"${w.title.replace(/"/g, '""')}"`);
+      lines.push(csvCell(w.title));
       lines.push("Category,Value,Percent");
-      r.data.forEach((d) => lines.push(`"${String(d.name).replace(/"/g, '""')}",${d.value},${d.pct.toFixed(2)}`));
+      r.data.forEach((d) => lines.push(`${csvCell(d.name)},${d.value},${d.pct.toFixed(2)}`));
       lines.push("");
     }
     const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });

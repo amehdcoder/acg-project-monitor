@@ -5,6 +5,7 @@
 // Returns only counts — no record data leaves this function.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { guardRequest } from "../_shared/authGuard.ts";
 import { encodeRow, featureSpace, Normaliser, type ColumnDef, type Encoded } from "../_shared/brain/features.ts";
 import { AdamW, ColumnTransformer, DenoisingAutoencoder, deserialize, randn, restore, serialize, snapshot } from "../_shared/brain/models.ts";
 
@@ -92,6 +93,12 @@ function trainBrain(ck: any, rows: Record<string, any>[]) {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  // Only the scheduler (worker secret) or other server functions may train.
+  const guard = await guardRequest(req, corsHeaders, { requireAdmin: true });
+  if (guard.response) return guard.response;
+  if (!guard.viaService) {
+    return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const { data: claimed, error } = await admin.rpc("claim_brain_for_training", { _min_steps: MIN_STEPS, _limit: MAX_BRAINS });
   if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });

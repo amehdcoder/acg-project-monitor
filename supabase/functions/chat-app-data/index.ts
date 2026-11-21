@@ -12,6 +12,7 @@
  */
 
 import { guardRequest } from "../_shared/authGuard.ts";
+import { hasAiPolicyAccess, signPolicyIds } from "../_shared/aiPolicyAccess.ts";
 import { retrieveWebKnowledge, shouldSearchWeb } from "../_shared/webKnowledge.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -173,12 +174,14 @@ function overlap(a: Set<string>, b: Set<string>) {
   return hits / Math.max(1, Math.min(a.size, b.size));
 }
 
-async function retrievePolicy(question: string) {
+async function retrievePolicy(question: string, userId: string | null) {
   const url = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !serviceKey) return { rules: [] as PolicyRow[], exemplars: [] as PolicyRow[], ids: [] as string[] };
 
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
+  // Learned guidance is private to the Owner and people granted the AI workspace.
+  if (!userId || !(await hasAiPolicyAccess(admin, userId))) return { rules: [], exemplars: [], ids: [] };
   const { data, error } = await admin
     .from("ai_chat_policy")
     .select("id,kind,topic,content,question,answer,avg_reward,trials")
@@ -239,7 +242,7 @@ Deno.serve(async (req) => {
 
     const [ctx, policy, webSources] = await Promise.all([
       buildContext(token),
-      retrievePolicy(lastQuestion),
+      retrievePolicy(lastQuestion, guard.userId ?? null),
       wantWeb ? retrieveWebKnowledge(lastQuestion).catch(() => []) : Promise.resolve([]),
     ]);
 
@@ -281,6 +284,7 @@ Deno.serve(async (req) => {
       rules: policy.rules.map((r) => ({ topic: r.topic, content: r.content, avgReward: Number(r.avg_reward) })),
       exemplars: policy.exemplars.map((e) => ({ question: e.question, answer: e.answer })),
       policyIds: policy.ids,
+      policyToken: guard.userId && policy.ids.length ? await signPolicyIds(guard.userId, policy.ids) : null,
       modelStats: modelStats ?? null,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {

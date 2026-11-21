@@ -11,9 +11,23 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+const ALLOWED_RETURN_HOSTS = new Set(["handscollect.lovable.app", "www.amehnities.org", "amehnities.org", "localhost"]);
+function safeReturnUrl(raw: string): string {
+  try {
+    const u = new URL(raw);
+    const hostOk = ALLOWED_RETURN_HOSTS.has(u.hostname) || /^[a-z0-9-]+\.lovable\.app$/i.test(u.hostname) || /^[a-z0-9-]+\.lovableproject\.com$/i.test(u.hostname);
+    const protoOk = u.protocol === "https:" || (u.protocol === "http:" && u.hostname === "localhost");
+    return hostOk && protoOk ? u.toString() : "";
+  } catch {
+    return "";
+  }
+}
+
 function htmlPage(status: "ok" | "error", message: string, returnTo: string) {
-  const safeMsg = message.replace(/</g, "&lt;");
-  const safeReturn = returnTo.replace(/"/g, "&quot;");
+  const safeMsg = message.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
+  const target = safeReturnUrl(returnTo);
+  // JSON-encode then HTML-escape for safe use inside an attribute's JS string.
+  const safeReturn = JSON.stringify(target).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
   return `<!doctype html><html><head><meta charset="utf-8"><title>Google connection</title>
   <style>
     body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#0b1220;color:#e5e7eb}
@@ -24,7 +38,7 @@ function htmlPage(status: "ok" | "error", message: string, returnTo: string) {
   <div class="card">
     <h2 class="${status === "ok" ? "ok" : "err"}">${status === "ok" ? "Google account connected" : "Connection failed"}</h2>
     <p>${safeMsg}</p>
-    <button onclick="window.opener && window.opener.postMessage({type:'google-oauth',status:'${status}'},'*'); window.close(); if(${safeReturn ? "true" : "false"}) location.href='${safeReturn}';">Done</button>
+    <button onclick="window.opener && window.opener.postMessage({type:'google-oauth',status:'${status}'},'*'); window.close(); if(${target ? "true" : "false"}) location.href=${safeReturn};">Done</button>
   </div>
   <script>
     try { window.opener && window.opener.postMessage({type:'google-oauth',status:'${status}'},'*'); } catch(e){}

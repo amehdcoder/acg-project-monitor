@@ -84,11 +84,40 @@ async function authHeaders(db: ReturnType<typeof admin>, conn: Connection) {
 const joinUrl = (base: string, path: string) =>
   `${base.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
 
+function isPrivateHost(host: string): boolean {
+  const h = host.toLowerCase().replace(/^\[|\]$/g, "");
+  if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".internal") || h.endsWith(".local")) return true;
+  if (h.startsWith("::ffff:") || h === "::1" || h === "::" || h.startsWith("fe80:") || h.startsWith("fc") || h.startsWith("fd")) return true;
+  const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (m) {
+    const a = Number(m[1]), b = Number(m[2]);
+    if (a === 10 || a === 127 || a === 0 || a >= 224) return true;
+    if (a === 169 && b === 254) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 100 && b >= 64 && b <= 127) return true;
+  }
+  return false;
+}
+
+/** Only public HTTPS servers may be contacted; internal addresses are refused. */
+async function assertPublicHttps(raw: string) {
+  const u = new URL(raw);
+  if (u.protocol !== "https:") throw new Error("Server address must use https");
+  if (isPrivateHost(u.hostname)) throw new Error("Server address points to a private network");
+  const [v4, v6] = await Promise.all([
+    Deno.resolveDns(u.hostname, "A").catch(() => [] as string[]),
+    Deno.resolveDns(u.hostname, "AAAA").catch(() => [] as string[]),
+  ]);
+  if ([...v4, ...v6].some(isPrivateHost)) throw new Error("Server address resolves to a private network");
+}
+
 async function remoteFetch(url: string, init: RequestInit, timeoutMs = 25000) {
+  await assertPublicHttps(url);
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { ...init, signal: ctrl.signal });
+    const res = await fetch(url, { ...init, redirect: "error", signal: ctrl.signal });
     const text = await res.text();
     let body: unknown = text;
     try { body = JSON.parse(text); } catch { /* keep text */ }

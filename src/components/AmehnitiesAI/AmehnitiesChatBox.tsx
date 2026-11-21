@@ -46,6 +46,7 @@ interface ChatMessage {
   followups?: string[];
   /** Learned-policy entries that shaped this answer — used for reward credit. */
   policyIds?: string[];
+  policyToken?: string | null;
   policyApplied?: PolicyApplied[];
   /** The question this answer responded to (needed by the learning loop). */
   question?: string;
@@ -178,6 +179,7 @@ export default function AmehnitiesChatBox({
 
     let catalog: Citation[] = [];
     let policyIds: string[] = [];
+    let policyToken: string | null = null;
     const policyApplied: PolicyApplied[] = [];
     let route: RouteInfo | undefined;
     try {
@@ -199,6 +201,7 @@ export default function AmehnitiesChatBox({
 
       catalog = (evidence.citations ?? []) as Citation[];
       policyIds = (evidence.policyIds ?? []) as string[];
+      policyToken = typeof evidence.policyToken === "string" ? evidence.policyToken : null;
 
       // Recall what training has written into long-term memory, so answers use
       // the trained model's own knowledge alongside the live evidence.
@@ -240,7 +243,7 @@ export default function AmehnitiesChatBox({
 
       const cites = usedCitations(body, catalog);
       setMessages((m) => m.map((x) => (x.id === replyId
-        ? { ...x, content: body, citations: cites, followups: composed.followups, policyIds, policyApplied, question, route }
+        ? { ...x, content: body, citations: cites, followups: composed.followups, policyIds, policyToken, policyApplied, question, route }
         : x)));
 
       if (convIdRef.current) {
@@ -299,6 +302,7 @@ export default function AmehnitiesChatBox({
         citations: msg.citations?.length ?? 0,
         followups: msg.followups?.length ?? 0,
         policyIds: msg.policyIds ?? [],
+        policyToken: msg.policyToken ?? null,
         route: msg.route,
       });
       setMessages((m) => m.map((x) => (x.id === msg.id ? { ...x, rated: rating } : x)));

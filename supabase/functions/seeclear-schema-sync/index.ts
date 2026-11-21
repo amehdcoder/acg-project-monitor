@@ -153,6 +153,7 @@ Deno.serve(async (req) => {
 
     /* ------------------------------------------------------------ status --- */
     if (action === "status") {
+      if (!internal && !isAdmin) return j({ error: "Forbidden" }, 403);
       const { data } = await admin
         .from("seeclear_kobo_schema")
         .select("*")

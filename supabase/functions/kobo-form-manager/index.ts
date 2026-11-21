@@ -295,7 +295,7 @@ Deno.serve(async (req) => {
           .eq("quiz_id", p.quiz_id)
           .maybeSingle();
         if (data) {
-          server_url = server_url || (data.server_url as string);
+          server_url = (data.server_url as string); // stored tokens only go to their stored server
           form_uid = form_uid || (data.form_uid as string);
           api_token = (data.api_token as string) || undefined;
         }
@@ -306,7 +306,7 @@ Deno.serve(async (req) => {
           .eq("id", p.config_id)
           .maybeSingle();
         if (data) {
-          server_url = server_url || (data.kobo_server_url as string);
+          server_url = (data.kobo_server_url as string); // stored tokens only go to their stored server
           form_uid = form_uid || (data.form_uid as string);
           api_token = (data.api_token as string) || undefined;
         }
@@ -317,7 +317,7 @@ Deno.serve(async (req) => {
           .eq("id", p.feed_id)
           .maybeSingle();
         if (data) {
-          server_url = server_url || (data.server_url as string);
+          server_url = (data.server_url as string); // stored tokens only go to their stored server
           form_uid = form_uid || (data.form_uid as string);
           api_token = (data.api_token as string) || undefined;
         }

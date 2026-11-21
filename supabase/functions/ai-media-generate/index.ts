@@ -14,6 +14,15 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
+// Video job IDs are signed when the server creates them so a user-edited
+// metadata.job_id can never steer gateway polling to another job.
+async function signJob(rowOwner: string, jobId: string): Promise<string> {
+  const secret = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(`ai-media-job:${secret}`), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${rowOwner}|${jobId}`));
+  return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -70,8 +79,12 @@ Deno.serve(async (req) => {
       if (!row) return json({ error: "Not found" }, 404);
       if (row.status !== "queued") return json({ status: row.status, media: row });
 
-      const jobId = (row.metadata as Record<string, unknown> | null)?.job_id as string | undefined;
+      const meta = (row.metadata as Record<string, unknown> | null) ?? {};
+      const jobId = typeof meta.job_id === "string" ? meta.job_id : undefined;
       if (!jobId) return json({ status: row.status, media: row });
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(jobId) || meta.job_sig !== await signJob(userId, jobId)) {
+        return json({ error: "This video job could not be verified." }, 400);
+      }
 
       const poll = await fetch(`${GATEWAY}/videos/${jobId}`, {
         headers: { "Lovable-API-Key": apiKey, "X-Lovable-AIG-SDK": "fetch" },
@@ -121,10 +134,11 @@ Deno.serve(async (req) => {
         return json({ error: e.message || "Video generation failed", status: e.status }, e.status);
       }
       const job = await res.json();
+      const newJobId = typeof job?.id === "string" ? job.id : null;
       const { data: row } = await admin.from("ai_generated_media").insert({
         kind: "video", prompt, model, status: "queued", created_by: userId,
         conversation_id: conversationId,
-        metadata: { job_id: job?.id ?? null, progress: job?.progress ?? 0, quality },
+        metadata: { job_id: newJobId, job_sig: newJobId ? await signJob(userId, newJobId) : null, progress: job?.progress ?? 0, quality },
       }).select("*").single();
       return json({ status: "queued", media: row, message: "Video job started. It usually takes 1–3 minutes." });
     }

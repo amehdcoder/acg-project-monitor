@@ -5,6 +5,7 @@
  * - Auto column widths from max content length.
  * - All values are resolved to human labels via KoboLabelResolver.
  */
+import { neutralizeFormula, csvCell } from "@/lib/security/csvSafe";
 import ExcelJS from "exceljs";
 import type { KoboLabelResolver } from "./koboLabelResolver";
 
@@ -96,7 +97,7 @@ export function exportCsv(
   resolver: KoboLabelResolver | null,
   filename = `Kobo_Data_Export_${new Date().toISOString().slice(0, 10)}.csv`,
 ) {
-  const esc = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
+  const esc = (raw: string) => { const s = neutralizeFormula(raw); return /[",\n\r']/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
   const lines = [columns.map((c) => esc(c.label)).join(",")];
   for (const r of rows) {
     lines.push(columns.map((c) => esc(resolveCell(r, c.key, resolver))).join(","));

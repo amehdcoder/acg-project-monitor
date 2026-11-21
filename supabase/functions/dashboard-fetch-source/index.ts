@@ -74,6 +74,7 @@ function isPrivateHostname(host: string): boolean {
     return true
   }
   // IPv6 loopback / link-local / unique-local
+  if (h.startsWith('::ffff:')) return true // IPv4-mapped IPv6
   if (h === '::1' || h === '::' || h.startsWith('fe80:') || h.startsWith('fc') || h.startsWith('fd')) {
     return true
   }
@@ -178,7 +179,7 @@ Deno.serve(async (req) => {
       }))
     } else if (kind === 'rest_api') {
       const url = String(config.url ?? '')
-      if (!/^https?:\/\//.test(url)) throw new Error('Invalid API URL')
+      if (!/^https:\/\//.test(url)) throw new Error('Only HTTPS API URLs are allowed')
       const safeUrl = await assertSafeUrl(url)
       const method = (String(config.method ?? 'GET').toUpperCase())
       // Only allow safe read methods and a minimal, controlled set of headers.
@@ -191,7 +192,7 @@ Deno.serve(async (req) => {
       for (const [k, v] of Object.entries(rawHeaders)) {
         if (ALLOWED_HEADERS.has(k.toLowerCase())) headers[k] = String(v)
       }
-      const resp = await fetch(safeUrl.toString(), { method, headers, redirect: 'error' })
+      const resp = await fetch(safeUrl.toString(), { method, headers, redirect: 'error', signal: AbortSignal.timeout(15000) })
       if (!resp.ok) throw new Error(`API request failed (${resp.status})`)
       const json = await resp.json()
       let arr = getByPath(json, config.jsonPath as string | undefined)

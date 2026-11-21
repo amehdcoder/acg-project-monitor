@@ -1,3 +1,4 @@
+import { neutralizeFormula, csvCell } from "@/lib/security/csvSafe";
 import { useEffect, useMemo, useState } from "react";
 import { Download, Loader2, Search, X } from "lucide-react";
 import {
@@ -141,8 +142,8 @@ const extractLocationFromSub = (s: any, profilesMap: Map<string, any>, formQuest
 
 const csvEscape = (val: any): string => {
   if (val === null || val === undefined) return "";
-  const s = typeof val === "string" ? val : JSON.stringify(val);
-  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  const s = neutralizeFormula(typeof val === "string" ? val : JSON.stringify(val));
+  if (/[",\n\r']/.test(s)) return `"${s.replace(/"/g, '""')}"`;
   return s;
 };
 

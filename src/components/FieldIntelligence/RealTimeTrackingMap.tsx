@@ -11,6 +11,7 @@ import { format } from "date-fns";
 import iconUrl from "leaflet/dist/images/marker-icon.png";
 import iconRetinaUrl from "leaflet/dist/images/marker-icon-2x.png";
 import shadowUrl from "leaflet/dist/images/marker-shadow.png";
+const escHtml = (v: unknown) => String(v ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch] as string));
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({ iconUrl, iconRetinaUrl, shadowUrl });
 
@@ -173,8 +174,8 @@ const RealTimeTrackingMap = ({ projectId, formId: _formId, realtimeKey }: Props)
 
       marker.bindPopup(`
         <div style="min-width:180px">
-          <strong>${c.name}</strong><br/>
-          <span style="color:${color}">●</span> ${c.status.charAt(0).toUpperCase() + c.status.slice(1)}<br/>
+          <strong>${escHtml(c.name)}</strong><br/>
+          <span style="color:${color}">●</span> ${escHtml(c.status.charAt(0).toUpperCase() + c.status.slice(1))}<br/>
           📊 ${c.submissionCount} submissions today<br/>
           📍 ${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}<br/>
           ${c.accuracy ? `🎯 ±${Math.round(c.accuracy)}m accuracy<br/>` : ""}

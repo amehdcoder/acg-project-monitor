@@ -102,7 +102,7 @@ Deno.serve(async (req) => {
         );
         sent++;
       } catch (e) {
-        console.error("send failed for", to, e);
+        console.error("night-submission-alert: send failed", (e as Error)?.message ?? "unknown error");
       }
     }
 

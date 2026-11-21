@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
 
     const { data: form } = await admin
       .from("forms")
-      .select("id,name,questions")
+      .select("id,name,questions,settings,project_id")
       .eq("id", body.formId)
       .maybeSingle();
     if (!form) {
@@ -88,6 +88,54 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    const fail = (status: number, error: string) =>
+      new Response(JSON.stringify({ error }), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    // ---- Destination approval --------------------------------------------
+    // The spreadsheet is pinned on the form the first time it is set; only an
+    // administrator can change a pinned spreadsheet afterwards.
+    const settings = ((form as { settings?: Record<string, unknown> }).settings ?? {}) as Record<string, unknown>;
+    const pinned = (settings.export_destination ?? {}) as { spreadsheet_id?: string };
+    const requestedSheet = body.spreadsheetId ? String(body.spreadsheetId).trim() : "";
+    if (requestedSheet && !/^[A-Za-z0-9_-]{20,128}$/.test(requestedSheet)) return fail(400, "Invalid spreadsheet ID");
+    if (requestedSheet && pinned.spreadsheet_id && pinned.spreadsheet_id !== requestedSheet) {
+      const [{ data: isAdmin }, { data: isOwner }] = await Promise.all([
+        admin.rpc("is_admin", { _user_id: userData.user.id }),
+        admin.rpc("is_owner", { _user_id: userData.user.id }),
+      ]);
+      if (!isAdmin && !isOwner) return fail(403, "This form already exports to an approved spreadsheet. Ask an administrator to change it.");
+    }
+    if (requestedSheet && pinned.spreadsheet_id !== requestedSheet) {
+      await admin.from("forms").update({
+        settings: { ...settings, export_destination: { ...pinned, spreadsheet_id: requestedSheet, set_by: userData.user.id, set_at: new Date().toISOString() } },
+      }).eq("id", form.id);
+    }
+    body.spreadsheetId = requestedSheet || null;
+
+    // Notification emails may only go to the caller or a member of the form's project.
+    if (body.notifyEmail) {
+      const email = String(body.notifyEmail).trim().toLowerCase();
+      if (!/^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(email) || email.length > 254) return fail(400, "Invalid email address");
+      let allowed = (userData.user.email ?? "").toLowerCase() === email;
+      if (!allowed && (form as { project_id?: string }).project_id) {
+        const { data: prof } = await admin.from("profiles").select("user_id").ilike("email", email).maybeSingle();
+        if (prof?.user_id) {
+          const { data: member } = await admin.from("user_project_assignments").select("user_id")
+            .eq("user_id", prof.user_id).eq("project_id", (form as { project_id: string }).project_id).maybeSingle();
+          allowed = Boolean(member);
+        }
+      }
+      if (!allowed) return fail(403, "Notifications can only be sent to you or members of this form's project.");
+      body.notifyEmail = email;
+    }
+    // Only Looker Studio links, and the form's own name, go into the message.
+    if (body.lookerStudioUrl) {
+      try {
+        const u = new URL(String(body.lookerStudioUrl));
+        body.lookerStudioUrl = u.protocol === "https:" && /(^|\.)lookerstudio\.google\.com$|(^|\.)datastudio\.google\.com$/.test(u.hostname) ? u.toString() : null;
+      } catch { body.lookerStudioUrl = null; }
+    }
+    body.formName = form.name;
 
     const { data: subs } = await admin
       .from("form_submissions")

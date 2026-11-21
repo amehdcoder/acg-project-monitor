@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
   if (guard.response) return guard.response;
 
   try {
-    const { requestId, decision, note } = await req.json();
+    const { requestId, decision } = await req.json();
     if (!requestId || (decision !== "approved" && decision !== "rejected")) {
       return new Response(JSON.stringify({ error: "requestId and valid decision are required" }), {
         status: 400,
@@ -38,6 +38,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (reqErr) throw reqErr;
     if (!reqRow) throw new Error("Request not found");
+    if (!reqRow.reviewed_at) throw new Error("Request has not been reviewed yet");
 
     const { data: prof } = await admin
       .from("profiles")
@@ -53,10 +54,15 @@ Deno.serve(async (req) => {
       });
     }
 
-    const name = (prof?.first_name ?? reqRow.requested_by_name ?? "").split(" ")[0]?.trim() || "there";
-    const formName = reqRow.form_label || reqRow.target_table || "your submission";
+    const rawName = (prof?.first_name ?? reqRow.requested_by_name ?? "").split(" ")[0]?.trim() || "there";
+    const rawFormName = reqRow.form_label || reqRow.target_table || "your submission";
     const approved = decision === "approved";
-    const reviewerNote = (note ?? reqRow.review_note ?? "").trim();
+    const name = safeName(rawName);
+    const formName = safeName(rawFormName);
+    // Use only the note saved with the review, escaped and bounded.
+    const reviewerNote = String(reqRow.review_note ?? "").trim().slice(0, 500)
+      .replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
+    const safeName = (v: string) => v.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
 
     const html = approved
       ? renderBrandEmail({

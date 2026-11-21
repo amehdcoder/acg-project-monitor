@@ -135,16 +135,20 @@ Deno.serve(async (req) => {
         const emailOptIn = prefs?.email !== false; // default on
         if (!profile?.email || !emailOptIn) continue;
 
-        const firstName = profile.first_name?.trim() || "there";
+        const escH = (v: unknown) => String(v ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch] as string));
+        const firstName = escH(profile.first_name?.trim() || "there");
+        const caseName = escH(c.name);
+        const typeLabel = escH(caseType?.label || "Case");
+        const safeMessage = escH(message);
         const html = renderBrandEmail({
           heading: isOverdue
-            ? `Reminder: "${c.name}" follow-up is overdue`
-            : `Follow-up due today: "${c.name}"`,
+            ? `Reminder: "${caseName}" follow-up is overdue`
+            : `Follow-up due today: "${caseName}"`,
           intro: `Hello ${firstName}, this is a friendly reminder from the Amehnities case-management system.`,
           body: `
-            <p>${message}</p>
-            <p><b>Case:</b> ${c.name}<br/>
-               <b>Type:</b> ${caseType?.label || "Case"}<br/>
+            <p>${safeMessage}</p>
+            <p><b>Case:</b> ${caseName}<br/>
+               <b>Type:</b> ${typeLabel}<br/>
                <b>Scheduled date:</b> ${new Date(c.next_follow_up_date!).toLocaleDateString()}</p>
             <p>Please open Amehnities and complete the follow-up form linked to this case as soon as possible. Timely follow-ups protect the people who depend on our work.</p>
           `,

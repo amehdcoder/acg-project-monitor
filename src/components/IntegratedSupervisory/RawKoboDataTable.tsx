@@ -1,3 +1,4 @@
+import { neutralizeFormula, csvCell } from "@/lib/security/csvSafe";
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -50,8 +51,8 @@ const hasPhotos = (r: any) => Array.isArray(r?._attachments) && r._attachments.s
 
 function toCSV(rows: Record<string, unknown>[], headers: string[]): string {
   const esc = (v: unknown) => {
-    const s = v == null ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    const s = neutralizeFormula(v == null ? "" : typeof v === "object" ? JSON.stringify(v) : String(v));
+    return /[",\n\r']/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   return [headers.join(","), ...rows.map((r) => headers.map((h) => esc(r[h])).join(","))].join("\n");
 }

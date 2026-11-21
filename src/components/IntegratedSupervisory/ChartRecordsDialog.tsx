@@ -6,6 +6,7 @@
  * submissions that produced that segment, rendered as a colourful, readable
  * table with a CSV export.
  */
+import { neutralizeFormula, csvCell } from "@/lib/security/csvSafe";
 import { useMemo } from "react";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
@@ -68,7 +69,7 @@ export default function ChartRecordsDialog({
 
   const download = () => {
     const heads = [...columns.map((c) => c.label), ...(hasDate ? ["Date"] : [])];
-    const esc = (v: string) => `"${String(v).replace(/"/g, '""')}"`;
+    const esc = (v: string) => csvCell(v);
     const csv = [
       heads.map(esc).join(","),
       ...rows.map((r) =>
