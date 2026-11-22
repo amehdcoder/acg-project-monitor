@@ -518,6 +518,17 @@ Deno.serve(async (req) => {
     }).safeParse(payload);
     if (!input.success) return json({ error: input.error.issues[0]?.message ?? "Invalid sign-in details" }, 400);
     const { project_id, scope } = input.data;
+    // New server addresses may only be chosen by the Owner or a Co-owner;
+    // other administrators may sign in again to an already-saved server.
+    if (guard.userId) {
+      const { data: privileged } = await db.rpc("is_owner_or_co_owner", { _user_id: guard.userId });
+      if (!privileged) {
+        const wanted = input.data.base_url.replace(/\/+$/, "").toLowerCase();
+        const { data: saved } = await db.from("health_exchange_connections").select("base_url").eq("project_id", project_id);
+        const known = (saved ?? []).some((r: { base_url: string | null }) => (r.base_url ?? "").replace(/\/+$/, "").toLowerCase() === wanted);
+        if (!known) return json({ error: "Only the Owner or a Co-owner can add a new DHIS2 server address." }, 403);
+      }
+    }
     const token = input.data.token ?? "";
     const username = input.data.username ?? "";
     const password = input.data.password ?? "";

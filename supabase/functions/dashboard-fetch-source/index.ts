@@ -178,6 +178,13 @@ Deno.serve(async (req) => {
         type: inferType(rows[0]?.[h || `col_${i}`]),
       }))
     } else if (kind === 'rest_api') {
+      // Custom web addresses can only be used by the Owner or a Co-owner.
+      const { data: privileged } = await authed.rpc('is_owner_or_co_owner', { _user_id: userData.user.id })
+      if (!privileged) {
+        return new Response(JSON.stringify({ error: 'Only the Owner or a Co-owner can connect a custom API source.' }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
       const url = String(config.url ?? '')
       if (!/^https:\/\//.test(url)) throw new Error('Only HTTPS API URLs are allowed')
       const safeUrl = await assertSafeUrl(url)
