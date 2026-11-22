@@ -512,6 +512,13 @@
       "when": 1795336973995,
       "tag": "0072_scope_quiz_questions_to_project",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1795337655766,
+      "tag": "0073_lock_dhis2_server_address",
+      "breakpoints": true
     }
   ]
 }
