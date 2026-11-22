@@ -52,7 +52,7 @@ const inScope = (allowed: string[], value: unknown) => {
   const list = (allowed || []).map(norm).filter(Boolean);
   if (!list.length) return true;
   const v = norm(value);
-  if (!v) return true; // sparse field: parent level already enforced
+  if (!v) return false; // restricted scope: rows without a location are excluded
   return list.includes(v);
 };
 
@@ -66,7 +66,8 @@ function toCsv(rows: Record<string, unknown>[]): string {
   if (!rows.length) return "";
   const cols = Array.from(new Set(rows.flatMap((r) => Object.keys(r))));
   const esc = (v: unknown) => {
-    const s = v == null ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
+    let s = v == null ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
+    if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   return [cols.join(","), ...rows.map((r) => cols.map((c) => esc(r[c])).join(","))].join("\n");

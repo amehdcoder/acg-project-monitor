@@ -98,12 +98,12 @@ Deno.serve(async (req) => {
     const pinned = (settings.export_destination ?? {}) as { spreadsheet_id?: string };
     const requestedSheet = body.spreadsheetId ? String(body.spreadsheetId).trim() : "";
     if (requestedSheet && !/^[A-Za-z0-9_-]{20,128}$/.test(requestedSheet)) return fail(400, "Invalid spreadsheet ID");
-    if (requestedSheet && pinned.spreadsheet_id && pinned.spreadsheet_id !== requestedSheet) {
+    if (requestedSheet && pinned.spreadsheet_id !== requestedSheet) {
       const [{ data: isAdmin }, { data: isOwner }] = await Promise.all([
         admin.rpc("is_admin", { _user_id: userData.user.id }),
         admin.rpc("is_owner", { _user_id: userData.user.id }),
       ]);
-      if (!isAdmin && !isOwner) return fail(403, "This form already exports to an approved spreadsheet. Ask an administrator to change it.");
+      if (!isAdmin && !isOwner) return fail(403, "Only an administrator can choose or change this form's export spreadsheet.");
     }
     if (requestedSheet && pinned.spreadsheet_id !== requestedSheet) {
       await admin.from("forms").update({

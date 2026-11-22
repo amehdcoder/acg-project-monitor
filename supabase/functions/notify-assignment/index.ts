@@ -129,6 +129,22 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (!guard.viaService) {
+      const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      const { data: recipient } = await admin.from("profiles").select("user_id")
+        .ilike("email", String(email).trim()).maybeSingle();
+      if (!recipient?.user_id) {
+        return new Response(JSON.stringify({ error: "Recipient is not a platform user" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const { data: rows } = kind === "project"
+        ? await admin.from("user_project_assignments").select("projects(name)").eq("user_id", recipient.user_id)
+        : await admin.from("user_form_assignments").select("forms(name)").eq("user_id", recipient.user_id);
+      const assigned = new Set((rows ?? []).map((r: any) => String((r.projects ?? r.forms)?.name ?? "")));
+      if (!items.every((i: unknown) => typeof i === "string" && assigned.has(i))) {
+        return new Response(JSON.stringify({ error: "Items must match the recipient's assignments" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    }
+
     const { subject, html } = renderEmail({ firstName, kind, items });
 
     const supabase = createClient(

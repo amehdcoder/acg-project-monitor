@@ -106,7 +106,7 @@ export default function SupervisionGapMap({ points, height = 360, className }: S
       m.bindPopup(
         `<div style="font-family:inherit;min-width:160px;padding:2px;">
            <div style="font-weight:900;font-size:13px;color:#0f172a;">${escapeHtmlText(p.name)}</div>
-           ${p.sub ? `<div style="font-size:10px;color:#64748b;margin-bottom:4px;">${p.sub}</div>` : ""}
+           ${p.sub ? `<div style="font-size:10px;color:#64748b;margin-bottom:4px;">${escapeHtmlText(p.sub)}</div>` : ""}
            <div style="font-size:11px;font-weight:800;color:${escapeHtmlText(color)};">${escapeHtmlText(p.visited ? "Visited during supervision" : "Not visited during supervision")}</div>
          </div>`,
       );

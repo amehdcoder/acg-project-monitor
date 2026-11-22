@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
       .select("is_owner")
       .eq("user_id", caller.id)
       .maybeSingle();
-    const isOwner = callerProfile?.is_owner === true || caller.email === OWNER_EMAIL;
+    const isOwner = callerProfile?.is_owner === true;
     if (!isOwner) {
       return new Response(JSON.stringify({ error: "Only the Owner can permanently delete accounts" }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },

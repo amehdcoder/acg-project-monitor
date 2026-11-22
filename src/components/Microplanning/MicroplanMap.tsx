@@ -7,6 +7,11 @@ import { attachSettlementDetails } from '@/lib/microplanning/settlementMapDetail
 import { attachAreaInspection } from "@/lib/microplanning/areaMapInteraction";
 import { useMicroplanMapBoundaries } from "@/hooks/useMicroplanMapBoundaries";
 import L from "leaflet";
+
+// Stored record text is user-controlled: every string field is HTML-escaped
+// before being interpolated into popup or label markup.
+const escapedEntry = <T extends object>(e: T): T =>
+  new Proxy(e, { get: (t, k) => { const v = (t as any)[k]; return typeof v === "string" ? escapeHtmlText(v) : v; } });
 import 'leaflet.markercluster';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import { renderBatches } from "@/lib/microplanning/renderBatches";
@@ -738,7 +743,7 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
             L.marker([cLat, cLng], {
               icon: L.divIcon({
                 className: "comm-lbl",
-                html: `<div style="font-size:9px;font-weight:600;color:#1E293B;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 5px #fff;white-space:nowrap;max-width:100px;overflow:hidden;text-overflow:ellipsis;text-align:center">${entry.community_name}${popLabel ? ` <span style='color:#1E293B;font-weight:400'>(${popLabel})</span>` : ""}</div>`,
+                html: `<div style="font-size:9px;font-weight:600;color:#1E293B;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 5px #fff;white-space:nowrap;max-width:100px;overflow:hidden;text-overflow:ellipsis;text-align:center">${escapeHtmlText(entry.community_name)}${popLabel ? ` <span style='color:#1E293B;font-weight:400'>(${popLabel})</span>` : ""}</div>`,
                 iconSize: [100, 14], iconAnchor: [50, -radius - 4],
               }), interactive: false,
             }).addTo(group);
@@ -837,7 +842,7 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
                   padding:2px 8px;border-radius:10px;white-space:nowrap;
                   box-shadow:0 2px 6px rgba(0,0,0,0.3);text-align:center;
                   max-width:140px;overflow:hidden;text-overflow:ellipsis;
-                ">${entry.flhf_name}<span style="font-weight:400;opacity:0.85;margin-left:4px">(${commCount}c / ${totalPop.toLocaleString()}p)</span></div>`,
+                ">${escapeHtmlText(entry.flhf_name)}<span style="font-weight:400;opacity:0.85;margin-left:4px">(${commCount}c / ${totalPop.toLocaleString()}p)</span></div>`,
                 iconSize: [140, 18], iconAnchor: [70, -20],
               }), interactive: false,
             }).addTo(group);
@@ -863,7 +868,8 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
   }, [cascadedEntries, activeTheme, showBufferZones, showDistanceLines, showLabels, flhfAggregates, wardAggregates, maxPop, viewportRevision]);
 
   // ─── Popup builders ───
-  const buildPopup = (e: MicroplanEntry, type: "community" | "settlement" = "community") => {
+  const buildPopup = (rawEntry: MicroplanEntry, type: "community" | "settlement" = "community") => {
+    const e = escapedEntry(rawEntry);
     const name = type === "community" ? e.community_name : (e.settlement_name || "Settlement");
     const dist = type === "community" ? e.community_distance_to_flhf_km : e.settlement_distance_to_flhf_km;
     const typeBadge = type === "community"
@@ -891,7 +897,8 @@ const MicroplanMap = ({ entries, onEntryClick, projectName }: MicroplanMapProps)
       </div></div>`;
   };
 
-  const buildFlhfPopup = (e: MicroplanEntry, agg: any) => {
+  const buildFlhfPopup = (rawFlhfEntry: MicroplanEntry, rawAgg: any) => {
+    const e = escapedEntry(rawFlhfEntry); const agg = rawAgg ? escapedEntry(rawAgg) : rawAgg;
     return `<div style="min-width:260px;font-family:system-ui">
       <span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:9px;font-weight:700;background:#DC262620;color:hsl(var(--chart-primary));margin-bottom:4px">🏥 HEALTH FACILITY</span>
       <div style="font-size:16px;font-weight:800;margin-bottom:2px">${e.flhf_name}</div>

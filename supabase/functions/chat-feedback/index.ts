@@ -313,7 +313,11 @@ Deno.serve(async (req) => {
 
     // A strongly-rewarded answer becomes a retrievable exemplar of good style.
     if (rating > 0 && reward >= 1 && question.length > 8 && answer.length > 120) {
-      await admin.from("ai_chat_policy").insert({
+      const [{ data: exAdmin }, { data: exOwner }] = await Promise.all([
+        admin.rpc("is_admin", { _user_id: guard.userId }),
+        admin.rpc("is_owner", { _user_id: guard.userId }),
+      ]);
+      if (exAdmin || exOwner) await admin.from("ai_chat_policy").insert({
         kind: "exemplar",
         topic: question.split(/\s+/).slice(0, 4).join(" ").toLowerCase().slice(0, 60),
         content: "High-rated answer pattern",

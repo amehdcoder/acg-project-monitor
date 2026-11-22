@@ -127,6 +127,12 @@ Deno.serve(async (req) => {
           continue;
         }
 
+        const { data: allowedForms } = await admin.rpc("accessible_form_ids", { _user_id: user.id });
+        if (!Array.isArray(allowedForms) || !allowedForms.includes(fullFormId)) {
+          results.push({ id: packet.s, status: "failed", error: "form not accessible" });
+          continue;
+        }
+
         // Get form questions for field mapping
         const { data: form, error: formErr } = await admin
           .from("forms")

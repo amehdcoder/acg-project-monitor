@@ -1,3 +1,4 @@
+import { neutralizeFormula } from "@/lib/security/csvSafe";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -62,7 +63,9 @@ const buildRows = (users: UserStatus[]) =>
   }));
 
 const exportCSV = (users: UserStatus[], dateRange: Props["dateRange"]) => {
-  const rows = buildRows(users);
+  const rows = buildRows(users).map((r) =>
+    Object.fromEntries(Object.entries(r).map(([k, v]) => [k, typeof v === "string" ? neutralizeFormula(v) : v])),
+  );
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "User Activity");

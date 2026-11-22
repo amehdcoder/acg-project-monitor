@@ -39,7 +39,8 @@ const safe = (s: string | null | undefined, fallback = "unknown") =>
     .slice(0, 60) || fallback;
 
 const csvCell = (v: any) => {
-  const s = v === null || v === undefined ? "" : String(v);
+  let s = v === null || v === undefined ? "" : String(v);
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 
