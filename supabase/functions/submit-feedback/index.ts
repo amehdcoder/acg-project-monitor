@@ -56,6 +56,7 @@ Deno.serve(async (req) => {
       .from("projects")
       .select("name")
       .eq("id", pid)
+      .eq("status", "active")
       .maybeSingle();
     if (!data) return json({ error: "Unknown project" }, 404);
     return json({ name: (data as { name: string }).name });
@@ -89,6 +90,7 @@ Deno.serve(async (req) => {
     .from("projects")
     .select("id")
     .eq("id", projectId)
+    .eq("status", "active")
     .maybeSingle();
   if (pErr || !project) return json({ error: "Unknown project" }, 404);
 
