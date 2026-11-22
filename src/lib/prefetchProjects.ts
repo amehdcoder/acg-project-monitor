@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { withTimeout } from "@/lib/withTimeout";
+import { fetchFormsMemberProjects, writeFormsMemberProjects } from "@/lib/formsProjectMembership";
 
 /**
  * Prefetch the user's accessible projects immediately after sign-in / session
@@ -77,6 +78,10 @@ export async function prefetchProjects(userId?: string | null): Promise<void> {
   if (!userId || !navigator.onLine) return;
   if (inFlight.has(userId)) return;
   inFlight.add(userId);
+  // Keep the Forms membership cache separate from broad management caches.
+  const memberWarm = fetchFormsMemberProjects(userId)
+    .then((rows) => writeFormsMemberProjects(userId, rows))
+    .catch(() => { /* Retain last verified memberships on network failure. */ });
   try {
     const liteRows = await fetchProjectsWithRetry("lite", { attempts: 3, timeoutMs: 18000 });
     localStorage.setItem(formsProjectKey(userId), JSON.stringify(liteRows));
@@ -88,6 +93,7 @@ export async function prefetchProjects(userId?: string | null): Promise<void> {
   } catch {
     /* best-effort warm cache; failures are non-fatal */
   } finally {
+    await memberWarm;
     inFlight.delete(userId);
   }
 }

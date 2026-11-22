@@ -157,7 +157,7 @@ import { FileSpreadsheet, KeyRound, GanttChartSquare, NotebookPen, Copy, EyeOff 
 import CopyMdaChecklistDialog from "@/components/MdaChecklist/CopyMdaChecklistDialog";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { withTimeoutFallback } from "@/lib/withTimeout";
-import { fetchProjectsWithRetry, writeProjectCaches } from "@/lib/prefetchProjects";
+import { fetchFormsMemberProjects, readFormsMemberProjects, writeFormsMemberProjects } from "@/lib/formsProjectMembership";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 interface FormSettings {
@@ -277,7 +277,7 @@ interface FormsViewProps {
 const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [forms, setForms] = useState<Form[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectSnapshot, setProjectSnapshot] = useState<{ userId: string; rows: Project[] } | null>(null);
   const [projectsLoadError, setProjectsLoadError] = useState<string | null>(null);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(selectedProjectId || null);
   const [rollupExporting, setRollupExporting] = useState(false);
@@ -371,37 +371,11 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showBulkAccess, setShowBulkAccess] = useState(false);
   const { user, profile, isAdmin, isSuperAdmin, isOwner, isOwnerLevel, role, isAdhoc, loading: authLoading } = useAuth();
   const { hasDashboardAccess } = useDashboardAccess();
-  const projectCacheKey = user?.id ? `amehnities:forms:projects:${user.id}` : null;
-
-  const readProjectCache = useCallback((): Project[] => {
-    if (!projectCacheKey) return [];
-    try {
-      const cached = JSON.parse(localStorage.getItem(projectCacheKey) || "[]");
-      if (Array.isArray(cached) && cached.length > 0) return cached;
-      // Fallback to the richer Projects page cache if the Forms-only cache has
-      // not been warmed yet. This prevents an empty dropdown after sign-in when
-      // one cache write succeeds before the other under a slow connection.
-      if (user?.id) {
-        const fullCached = JSON.parse(localStorage.getItem(`amehnities:projects:list:${user.id}`) || "[]");
-        return Array.isArray(fullCached)
-          ? fullCached.filter((p: any) => p?.id && p?.name).map((p: any) => ({ id: p.id, name: p.name }))
-          : [];
-      }
-      return [];
-    } catch {
-      return [];
-    }
-  }, [projectCacheKey, user?.id]);
-
-  const writeProjectCache = useCallback((items: Project[]) => {
-    if (!projectCacheKey) return;
-    try {
-      localStorage.setItem(projectCacheKey, JSON.stringify(items));
-      if (user?.id) writeProjectCaches(user.id, items);
-    } catch {
-      /* ignore storage failures */
-    }
-  }, [projectCacheKey, user?.id]);
+  const projects = useMemo(() => projectSnapshot?.userId === user?.id
+    ? projectSnapshot.rows : readFormsMemberProjects(user?.id), [projectSnapshot, user?.id]);
+  const memberProjectIds = useMemo(() => new Set(projects.map((p) => p.id)), [projects]);
+  const activeProjectUserRef = useRef(user?.id);
+  activeProjectUserRef.current = user?.id;
   const [assignedStandardCodes, setAssignedStandardCodes] = useState<Set<string>>(new Set());
   // Owner/Admin-only: exact submission count per form so the owner can tell at a
   // glance which checklists actually have data (and how much) without opening
@@ -862,17 +836,25 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   // queries ran while `role` was still null.
   useEffect(() => {
     if (authLoading) return;
-    const cached = readProjectCache();
-    if (cached.length > 0) setProjects(cached);
     fetchProjects();
+    const refresh = () => { if (navigator.onLine) void fetchProjects(); };
+    window.addEventListener("online", refresh);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("project-access-updated", refresh);
+    return () => {
+      window.removeEventListener("online", refresh);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("project-access-updated", refresh);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, user?.id, role, isSuperAdmin, isOwnerLevel, isAdmin]);
 
   useEffect(() => {
-    if (selectedProjectId) {
+    if (selectedProjectId && memberProjectIds.has(selectedProjectId)) {
       setCurrentProjectId(selectedProjectId);
     }
-  }, [selectedProjectId]);
+    if (currentProjectId && !memberProjectIds.has(currentProjectId)) setCurrentProjectId(null);
+  }, [selectedProjectId, memberProjectIds, currentProjectId]);
 
   // Never leave the Forms page stuck on the loading skeleton when offline. The
   // network fetches are skipped offline, so if auth resolution is slow the
@@ -887,13 +869,13 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
   useEffect(() => {
     if (authLoading) return;
-    if (currentProjectId) {
+    if (currentProjectId && memberProjectIds.has(currentProjectId)) {
       fetchForms(currentProjectId);
     } else {
       fetchAllForms();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentProjectId, authLoading, user?.id, role, isSuperAdmin, isOwnerLevel]);
+  }, [currentProjectId, authLoading, user?.id, role, isSuperAdmin, isOwnerLevel, memberProjectIds]);
 
   // Silent form restore: ONLY re-open a form after a genuine silent app update
   // (the sessionStorage SILENT_UPDATE_RESTORE_KEY is written immediately before
@@ -951,27 +933,26 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
 
   const fetchProjects = async () => {
-    const cached = readProjectCache();
-    if (cached.length > 0) {
-      setProjects(cached);
-      setProjectsLoadError(null);
-    }
+    const userId = user?.id;
+    if (!userId) { setProjectSnapshot(null); return; }
+    const cached = readFormsMemberProjects(userId);
+    setProjectSnapshot({ userId, rows: cached });
+    if (!navigator.onLine) return;
     try {
-      // One policy-scoped query is the source of truth. The old role/assignment
-      // branching could execute before role hydration completed and leave admins
-      // with an empty dropdown until a hard refresh.
-      const nextProjects = await fetchProjectsWithRetry("lite", { attempts: 3, timeoutMs: 18000 });
-      setProjects(nextProjects);
-      writeProjectCache(nextProjects);
+      const nextProjects = await fetchFormsMemberProjects(userId);
+      if (activeProjectUserRef.current !== userId) return;
+      setProjectSnapshot({ userId, rows: nextProjects });
+      writeFormsMemberProjects(userId, nextProjects);
       setProjectsLoadError(null);
     } catch (error: any) {
       console.error("Error fetching projects:", error);
-      if (cached.length > 0) setProjects(cached);
+      if (activeProjectUserRef.current !== userId) return;
       setProjectsLoadError(cached.length > 0 ? null : (error?.message || "Projects are temporarily unavailable"));
     }
   };
 
   const fetchForms = async (projectId: string) => {
+    if (!memberProjectIds.has(projectId)) return;
     // When offline, skip the network call and rely on the offline cache merge.
     if (!isOnline) {
       setLoading(false);
@@ -1496,7 +1477,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           ),
       )
       .map(toRenderableForm),
-  ];
+  ].filter((form) => memberProjectIds.has(form.project_id));
 
 
   // 300ms debounce prevents per-keystroke re-filtering across the full merged form set.
