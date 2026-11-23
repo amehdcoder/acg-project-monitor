@@ -1,5 +1,7 @@
 # Roadmap
 
+- [x] Test offline Forms lists for administrators and ordinary users with limited/all-project access: all four automated scenarios pass (13 tests total), including failed refresh, separate-account caches and removed access. Live Abba Babagana membership is Accelerate only; signed-in Forms matches, true disconnected selection works, and cached reload with data requests blocked preserves only Accelerate. Other three real-account scenarios were not rerun this turn; full disconnected installed-device reopening remains unverified. No grants or records changed.
+
 - [x] Restore individual administrator-accessible projects in the Forms selector using server-verified access; ordinary users remain membership-only. Nine tests pass; signed-in Super Admin sees all 16 individual projects and selects Accelerate; the same list survives reload with data requests blocked and offline status simulated. Full disconnected preview reload cannot load the development shell; physical installed-device reopening remains unverified. No grants or records changed.
 
 - [ ] Restrict Forms projects and their visible forms to the signed-in user's memberships, retain a separate verified offline cache, and test account isolation and refresh/removal behavior.

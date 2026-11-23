@@ -69,4 +69,30 @@ describe("Forms project memberships", () => {
     await expect(fetchFormsMemberProjects("admin")).rejects.toThrow("role unavailable");
     expect(supabase.from).not.toHaveBeenCalled();
   });
+  it.each([
+    { account: "limited-admin", admin: true, allowed: [rows[0]] },
+    { account: "all-admin", admin: true, allowed: rows },
+    { account: "limited-member", admin: false, allowed: [rows[1]] },
+    { account: "all-member", admin: false, allowed: rows },
+  ])("keeps $account's verified list during an offline outage without widening it", async ({ account, admin, allowed }) => {
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: admin, error: null } as any);
+    const assignments = allowed.map(p => ({ project_id: p.id }));
+    vi.mocked(supabase.from).mockImplementation(((table: string) => ({
+      select: () => table === "user_project_assignments"
+        ? { eq: async () => ({ data: assignments, error: null }) }
+        : { order: async () => ({ data: allowed, error: null }),
+            in: () => ({ order: async () => ({ data: rows, error: null }) }) },
+    })) as any);
+    const verified = await fetchFormsMemberProjects(account);
+    expect(verified).toEqual(allowed);
+    writeFormsMemberProjects(account, verified);
+    writeFormsMemberProjects("different-account", rows);
+    localStorage.setItem(`amehnities:projects:list:${account}`, JSON.stringify(rows));
+    vi.mocked(supabase.rpc).mockRejectedValue(new Error("offline"));
+    await expect(fetchFormsMemberProjects(account)).rejects.toThrow("offline");
+    expect(readFormsMemberProjects(account)).toEqual(allowed);
+    expect(readFormsMemberProjects("unprepared-account")).toEqual([]);
+    writeFormsMemberProjects(account, []);
+    expect(readFormsMemberProjects(account)).toEqual([]);
+  });
 });
