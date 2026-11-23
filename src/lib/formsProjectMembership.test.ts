@@ -1,12 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-vi.mock("@/integrations/supabase/client", () => ({ supabase: { from: vi.fn() } }));
+vi.mock("@/integrations/supabase/client", () => ({ supabase: { from: vi.fn(), rpc: vi.fn() } }));
 import { supabase } from "@/integrations/supabase/client";
 import { fetchFormsMemberProjects, memberProjectRows, readFormsMemberProjects, writeFormsMemberProjects } from "./formsProjectMembership";
 
 const rows = [{ id: "member", name: "Member project" }, { id: "other", name: "Other project" }];
 describe("Forms project memberships", () => {
-  beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); });
-  it("shows only member projects, without an administrator bypass", () => {
+  beforeEach(() => {
+    localStorage.clear(); vi.clearAllMocks();
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: false, error: null } as any);
+  });
+  it("shows only member projects for non-administrators", () => {
     expect(memberProjectRows(rows, [{ project_id: "member" }])).toEqual([rows[0]]);
   });
   it("retains only the same user's verified memberships offline", () => {
@@ -42,5 +45,28 @@ describe("Forms project memberships", () => {
     vi.mocked(supabase.from).mockReturnValue({ select: () => ({ eq: async () => ({ data: null, error: new Error("unavailable") }) }) } as any);
     await expect(fetchFormsMemberProjects("alice")).rejects.toThrow("unavailable");
     expect(readFormsMemberProjects("alice")).toEqual([]);
+  });
+  it("lists all server-accessible projects for a verified administrator without assignments", async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: true, error: null } as any);
+    const order = vi.fn().mockResolvedValue({ data: rows, error: null });
+    vi.mocked(supabase.from).mockReturnValue({ select: () => ({ order }) } as any);
+    expect(await fetchFormsMemberProjects("admin")).toEqual(rows);
+    expect(supabase.rpc).toHaveBeenCalledWith("is_admin", { _user_id: "admin" });
+    expect(supabase.from).toHaveBeenCalledTimes(1);
+    expect(supabase.from).toHaveBeenCalledWith("projects");
+  });
+  it("retains only the limited project list returned for an administrator", async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: true, error: null } as any);
+    vi.mocked(supabase.from).mockReturnValue({ select: () => ({ order: async () => ({ data: [rows[0]], error: null }) }) } as any);
+    const projects = await fetchFormsMemberProjects("limited-admin");
+    expect(projects).toEqual([rows[0]]);
+    writeFormsMemberProjects("limited-admin", projects);
+    expect(readFormsMemberProjects("limited-admin")).toEqual([rows[0]]);
+    expect(readFormsMemberProjects("other-admin")).toEqual([]);
+  });
+  it("does not widen access when server role verification fails", async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: null, error: new Error("role unavailable") } as any);
+    await expect(fetchFormsMemberProjects("admin")).rejects.toThrow("role unavailable");
+    expect(supabase.from).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,7 @@
 # Roadmap
 
+- [x] Restore individual administrator-accessible projects in the Forms selector using server-verified access; ordinary users remain membership-only. Nine tests pass; signed-in Super Admin sees all 16 individual projects and selects Accelerate; the same list survives reload with data requests blocked and offline status simulated. Full disconnected preview reload cannot load the development shell; physical installed-device reopening remains unverified. No grants or records changed.
+
 - [ ] Restrict Forms projects and their visible forms to the signed-in user's memberships, retain a separate verified offline cache, and test account isolation and refresh/removal behavior.
 
 - [ ] Sweep every Geo Microplanning presentation path for readable text, including differently built map popups, chart tooltips, tables, dialogs, forms and exports; keep other app pages and all records/access/settings unchanged.

@@ -24,8 +24,22 @@ export function memberProjectRows(rows: FormsProject[], assignments: { project_i
 }
 
 export async function fetchFormsMemberProjects(userId: string): Promise<FormsProject[]> {
-  // Explicit membership applies even to administrators; general project RLS can
-  // deliberately expose more projects for management outside the Forms page.
+  // Resolve administrator status on the server, never from a client role/cache.
+  // Project RLS still determines which individual projects an admin can see.
+  const { data: administrator, error: roleError } = await withTimeout(
+    supabase.rpc("is_admin", { _user_id: userId }),
+    18000, "forms_project_role_timeout",
+  );
+  if (roleError) throw roleError;
+  if (administrator === true) {
+    const { data, error } = await withTimeout(
+      supabase.from("projects").select("id, name").order("name", { ascending: true }),
+      18000, "forms_admin_projects_timeout",
+    );
+    if (error) throw error;
+    return data || [];
+  }
+  // Non-administrators remain restricted to explicit project memberships.
   const { data: assignments, error: assignmentError } = await withTimeout(
     supabase.from("user_project_assignments").select("project_id").eq("user_id", userId),
     18000, "forms_memberships_timeout",
