@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { QrCode, Camera, X, ScanLine, Loader2, CheckCircle, AlertCircle, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { fetchAuthorizedForms } from "@/lib/authorizedForms";
+import { useOfflineForms } from "@/hooks/useOfflineForms";
 import { toast } from "@/hooks/use-toast";
 
 interface QRCodeScannerProps {
@@ -46,6 +48,11 @@ const QRCodeScanner = ({ open, onOpenChange, onFormReady, onExternalXlsform }: Q
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
   const containerId = useRef(`qr-scanner-${Math.random().toString(36).substr(2, 9)}`);
   const { user } = useAuth();
+  const { getForm } = useOfflineForms();
+  const activeUser = useRef(user?.id);
+  activeUser.current = user?.id;
+  const activeOpen = useRef(open);
+  activeOpen.current = open;
 
   const stopScanning = useCallback(async () => {
     if (scannerRef.current) {
@@ -91,34 +98,14 @@ const QRCodeScanner = ({ open, onOpenChange, onFormReady, onExternalXlsform }: Q
         return;
       }
 
-      const { data: existing } = await supabase
-        .from("user_form_assignments")
-        .select("id")
-        .eq("user_id", user?.id)
-        .eq("form_id", formId)
-        .maybeSingle();
+      const userId = user?.id;
+      if (!userId) { setResult({ success: false, message: "Sign in before opening a project form." }); return; }
+      const form = navigator.onLine
+        ? (await fetchAuthorizedForms(userId)).find(f => f.id === formId)
+        : await getForm(formId);
+      if (activeUser.current !== userId || !activeOpen.current) return;
 
-      if (!existing && user) {
-        const { error: assignError } = await supabase
-          .from("user_form_assignments")
-          .insert({
-            user_id: user.id,
-            form_id: formId,
-            assigned_by: user.id,
-          });
-
-        if (assignError) {
-          console.warn("Could not auto-assign form:", assignError);
-        }
-      }
-
-      const { data: form, error: formError } = await supabase
-        .from("forms")
-        .select("*")
-        .eq("id", formId)
-        .maybeSingle();
-
-      if (formError || !form) {
+      if (!form) {
         setResult({ success: false, message: "Form not found. It may have been deleted or you don't have access." });
         setIsProcessing(false);
         return;
@@ -131,9 +118,10 @@ const QRCodeScanner = ({ open, onOpenChange, onFormReady, onExternalXlsform }: Q
       }
 
       setResult({ success: true, message: `Form "${form.name}" is ready to fill!` });
-      toast({ title: "Form Found", description: `"${form.name}" assigned and ready.` });
+      toast({ title: "Form Found", description: `"${form.name}" is ready.` });
 
       setTimeout(() => {
+        if (activeUser.current !== userId || !activeOpen.current) return;
         onFormReady(form);
         onOpenChange(false);
         setResult(null);
@@ -143,7 +131,7 @@ const QRCodeScanner = ({ open, onOpenChange, onFormReady, onExternalXlsform }: Q
     } finally {
       setIsProcessing(false);
     }
-  }, [user, stopScanning, onFormReady, onOpenChange, onExternalXlsform]);
+  }, [user, getForm, stopScanning, onFormReady, onOpenChange, onExternalXlsform]);
 
   const requestCameraAndStart = useCallback(async () => {
     setResult(null);
@@ -299,7 +287,7 @@ const QRCodeScanner = ({ open, onOpenChange, onFormReady, onExternalXlsform }: Q
               </div>
               <p className="text-sm font-medium mb-1">Scan to Get Your Form</p>
               <p className="text-xs text-muted-foreground text-center mb-6">
-                Scan the QR code provided by your supervisor to get assigned a form and start collecting data.
+                Scan a project form you already have access to.
               </p>
               <Button variant="acg" className="w-full" onClick={requestCameraAndStart}>
                 <Camera className="h-4 w-4 mr-2" />

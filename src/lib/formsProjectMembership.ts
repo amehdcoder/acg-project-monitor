@@ -14,7 +14,7 @@ export function readFormsMemberProjects(userId: string | null | undefined): Form
 }
 
 export function writeFormsMemberProjects(userId: string, projects: FormsProject[]): void {
-  try { localStorage.setItem(cacheKey(userId), JSON.stringify({ userId, projects })); }
+  try { localStorage.setItem(cacheKey(userId), JSON.stringify({ userId, projects })); window.dispatchEvent(new Event("forms-project-access")); }
   catch { /* Offline storage may be unavailable. */ }
 }
 

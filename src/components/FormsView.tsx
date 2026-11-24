@@ -159,6 +159,8 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import { withTimeoutFallback } from "@/lib/withTimeout";
 import { fetchFormsMemberProjects, readFormsMemberProjects, writeFormsMemberProjects } from "@/lib/formsProjectMembership";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { fetchAuthorizedForms } from "@/lib/authorizedForms";
+import { canOpenOfflineForm } from "@/lib/offlineFormAccess";
 
 interface FormSettings {
   requireLocation?: boolean;
@@ -376,6 +378,12 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const memberProjectIds = useMemo(() => new Set(projects.map((p) => p.id)), [projects]);
   const activeProjectUserRef = useRef(user?.id);
   activeProjectUserRef.current = user?.id;
+  useEffect(() => {
+    setFillingForm(null); setForms([]); setSavedFormsMode(null);
+  }, [user?.id]);
+  useEffect(() => {
+    if (fillingForm && !memberProjectIds.has(fillingForm.project_id)) setFillingForm(null);
+  }, [memberProjectIds, fillingForm]);
   const [assignedStandardCodes, setAssignedStandardCodes] = useState<Set<string>>(new Set());
   // Owner/Admin-only: exact submission count per form so the owner can tell at a
   // glance which checklists actually have data (and how much) without opening
@@ -890,6 +898,11 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     try {
       restore = JSON.parse(sessionStorage.getItem(SILENT_UPDATE_RESTORE_KEY) || "null");
     } catch {}
+    if (restore && restore.userId !== user?.id) {
+      sessionStorage.removeItem(SILENT_UPDATE_RESTORE_KEY);
+      silentRestoreHandledRef.current = true;
+      return;
+    }
     const formId = restore?.formId;
     if (!formId) {
       // Nothing to silently restore — mark handled so a later Back/login never
@@ -899,7 +912,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     }
     try {
       const active = JSON.parse(localStorage.getItem(ACTIVE_FORM_FILL_KEY) || "null");
-      if (forms.length === 0 && offlineForms.length === 0 && active?.projectId && active.projectId !== currentProjectId) {
+      if (forms.length === 0 && offlineForms.length === 0 && active?.userId === user?.id && memberProjectIds.has(active?.projectId) && active.projectId !== currentProjectId) {
         setCurrentProjectId(active.projectId);
         return; // wait for the correct project's forms to load, then retry
       }
@@ -910,7 +923,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         return { ...of, questions: ungroupedQuestions, groups: groupItems, submissions_count: 0, created_at: of.downloaded_at } as Form;
       });
       const form = forms.find((f) => f.id === formId) || offlineMatches.find((f) => f.id === formId);
-      if (form) {
+      if (form && form.status === "active" && memberProjectIds.has(form.project_id) && canOpenOfflineForm(user?.id, form.id, form.project_id)) {
         silentRestoreHandledRef.current = true;
         sessionStorage.removeItem(SILENT_UPDATE_RESTORE_KEY);
         // The Integrated MDA Supervisory Checklist opens to a navigation hub
@@ -924,12 +937,12 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         }
         setFillingForm(form);
         if (form.project_id && form.project_id !== currentProjectId) setCurrentProjectId(form.project_id);
-      } else if (active?.projectId && active.projectId !== currentProjectId) {
+      } else if (active?.userId === user?.id && memberProjectIds.has(active?.projectId) && active.projectId !== currentProjectId) {
         setCurrentProjectId(active.projectId);
       }
 
     } catch {}
-  }, [authLoading, currentProjectId, fillingForm, forms, offlineForms]);
+  }, [authLoading, currentProjectId, fillingForm, forms, offlineForms, user?.id, memberProjectIds]);
 
 
   const fetchProjects = async () => {
@@ -953,196 +966,24 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
   const fetchForms = async (projectId: string) => {
     if (!memberProjectIds.has(projectId)) return;
-    // When offline, skip the network call and rely on the offline cache merge.
-    if (!isOnline) {
-      setLoading(false);
-      return;
-    }
-    try {
-      // Only show the spinner when nothing is on screen yet — re-showing it over
-      // already-rendered forms made the page blink on every refresh.
-      if (forms.length === 0) setLoading(true);
-      const query = () => supabase
-        .from("forms")
-        .select("*")
-        .eq("project_id", projectId)
-        .order("created_at", { ascending: false });
-      // Slow field networks: one longer retry before falling back to the offline copy.
-      let res: any;
-      try { res = await withTimeout(query(), 15000, "project_forms_timeout"); }
-      catch { res = await withTimeout(query(), 25000, "project_forms_timeout"); }
-      const { data: formsData, error } = res;
-
-      if (error) throw error;
-
-      // Do not run one count query per form; that N+1 pattern was making the
-      // page unusable on slow field connections. Render immediately; dashboards
-      // and history screens fetch their own exact submission data when opened.
-      const formsWithCounts = (formsData || []).map(toRenderableForm);
-
-      setForms(formsWithCounts);
-      // Auto-cache every fetched form so it can be opened offline later.
-      cacheFormsForOffline(formsWithCounts);
-      // Drop any stale offline copies in this project that no longer exist on
-      // the server (e.g. duplicates left behind after a dedup/recreate).
-      pruneStaleForms(formsWithCounts.map((f) => f.id), projectId);
-    } catch (error: any) {
-      console.error("Error fetching forms:", error);
-      // Timeouts are a connectivity condition, not an error the user can act on:
-      // keep showing the downloaded copies silently instead of a raw error code.
-      const isTimeout = /timeout/i.test(String(error?.message || ""));
-      if (!isTimeout && forms.length === 0 && offlineForms.length === 0) {
-        toast({
-          title: "Couldn't refresh forms",
-          description: "Showing forms saved on this device. We'll try again automatically.",
-        });
-      }
-    } finally {
-      setLoading(false);
-    }
+    await fetchAllForms(projectId);
   };
 
-  const fetchAllForms = async () => {
-    // When offline, skip the network call and rely on the offline cache merge.
-    if (!isOnline) {
-      setLoading(false);
-      return;
-    }
-    const stopTimer = startTimer("forms_api_fetch_all");
-    let fetchOk = true;
+  const fetchAllForms = async (projectId?: string) => {
+    const userId = user?.id;
+    if (!isOnline || !userId) { setLoading(false); return; }
     try {
-      setLoading(true);
-
-      
-      // Super admins and owner-level users (Owner + Co-owner) see all forms;
-      // Systems admins only see assigned forms
-      let formsData;
-      if (isSuperAdmin || isOwnerLevel) {
-        const { data, error } = await withTimeout(supabase
-          .from("forms")
-          .select("*")
-          .order("created_at", { ascending: false }), 10000, "all_forms_timeout");
-        if (error) throw error;
-        formsData = data;
-      } else if (role === "systems_admin") {
-        // Systems admins see only forms they are assigned to via project or form assignments
-        const [formAssignRes, projectAssignRes, sarmaanAccessRes] = await withTimeout(Promise.all([
-          supabase.from("user_form_assignments").select("form_id").eq("user_id", user?.id),
-          supabase.from("user_project_assignments").select("project_id").eq("user_id", user?.id),
-          supabase.from("sarmaan_form_access" as any).select("form_id").eq("user_id", user?.id),
-        ]), 10000, "systems_admin_access_timeout");
-        const { data: formAssignments, error: formAssignError } = formAssignRes;
-        const { data: projectAssignments, error: projectAssignError } = projectAssignRes;
-        const { data: sarmaanAccessRows, error: sarmaanAccessError } = sarmaanAccessRes;
-
-        if (sarmaanAccessError) throw sarmaanAccessError;
-
-        const directFormIds = formAssignments?.map(a => a.form_id) || [];
-        const sarmaanAccessFormIds = (sarmaanAccessRows as any[] | null || []).map(a => a.form_id);
-        const projectIds = projectAssignments?.map(a => a.project_id) || [];
-        
-        let formsFromProjects: string[] = [];
-        if (projectIds.length > 0) {
-          const { data: projectForms } = await withTimeout(supabase
-            .from("forms")
-            .select("id")
-            .in("project_id", projectIds), 10000, "systems_project_forms_timeout");
-          formsFromProjects = projectForms?.map(f => f.id) || [];
-        }
-        
-        const allFormIds = [...new Set([...directFormIds, ...formsFromProjects, ...sarmaanAccessFormIds])];
-        
-        if (allFormIds.length > 0) {
-          const { data, error } = await withTimeout(supabase
-            .from("forms")
-            .select("*")
-            .in("id", allFormIds)
-            .order("created_at", { ascending: false }), 10000, "systems_forms_timeout");
-          if (error) throw error;
-          formsData = data;
-        } else {
-          formsData = [];
-        }
-      } else {
-        // Regular users get their explicitly-assigned forms PLUS automatic access
-        // to the Integrated MDA Supervisory Checklist for every project they are a
-        // member of (the checklist is auto-granted to all project members; the
-        // dashboard is gated separately and not opened here).
-        const [assignRes, sarmaanAccessRes, projectAssignRes] = await withTimeout(Promise.all([
-          supabase.from("user_form_assignments").select("form_id").eq("user_id", user?.id),
-          supabase.from("sarmaan_form_access" as any).select("form_id").eq("user_id", user?.id),
-          supabase.from("user_project_assignments").select("project_id").eq("user_id", user?.id),
-        ]), 10000, "user_access_timeout");
-        const { data: assignments, error: assignError } = assignRes;
-        const { data: sarmaanAccessRows, error: sarmaanAccessError } = sarmaanAccessRes;
-        const { data: projectAssignments } = projectAssignRes;
-
-        if (assignError) throw assignError;
-        if (sarmaanAccessError) throw sarmaanAccessError;
-
-        const assignedFormIds = (assignments || []).map(a => a.form_id);
-
-        // SARMAAN checklist grants live in their own access table. Include those
-        // form ids here so users see the dedicated SARMAAN ACSM checklist even
-        // when they are not otherwise assigned through the generic form system.
-        const sarmaanAccessFormIds = (sarmaanAccessRows as any[] | null || []).map(a => a.form_id);
-
-        // Pull all forms from the user's assigned projects so we can surface the
-        // MDA checklist automatically even when it was never explicitly assigned.
-        const memberProjectIds = (projectAssignments || []).map(a => a.project_id);
-
-        let autoMdaFormIds: string[] = [];
-        let autoSarmaanAcsmFormIds: string[] = [];
-        if (memberProjectIds.length > 0) {
-          const { data: projectForms } = await withTimeout(supabase
-            .from("forms")
-            .select("id, name, settings, questions")
-            .in("project_id", memberProjectIds), 10000, "user_project_forms_timeout");
-          autoMdaFormIds = (projectForms || [])
-            .filter((f: any) => {
-              const allItems = (f.questions as unknown as any[]) || [];
-              const groups = allItems.filter((q: any) => Array.isArray(q.questions));
-              return isMdaChecklistLike({
-                settings: (f.settings as unknown as FormSettings) || {},
-                formName: f.name,
-                groups: groups as FormGroup[],
-              });
-            })
-            .map((f: any) => f.id);
-          autoSarmaanAcsmFormIds = (projectForms || [])
-            .filter((f: any) => isSarmaanAcsmStoredForm(f))
-            .map((f: any) => f.id);
-        }
-
-        const formIds = [...new Set([...assignedFormIds, ...autoMdaFormIds, ...autoSarmaanAcsmFormIds, ...sarmaanAccessFormIds])];
-
-        if (formIds.length > 0) {
-          const { data, error } = await withTimeout(supabase
-            .from("forms")
-            .select("*")
-            .in("id", formIds)
-            .order("created_at", { ascending: false }), 10000, "user_forms_timeout");
-          if (error) throw error;
-          formsData = data;
-        } else {
-          formsData = [];
-        }
-      }
-
-      const formsWithCounts = (formsData || []).map(toRenderableForm);
-
-      setForms(formsWithCounts);
-      // Auto-cache every fetched form so it can be opened offline later.
-      cacheFormsForOffline(formsWithCounts);
-      // Globally drop stale offline copies not present in this authoritative set
-      // (removes ghost duplicates left behind by offline downloads / dedup).
-      pruneStaleForms(formsWithCounts.map((f) => f.id));
-    } catch (error: any) {
-      console.error("Error fetching forms:", error);
-      fetchOk = false;
+      if (!forms.length) setLoading(true);
+      const allowed = await fetchAuthorizedForms(userId);
+      if (activeProjectUserRef.current !== userId) return;
+      const rows = allowed.filter(f => !projectId || f.project_id === projectId).map(toRenderableForm);
+      setForms(rows);
+      await cacheFormsForOffline(rows);
+      await pruneStaleForms(allowed.map(f => f.id));
+    } catch (error) {
+      console.error("Error refreshing accessible forms:", error);
     } finally {
-      setLoading(false);
-      stopTimer(fetchOk, { role: role || "user" });
+      if (activeProjectUserRef.current === userId) setLoading(false);
     }
   };
 
@@ -2029,7 +1870,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     );
   }
 
-  if (fillingForm) {
+  if (fillingForm && fillingForm.status === "active" && memberProjectIds.has(fillingForm.project_id) && canOpenOfflineForm(user?.id, fillingForm.id, fillingForm.project_id)) {
     const fillerCommon = {
       formId: fillingForm.id,
       formName: fillingForm.name,
@@ -4904,6 +4745,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         open={showQRScanner}
         onOpenChange={setShowQRScanner}
         onFormReady={(form) => {
+          if (!memberProjectIds.has(form.project_id) || !canOpenOfflineForm(user?.id, form.id, form.project_id)) return;
           const allItems = (form.questions || []) as any[];
           const groupItems = allItems.filter((q: any) => Array.isArray(q.questions)) as FormGroup[];
           const ungroupedQuestions = allItems.filter((q: any) => !Array.isArray(q.questions)) as Question[];

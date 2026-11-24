@@ -9,6 +9,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import { sealRecord } from "@/lib/deviceCrypto";
 import { withTimeoutFallback } from "@/lib/withTimeout";
+import { fetchAuthorizedForms } from "./authorizedForms";
+import { ownedOfflineForm } from "./offlineFormAccess";
 
 const DB_NAME = "acg_monitor_offline";
 const DB_VERSION = 4;
@@ -84,43 +86,7 @@ export const warmCacheUserFormsDetailed = async (ctx: WarmCacheCtx): Promise<War
   const empty: WarmCacheResult = { count: 0, forms: [], scopedToGrants: !ctx.isAdmin };
   if (!navigator.onLine || !ctx.userId) return empty;
   try {
-    let formIds: string[] | null = null;
-
-    if (!ctx.isAdmin) {
-      // Regular users: forms assigned directly + forms from assigned projects.
-      const [formAssign, projAssign, sarmaanAssign] = await withTimeoutFallback(
-        Promise.all([
-          supabase.from("user_form_assignments").select("form_id").eq("user_id", ctx.userId),
-          supabase.from("user_project_assignments").select("project_id").eq("user_id", ctx.userId),
-          supabase.from("sarmaan_form_access" as any).select("form_id").eq("user_id", ctx.userId),
-        ]),
-        9000,
-        [{ data: [] }, { data: [] }, { data: [] }] as any,
-      );
-      const direct = (formAssign.data || []).map((a: any) => a.form_id);
-      const sarmaan = ((sarmaanAssign.data as any[] | null) || []).map((a: any) => a.form_id);
-      const projectIds = (projAssign.data || []).map((a: any) => a.project_id);
-      let fromProjects: string[] = [];
-      if (projectIds.length > 0) {
-        const { data } = await withTimeoutFallback(
-          supabase.from("forms").select("id").in("project_id", projectIds),
-          9000,
-          { data: [] } as any,
-        );
-        fromProjects = (data || []).map((f: any) => f.id);
-      }
-      formIds = [...new Set([...direct, ...sarmaan, ...fromProjects])];
-      if (formIds.length === 0) return empty;
-    }
-
-    let query = supabase.from("forms").select("*");
-    if (formIds) query = query.in("id", formIds);
-    const { data: formsData, error } = await withTimeoutFallback(
-      query,
-      12000,
-      { data: [], error: null } as any,
-    );
-    if (error || !formsData) return empty;
+    const formsData = await fetchAuthorizedForms(ctx.userId);
 
     const db = await openDB();
     const cachedForms: { id: string; name: string; project_id: string }[] = [];
@@ -140,7 +106,7 @@ export const warmCacheUserFormsDetailed = async (ctx: WarmCacheCtx): Promise<War
         updated_at: (form as any).updated_at || new Date().toISOString(),
       };
       try {
-        await putForm(db, await sealRecord(offlineForm, ["id", "project_id", "downloaded_at"]));
+        await putForm(db, await sealRecord(ownedOfflineForm(offlineForm, ctx.userId), ["id", "project_id", "downloaded_at"]));
         cachedForms.push({ id: form.id, name: form.name, project_id: form.project_id });
       } catch {
         /* skip a single bad row */
