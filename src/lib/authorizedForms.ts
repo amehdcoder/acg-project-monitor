@@ -2,12 +2,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { withTimeout } from "./withTimeout";
 import { fetchFormsMemberProjects, writeFormsMemberProjects } from "./formsProjectMembership";
 import { isMdaChecklistLike } from "./mdaFollowUp";
+import { writeOfflineFormGrants } from "./offlineFormAccess";
 
 /** One server-verified resolver for list, download, Dashboard and QR opening. */
 export async function fetchAuthorizedForms(userId: string) {
   const projects = await fetchFormsMemberProjects(userId);
   const ids = projects.map(p => p.id);
-  if (!ids.length) { writeFormsMemberProjects(userId, projects); return []; }
+  if (!ids.length) { writeFormsMemberProjects(userId, projects); writeOfflineFormGrants(userId, []); return []; }
   const [owner, roles, direct, sarmaan, forms] = await withTimeout(Promise.all([
     supabase.rpc("is_owner_level", { _user_id: userId }),
     supabase.from("user_roles").select("role").eq("user_id", userId),
@@ -25,5 +26,6 @@ export async function fetchAuthorizedForms(userId: string) {
       isMdaChecklistLike({ settings: settings || {}, formName: f.name, groups: items.filter(q => q && typeof q === "object" && "questions" in q) as never });
   });
   writeFormsMemberProjects(userId, projects);
+  writeOfflineFormGrants(userId, allowed.map(f => f.id));
   return allowed;
 }
