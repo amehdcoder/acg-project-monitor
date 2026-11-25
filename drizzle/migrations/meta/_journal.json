@@ -610,6 +610,13 @@
       "when": 1795630003861,
       "tag": "0086_member_scope_follows_visible_records",
       "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1795631811876,
+      "tag": "0087_case_id_without_date",
+      "breakpoints": true
     }
   ]
 }

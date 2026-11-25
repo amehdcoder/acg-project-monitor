@@ -325,7 +325,7 @@ const FacilityRegistry = ({
                   onChange={(e) => setDraft((d) => ({ ...d, code: e.target.value.toUpperCase() }))}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Used inside beneficiary case IDs, e.g. CiS2-EEHK-20260914-0000001. Left blank, it is
+                  Used inside beneficiary case IDs, e.g. CiS2-EEHK-0000001. Left blank, it is
                   built from the facility name.
                 </p>
               </div>
