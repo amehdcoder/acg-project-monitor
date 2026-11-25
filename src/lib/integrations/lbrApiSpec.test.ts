@@ -37,3 +37,18 @@ describe("LBR integration spec", () => {
     expect(specToText(one)).toContain("SCHEMA: SERVICE");
   });
 });
+
+describe("living document revision", () => {
+  const base = { moduleName: "CiSKuLA 2", projectName: "Test", supabaseUrl: "https://x.supabase.co/" };
+  it("stays the same when only the issue time changes", () => {
+    const a = buildLbrApiSpec({ ...base, config: CISKULA_PRESET, now: new Date("2026-11-25T00:00:00Z") });
+    const b = buildLbrApiSpec({ ...base, config: CISKULA_PRESET, now: new Date("2026-11-26T00:00:00Z") });
+    expect(a.revision).toBe(b.revision);
+  });
+  it("changes when a component is renamed in the records setup", () => {
+    const changed = { ...CISKULA_PRESET, components: CISKULA_PRESET.components.map((c, i) => (i === 0 ? { ...c, label: `${c.label} (renamed)` } : c)) };
+    const a = buildLbrApiSpec({ ...base, config: CISKULA_PRESET });
+    const b = buildLbrApiSpec({ ...base, config: changed });
+    expect(b.revision).not.toBe(a.revision);
+  });
+});

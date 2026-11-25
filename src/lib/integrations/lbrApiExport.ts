@@ -79,7 +79,7 @@ export function specSections(s: LbrApiSpec) {
 }
 
 export function specToText(s: LbrApiSpec): string {
-  const L: string[] = ["AMEHNITIES", s.title, s.subtitle, `Document ${s.documentId} · v${s.version} · ${fmtDate(s.generatedAt)}`, `Project: ${s.projectName} · Module: ${s.moduleName}`, s.classification, "=".repeat(78)];
+  const L: string[] = ["AMEHNITIES", s.title, s.subtitle, `Document ${s.documentId} · ${s.version} · ${fmtDate(s.generatedAt)}`, `Project: ${s.projectName} · Module: ${s.moduleName}`, s.classification, "=".repeat(78)];
   for (const sec of specSections(s)) {
     L.push("", `${sec.n}. ${sec.title.toUpperCase()}`, "-".repeat(78));
     sec.paras?.forEach((p) => L.push(p));
@@ -113,7 +113,7 @@ async function toPdf(s: LbrApiSpec, logos: Logo[]): Promise<Blob> {
   doc.setFont("helvetica", "normal"); doc.setFontSize(11); doc.setTextColor(220, 228, 236);
   doc.text(doc.splitTextToSize(s.subtitle, W - 2 * M), M + 4, 134);
   doc.setFont("helvetica", "bold"); doc.setTextColor(...hex("F5C84B")); doc.text(doc.splitTextToSize(`Components covered: ${scopeText(s)}`, W - 2 * M - 4), M + 4, 146); doc.setFont("helvetica", "normal");
-  const meta = [["Document ID", s.documentId], ["Version", s.version], ["Issued", fmtDate(s.generatedAt)], ["Project", s.projectName], ["Module", s.moduleName], ["Classification", s.classification]];
+  const meta = [["Document ID", s.documentId], ["Edition", s.version], ["Setup last changed", s.lastChanged ? fmtDate(s.lastChanged) : "—"], ["Issued", fmtDate(s.generatedAt)], ["Project", s.projectName], ["Module", s.moduleName], ["Classification", s.classification]];
   let my = 186; meta.forEach(([k, v]) => { const t = doc.splitTextToSize(String(v), W - M - 52 - M); doc.setTextColor(...hex("9FD8D2")); doc.text(k.toUpperCase(), M + 4, my); doc.setTextColor(255, 255, 255); doc.text(t, M + 48, my); my += Math.max(1, t.length) * 5 + 4; });
   doc.setFontSize(9); doc.setTextColor(180, 192, 204); doc.text("Amehnities · HANDS Nigeria Decision Support Platform · www.amehnities.org", M + 4, H - 14);
 
@@ -196,7 +196,7 @@ async function toPdf(s: LbrApiSpec, logos: Logo[]): Promise<Blob> {
     doc.text("AMEHNITIES", M, 9);
     doc.text("LBR API & Webhook Integration Specification", W - M, 9, { align: "right" });
     doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...hex(MUTED));
-    doc.text(`${s.documentId} · v${s.version} · ${scopeText(s)}`.slice(0, 110), M, H - 8);
+    doc.text(`${s.documentId} · ${s.version} · ${scopeText(s)}`.slice(0, 110), M, H - 8);
     doc.text(`Page ${i - 1} of ${n - 1}`, W - M, H - 8, { align: "right" });
   }
   return doc.output("blob");
@@ -236,7 +236,7 @@ async function toDocx(s: LbrApiSpec, logos: Logo[]): Promise<Blob> {
     new Paragraph({ children: [new TextRun({ text: "Longitudinal Beneficiary Records", bold: true, color: NAVY, size: 56 })] }),
     new Paragraph({ spacing: { after: 300 }, children: [new TextRun({ text: "API & Webhook Integration Guide", color: TEAL, size: 36 })] }),
     new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: GOLD, space: 6 } }, spacing: { after: 400 }, children: [new TextRun({ text: s.subtitle, color: MUTED, size: 24 })] }),
-    table(["Item", "Detail"], [["Document ID", s.documentId], ["Version", s.version], ["Issued", fmtDate(s.generatedAt)], ["Project", s.projectName], ["Module", s.moduleName], ["Components covered", scopeText(s)], ["Classification", s.classification]]),
+    table(["Item", "Detail"], [["Document ID", s.documentId], ["Edition", s.version], ["Setup last changed", s.lastChanged ? fmtDate(s.lastChanged) : "—"], ["Issued", fmtDate(s.generatedAt)], ["Project", s.projectName], ["Module", s.moduleName], ["Components covered", scopeText(s)], ["Classification", s.classification]]),
     new Paragraph({ children: [new PageBreak()] }),
   ];
   const doc = new Document({
@@ -249,7 +249,7 @@ async function toDocx(s: LbrApiSpec, logos: Logo[]): Promise<Blob> {
     sections: [{
       properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1300, bottom: 1100, left: 1440, right: 1440 } } },
       headers: { default: new Header({ children: [new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: TEAL, space: 4 } }, children: [new TextRun({ text: "AMEHNITIES  ", bold: true, color: TEAL, size: 16 }), new TextRun({ text: "LBR API & Webhook Integration Specification", bold: true, color: NAVY, size: 16 })] })] }) },
-      footers: { default: new Footer({ children: [new Paragraph({ children: [new TextRun({ text: `${s.documentId} · v${s.version} · Page `, color: MUTED, size: 15 }), new TextRun({ children: [PageNumber.CURRENT], color: MUTED, size: 15 })] })] }) },
+      footers: { default: new Footer({ children: [new Paragraph({ children: [new TextRun({ text: `${s.documentId} · ${s.version} · Page `, color: MUTED, size: 15 }), new TextRun({ children: [PageNumber.CURRENT], color: MUTED, size: 15 })] })] }) },
       children: [...cover, ...body],
     }],
   });
@@ -283,7 +283,7 @@ async function toPptx(s: LbrApiSpec, logos: Logo[]): Promise<Blob> {
   cover.addText("TECHNICAL INTEGRATION SPECIFICATION", { x: 0.7, y: 2.6, w: 11, h: 0.4, fontSize: 16, bold: true, color: "9FD8D2" });
   cover.addText("Longitudinal Beneficiary Records", { x: 0.7, y: 3.0, w: 12, h: 0.9, fontSize: 42, bold: true, color: "FFFFFF", fontFace: "Georgia" });
   cover.addText("API & Webhook Integration Guide", { x: 0.7, y: 3.9, w: 12, h: 0.6, fontSize: 24, color: GOLD, fontFace: "Georgia" });
-  cover.addText(`Components covered: ${scopeText(s)}\n${s.projectName} · ${s.moduleName}\nIssued ${fmtDate(s.generatedAt)} · v${s.version}`, { x: 0.7, y: 4.8, w: 12, h: 1.9, fontSize: 15, color: "DCE4EC", valign: "top", fit: "shrink" });
+  cover.addText(`Components covered: ${scopeText(s)}\n${s.projectName} · ${s.moduleName}\nIssued ${fmtDate(s.generatedAt)} · ${s.version}`, { x: 0.7, y: 4.8, w: 12, h: 1.9, fontSize: 15, color: "DCE4EC", valign: "top", fit: "shrink" });
 
   for (const sec of specSections(s)) {
     let sl = brand(sec.title, sec.n); let y = TOP;

@@ -16,6 +16,8 @@ export type SpecEvent = { id: string; summary: string; trigger: string; payload:
 export type LbrApiSpec = {
   documentId: string; title: string; subtitle: string; version: string; generatedAt: string;
   classification: string; moduleName: string; projectName: string;
+  /** Content fingerprint of this edition; changes whenever the records setup changes. */
+  revision: string; lastChanged: string | null;
   baseUrl: string; webhookOrigin: string;
   selection: { mode: "all" | "single" | "multiple"; componentKeys: string[]; labels: string[] };
   endpointsForSelection: { purpose: string; method: string; url: string }[];
@@ -75,6 +77,8 @@ export function buildLbrApiSpec(input: {
   config: ProgrammeModuleConfig; moduleName: string; projectName: string; supabaseUrl: string; now?: Date;
   /** Component keys to document; empty or omitted = all components. */
   components?: string[]; moduleId?: string;
+  /** When the records setup (components, fields) last changed. */
+  lastChanged?: string | null;
 }): LbrApiSpec {
   const now = input.now ?? new Date();
   const origin = input.supabaseUrl.replace(/\/+$/, "");
@@ -96,12 +100,13 @@ export function buildLbrApiSpec(input: {
   const mod = input.moduleId ? { module_id: input.moduleId } : {};
   const scopeLabel = mode === "all" ? "All components" : picked.map((c) => c.label).join(", ");
 
-  return {
+  const spec: LbrApiSpec = {
     documentId: `AMH-LBR-API-${now.toISOString().slice(0, 10).replace(/-/g, "")}`,
     title: "Longitudinal Beneficiary Records — API & Webhook Integration Specification",
     subtitle: "Developer requirements for connecting external software to Amehnities",
     version: "1.0", generatedAt: now.toISOString(),
     classification: "Confidential — authorised integration partners",
+    revision: "", lastChanged: input.lastChanged ?? null,
     moduleName: input.moduleName, projectName: input.projectName,
     baseUrl, webhookOrigin: origin,
     selection: { mode, componentKeys: keys, labels: picked.map((c) => c.label) },
@@ -120,6 +125,7 @@ export function buildLbrApiSpec(input: {
       { purpose: "Your webhook receiver (register in Amehnities)", method: "POST ←", url: "https://<your-system>/amehnities/webhooks" },
     ],
     overview: [
+      `Living document: generated live from the current Longitudinal Beneficiary Records setup${input.lastChanged ? ` (last changed ${new Date(input.lastChanged).toUTCString().replace(" GMT", " UTC")})` : ""}. The revision code changes whenever components, services or fields change; GET /components always returns the current live structure.`,
       `This edition covers: ${scopeLabel} (${mode === "all" ? "all components" : mode === "single" ? "single component" : `${picked.length} components`}). Only the fields, services and filters for this selection are included.`,
       "Amehnities keeps one longitudinal record per person, identified by a unique Case ID, with integrated services delivered across programme components.",
       "External systems connect through two channels: a read-only REST API (pull) and signed webhooks (push). Both are scoped to exactly one project per credential.",
@@ -253,4 +259,15 @@ export function buildLbrApiSpec(input: {
     ],
     contacts: ["Amehnities Platform — HANDS Nigeria Decision Support Platform", "https://www.amehnities.org"],
   };
+  spec.revision = specRevision(spec);
+  spec.version = `Live · rev ${spec.revision}`;
+  return spec;
+}
+
+/** Stable fingerprint of the document content (ignores issue time). */
+export function specRevision(s: LbrApiSpec): string {
+  const body = JSON.stringify({ ...s, documentId: "", generatedAt: "", revision: "", version: "", lastChanged: "" });
+  let h = 0x811c9dc5;
+  for (let i = 0; i < body.length; i++) { h ^= body.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return (h >>> 0).toString(16).padStart(8, "0").toUpperCase();
 }
