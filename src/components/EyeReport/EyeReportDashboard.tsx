@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import hero from "@/assets/eye-report/hero.jpg";
 import {
-  AGE_BANDS, MONTHS, aggregate, aggregatePatients, byMonth, normCsom, normSummary, pct, t, totals, vaTotal,
+  AGE_BANDS, EYE_COUNTING_WINDOW_START, MONTHS, aggregate, aggregatePatients, byMonth, normCsom, normSummary, pct, t, totals, vaTotal, withinCountingWindow,
   type EyePatientRow, type EyeReportRow,
 } from "@/lib/eyeReport/definition";
 import { deleteReport, loadReportAttachments } from "@/lib/eyeReport/store";
@@ -45,6 +45,7 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
   const fromCache = reportData.fromCache || patientData.fromCache;
   const unavailable = reportData.unavailable;
   const thisYear = new Date().getFullYear();
+  const windowLabel = new Date(`${EYE_COUNTING_WINDOW_START}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
   const [year, setYear] = useState(String(thisYear));
   const [month, setMonth] = useState("all");
   const [from, setFrom] = useState("");
@@ -68,7 +69,11 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
   const yearRows = useMemo(() => rows.filter((r) => (year === "all" || r.report_date.startsWith(year)) && (lga === "all" || r.lga === lga) && (facility === "all" || r.facility_name === facility) && (!csomOnly || r.csom)), [rows, year, lga, facility, csomOnly]);
   const filtered = useMemo(() => yearRows.filter((r) => (month === "all" || Number(r.report_date.slice(5, 7)) === Number(month)) && (!from || r.report_date >= from) && (!to || r.report_date <= to)), [yearRows, month, from, to]);
   const filteredPatients = useMemo(() => patients.filter((p) => (year === "all" || p.report_date.startsWith(year)) && (month === "all" || Number(p.report_date.slice(5, 7)) === Number(month)) && (!from || p.report_date >= from) && (!to || p.report_date <= to) && (lga === "all" || p.lga === lga) && (facility === "all" || p.facility_name === facility)), [patients, year, month, from, to, lga, facility]);
-  const pAgg = useMemo(() => aggregatePatients(filteredPatients), [filteredPatients]);
+  // Dashboard totals only: every aggregate on this page counts from the window start,
+  // while the map, monthly trend, acuity and milestone views keep showing all dates.
+  const counted = useMemo(() => withinCountingWindow(filtered), [filtered]);
+  const countedPatients = useMemo(() => withinCountingWindow(filteredPatients), [filteredPatients]);
+  const pAgg = useMemo(() => aggregatePatients(countedPatients), [countedPatients]);
   /** Screened-patient count per report (facility + day), for the reconciliation badge. */
   const screenedByDay = useMemo(() => {
     const m = new Map<string, number>();
@@ -79,7 +84,7 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
     return m;
   }, [patients]);
 
-  const agg = useMemo(() => aggregate(filtered), [filtered]); const S = agg.summary; const T = totals(S); const c = agg.csom;
+  const agg = useMemo(() => aggregate(counted), [counted]); const S = agg.summary; const T = totals(S); const c = agg.csom;
   const pick = (x: { m: number; f: number }) => (sex === "all" ? t(x) : x[sex]);
   const monthly = useMemo(() => byMonth(yearRows).map((a, i) => { const tt = totals(a.summary); return { month: MONTHS[i].slice(0, 3), Consulted: pick(tt.consulted), Surgeries: pick(tt.surgeries), Glasses: pick(tt.glasses), Lenses: pick(tt.lenses) }; }), [yearRows, sex]);
   const ageSex = AGE_BANDS.map((b) => ({ band: b.label, Male: S.consult[b.key].m, Female: S.consult[b.key].f }));
@@ -87,9 +92,9 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
   const fuGood = pct(c.followup.presenting.good, vaTotal(c.followup.presenting));
   const facilityTable = useMemo(() => {
     const m = new Map<string, EyeReportRow[]>();
-    for (const r of filtered) m.set(r.facility_name, [...(m.get(r.facility_name) ?? []), r]);
+    for (const r of counted) m.set(r.facility_name, [...(m.get(r.facility_name) ?? []), r]);
     return [...m.entries()].map(([name, list]) => { const a = aggregate(list); const tt = totals(a.summary); return { name, lga: list[0].lga, days: a.days, consulted: pick(tt.consulted), surgeries: pick(tt.surgeries), glasses: pick(tt.glasses), good: pct(a.csom.discharge.presenting.good, vaTotal(a.csom.discharge.presenting)) }; }).sort((a, b) => b.consulted - a.consulted);
-  }, [filtered, sex]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [counted, sex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const kpis = [
     { label: "Persons consulted", value: pick(T.consulted), sub: `${T.consulted.m} M · ${T.consulted.f} F`, icon: Stethoscope, cls: "from-eye-blue to-eye-deep" },
@@ -104,9 +109,9 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
 
   const periodLabel = [month !== "all" ? MONTHS[Number(month) - 1] : "", year === "all" ? "All years" : year, from || to ? `${from || "…"} to ${to || "…"}` : ""].filter(Boolean).join(" ");
   const doExport = async () => {
-    if (filtered.length === 0) { toast.info("No reports match the current filters."); return; }
+    if (counted.length === 0) { toast.info("No reports match the current filters."); return; }
     setExporting(true);
-    try { await exportAggregated(filtered, { projectName, facilityLabel: facility !== "all" ? facility : lga !== "all" ? `All facilities — ${lga} LGA` : "All facilities", periodLabel, filters: csomOnly ? "CSOM reports only" : undefined }); }
+    try { await exportAggregated(counted, { projectName, facilityLabel: facility !== "all" ? facility : lga !== "all" ? `All facilities — ${lga} LGA` : "All facilities", periodLabel, filters: csomOnly ? "CSOM reports only" : undefined }); }
     catch { toast.error("Export failed"); } finally { setExporting(false); }
   };
   const [opening, setOpening] = useState<string | null>(null);
@@ -135,6 +140,9 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
           <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-eye-gold">Primary Eye Care · {projectName}</p>
           <h1 className="mt-1 text-2xl font-extrabold sm:text-3xl">Eye Health Outputs & Outcomes</h1>
           <p className="mt-1 max-w-xl text-sm opacity-85">Daily facility reports, aggregated by month and year, with cataract surgery outcome monitoring.</p>
+          <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-primary-foreground/15 px-3 py-1 text-xs font-semibold text-primary-foreground">
+            <CalendarRange className="h-3.5 w-3.5" /> Dashboard totals count from {windowLabel} — earlier reports still appear on the map, trend and milestone views
+          </p>
           <div className="mt-4 flex flex-wrap gap-2">
             {canReport && <Button onClick={() => setForm({ open: true })} className="bg-eye-gold text-eye-ink hover:bg-eye-gold/90"><Plus className="mr-1 h-4 w-4" /> New daily report</Button>}
             {canReport && <Button onClick={() => setForm({ open: true, wgOnly: true })} variant="secondary"><Accessibility className="mr-1 h-4 w-4" /> WG-SS screening only</Button>}
@@ -249,7 +257,7 @@ export default function EyeReportDashboard({ projectId, projectName, facilities,
         </section>
 
         <section className="rounded-2xl border bg-card shadow-sm">
-          <h3 className="flex items-center gap-2 border-b p-4 text-sm font-bold"><FileSpreadsheet className="h-4 w-4 text-eye-orange" /> Individual daily reports ({filtered.length})</h3>
+          <h3 className="flex flex-wrap items-center gap-2 border-b p-4 text-sm font-bold"><FileSpreadsheet className="h-4 w-4 text-eye-orange" /> Individual daily reports ({filtered.length})<span className="font-normal text-muted-foreground">· every report is listed here; the totals above count from {windowLabel}</span></h3>
           <div className="max-h-[480px] overflow-auto"><table className="w-full min-w-[760px] text-sm">
             <thead className="sticky top-0 bg-eye-deep text-left text-xs uppercase tracking-wider text-primary-foreground"><tr><th className="p-3">Date</th><th className="p-3">Facility</th><th className="p-3 text-right">Consulted</th><th className="p-3 text-right">Cataract</th><th className="p-3 text-right">Glasses</th><th className="p-3">CSOM</th><th className="p-3">WG-SS</th><th className="p-3">Prepared by</th><th className="p-3 text-right">Actions</th></tr></thead>
             <tbody>{filtered.map((r, i) => { const s = normSummary(r.summary), tt = totals(s), cs = normCsom(r.csom); const mine = r.created_by === userId; const screened = screenedByDay.get(`${r.facility_name.toLowerCase()}|${r.report_date}`) ?? 0; const consultedN = t(tt.consulted); return (

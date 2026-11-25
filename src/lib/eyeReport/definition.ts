@@ -5,6 +5,22 @@
 export const EYE_REPORT_NAME = "Eye Health Daily Facility Report";
 export const EYE_DASH_NAME = "Eye Health Outputs & Outcomes Dashboard";
 
+/**
+ * Counting window: every Eye Health statistic starts on this day. Reports dated
+ * earlier stay in the database as evidence but are not counted in any total,
+ * map, trend, acuity or milestone view.
+ */
+export const EYE_COUNTING_WINDOW_START = "2026-11-02";
+
+/** True when a report date falls inside the counting window. */
+export const inCountingWindow = (date: string | null | undefined): boolean =>
+  typeof date === "string" && date >= EYE_COUNTING_WINDOW_START;
+
+/** Keeps only rows dated inside the counting window. */
+export function withinCountingWindow<T extends { report_date: string }>(rows: T[]): T[] {
+  return rows.filter((r) => inCountingWindow(r.report_date));
+}
+
 export type MF = { m: number; f: number };
 export const AGE_BANDS = [
   { key: "a0_14", label: "0–14 yrs" },
