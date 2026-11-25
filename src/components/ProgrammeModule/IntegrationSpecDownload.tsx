@@ -53,10 +53,11 @@ export default function IntegrationSpecDownload({ config: initialConfig, moduleN
 
   // Prepare the file in the background as soon as the window opens or the choice changes,
   // so clicking Download saves it instantly (browsers block downloads after long waits).
-  const selKey = `${format}|${allOn ? "*" : [...picked].sort().join(",")}|${liveSetup.changedAt || ""}|${simpleHash(liveSetup.sig)}`;
+  const selKey = `${format}|${allOn ? "*" : [...picked].sort().join(",")}|${liveSetup.changedAt || ""}|${simpleHash(liveSetup.sig)}|${projectLive || ""}`;
   const [ready, setReady] = useState<{ key: string; blob: Blob; filename: string } | null>(null);
   const [prepError, setPrepError] = useState<string | null>(null);
   const projectNameRef = useRef<Promise<string> | null>(null);
+  const [projectLive, setProjectLive] = useState<string | null>(null);
   const pendingClick = useRef(false);
   const [nonce, setNonce] = useState(0);
   const [revision, setRevision] = useState<string | null>(null);
@@ -81,7 +82,8 @@ export default function IntegrationSpecDownload({ config: initialConfig, moduleN
         const { data } = await supabase.from("projects").select("name").eq("id", projectId).maybeSingle();
         return data?.name || "Project";
       })();
-      const [projectName, { buildLbrApiSpec }, { buildSpecFile }] = await Promise.all([projectNameRef.current, import("@/lib/integrations/lbrApiSpec"), import("@/lib/integrations/lbrApiExport")]);
+      const [fetchedName, { buildLbrApiSpec }, { buildSpecFile }] = await Promise.all([projectNameRef.current, import("@/lib/integrations/lbrApiSpec"), import("@/lib/integrations/lbrApiExport")]);
+      const projectName = projectLive || fetchedName;
       const spec = buildLbrApiSpec({ config, moduleName, projectName, supabaseUrl: import.meta.env.VITE_SUPABASE_URL, components: allOn ? [] : picked, moduleId: moduleId || undefined, lastChanged: liveSetup.changedAt });
       setRevision(spec.revision);
       const file = await buildSpecFile(spec, format);
@@ -109,6 +111,10 @@ export default function IntegrationSpecDownload({ config: initialConfig, moduleN
       const { data } = await supabase.from("programme_modules").select("config,name,updated_at").eq("id", moduleId).maybeSingle();
       if (live && data) applySetup((data as unknown as { config: unknown }).config, (data as unknown as { name?: string }).name, (data as unknown as { updated_at?: string }).updated_at || null, announce && primed);
       primed = true;
+      if (projectId) {
+        const { data: proj } = await supabase.from("projects").select("name").eq("id", projectId).maybeSingle();
+        if (live && proj?.name) setProjectLive(proj.name);
+      }
     };
     void refetch(false);
     const channel = supabase.channel(`spec-module-${moduleId}-${Math.random().toString(36).slice(2)}`)
