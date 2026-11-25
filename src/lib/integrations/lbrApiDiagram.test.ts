@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildLbrSchema } from "./lbrApiSchema";
 
-const f = (key: string, type = "text", required = false) => ({ key, label: key, type, required });
+const f = (key: string, type = "text", required = false) => ({ key, label: key, type, required, location: "test" });
 const schema = buildLbrSchema({ baseUrl: "https://x", core: [f("id", "uuid", true), f("case_id", "text", true)], profile: [f("sex")],
   service: [f("id", "uuid", true), f("beneficiary_id", "uuid", true), f("component_key", "enum", true)],
   components: [{ key: "eye_health", label: "Eye Health", services: [], extraFields: [f("va_left")] }] });
