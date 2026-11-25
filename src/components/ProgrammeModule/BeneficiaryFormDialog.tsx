@@ -1,4 +1,7 @@
 import { useMemo, useState } from "react";
+
+/** Longest a single server step may hold the Save button. */
+const SAVE_STEP_TIMEOUT_MS = 8000;
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -131,30 +134,48 @@ const BeneficiaryFormDialog = ({
         });
       } else {
         const submission_uuid = newUuid();
-        // Read the signed-in user from the local session and ask for the Case ID
-        // at the same time — neither waits on the other.
-        const [sessionRes, caseIdRes] = await Promise.all([
-          supabase.auth.getSession(),
-          navigator.onLine
-            ? supabase.rpc("next_beneficiary_case_id", {
+        // Never let a slow or patchy connection hold the Save button: each
+        // server step gets a short deadline, then the record is kept on the
+        // device and sent by the queue (same id + submission_uuid, so a late
+        // server insert and the replay can never create a duplicate).
+        const sessionRes = await supabase.auth.getSession();
+        const auth = { user: sessionRes.data.session?.user };
+        let caseId: string | null = null;
+        let online = navigator.onLine;
+        if (online) {
+          const ctl = new AbortController();
+          const timer = setTimeout(() => ctl.abort(), SAVE_STEP_TIMEOUT_MS);
+          try {
+            const res = await supabase.rpc("next_beneficiary_case_id", {
               _module_id: moduleId,
               _facility_id: facilityId || null,
-            } as never)
-            : Promise.resolve({ data: null }),
-        ]);
-        const auth = { user: sessionRes.data.session?.user };
-        const caseId = (caseIdRes.data as unknown as string) || null;
+            } as never).abortSignal(ctl.signal);
+            caseId = (res.data as unknown as string) || null;
+            if (res.error && ctl.signal.aborted) online = false;
+          } catch { online = false; } finally { clearTimeout(timer); }
+        }
         const payload = {
           ...base,
+          id: submission_uuid,
           case_id: caseId || `PENDING-${submission_uuid.slice(0, 8).toUpperCase()}`,
           submission_uuid,
           created_by: auth.user?.id,
         };
-        if (navigator.onLine) {
-          const { data, error } = await supabase.from("beneficiaries")
-            .insert(payload as never).select("*").single();
-          if (error) throw error;
-          savedRow = data as unknown as BeneficiaryRow;
+        let sent = false;
+        if (online && caseId) {
+          const ctl = new AbortController();
+          const timer = setTimeout(() => ctl.abort(), SAVE_STEP_TIMEOUT_MS);
+          try {
+            // No read-back: building the row locally skips a second
+            // permission-checked select on the server.
+            const { error } = await supabase.from("beneficiaries")
+              .insert(payload as never).abortSignal(ctl.signal);
+            if (error && !ctl.signal.aborted && error.code !== "23505") throw error;
+            sent = !error || error.code === "23505";
+          } finally { clearTimeout(timer); }
+        }
+        if (sent) {
+          savedRow = { ...(payload as unknown as BeneficiaryRow), created_at: new Date().toISOString() } as BeneficiaryRow;
           toast({ title: "Beneficiary registered", description: payload.case_id });
         } else {
           enqueue("beneficiary", payload as unknown as Record<string, unknown>);
@@ -164,7 +185,7 @@ const BeneficiaryFormDialog = ({
             id: submission_uuid,
             __pending: true,
           } as BeneficiaryRow;
-          toast({ title: "Saved offline", description: "It will sync automatically when you are back online." });
+          toast({ title: "Saved on this device", description: "The connection is slow — it will sync automatically." });
         }
       }
       // Open the WG-SS disability screening before closing — it applies to
