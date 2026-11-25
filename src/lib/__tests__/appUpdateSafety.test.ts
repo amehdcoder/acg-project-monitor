@@ -42,6 +42,25 @@ describe("safe, responsive app updates", () => {
     expect(replace).not.toHaveBeenCalled();
   });
 
+  it("same version is never offered as an update", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => response("development", '<div id="root"></div><script src="/assets/index-current.js"></script>')));
+    const mgr = await import("@/lib/appUpdateManager");
+    const result = await mgr.checkForAppUpdate({ force: true });
+    expect(result.updateAvailable).toBe(false);
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("a real new version is only applied when Update is tapped", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => response()));
+    const mgr = await import("@/lib/appUpdateManager");
+    const found = await mgr.checkForAppUpdate({ force: true });
+    expect(found.updateAvailable).toBe(true);
+    await new Promise(r => setTimeout(r, 20));
+    expect(replace).not.toHaveBeenCalled();
+    expect(await mgr.hardReloadToLatest()).toBe(true);
+    expect(replace).toHaveBeenCalledTimes(1);
+  });
+
   it("hung probes abort and return a retryable failure within a bounded time", async () => {
     vi.useFakeTimers();
     const fetcher = vi.fn(() => new Promise<Response>(() => {}));
