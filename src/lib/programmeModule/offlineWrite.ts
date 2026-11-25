@@ -5,7 +5,7 @@
 // a replay can never create a duplicate.
 
 import { supabase } from "@/integrations/supabase/client";
-import { enqueue, flushQueue, mergeIntoQueued, newUuid } from "./offlineQueue";
+import { enqueue, flushQueue, mergeIntoQueued, newUuid, SAVE_DEADLINE_MS } from "./offlineQueue";
 import { cachePatchRows } from "./offlineReadCache";
 
 const db = supabase as unknown as { from: (t: string) => any }; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -92,7 +92,12 @@ export async function offlineMutate(op: OpPayload & { forceQueue?: boolean }): P
 
   if (!navigator.onLine || op.forceQueue) return queue();
   try {
-    await runOp(prepared);
+    // A slow connection must not hold Save: past the deadline keep the change
+    // on the device (ops are idempotent by stable id, so replays are safe).
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const slow = new Promise<"slow">((r) => { timer = setTimeout(() => r("slow"), SAVE_DEADLINE_MS); });
+    const outcome = await Promise.race([runOp(prepared).then(() => "done" as const), slow]).finally(() => clearTimeout(timer));
+    if (outcome === "slow") return queue();
     await patchCache();
     void flushQueue();
     return { id, queued: false };

@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { enqueue, flushQueue, newUuid } from "@/lib/programmeModule/offlineQueue";
+import { enqueue, flushQueue, newUuid, insertWithDeadline } from "@/lib/programmeModule/offlineQueue";
 import { visibleComponents } from "@/lib/programmeModule/defaults";
 import type { ProgrammeModuleConfig } from "@/lib/programmeModule/types";
 import { recordAudit } from "./useProgrammeModule";
@@ -69,9 +69,9 @@ const ReferralDialog = ({
         created_by: auth.user?.id,
       };
       if (navigator.onLine) {
-        const { error } = await supabase.from("beneficiary_referrals").insert(payload as never);
+        const { error } = await insertWithDeadline("referral", payload as unknown as Record<string, unknown>);
         if (error) throw error;
-        await recordAudit({
+        void recordAudit({
           beneficiary_id: beneficiaryId, project_id: projectId,
           action: "referral_created", new_value: payload.referred_to,
         });

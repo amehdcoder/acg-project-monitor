@@ -157,3 +157,34 @@ export const bindQueueAutoFlush = () => {
   setInterval(() => { if (read().length) void flushQueue(); }, 60_000);
   void flushQueue();
 };
+
+
+/** Longest a record Save may wait on the server before keeping it on the device. */
+export const SAVE_DEADLINE_MS = 8000;
+
+/**
+ * Inserts a queueable record, but never holds the Save button longer than the
+ * deadline: on a slow or dropped connection the payload is queued instead.
+ * Safe against duplicates because replays upsert on submission_uuid.
+ */
+export async function insertWithDeadline(
+  kind: Exclude<QueueKind, "op">,
+  payload: Record<string, unknown>,
+): Promise<{ error: { message: string; code?: string } | null; queued: boolean }> {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), SAVE_DEADLINE_MS);
+  try {
+    const { error } = await supabase.from(TABLES[kind]).insert(payload as never).abortSignal(ctl.signal);
+    if (!error || error.code === "23505") return { error: null, queued: false };
+    if (ctl.signal.aborted || /failed to fetch|network|load failed/i.test(error.message)) {
+      enqueue(kind, payload);
+      return { error: null, queued: true };
+    }
+    return { error, queued: false };
+  } catch {
+    enqueue(kind, payload);
+    return { error: null, queued: true };
+  } finally {
+    clearTimeout(timer);
+  }
+}

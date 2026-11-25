@@ -1,3 +1,4 @@
+import { offlineMutate } from "@/lib/programmeModule/offlineWrite";
 // MMDP / NTD limb-care and hydrocoele visit.
 //
 // Captures the clinical photograph and the measurements needed for outcome
@@ -20,7 +21,7 @@ import { Activity, TrendingDown, TrendingUp, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { enqueue, flushQueue, newUuid } from "@/lib/programmeModule/offlineQueue";
+import { enqueue, flushQueue, newUuid, insertWithDeadline } from "@/lib/programmeModule/offlineQueue";
 import { analyseClinicalImage, assessLimbProgress } from "@/lib/programmeModule/limbProgress";
 import type { ImageSignal, LimbMeasurement } from "@/lib/programmeModule/limbProgress";
 import {
@@ -156,14 +157,12 @@ const MmdpServiceForm = ({
       };
 
       if (navigator.onLine) {
-        const { error } = await supabase.from("beneficiary_services").insert(payload as never);
+        const { error } = await insertWithDeadline("service", payload as unknown as Record<string, unknown>);
         if (error) throw error;
         if (followUp.date) {
-          await supabase.from("beneficiaries")
-            .update({ next_follow_up_date: followUp.date } as never)
-            .eq("id", beneficiary.id);
+          void offlineMutate({ table: "beneficiaries", action: "update", values: { next_follow_up_date: followUp.date }, id: beneficiary.id }).catch(() => undefined);
         }
-        await recordAudit({
+        void recordAudit({
           beneficiary_id: beneficiary.id, project_id: projectId,
           action: "mmdp_visit_recorded", field_name: site, new_value: payload.result,
         });

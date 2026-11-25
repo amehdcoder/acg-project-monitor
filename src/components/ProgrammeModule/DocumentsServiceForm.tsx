@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { enqueue, flushQueue, newUuid } from "@/lib/programmeModule/offlineQueue";
+import { enqueue, flushQueue, newUuid, insertWithDeadline } from "@/lib/programmeModule/offlineQueue";
 import type { BeneficiaryRow, ProgrammeComponent } from "@/lib/programmeModule/types";
 import AttachmentsField, { type Attachment } from "./AttachmentsField";
 import SignaturePad from "./SignaturePad";
@@ -162,9 +162,9 @@ const DocumentsServiceForm = ({
       };
 
       if (navigator.onLine) {
-        const { error } = await supabase.from("beneficiary_services").insert(payload as never);
+        const { error } = await insertWithDeadline("service", payload as unknown as Record<string, unknown>);
         if (error) throw error;
-        await recordAudit({
+        void recordAudit({
           beneficiary_id: beneficiary.id, project_id: projectId,
           action: "document_recorded", field_name: component.key, new_value: serviceName,
         });

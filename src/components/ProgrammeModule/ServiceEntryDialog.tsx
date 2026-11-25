@@ -1,3 +1,4 @@
+import { offlineMutate } from "@/lib/programmeModule/offlineWrite";
 import { useEffect, useMemo, useState } from "react";
 import { outcomesForComponent, servicesForComponent } from "@/lib/programmeModule/componentOutcomes";
 import {
@@ -11,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { enqueue, flushQueue, newUuid } from "@/lib/programmeModule/offlineQueue";
+import { enqueue, flushQueue, newUuid, insertWithDeadline } from "@/lib/programmeModule/offlineQueue";
 import { visibleComponents } from "@/lib/programmeModule/defaults";
 import type { ProgrammeModuleConfig } from "@/lib/programmeModule/types";
 import ConfigFieldRenderer, { AnswerMap, isRelevant } from "./ConfigFieldRenderer";
@@ -157,14 +158,12 @@ const ServiceEntryDialog = ({
         recorded_by: auth.user?.id,
       };
       if (navigator.onLine) {
-        const { error } = await supabase.from("beneficiary_services").insert(payload as never);
+        const { error } = await insertWithDeadline("service", payload as unknown as Record<string, unknown>);
         if (error) throw error;
         if (followUp.date) {
-          await supabase.from("beneficiaries")
-            .update({ next_follow_up_date: followUp.date } as never)
-            .eq("id", beneficiaryId);
+          void offlineMutate({ table: "beneficiaries", action: "update", values: { next_follow_up_date: followUp.date }, id: beneficiaryId }).catch(() => undefined);
         }
-        await recordAudit({
+        void recordAudit({
           beneficiary_id: beneficiaryId, project_id: projectId,
           action: "service_recorded", field_name: componentKey, new_value: payload.service_name || "",
         });

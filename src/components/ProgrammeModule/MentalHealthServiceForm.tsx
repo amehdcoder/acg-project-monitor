@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { enqueue, flushQueue, newUuid } from "@/lib/programmeModule/offlineQueue";
+import { enqueue, flushQueue, newUuid, insertWithDeadline } from "@/lib/programmeModule/offlineQueue";
 import { STANDARD_ASSESSMENTS, scoreAssessment } from "@/lib/standardAssessments/definitions";
 import type { BeneficiaryRow } from "@/lib/programmeModule/types";
 import { recordAudit } from "./useProgrammeModule";
@@ -136,9 +136,9 @@ const MentalHealthServiceForm = ({
         recorded_by: auth.user?.id,
       };
       if (navigator.onLine) {
-        const { error } = await supabase.from("beneficiary_services").insert(payload as never);
+        const { error } = await insertWithDeadline("service", payload as unknown as Record<string, unknown>);
         if (error) throw error;
-        await recordAudit({
+        void recordAudit({
           beneficiary_id: beneficiary.id, project_id: projectId,
           action: "assessment_recorded", field_name: formKey, new_value: payload.result,
         });

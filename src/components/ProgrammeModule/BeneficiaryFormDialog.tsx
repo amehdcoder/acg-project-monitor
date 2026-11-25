@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 
 /** Longest a single server step may hold the Save button. */
-const SAVE_STEP_TIMEOUT_MS = 8000;
+const SAVE_STEP_TIMEOUT_MS = SAVE_DEADLINE_MS;
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -10,7 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { enqueue, newUuid, flushQueue } from "@/lib/programmeModule/offlineQueue";
+import { enqueue, newUuid, flushQueue, SAVE_DEADLINE_MS } from "@/lib/programmeModule/offlineQueue";
 import type { BeneficiaryRow, ProgrammeModuleConfig } from "@/lib/programmeModule/types";
 import ConfigFieldRenderer, {
   AnswerMap, applyCalculations, isRelevant, validateQuestion,
