@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { withTimeoutFallback } from "@/lib/withTimeout";
 import { LATEST_PUBLISHED_VERSION } from "@/config/appVersion";
+import { lookupClientIp } from "@/lib/auth/clientIp";
 
 const HEARTBEAT_INTERVAL = 60_000; // 1 minute
 const IMPERSONATION_KEY = "acg_impersonation_admin_session";
@@ -49,10 +50,8 @@ function getDeviceDescription(): string {
 async function fetchClientIp(): Promise<string | null> {
   // Strategy 1: Our edge function
   try {
-    const { data, error } = await supabase.functions.invoke("get-client-ip");
-    if (!error && data?.ip && data.ip !== "unknown") {
-      return data.ip;
-    }
+    const ip = await lookupClientIp();
+    if (ip) return ip;
   } catch {
     // continue to fallbacks
   }
@@ -197,6 +196,9 @@ export function useHeartbeat() {
 
         if (updateError) {
           console.warn("[Heartbeat] Profile update failed:", updateError.message);
+          // The guard already requests session recovery. Do not cascade optional
+          // device-session writes while that session is being restored.
+          if (updateError.code === "PGRST301" || updateError.code === "PGRST303") return;
         }
 
         // Fetch IP in background if not cached, then update separately
@@ -284,7 +286,7 @@ export function useHeartbeat() {
           if (!beat._lastIpRefresh || now - beat._lastIpRefresh > 600_000) {
             beat._lastIpRefresh = now;
             fetchClientIp().then((ip) => {
-              if (ip) cachedIpRef.current = ip;
+              if (ip && !cancelled) cachedIpRef.current = ip;
             });
           }
         }

@@ -12,6 +12,15 @@ describe("live session guard", () => {
   it("blocks signed-in data reads sent as a signed-out visitor", () => {
     expect(shouldBlock(`${B}/rest/v1/projects`, jwt("anon"), "u1")).toBe(true);
   });
+  it("allows the public IP lookup during session recovery", () => {
+    expect(shouldBlock(`${B}/functions/v1/get-client-ip`, jwt("anon"), "u1")).toBe(false);
+    expect(shouldBlock(`${B}/functions/v1/get-client-ip?probe=1`, jwt("anon"), "u1")).toBe(false);
+  });
+  it("keeps private functions and similarly named routes protected", () => {
+    for (const path of ["external-api", "health-exchange", "get-client-ip-private", "get-client-ip/records"]) {
+      expect(shouldBlock(`${B}/functions/v1/${path}`, jwt("anon"), "u1")).toBe(true);
+    }
+  });
   it("allows real sessions, signed-out visitors and sign-in calls", () => {
     expect(shouldBlock(`${B}/rest/v1/projects`, jwt("authenticated"), "u1")).toBe(false);
     expect(shouldBlock(`${B}/rest/v1/projects`, jwt("anon"), null)).toBe(false);

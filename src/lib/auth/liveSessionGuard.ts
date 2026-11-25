@@ -18,6 +18,7 @@ export function setExpectedUser(id: string | null) { expectedUserId = id; }
 const BACKEND = String(import.meta.env.VITE_SUPABASE_URL || "").replace(/\/+$/, "");
 // Endpoints that legitimately run without an account session.
 const PUBLIC_FUNCTIONS = /\/functions\/v1\/(auth-precheck|project-collect|public-|ccff|community-feedback)/;
+const PUBLIC_IP_FUNCTION = /^\/functions\/v1\/get-client-ip\/?(?:\?.*)?$/;
 
 /** Role claimed by a bearer token: "anon" for the publishable key or a non-JWT key. */
 export function bearerRole(auth: string | null | undefined): string | null {
@@ -35,7 +36,7 @@ export function bearerRole(auth: string | null | undefined): string | null {
 export function shouldBlock(url: string, auth: string | null, userId: string | null): boolean {
   if (!userId || !BACKEND || !url.startsWith(BACKEND)) return false;
   const path = url.slice(BACKEND.length);
-  const data = path.startsWith("/rest/v1/") || (path.startsWith("/functions/v1/") && !PUBLIC_FUNCTIONS.test(path));
+  const data = path.startsWith("/rest/v1/") || (path.startsWith("/functions/v1/") && !PUBLIC_FUNCTIONS.test(path) && !PUBLIC_IP_FUNCTION.test(path));
   return data && bearerRole(auth) === "anon";
 }
 
