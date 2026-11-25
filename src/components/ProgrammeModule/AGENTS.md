@@ -1,0 +1,1 @@
+- Project team 'Add users' wizard maps View only / View & record / Record only plus component, tab and record scope into member permissions (`addUsersAccess.ts`); per-record limits (`beneficiary_ids`) are enforced in `beneficiary_in_user_scope` — why: the simple choice must restrict data server-side, not just hide UI.

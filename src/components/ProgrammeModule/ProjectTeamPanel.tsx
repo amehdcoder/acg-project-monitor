@@ -41,6 +41,7 @@ import {
 import { useProjectUsers } from "@/lib/programmeModule/projectUsers";
 import LocationCombobox from "@/components/MdaChecklist/LocationCombobox";
 import GeoCascadeFields from "./GeoCascadeFields";
+import AddUsersWizard from "./AddUsersWizard";
 
 interface Props {
   projectId: string;
@@ -64,6 +65,7 @@ const ProjectTeamPanel = ({ projectId, moduleId, canManage = false, components =
   const { users: projectUsers } = useProjectUsers(projectId);
 
   const [open, setOpen] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [editing, setEditing] = useState<TeamMemberRow | null>(null);
   const [form, setForm] = useState({ ...blank });
   const [perms, setPerms] = useState<TeamPermissions>({ ...PRESETS.state });
@@ -183,6 +185,8 @@ const ProjectTeamPanel = ({ projectId, moduleId, canManage = false, components =
 
   return (
     <div className="space-y-4">
+      {canManage && <AddUsersWizard open={wizardOpen} onOpenChange={setWizardOpen} projectId={projectId} moduleId={moduleId}
+        components={components} members={members} onSaved={() => void reload()} />}
       <Card className="p-4">
         <div className="flex flex-wrap items-center gap-2">
           <Users className="h-4 w-4 text-primary" />
@@ -193,9 +197,12 @@ const ProjectTeamPanel = ({ projectId, moduleId, canManage = false, components =
             </p>
           </div>
           {canManage && (
-            <Button size="sm" onClick={startAdd}>
-              <UserPlus className="mr-1 h-4 w-4" /> Add team member
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" onClick={() => setWizardOpen(true)}>
+                <UserPlus className="mr-1 h-4 w-4" /> Add users
+              </Button>
+              <Button size="sm" variant="outline" onClick={startAdd}>Detailed entry</Button>
+            </div>
           )}
         </div>
 

@@ -81,6 +81,7 @@ import DevicePreviewDialog from "./DevicePreviewDialog";
 import ViewAsDialog, { ViewAsBanner } from "./ViewAsDialog";
 import { viewAsPermissions, viewAsRecordVisible, type ViewAsConfig } from "@/lib/programmeModule/viewAs";
 import { applyDeviceFit } from "@/lib/deviceFit";
+import { useAuth } from "@/hooks/useAuth";
 
 
 interface Props {
@@ -111,6 +112,7 @@ const ProgrammeModuleWorkspace = ({
   const isOwner = viewAs ? false : realIsOwner;
   const isSuperAdmin = viewAs ? false : realIsSuperAdmin;
   const { toast } = useToast();
+  const { user } = useAuth();
   const { modules, loading, reload } = useProgrammeModules(projectId);
   const [activeId, setActiveId] = useState<string>("");
   const [galleryOpen, setGalleryOpen] = useState(false);
@@ -248,10 +250,13 @@ const ProgrammeModuleWorkspace = ({
   const scopedBeneficiaries = useMemo(() => {
     let rows = beneficiaries;
     if (viewAs) rows = rows.filter((b) => viewAsRecordVisible(viewAs, b as unknown as { state?: string; facility_id?: string }));
+    const onlyIds = memberPerms?.beneficiary_ids;
+    if (onlyIds?.length) { const ok = new Set(onlyIds); rows = rows.filter((b) => ok.has((b as { id: string }).id) || (b as { created_by?: string }).created_by === user?.id); }
     if (!isFocalPerson) return rows;
     return rows.filter((b) =>
       Boolean(facilityLevels[(b as unknown as { facility_id?: string }).facility_id || ""]));
-  }, [beneficiaries, facilityLevels, isFocalPerson, viewAs]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [beneficiaries, facilityLevels, isFocalPerson, viewAs, (memberPerms?.beneficiary_ids || []).join(",")]);
   // The open record must follow fresh saved data, not the object captured on click.
   useEffect(() => {
     if (loadingBeneficiaries) return;

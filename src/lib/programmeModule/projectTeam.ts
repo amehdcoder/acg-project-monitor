@@ -101,6 +101,8 @@ export interface TeamPermissions {
   hidden_views?: string[];
   /** Beneficiary profile sections hidden for this person (Access studio). */
   hidden_sections?: string[];
+  /** Individual beneficiary records this member is limited to (empty = all in scope). */
+  beneficiary_ids?: string[];
   /** Access studio category this member follows. */
   access_category?: string;
 }
