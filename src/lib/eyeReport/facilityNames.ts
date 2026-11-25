@@ -33,7 +33,38 @@ function canonical(row: FacilityRecord): { token: string; name: string } {
     const suffixLabel = suffix === "generalhospital" ? "General Hospital" : suffix === "primaryhealthcentre" ? "Primary Health Centre" : "Primary Health Center";
     return { token: lga + suffix, name: `${title(row.lga ?? "")} ${suffixLabel}` };
   }
+  // Drop a trailing LGA or State qualifier ("… Teaching Hospital Dutse").
+  for (const place of [lga, state]) {
+    if (place.length < 4) continue;
+    const t = token.endsWith(place) ? token.slice(0, -place.length) : "";
+    if (t.length >= 12 && /(hospital|centre|center|clinic|phc|fmc)/.test(t)) {
+      const re = new RegExp(`\\s+${place}$`);
+      return { token: t, name: title(name.replace(re, "")) };
+    }
+  }
   return { token, name: title(name) || "Facility name not recorded" };
+}
+function distance(a: string, b: string, max: number): number {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i]; let best = i;
+    for (let j = 1; j <= b.length; j++) { cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); best = Math.min(best, cur[j]); }
+    if (best > max) return max + 1; prev = cur;
+  }
+  return prev[b.length];
+}
+const TYPE_WORDS = /^(general|genral|generl|gen|hospital|hospita|hosptal|hopital|hosp|primary|primery|health|helth|heath|centre|center|centr|clinic|clinc|comprehensive|federal|university|teaching|medical|specialist|eye|state)$/;
+/** Typo-tolerant match: locality/proper-name words must match exactly; only facility-type words may differ by small typos. */
+export function similarFacilityNames(a: string, b: string): boolean {
+  const wa = words(a).split(" "), wb = words(b).split(" ");
+  const own = (w: string[]) => w.filter(x => !TYPE_WORDS.test(x)).join(" ");
+  if (!own(wa) || own(wa) !== own(wb)) return false;
+  const ta = compact(a), tb = compact(b);
+  if (ta === tb) return true;
+  if (ta.replace(/\D/g, "") !== tb.replace(/\D/g, "")) return false;
+  const max = Math.max(1, Math.floor(Math.max(ta.length, tb.length) * 0.1));
+  return distance(ta, tb, max) <= max;
 }
 const scope = (r: FacilityRecord) => JSON.stringify([r.project_id ?? "", compact(r.state ?? ""), compact(r.lga ?? "")]);
 export type FacilityNormalizer = <T extends FacilityRecord>(row: T) => T;
@@ -50,9 +81,20 @@ export function createFacilityNormalizer(records: FacilityRecord[], registry: Fa
     ids.add(idKey(r)); idsByName.set(k, ids);
   }
   for (const r of refs) registeredNames.set(idKey(r), canonical(r).name);
+  // Automatic spelling merge: within one project/State/LGA, map similar
+  // unlinked tokens onto the most frequent spelling (or a registered one).
+  const tokenCount = new Map<string, Map<string, { n: number; name: string }>>();
+  for (const r of all) { const sc = scope(r), m = tokenCount.get(sc) ?? new Map(); const c = canonical(r); const e = m.get(c.token) ?? { n: 0, name: c.name }; e.n += r.facility_id ? 1000 : 1; m.set(c.token, e); tokenCount.set(sc, m); }
+  const fuzzy = new Map<string, string>();
+  for (const [sc, m] of tokenCount) {
+    const ranked = [...m].sort((a, b) => b[1].n - a[1].n || a[0].localeCompare(b[0]));
+    const reps: [string, string][] = [];
+    for (const [t, e] of ranked) { const rep = reps.find(x => similarFacilityNames(x[1], e.name)); if (rep) fuzzy.set(`${sc}:${t}`, rep[0]); else reps.push([t, e.name]); }
+  }
+  const tokenOf = (r: FacilityRecord) => { const t = canonical(r).token; return fuzzy.get(`${scope(r)}:${t}`) ?? t; };
   const keyFor = (r: FacilityRecord) => {
     if (r.facility_id) return idKey(r);
-    const k = `${scope(r)}:${canonical(r).token}`, ids = idsByName.get(k);
+    const k = `${scope(r)}:${tokenOf(r)}`, ids = idsByName.get(k);
     if (ids?.size === 1) return [...ids][0];
     return `${k}:unregistered`;
   };
