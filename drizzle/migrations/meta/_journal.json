@@ -519,6 +519,13 @@
       "when": 1795337655766,
       "tag": "0073_lock_dhis2_server_address",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1795610232648,
+      "tag": "0074_restrict_stock_movements_and_route_reward",
+      "breakpoints": true
     }
   ]
 }

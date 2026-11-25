@@ -1,3 +1,4 @@
+import { sanitizeCsvText, neutralizeFormula } from "@/lib/security/csvSafe";
 import { useState, useEffect, useCallback, useRef, useMemo, useDeferredValue, Fragment, memo } from "react";
 import { deriveOnce } from "@/lib/microplanning/derivedCache";
 import { normalizeMicroplanEntry } from "@/lib/microplanning/normalizeEntry";
@@ -2283,7 +2284,10 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
     })));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Medicine Allocation");
-    XLSX.writeFile(wb, "Medicine_Allocation_by_LGA.csv", { bookType: "csv" });
+    const csv = sanitizeCsvText(XLSX.utils.sheet_to_csv(ws));
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "Medicine_Allocation_by_LGA.csv"; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     toast({ title: "CSV exported", description: `${medicineAllocationData.length} rows exported.` });
   };
 
@@ -2291,7 +2295,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
     if (medicineAllocationData.length === 0) return;
     const ws = XLSX.utils.json_to_sheet(medicineAllocationData.map(r => ({
       Year: r.year, State: r.state, LGA: r.lga, Ward: r.ward, FLHF: r.flhf,
-      Community: r.community, Settlement: r.settlement,
+      Community: neutralizeFormula(r.community), Settlement: neutralizeFormula(r.settlement),
       "Target Population": r.targetPop, "Medicine Required": r.medicineRequired, "% Share": Number(r.pct.toFixed(1)),
       "Expected Treatment (People)": r.peopleToTreat, "Drug/Person Ratio": r.ratio ? Number(r.ratio.toFixed(2)) : 0,
     })));

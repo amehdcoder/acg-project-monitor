@@ -173,8 +173,10 @@ Deno.serve(async (req) => {
         .order("updated_at", { ascending: false })
         .limit(1);
       const cfg = cfgs?.[0];
-      const dToken = String(body?.api_token ?? "").trim() || String(cfg?.api_token ?? "");
-      const dServer = String(body?.server_url ?? "").trim() ||
+      const ownToken = String(body?.api_token ?? "").trim();
+      const dToken = ownToken || String(cfg?.api_token ?? "");
+      // A saved token is only sent to the server it was saved for.
+      const dServer = (ownToken ? String(body?.server_url ?? "").trim() : "") ||
         String(cfg?.kobo_server_url ?? "https://kf.kobotoolbox.org");
       if (!dToken) return j({ error: "no_kobo_config", detail: "No KoboToolbox API token saved." }, 400);
       try {
@@ -205,8 +207,9 @@ Deno.serve(async (req) => {
         .select("kobo_server_url, api_token")
         .order("updated_at", { ascending: false })
         .limit(1);
-      const tok = String(body?.api_token ?? "").trim() || String(cfgs?.[0]?.api_token ?? "");
-      const srv = String(body?.server_url ?? "").trim() ||
+      const ownTok = String(body?.api_token ?? "").trim();
+      const tok = ownTok || String(cfgs?.[0]?.api_token ?? "");
+      const srv = (ownTok ? String(body?.server_url ?? "").trim() : "") ||
         String(cfgs?.[0]?.kobo_server_url ?? "https://kf.kobotoolbox.org");
       if (!tok) return j({ error: "no_kobo_config", detail: "No KoboToolbox API token available." }, 400);
       const { error: cErr } = await admin.from("kobo_form_configs").upsert({
@@ -251,7 +254,8 @@ Deno.serve(async (req) => {
       }
       if (cfg) {
         formUid = formUid || String(cfg.form_uid);
-        serverUrl = serverUrl || String(cfg.kobo_server_url ?? "https://kf.kobotoolbox.org");
+        // A saved token is only ever sent to the server it was saved for.
+        serverUrl = String(cfg.kobo_server_url ?? "https://kf.kobotoolbox.org");
         token = String(cfg.api_token);
       }
     }

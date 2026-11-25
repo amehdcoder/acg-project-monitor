@@ -214,13 +214,14 @@ Deno.serve(async (req) => {
     if (insertError) return json({ error: insertError.message }, 400);
 
     // Routing policy learns which model tier actually earns reward per class.
-    await admin.rpc("ai_route_reward", {
+    const { data: canTrain } = await admin.rpc("is_admin", { _user_id: guard.userId });
+    if (canTrain === true) await admin.rpc("ai_route_reward", {
       _class: questionClass, _tier: tier, _model: routeModel, _reward: reward,
     });
 
     // Bandit credit assignment: every policy entry that shaped this answer
     // receives the reward, so weak rules decay and strong ones are reinforced.
-    await Promise.all(policyIds.map((id) =>
+    if (canTrain === true) await Promise.all(policyIds.map((id) =>
       admin.rpc("ai_policy_reward", { _policy_id: id, _reward: reward })
     ));
 
@@ -294,9 +295,9 @@ Deno.serve(async (req) => {
           .limit(20);
         const duplicate = (existing ?? []).find((r) =>
           r.content.trim().toLowerCase() === lesson.rule.toLowerCase());
-        if (duplicate) {
+        if (duplicate && canTrain === true) {
           await admin.rpc("ai_policy_reward", { _policy_id: duplicate.id, _reward: Math.abs(reward) });
-        } else {
+        } else if (!duplicate) {
           await admin.from("ai_chat_policy").insert({
             kind: "rule",
             topic: lesson.topic,

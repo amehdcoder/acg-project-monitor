@@ -86,6 +86,8 @@ Deno.serve(async (req) => {
           attachments: Array.isArray(d.attachments) ? d.attachments.slice(0, 30) : [],
           created_by: ctx.collectorUserId, device_id: ctx.deviceId, collector_label: ctx.label,
         };
+        const { data: prior } = await db.from('eye_daily_reports').select('project_id, device_id').eq('id', record.id).maybeSingle();
+        if (prior && (prior.project_id !== ctx.projectId || prior.device_id !== ctx.deviceId)) throw new Error('record_id_conflict');
         const { error } = await db.from('eye_daily_reports').upsert(row, { onConflict: 'id' });
         if (error?.code === '23505') throw new Error('duplicate_facility_day');
         if (error) throw new Error(error.message);
@@ -150,7 +152,7 @@ Deno.serve(async (req) => {
         (caseTypes ?? []).filter((c: any) => c.project_id === ctx.projectId).map((c: any) => c.id),
       );
 
-      const caseRows: Record<string, unknown>[] = [];
+      let caseRows: Record<string, unknown>[] = [];
       for (const r of caseRecords) {
         const typeId = String(r.caseTypeId || r.formId);
         if (!ctx.allowCases) {
@@ -172,6 +174,14 @@ Deno.serve(async (req) => {
           opened_at: r.submittedAt || now,
           client_submitted_at: r.clientSubmittedAt || r.submittedAt || now,
         });
+      }
+      if (caseRows.length > 0) {
+        // Never let a device overwrite a case that belongs to another project
+        // or was created by someone else.
+        const { data: priorCases } = await db.from("cases").select("id, project_id, owner_id").in("id", caseRows.map((r) => String(r.id)));
+        const foreign = new Set((priorCases ?? []).filter((c: any) => c.project_id !== ctx.projectId || c.owner_id !== ctx.collectorUserId).map((c: any) => String(c.id)));
+        for (const id of foreign) rejected.push({ id, reason: "record_id_conflict" });
+        caseRows = caseRows.filter((r) => !foreign.has(String(r.id)));
       }
       if (caseRows.length > 0) {
         // Atomic, idempotent, last-write-wins ingestion in a single

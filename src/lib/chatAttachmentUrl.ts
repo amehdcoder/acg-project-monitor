@@ -1,8 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 
 const BUCKET = "chat-attachments";
-const SIGNED_URL_TTL_SECONDS = 60 * 60; // 1 hour
-const REFRESH_MARGIN_MS = 5 * 60 * 1000;
+const SIGNED_URL_TTL_SECONDS = 5 * 60; // short-lived so removed members lose access quickly
+const REFRESH_MARGIN_MS = 30 * 1000;
 
 interface CachedUrl {
   signedUrl: string;

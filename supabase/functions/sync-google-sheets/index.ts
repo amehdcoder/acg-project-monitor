@@ -341,6 +341,22 @@ serve(async (req) => {
 
     console.log(`Auth mode: ${usedPerUserToken ? "per-user OAuth" : "service account"}`);
 
+    // Bound the destination: IDs must look like real sheet IDs, and the shared
+    // service account may only write to administrator-approved spreadsheets.
+    if (spreadsheetId !== undefined && !/^[A-Za-z0-9_-]{20,100}$/.test(String(spreadsheetId))) {
+      return new Response(JSON.stringify({ error: "Invalid spreadsheet ID" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (!usedPerUserToken) {
+      const allowed = new Set((Deno.env.get("GOOGLE_SHEETS_ALLOWED_IDS") ?? "").split(",").map((v) => v.trim()).filter(Boolean));
+      if (!allowed.has(String(spreadsheetId))) {
+        return new Response(JSON.stringify({ error: "This spreadsheet is not approved for the shared account. Connect your own Google account in Integrations." }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     console.log(`Processing action: ${action}, sheet: ${spreadsheetId}, form: ${formId}, project: ${projectId}`);
 
     if (action === "sync") {

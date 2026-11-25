@@ -27,17 +27,18 @@ const MAX_ENTRIES = 40;
  * function runs after a model change. Rows written by the current model carry
  * `metadata.embed_model`; anything else is stale and is deleted once.
  */
-let purgedStale = false;
-async function purgeStaleVectors(admin: ReturnType<typeof createClient>) {
-  if (purgedStale) return;
-  purgedStale = true;
+const purgedFor = new Set<string>();
+async function purgeStaleVectors(admin: ReturnType<typeof createClient>, userId: string) {
+  if (purgedFor.has(userId)) return;
+  purgedFor.add(userId);
   const { error } = await admin
     .from("ai_memory_embeddings")
     .delete()
+    .eq("created_by", userId)
     .or(`metadata->>embed_model.is.null,metadata->>embed_model.neq.${EMBED_MODEL}`);
 
   if (error) {
-    purgedStale = false;
+    purgedFor.delete(userId);
     console.error("stale vector purge failed:", error.message);
   }
 }
@@ -72,7 +73,7 @@ Deno.serve(async (req) => {
     if (!userId) return json({ error: "Unauthorized" }, 401);
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
-    await purgeStaleVectors(admin);
+    await purgeStaleVectors(admin, userId);
 
     const body = await req.json().catch(() => ({}));
     const action = String(body?.action ?? "search");
