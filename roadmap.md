@@ -247,3 +247,7 @@
 - [x] Refine workspace hierarchy, metrics, navigation, filters and map controls without changing data or access; 21 regression tests passed.
 - [x] Verify isolated sample-data maps on desktop and phone, including themes, summary, expansion and settlement controls.
 - [ ] Verify real-data dashboard navigation — the available signed-in account returns Access Restricted; existing permissions were not changed.
+
+- [x] Real-account checks (2026-11-25): Geo Microplanning text readable (0 low-contrast items, signed in as Super Admin); 32 saved banking records all valid 10-digit, 0 invalid; facility-name merging and boundary tests pass (402).
+- [ ] Move to own database — blocked: needs separate destination-connected project + verified export.
+- [ ] Land-feature catalogue — blocked: needs approved public land-feature data source.
