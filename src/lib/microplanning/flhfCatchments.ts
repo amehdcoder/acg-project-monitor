@@ -88,7 +88,7 @@ export function drawFlhfCatchments(map: L.Map, entries: readonly CatchmentEntry[
   for (const c of catchments) {
     const outline = catchmentOutline(c);
     if (outline.length >= 3) {
-      L.polygon(outline, { pane: "flhfAreas", color: c.color, weight: 1.6, opacity: 0.9, fillColor: c.color, fillOpacity: 0.28, smoothFactor: 1.5 })
+      L.polygon(outline, { pane: "flhfAreas", color: c.color, weight: 1.4, opacity: 0.85, dashArray: "4 3", fill: true, fillOpacity: 0, smoothFactor: 1.5 })
         .bindTooltip(`<b>${esc(c.name)}</b><br/>${escapeHtmlText(c.communities.length)} communities / settlements`, { sticky: true, className: "flhf-catchment-tip" })
         .addTo(group);
       outline.forEach(p => bounds.extend(p));
@@ -117,9 +117,7 @@ export function drawFlhfCatchments(map: L.Map, entries: readonly CatchmentEntry[
     control = new L.Control({ position: "bottomright" });
     control.onAdd = () => {
       const div = L.DomUtil.create("div", "flhf-legend");
-      const rows = catchments.slice(0, 10).map(c => `<div class="flhf-legend-row"><i style="background:${c.color}"></i><span>${esc(c.name)}</span></div>`).join("");
-      const more = catchments.length > 10 ? `<div class="flhf-legend-more">+${catchments.length - 10} more FLHF areas</div>` : "";
-      div.innerHTML = `<b>Legend</b>${rows}${more}<div class="flhf-legend-row"><span class="flhf-legend-h">H</span><span>FLHF location</span></div><div class="flhf-legend-row"><em></em><span>Community / settlement</span></div>`;
+      div.innerHTML = `<div class="flhf-legend-row"><i style="background:transparent;border:1.5px dashed currentColor"></i><span>FLHF catchment (hover for name)</span></div><div class="flhf-legend-row"><span class="flhf-legend-h">H</span><span>FLHF location</span></div><div class="flhf-legend-row"><em></em><span>Community / settlement</span></div>`;
       L.DomEvent.disableClickPropagation(div); L.DomEvent.disableScrollPropagation(div);
       return div;
     };
