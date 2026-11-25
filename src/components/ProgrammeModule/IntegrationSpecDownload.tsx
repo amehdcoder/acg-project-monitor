@@ -21,6 +21,7 @@ const FORMATS: { id: SpecFormat; label: string }[] = [
 export default function IntegrationSpecDownload({ config: initialConfig, moduleName: initialName, projectId, moduleId }: { config: ProgrammeModuleConfig; moduleName: string; projectId?: string | null; moduleId?: string | null }) {
   // Living document: track the records setup live so every download reflects the latest changes.
   const [liveSetup, setLiveSetup] = useState<{ config: ProgrammeModuleConfig; name: string; changedAt: string | null; sig: string }>(() => ({ config: initialConfig, name: initialName, changedAt: null, sig: JSON.stringify(normalizeConfig(initialConfig)) + "|" + (initialName || "") }));
+  const [projectLive, setProjectLive] = useState<string | null>(null);
   const [liveNotice, setLiveNotice] = useState<string | null>(null);
   const applySetup = (cfg: unknown, name: string | undefined, changedAt: string | null, announce: boolean) => {
     const config = normalizeConfig(cfg as ProgrammeModuleConfig);
@@ -57,7 +58,6 @@ export default function IntegrationSpecDownload({ config: initialConfig, moduleN
   const [ready, setReady] = useState<{ key: string; blob: Blob; filename: string } | null>(null);
   const [prepError, setPrepError] = useState<string | null>(null);
   const projectNameRef = useRef<Promise<string> | null>(null);
-  const [projectLive, setProjectLive] = useState<string | null>(null);
   const pendingClick = useRef(false);
   const [nonce, setNonce] = useState(0);
   const [revision, setRevision] = useState<string | null>(null);
