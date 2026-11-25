@@ -224,6 +224,10 @@
 .overview-orange { --overview-tone: var(--records-amber); --overview-soft: var(--pc-red-soft); }
 .overview-violet { --overview-tone: var(--pc-violet); --overview-soft: var(--pc-violet-soft); }
 .overview-gold { --overview-tone: var(--records-amber); --overview-soft: var(--pc-red-soft); }
+.overview-red { --overview-tone: var(--pc-red); --overview-soft: var(--pc-red-soft); }
+.overview-teal { --overview-tone: var(--pc-teal); --overview-soft: var(--pc-teal-soft); }
+.overview-count { display: inline-flex; align-items: center; gap: 6px; border-radius: 9999px; padding: 8px 14px; font-size: .875rem; font-weight: 700; background: hsl(var(--overview-soft)); color: hsl(var(--overview-tone)); }
+.overview-count b { font-size: 1.05rem; font-weight: 800; }
 .overview-card-icon { width: 80px; height: 80px; color: hsl(var(--primary-foreground)); background: linear-gradient(140deg, hsl(var(--overview-tone)), hsl(var(--overview-tone) / .8)); }
 .overview-card .overview-card-icon svg { width: 44px; height: 44px; }
 .overview-card-copy { width: 47%; }
