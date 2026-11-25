@@ -358,7 +358,12 @@ const applyLatest = async (): Promise<boolean> => {
     prepareSilentFormRestoreForUpdate();
     releaseDeploymentPin();
     if (swUpdater && !shouldSkipServiceWorker) {
-      await withTimeout(swUpdater(controller.signal), 12000, "The update couldn't finish downloading. Please try again.");
+      // The offline copy of a large release can take a while to finish
+      // downloading. The verified shell above already proves the new version
+      // is reachable, so never make the person wait for it: reload onto the
+      // new version now and let the offline copy finish in the background.
+      await withTimeout(swUpdater(controller.signal), 6000, "offline copy still downloading")
+        .catch(error => console.info("[UpdateManager] Continuing while the offline copy finishes", error));
     }
     // Retain workers, precaches, reference data and all offline queues. Only
     // invalidate navigation runtime HTML after the new shell is reachable.
