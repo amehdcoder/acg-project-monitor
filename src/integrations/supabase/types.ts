@@ -7476,6 +7476,66 @@ export type Database = {
         }
         Relationships: []
       }
+      integration_connections: {
+        Row: {
+          app_kind: string
+          auto_detect: boolean
+          base_url: string | null
+          created_at: string
+          created_by: string | null
+          direction: string
+          external_fields: Json
+          id: string
+          is_active: boolean
+          mappings: Json
+          name: string
+          project_id: string
+          target_id: string
+          target_label: string | null
+          target_type: string
+          updated_at: string
+          webhook_endpoint_id: string | null
+        }
+        Insert: {
+          app_kind?: string
+          auto_detect?: boolean
+          base_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          direction?: string
+          external_fields?: Json
+          id?: string
+          is_active?: boolean
+          mappings?: Json
+          name: string
+          project_id: string
+          target_id: string
+          target_label?: string | null
+          target_type: string
+          updated_at?: string
+          webhook_endpoint_id?: string | null
+        }
+        Update: {
+          app_kind?: string
+          auto_detect?: boolean
+          base_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          direction?: string
+          external_fields?: Json
+          id?: string
+          is_active?: boolean
+          mappings?: Json
+          name?: string
+          project_id?: string
+          target_id?: string
+          target_label?: string | null
+          target_type?: string
+          updated_at?: string
+          webhook_endpoint_id?: string | null
+        }
+        Relationships: []
+      }
       irf_archived_reports: {
         Row: {
           archived_by: string | null

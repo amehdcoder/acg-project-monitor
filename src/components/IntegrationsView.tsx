@@ -33,6 +33,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import GoogleAccountConnect from "@/components/Integrations/GoogleAccountConnect";
 import Dhis2IntegrationsHub from "@/components/Integrations/Dhis2IntegrationsHub";
+import IntegrationStudio from "@/components/Integrations/IntegrationStudio";
 import ApiWebhooksPanel from "@/components/Integrations/ApiWebhooksPanel";
 import { sanitizeCsvText } from "@/lib/security/csvSafe";
 
@@ -511,9 +512,11 @@ const IntegrationsView = () => {
           Integrations
         </h1>
         <p className="text-muted-foreground">
-          Connect your data with Google Sheets and Looker Studio
+          Connect Amehnities with any outside app, health system or spreadsheet
         </p>
       </div>
+
+      <IntegrationStudio projects={projects} />
 
       <Dhis2IntegrationsHub projects={projects} />
 
