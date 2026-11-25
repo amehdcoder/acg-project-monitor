@@ -342,7 +342,33 @@ export const hardReloadToLatest = (_opts: { force?: boolean } = {}): Promise<boo
   return applyPromise;
 };
 
-const applyLatest = async (): Promise<boolean> => {
+// A tapped update survives its own reload: if the offline copy was still
+// downloading, the old one may briefly answer the reload with the previous
+// version. The new tab then finishes the same update once, patiently.
+const UPDATE_TARGET_KEY = "app_update_target_v1";
+const runningIdFor = (source: AppUpdateState["source"]) =>
+  source === "html" ? htmlBuildId(document.documentElement.outerHTML) : CURRENT_BUILD_ID;
+
+export const resumeTappedUpdate = (): boolean => {
+  try {
+    const raw = sessionStorage.getItem(UPDATE_TARGET_KEY);
+    if (!raw) return false;
+    const t = JSON.parse(raw) as { target: string; source: AppUpdateState["source"]; at: number; tries: number };
+    if (Date.now() - t.at > 3 * 60_000 || t.tries >= 2 || runningIdFor(t.source) === t.target) {
+      sessionStorage.removeItem(UPDATE_TARGET_KEY);
+      return false;
+    }
+    sessionStorage.setItem(UPDATE_TARGET_KEY, JSON.stringify({ ...t, tries: t.tries + 1 }));
+    setState({ updateAvailable: true, latestBuildId: t.target, source: t.source });
+    if (applyPromise) return true;
+    applyPromise = applyLatest(true).finally(() => { applyPromise = null; });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const applyLatest = async (patient = false): Promise<boolean> => {
   operationGeneration++;
   setState({ status: "updating", error: null });
   const controller=new AbortController();
@@ -362,7 +388,7 @@ const applyLatest = async (): Promise<boolean> => {
       // downloading. The verified shell above already proves the new version
       // is reachable, so never make the person wait for it: reload onto the
       // new version now and let the offline copy finish in the background.
-      await withTimeout(swUpdater(controller.signal), 6000, "offline copy still downloading")
+      await withTimeout(swUpdater(controller.signal), patient ? 60_000 : 6000, "offline copy still downloading")
         .catch(error => console.info("[UpdateManager] Continuing while the offline copy finishes", error));
     }
     // Retain workers, precaches, reference data and all offline queues. Only
@@ -372,6 +398,14 @@ const applyLatest = async (): Promise<boolean> => {
     }
     if (!navigator.onLine) throw new Error("Connection lost. Reconnect and tap Update again; your saved work is protected.");
     try { localStorage.removeItem(SNOOZE_KEY); } catch { /* optional metadata */ }
+    try {
+      if (state.latestBuildId && state.latestBuildId !== runningIdFor(state.source)) {
+        const prev = JSON.parse(sessionStorage.getItem(UPDATE_TARGET_KEY) || "null");
+        sessionStorage.setItem(UPDATE_TARGET_KEY, JSON.stringify({
+          target: state.latestBuildId, source: state.source, at: prev?.at ?? Date.now(), tries: prev?.tries ?? 0,
+        }));
+      }
+    } catch { /* optional continuation */ }
     const url = new URL(window.location.href);
     url.searchParams.delete("__app_update");
     url.searchParams.set("__v", String(Date.now()));
@@ -389,6 +423,7 @@ export const startAppUpdatePolling = () => {
   let stopped = false;
 
   if (isPreviewHost) return () => {};
+  resumeTappedUpdate();
 
   const check = () => { if (document.visibilityState !== "hidden") void checkForAppUpdate(); };
   const restart = () => {

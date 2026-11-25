@@ -72,6 +72,29 @@ describe("safe, responsive app updates", () => {
     expect(document.cookie).not.toContain("__dpl=old-release");
   });
 
+  it("a tapped update that reloads onto the old version finishes once, never repeatedly", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => response()));
+    let mgr = await import("@/lib/appUpdateManager");
+    await mgr.checkForAppUpdate({ force: true });
+    await mgr.hardReloadToLatest();
+    expect(replace).toHaveBeenCalledTimes(1);
+    for (const expected of [2, 3, 3]) {
+      vi.resetModules();
+      mgr = await import("@/lib/appUpdateManager");
+      mgr.resumeTappedUpdate();
+      await new Promise(r => setTimeout(r, 20));
+      expect(replace).toHaveBeenCalledTimes(expected);
+    }
+  });
+
+  it("no update is resumed without a tap", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => response()));
+    const mgr = await import("@/lib/appUpdateManager");
+    await mgr.checkForAppUpdate({ force: true });
+    expect(mgr.resumeTappedUpdate()).toBe(false);
+    expect(replace).not.toHaveBeenCalled();
+  });
+
   it("hung probes abort and return a retryable failure within a bounded time", async () => {
     vi.useFakeTimers();
     const fetcher = vi.fn(() => new Promise<Response>(() => {}));

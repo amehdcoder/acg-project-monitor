@@ -215,7 +215,7 @@ export default defineConfig(({ mode }) => {
             handler: "NetworkFirst",
             options: {
               cacheName: "html-cache",
-              networkTimeoutSeconds: 3,
+              networkTimeoutSeconds: 8, // a busy download of the offline copy must not make reloads fall back to the old page
               expiration: { maxEntries: 10 },
               precacheFallback: { fallbackURL: "index.html" },
             },
