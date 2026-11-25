@@ -6339,6 +6339,36 @@ export type Database = {
           },
         ]
       }
+      form_submission_daily_digests: {
+        Row: {
+          created_at: string
+          digest_date: string
+          error: string | null
+          owner_id: string
+          recipient: string | null
+          status: string
+          submission_count: number | null
+        }
+        Insert: {
+          created_at?: string
+          digest_date: string
+          error?: string | null
+          owner_id: string
+          recipient?: string | null
+          status?: string
+          submission_count?: number | null
+        }
+        Update: {
+          created_at?: string
+          digest_date?: string
+          error?: string | null
+          owner_id?: string
+          recipient?: string | null
+          status?: string
+          submission_count?: number | null
+        }
+        Relationships: []
+      }
       form_submission_email_alerts: {
         Row: {
           created_at: string
