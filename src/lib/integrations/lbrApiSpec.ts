@@ -266,7 +266,7 @@ export function buildLbrApiSpec(input: {
 
 /** Stable fingerprint of the document content (ignores issue time). */
 export function specRevision(s: LbrApiSpec): string {
-  const body = JSON.stringify({ ...s, documentId: "", generatedAt: "", revision: "", version: "", lastChanged: "" });
+  const body = JSON.stringify({ ...s, documentId: "", generatedAt: "", revision: "", version: "", lastChanged: "", overview: s.overview.filter((t) => !t.startsWith("Living document")) });
   let h = 0x811c9dc5;
   for (let i = 0; i < body.length; i++) { h ^= body.charCodeAt(i); h = Math.imul(h, 0x01000193); }
   return (h >>> 0).toString(16).padStart(8, "0").toUpperCase();

@@ -20,7 +20,7 @@ const FORMATS: { id: SpecFormat; label: string }[] = [
 /** Owner-only download of the LBR API & webhook integration specification. */
 export default function IntegrationSpecDownload({ config: initialConfig, moduleName: initialName, projectId, moduleId }: { config: ProgrammeModuleConfig; moduleName: string; projectId?: string | null; moduleId?: string | null }) {
   // Living document: track the records setup live so every download reflects the latest changes.
-  const [liveSetup, setLiveSetup] = useState<{ config: ProgrammeModuleConfig; name: string; changedAt: string | null; sig: string }>(() => ({ config: initialConfig, name: initialName, changedAt: null, sig: JSON.stringify(initialConfig) }));
+  const [liveSetup, setLiveSetup] = useState<{ config: ProgrammeModuleConfig; name: string; changedAt: string | null; sig: string }>(() => ({ config: initialConfig, name: initialName, changedAt: null, sig: JSON.stringify(normalizeConfig(initialConfig)) + "|" + (initialName || "") }));
   const [liveNotice, setLiveNotice] = useState<string | null>(null);
   const applySetup = (cfg: unknown, name: string | undefined, changedAt: string | null, announce: boolean) => {
     const config = normalizeConfig(cfg as ProgrammeModuleConfig);
@@ -104,16 +104,17 @@ export default function IntegrationSpecDownload({ config: initialConfig, moduleN
   // Realtime + focus/reconnect refresh of the records setup while the owner can download.
   useEffect(() => {
     if (!owner || !moduleId) return;
-    let live = true;
+    let live = true, primed = false;
     const refetch = async (announce: boolean) => {
       const { data } = await supabase.from("programme_modules").select("config,name,updated_at").eq("id", moduleId).maybeSingle();
-      if (live && data) applySetup((data as unknown as { config: unknown }).config, (data as unknown as { name?: string }).name, (data as unknown as { updated_at?: string }).updated_at || null, announce);
+      if (live && data) applySetup((data as unknown as { config: unknown }).config, (data as unknown as { name?: string }).name, (data as unknown as { updated_at?: string }).updated_at || null, announce && primed);
+      primed = true;
     };
     void refetch(false);
     const channel = supabase.channel(`spec-module-${moduleId}-${Math.random().toString(36).slice(2)}`)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "programme_modules", filter: `id=eq.${moduleId}` }, (p) => {
         const row = p.new as { config?: unknown; name?: string; updated_at?: string };
-        if (row?.config) applySetup(row.config, row.name, row.updated_at || null, true); else void refetch(true);
+        if (row?.config) { primed = true; applySetup(row.config, row.name, row.updated_at || null, true); } else void refetch(true);
       })
       .subscribe((status) => { if (status === "SUBSCRIBED") void refetch(true); });
     const onFocus = () => { if (document.visibilityState === "visible") void refetch(true); };

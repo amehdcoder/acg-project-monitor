@@ -52,3 +52,10 @@ describe("living document revision", () => {
     expect(b.revision).not.toBe(a.revision);
   });
 });
+
+describe("living document revision after undo", () => {
+  it("returns to the same code when a change is reverted, whatever the change time", () => {
+    const base = { config: CISKULA_PRESET, moduleName: "CiSKuLA 2", projectName: "Test", supabaseUrl: "https://x.supabase.co/" };
+    expect(buildLbrApiSpec({ ...base, lastChanged: "2026-10-24T12:32:40Z" }).revision).toBe(buildLbrApiSpec({ ...base, lastChanged: "2026-11-25T19:52:18Z" }).revision);
+  });
+});
