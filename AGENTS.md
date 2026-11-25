@@ -39,7 +39,7 @@
 
 - Assessments reuse QuizBuilder/server scoring; keys append to unpublished quizzes; pair by quiz/source/person. Exact activity links feed reporting-only aggregates by post-test month; dedup activity/person; user-scoped caches — why: no wrong-training totals.
 - Landing uses `appLanding`, not session tabs; retain links/locks — why: predictable entry.
-- Updates: probes omit cookies and a tap drops the host `__dpl` release pin; reload never waits on the offline-copy download, resuming a tapped update once if the old page returns; retain precaches/queues, stamp builds at boot — why: pinned or slow-installing releases must not hide or block real updates, and nothing applies without a tap.
+- Updates: cookie-free probes; a tap drops the `__dpl` pin, never waits on the offline copy, resumes once if the old page returns — why: real updates show and apply only on tap.
 
 - Access studio: resolve saved categories for real members and previews; refresh on access events, reconnect, focus and bounded polling; enforce hidden pages/profile content and server-side action checks; use authorized `save_graduation_gate` RPC rather than replacing whole profiles — why: current permissions and explicit persistence failures prevent stale grants and lost decisions.
 - Eye Health daily facility reporting stores one row per facility per day in `eye_daily_reports` (summary + optional CSOM JSON); projects opt in via `eye_report_projects`, per-user report/dashboard grants in `eye_report_access` (admins implicit); rules/aggregation live in `src/lib/eyeReport/definition.ts`, signed-in writes use `offlineMutate`, devices send `kind: "eye_daily"` through `project-collect` — why: monthly/annual totals and template exports derive from daily rows, offline and account-free alike.
