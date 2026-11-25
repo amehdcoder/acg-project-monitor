@@ -21,3 +21,11 @@ describe("connectionTransform", () => {
     expect(outbound({ full_name: "x" }, null, [{ external: "__proto__.polluted", internal: "full_name" }])).toEqual({});
   });
 });
+
+import { inbound as inb2, cleanMaps as cm2 } from "./connectionTransform";
+import { it as it2, expect as ex2 } from "vitest";
+it2("keeps Kobo/ODK group paths like respondent/name", () => {
+  const maps = cm2([{ external: "respondent/name", internal: "full_name" }]);
+  ex2(maps).toHaveLength(1);
+  ex2(JSON.stringify(inb2({ "respondent/name": "Amina" }, maps))).toContain("Amina");
+});

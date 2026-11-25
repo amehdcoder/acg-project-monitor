@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import ExternalConnectorsView from "./ExternalConnectorsView";
 import * as XLSX from "xlsx";
 import {
   Download,
@@ -8,7 +7,6 @@ import {
   Link2,
   CheckCircle,
   AlertCircle,
-  Settings,
   ExternalLink,
   Play,
   Loader2,
@@ -479,10 +477,6 @@ const IntegrationsView = () => {
     }
   };
 
-  const handleSaveSettings = () => {
-    toast({ title: "Settings Saved", description: "Your integration settings have been updated." });
-  };
-
   const integrations = [
     {
       id: "google-sheets",
@@ -911,73 +905,6 @@ const IntegrationsView = () => {
         </CardContent>
       </Card>
 
-      {/* Settings Card */}
-      <Card className="border-0 shadow-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="h-5 w-5" />
-            Integration Settings
-          </CardTitle>
-          <CardDescription>
-            Configure how your data flows between Amehnities and external services
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="sync-interval">Sync Interval</Label>
-              <select
-                id="sync-interval"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <option value="realtime">Real-time</option>
-                <option value="5min">Every 5 minutes</option>
-                <option value="15min">Every 15 minutes</option>
-                <option value="1hour">Every hour</option>
-                <option value="manual">Manual only</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="data-format">Data Format</Label>
-              <select
-                id="data-format"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <option value="json">JSON</option>
-                <option value="csv">CSV</option>
-                <option value="excel">Excel</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between rounded-lg bg-muted/50 p-4">
-            <div>
-              <p className="font-medium text-foreground">Include Metadata</p>
-              <p className="text-sm text-muted-foreground">
-                Include submission timestamps, location, and device info
-              </p>
-            </div>
-            <Switch defaultChecked />
-          </div>
-
-          <div className="flex items-center justify-between rounded-lg bg-muted/50 p-4">
-            <div>
-              <p className="font-medium text-foreground">Notify on Sync Errors</p>
-              <p className="text-sm text-muted-foreground">
-                Receive alerts when data sync fails
-              </p>
-            </div>
-            <Switch defaultChecked />
-          </div>
-
-          <div className="flex justify-end pt-4">
-            <Button variant="acg" onClick={handleSaveSettings}>
-              Save Settings
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Help Section */}
       <Card className="border border-acg-gold/30 bg-acg-gold/5">
         <CardContent className="flex flex-col items-center gap-4 py-8 text-center sm:flex-row sm:text-left">
@@ -997,8 +924,6 @@ const IntegrationsView = () => {
         </CardContent>
       </Card>
 
-      {/* External Data Connectors */}
-      <ExternalConnectorsView />
     </div>
   );
 };

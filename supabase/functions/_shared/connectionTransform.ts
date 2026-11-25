@@ -4,10 +4,12 @@
 export type ConnMap = { external: string; internal: string }
 type Obj = Record<string, unknown>
 const isObj = (v: unknown): v is Obj => !!v && typeof v === 'object' && !Array.isArray(v)
-const SAFE = /^[A-Za-z0-9_\- .]{1,120}$/
+const SAFE = /^[A-Za-z0-9_\- .\/:]{1,120}$/
 const BLOCKED = new Set(['__proto__', 'prototype', 'constructor'])
 
 export function getPath(o: unknown, path: string): unknown {
+  // Kobo/ODK send flat group paths such as "respondent/name" — exact keys win.
+  if (isObj(o) && !BLOCKED.has(path) && Object.prototype.hasOwnProperty.call(o, path)) return o[path]
   let cur: unknown = o
   for (const p of path.split('.')) { if (!isObj(cur) || BLOCKED.has(p)) return undefined; cur = cur[p] }
   return cur
