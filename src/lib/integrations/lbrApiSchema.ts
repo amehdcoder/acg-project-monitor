@@ -1,6 +1,7 @@
 // Builds the data schema (entity model + JSON Schema 2020-12 / OpenAPI 3.1 compatible)
 // for the components selected in the LBR integration specification.
 import type { SpecField } from "./lbrApiSpec";
+import { schemaToMermaid } from "./lbrApiDiagram";
 
 export type SchemaProp = { name: string; type: string; format?: string; required: boolean; description: string; enum?: string[] };
 export type SchemaEntity = { id: string; title: string; accent: "navy" | "teal" | "gold"; description: string; props: SchemaProp[] };
@@ -9,6 +10,8 @@ export type LbrSchema = {
   entities: SchemaEntity[];
   relations: { from: string; to: string; cardinality: string; via: string }[];
   jsonSchema: Record<string, unknown>;
+  /** Mermaid erDiagram source of the same model. */
+  mermaid?: string;
 };
 
 const ENUM_IN = /:\s*([a-z_]+(?:\s*\|\s*[a-z_]+)+)/i;
@@ -81,7 +84,7 @@ export function buildLbrSchema(input: {
     if: { properties: { component_key: { const: c.key } } },
     then: { properties: { data: { $ref: id(`ServiceData_${c.key}`) } } },
   }));
-  return {
+  const out: LbrSchema = {
     standard: "JSON Schema Draft 2020-12 · OpenAPI 3.1 compatible · ISO 8601 dates · RFC 4122 UUIDs",
     entities, relations,
     jsonSchema: {
@@ -91,4 +94,6 @@ export function buildLbrSchema(input: {
       $defs: defs,
     },
   };
+  out.mermaid = schemaToMermaid(out);
+  return out;
 }

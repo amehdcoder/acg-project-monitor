@@ -1,6 +1,7 @@
 // Renders the LBR integration specification into PDF, Word, PowerPoint, TXT and JSON.
 import type { LbrApiSpec } from "./lbrApiSpec";
 import type { SchemaEntity, SchemaProp } from "./lbrApiSchema";
+import { renderErDiagram } from "./lbrApiDiagram";
 import amehnitiesLogo from "@/assets/logo-amehnities.png";
 import fmohLogo from "@/assets/logo-fmoh.png";
 import cbmLogo from "@/assets/cbm-logo.png";
@@ -60,7 +61,8 @@ export function specSections(s: LbrApiSpec) {
     { n: "7.1", title: "Profile fields (beneficiary.profile)", table: { head: ["Key", "Label", "Type", "Required", "Allowed values"], rows: fieldRows(s.profileFields) } },
     { n: "7.2", title: "Service record", table: { head: ["Field", "Description", "Type", "Always present", "Allowed values"], rows: fieldRows(s.serviceFields) } },
     { n: "7.3", title: "Component-specific service fields (service.data)", table: { head: ["Key", "Label", "Type", "Required", "Component"], rows: s.components.flatMap((c) => c.extraFields.map((f) => [f.key, f.label, f.type, f.required ? "Yes" : "No", c.key])) } },
-    { n: "7.4", title: "Data schema — entity model", paras: [`Standard: ${s.schema.standard}.`, "Each card is one object exchanged with Amehnities. A filled marker and bold name indicate a required field; types follow JSON Schema."], entities: s.schema.entities,
+    { n: "7.4", title: "Entity-relationship diagram", paras: ["How the records for this selection connect, in crow's-foot notation: a bar means exactly one, a circle means optional, a fork means many. Mermaid source of the same diagram is in the TXT and JSON downloads (schema.mermaid)."], diagram: true, mermaid: s.schema.mermaid },
+    { n: "7.4.0", title: "Data schema — entity model", paras: [`Standard: ${s.schema.standard}.`, "Each card is one object exchanged with Amehnities. A filled marker and bold name indicate a required field; types follow JSON Schema."], entities: s.schema.entities,
       table: { head: ["From", "To", "Cardinality", "Join / embedding"], rows: s.schema.relations.map((r) => [r.from, r.to, r.cardinality, r.via]) } },
     ...s.schema.entities.map((e, i) => ({ n: `7.4.${i + 1}`, title: `Schema: ${e.title}`, paras: [e.description],
       table: { head: ["Property", "Type", "Required", "Description", "Allowed values"], rows: e.props.length ? e.props.map((p) => [p.name, typeText(p), p.required ? "Yes" : "No", p.description, p.enum?.join(", ") || "—"]) : [["—", "object", "No", "No additional fields configured", "—"]] } })),
@@ -73,7 +75,7 @@ export function specSections(s: LbrApiSpec) {
     { n: "8.3", title: "Delivery and retries", bullets: s.webhook.retries },
     { n: "9", title: "Errors", table: { head: ["HTTP", "Meaning", "Action"], rows: s.errors.map((e) => [String(e.status), e.meaning, e.action]) } },
     { n: "10", title: "Onboarding checklist", bullets: s.checklist },
-  ] as { n: string; title: string; paras?: string[]; bullets?: string[]; table?: { head: string[]; rows: string[][] }; code?: string; entities?: SchemaEntity[] }[];
+  ] as { n: string; title: string; paras?: string[]; bullets?: string[]; table?: { head: string[]; rows: string[][] }; code?: string; entities?: SchemaEntity[]; diagram?: boolean; mermaid?: string }[];
 }
 
 export function specToText(s: LbrApiSpec): string {
@@ -84,6 +86,7 @@ export function specToText(s: LbrApiSpec): string {
     sec.bullets?.forEach((b) => L.push(`  - ${b}`));
     if (sec.table) { L.push(sec.table.head.join(" | ")); sec.table.rows.forEach((r) => L.push(r.join(" | "))); }
     if (sec.code) L.push("", ...sec.code.split("\n").map((c) => `    ${c}`));
+    if (sec.mermaid) L.push("", "Mermaid source (paste into mermaid.live, GitHub or Confluence):", "", ...sec.mermaid.split("\n").map((c) => `    ${c}`));
   }
   L.push("", ...s.contacts);
   return L.join("\n");
@@ -115,6 +118,7 @@ async function toPdf(s: LbrApiSpec, logos: Logo[]): Promise<Blob> {
   doc.setFontSize(9); doc.setTextColor(180, 192, 204); doc.text("Amehnities · HANDS Nigeria Decision Support Platform · www.amehnities.org", M + 4, H - 14);
 
   // Body
+  const diagram = renderErDiagram(s.schema);
   doc.addPage(); let y = 26;
   const ensure = (need: number) => { if (y + need > H - 20) { doc.addPage(); y = 26; } };
   for (const sec of specSections(s)) {
@@ -126,6 +130,11 @@ async function toPdf(s: LbrApiSpec, logos: Logo[]): Promise<Blob> {
     doc.setFont("helvetica", "normal"); doc.setFontSize(9.5); doc.setTextColor(...hex(INK));
     for (const p of sec.paras || []) { const t = doc.splitTextToSize(p, W - 2 * M); ensure(t.length * 4.6); doc.text(t, M, y); y += t.length * 4.6 + 1.5; }
     for (const b of sec.bullets || []) { const t = doc.splitTextToSize(b, W - 2 * M - 6); ensure(t.length * 4.6); doc.setFillColor(...hex(GOLD)); doc.circle(M + 1.5, y - 1.3, 0.9, "F"); doc.text(t, M + 5, y); y += t.length * 4.6 + 1; }
+    if (sec.diagram && diagram) {
+      const maxW = W - 2 * M, maxH = H - 26 - 22;
+      let w = maxW, h = (w * diagram.h) / diagram.w; if (h > maxH) { h = maxH; w = (h * diagram.w) / diagram.h; }
+      ensure(h + 4); doc.addImage(diagram.data, "PNG", M + (maxW - w) / 2, y, w, h); y += h + 5;
+    }
     if (sec.entities?.length) {
       const ACC = { navy: NAVY, teal: TEAL, gold: GOLD } as const;
       const gap = 5, cw = (W - 2 * M - gap) / 2, rh = 4.4, MAXR = 9;
@@ -217,6 +226,7 @@ async function toDocx(s: LbrApiSpec, logos: Logo[]): Promise<Blob> {
     body.push(new Paragraph({ heading: top ? HeadingLevel.HEADING_1 : HeadingLevel.HEADING_2, children: [new TextRun(`${sec.n}  ${sec.title}`)] }));
     sec.paras?.forEach((p) => body.push(new Paragraph({ spacing: { after: 100 }, children: [new TextRun(p)] })));
     sec.bullets?.forEach((b) => body.push(new Paragraph({ numbering: { reference: "bullets", level: 0 }, children: [new TextRun(b)] })));
+    if (sec.diagram) { const dg = renderErDiagram(s.schema); if (dg) { const w = Math.min(600, Math.round((860 * dg.w) / dg.h)); body.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 160 }, children: [new ImageRun({ type: "png", data: bytes(dg.data), transformation: { width: w, height: Math.round((w * dg.h) / dg.w) }, altText: { title: "Entity-relationship diagram", description: "Entity-relationship diagram of the selected components", name: "ER diagram" } })] })); } }
     if (sec.table?.rows.length) { body.push(table(sec.table.head, sec.table.rows)); body.push(new Paragraph({ children: [] })); }
     if (sec.code) sec.code.split("\n").forEach((l) => body.push(new Paragraph({ shading: { fill: "0F1B2D", type: ShadingType.CLEAR }, children: [new TextRun({ text: l || " ", font: "Consolas", size: 16, color: "C9F2EC" })] })));
   }
@@ -285,6 +295,7 @@ async function toPptx(s: LbrApiSpec, logos: Logo[]): Promise<Blob> {
       sl.addText(it.t, { x: X, y, w: CWI, h, fontSize: pt, color: INK, valign: "top", bullet: it.bullet ? { code: "25A0" } : undefined, margin: 2 });
       y += h + 0.04;
     }
+    if (sec.diagram) { const dg = renderErDiagram(s.schema); if (dg) { sl = brand(sec.title, sec.n); const maxH = BOTTOM - TOP + 0.4; let w = CWI, h = (w * dg.h) / dg.w; if (h > maxH) { h = maxH; w = (h * dg.w) / dg.h; } sl.addImage({ data: dg.data, x: X + (CWI - w) / 2, y: TOP - 0.2, w, h }); y = BOTTOM; } }
     if (sec.table?.rows.length) {
       const head = sec.table.head; const weights = head.map((h) => /description|how|url|payload|grants|action|services|label|purpose|allowed/i.test(h) ? 2.4 : /method|in$|required|http|always/i.test(h) ? 0.7 : 1);
       const tot = weights.reduce((a, b) => a + b, 0); const colW = weights.map((x) => (CWI * x) / tot);
