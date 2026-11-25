@@ -185,7 +185,7 @@ const BeneficiaryFormDialog = ({
             id: submission_uuid,
             __pending: true,
           } as BeneficiaryRow;
-          toast({ title: "Saved on this device", description: "The connection is slow — it will sync automatically." });
+          toast({ title: "Saved on this device", description: navigator.onLine ? "The connection is slow — it will sync automatically." : "You're offline — it will sync automatically when you're back online." });
         }
       }
       // Open the WG-SS disability screening before closing — it applies to

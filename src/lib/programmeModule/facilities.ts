@@ -62,6 +62,7 @@ export const URGENCY_OPTIONS = [
 
 /** All facilities the signed-in user may see (project register). */
 export const useFacilities = (projectId?: string) => {
+  const { user } = useAuth();
   const [facilities, setFacilities] = useState<FacilityRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -73,10 +74,14 @@ export const useFacilities = (projectId?: string) => {
       .order("name")
       .limit(2000);
     if (projectId) q = q.or(`project_id.eq.${projectId},project_id.is.null`);
-    const { data } = await q;
+    // Kept on the device per account so offline registration can still pick a facility.
+    const { data, fromCache } = user
+      ? await cachedRead(`facilities:${projectId || "all"}`, () => q, 12_000, user.id)
+      : await q.then((r) => ({ data: r.data, fromCache: false }));
+    if (fromCache && data === null) { setLoading(false); return; }
     setFacilities((data as FacilityRow[]) || []);
     setLoading(false);
-  }, [projectId]);
+  }, [projectId, user?.id]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -91,13 +96,16 @@ export const useMyFacilities = () => {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const { data: auth } = await supabase.auth.getUser();
+      // getSession works offline; getUser needs the network.
+      const { data: sess } = await supabase.auth.getSession();
+      const auth = { user: sess.session?.user };
       if (!auth.user) { if (!cancelled) { setFacilityIds([]); setLoading(false); } return; }
-      const { data } = await supabase
+      const uid = auth.user.id;
+      const { data } = await cachedRead(`my-facilities`, () => supabase
         .from("facility_focal_persons")
         .select("facility_id")
-        .eq("user_id", auth.user.id)
-        .eq("is_active", true);
+        .eq("user_id", uid)
+        .eq("is_active", true), 12_000, uid);
       if (cancelled) return;
       setFacilityIds(((data as { facility_id: string }[]) || []).map((r) => r.facility_id));
       setLoading(false);

@@ -1,3 +1,4 @@
+import { offlineMutate } from "@/lib/programmeModule/offlineWrite";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeConfig } from "@/lib/programmeModule/defaults";
@@ -178,9 +179,13 @@ export const recordAudit = async (entry: {
   old_value?: string;
   new_value?: string;
 }) => {
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) return;
-  await supabase.from("beneficiary_audit").insert({ ...entry, actor_id: auth.user.id } as never);
+  // getSession works offline; the queued write keeps offline edits in the record history.
+  const { data } = await supabase.auth.getSession();
+  const uid = data.session?.user?.id;
+  if (!uid) return;
+  try {
+    await offlineMutate({ table: "beneficiary_audit", action: "insert", values: { ...entry, actor_id: uid } });
+  } catch { /* history is best-effort; never block the save */ }
 };
 
 export const syncNow = () => flushQueue();
