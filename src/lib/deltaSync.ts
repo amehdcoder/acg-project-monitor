@@ -141,6 +141,7 @@ export async function syncResource(resource: MasterResource): Promise<MasterSync
 
   const existing = await getMeta(resource);
   let watermark = existing?.watermark ?? null;
+  let afterId: string | null = null;
 
   try {
     // Loop pages until a short page signals we've caught up.
@@ -151,8 +152,11 @@ export async function syncResource(resource: MasterResource): Promise<MasterSync
         .from(resource as any)
         .select("*")
         .order("updated_at", { ascending: true })
+        .order("id", { ascending: true })
         .limit(PAGE);
-      if (watermark) q = q.gt("updated_at", watermark);
+      // Keyset on (updated_at, id) so rows sharing a timestamp across a page edge are never skipped.
+      if (watermark && afterId) q = q.or(`updated_at.gt.${watermark},and(updated_at.eq.${watermark},id.gt.${afterId})`);
+      else if (watermark) q = q.gt("updated_at", watermark);
 
       const { data, error } = await q;
       if (error) break; // RLS/permission/transient — keep prior cache & watermark
@@ -161,7 +165,7 @@ export async function syncResource(resource: MasterResource): Promise<MasterSync
 
       await putRecords(resource, rows);
       const newest = rows[rows.length - 1]?.updated_at as string | undefined;
-      if (newest && newest !== watermark) watermark = newest;
+      if (newest) { watermark = newest; afterId = String(rows[rows.length - 1]?.id ?? ""); }
       if (rows.length < PAGE) break;
     }
   } catch {

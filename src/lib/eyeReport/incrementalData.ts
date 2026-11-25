@@ -103,6 +103,14 @@ async function sync<T extends SyncRow>(userId: string, projectId: string, table:
         if (!data || data.length < 1000) break;
         afterId = data[data.length - 1].id;
       }
+      // Fetch records the device never received (e.g. late offline syncs with older timestamps).
+      const known = new Set([...(previous ?? []).map(r => r.id), ...changes.map(r => r.id)]);
+      const missing = [...ids].filter(id => !known.has(id));
+      for (let i = 0; i < missing.length; i += 200) {
+        const { data, error } = await db.from(table).select(listColumns(table)).in("id", missing.slice(i, i + 200)).abortSignal(AbortSignal.timeout(20_000));
+        if (error) return { data: null, error };
+        changes.push(...((data ?? []) as T[]));
+      }
     }
     const cursor = changes.reduce((latest, row) => row.updated_at && (!latest || row.updated_at > latest) ? row.updated_at : latest, meta?.cursor ?? null);
     nextMeta = { cursor, reconciledAt: shouldReconcile || previous === null ? Date.now() : meta?.reconciledAt ?? 0 };
