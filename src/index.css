@@ -1895,3 +1895,24 @@ html[data-lbr-fit="on"][data-lbr-device="ios"] .lbr-type button { min-height: 44
 .flhf-legend-row s { width:18px; height:3px; border-radius:2px; flex:none; text-decoration:none; }
 .geo-features-src, .geo-features-status { color:hsl(var(--muted-foreground)); font-size:10px; margin-top:3px; }
 .geo-features-status:empty { display:none; }
+
+/* Overview hub cards: clearly interactive tiles (shared by Overview, People & care, Protection, Intelligence hubs) */
+.overview-card { cursor: pointer; isolation: isolate; transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease, background .2s ease; box-shadow: 0 1px 2px hsl(var(--health-ink) / .06), 0 6px 18px -10px hsl(var(--overview-tone) / .35); }
+.overview-card::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 5px; background: hsl(var(--overview-tone)); border-radius: 16px 0 0 16px; z-index: 1; }
+.overview-card:hover { transform: translateY(-2px); border-color: hsl(var(--overview-tone) / .45); box-shadow: 0 2px 4px hsl(var(--health-ink) / .06), 0 18px 36px -16px hsl(var(--overview-tone) / .55); }
+.overview-card:active { transform: translateY(0); }
+.overview-card:focus-visible { outline: 3px solid hsl(var(--overview-tone)); outline-offset: 3px; }
+.overview-art { top: 14px; right: 14px; bottom: auto; width: calc(43% - 14px); height: 150px; border-radius: 14px; overflow: hidden; background: hsl(var(--card)); border: 1px solid hsl(var(--overview-tone) / .18); box-shadow: inset 0 0 0 1px hsl(var(--card) / .6), 0 8px 20px -14px hsl(var(--health-ink) / .5); }
+.overview-art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, hsl(var(--overview-tone) / .18)); transition: opacity .2s ease; }
+.overview-art img { object-fit: cover; mix-blend-mode: normal; transition: transform .35s ease; }
+.overview-card:hover .overview-art img { transform: scale(1.05); }
+.overview-arrow { z-index: 2; top: auto; bottom: 18px; right: 18px; width: auto; height: 38px; gap: 4px; padding: 0 12px 0 16px; font-weight: 700; font-size: .875rem; color: hsl(var(--primary-foreground)); background: hsl(var(--overview-tone)); box-shadow: 0 6px 14px -8px hsl(var(--overview-tone)); transition: gap .2s ease, padding .2s ease; }
+.overview-arrow::before { content: "Open"; }
+.overview-arrow svg { width: 18px !important; height: 18px !important; }
+.overview-card:hover .overview-arrow { gap: 8px; padding-right: 10px; }
+.overview-card .relative.mt-4 { padding-right: 96px; }
+@media (max-width: 640px) {
+  .overview-art { position: relative; top: 0; right: 0; width: 100%; height: 130px; margin: 0 0 12px; order: -1; align-self: stretch; }
+  .overview-card .relative.mt-4 { padding-right: 0; padding-bottom: 46px; }
+}
+@media (prefers-reduced-motion: reduce) { .overview-card, .overview-art img, .overview-arrow { transition: none; } .overview-card:hover { transform: none; } .overview-card:hover .overview-art img { transform: none; } }
