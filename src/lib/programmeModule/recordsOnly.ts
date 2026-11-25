@@ -1,3 +1,4 @@
+import { userCacheKey } from "@/lib/cacheUser";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -22,7 +23,7 @@ export function useRecordsOnlyProjects() {
   const { user, isOwnerLevel, loading: authLoading } = useAuth();
   const [locked, setLocked] = useState<RecordsOnlyProject[]>(() => {
     try {
-      const raw = localStorage.getItem(CACHE_KEY);
+      const raw = localStorage.getItem(userCacheKey(CACHE_KEY));
       const parsed = raw ? JSON.parse(raw) : null;
       return Array.isArray(parsed) ? parsed : [];
     } catch {
@@ -55,7 +56,7 @@ export function useRecordsOnlyProjects() {
         setLocked(lockedRows);
         setTotalProjects(data.length);
         try {
-          localStorage.setItem(CACHE_KEY, JSON.stringify(lockedRows));
+          localStorage.setItem(userCacheKey(CACHE_KEY), JSON.stringify(lockedRows));
         } catch {
           /* storage may be unavailable */
         }

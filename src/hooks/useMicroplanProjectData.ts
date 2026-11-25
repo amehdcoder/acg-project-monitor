@@ -1,3 +1,4 @@
+import { userCacheKey } from "@/lib/cacheUser";
 /**
  * Loads Geo-enabled Microplanning data for a single project so other pages
  * (e.g. the Medicine Accountability dashboard) can use the plan as a
@@ -32,7 +33,7 @@ const ENTRY_COLUMNS =
   "cdd_details, cdd_phone_numbers, cdd_from_community, population_source, mda_type, notes, project_id, created_at";
 
 const PAGE_SIZE = 1000;
-const cacheKey = (projectId: string) => `microplan-linkage-cache:${projectId}`;
+const cacheKey = (projectId: string) => userCacheKey(`microplan-linkage-cache:${projectId}`);
 
 const readCache = (projectId: string): MicroplanEntry[] | null => {
   try {
@@ -65,12 +66,12 @@ export function useMicroplanProjects() {
       if (cancelled) return;
       const rows = (data ?? []).map((p) => ({ id: String(p.id), name: String(p.name ?? "Untitled project") }));
       setProjects(rows);
-      try { localStorage.setItem("microplan-linkage-projects", JSON.stringify(rows)); } catch { /* noop */ }
+      try { localStorage.setItem(userCacheKey("microplan-linkage-projects"), JSON.stringify(rows)); } catch { /* noop */ }
       setLoading(false);
     })().catch(() => {
       // offline: fall back to the last known project list
       try {
-        const raw = localStorage.getItem("microplan-linkage-projects");
+        const raw = localStorage.getItem(userCacheKey("microplan-linkage-projects"));
         if (raw && !cancelled) setProjects(JSON.parse(raw));
       } catch { /* noop */ }
       if (!cancelled) setLoading(false);

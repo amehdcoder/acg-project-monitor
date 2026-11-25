@@ -1,3 +1,4 @@
+import { userCacheKey } from "@/lib/cacheUser";
 /**
  * MDA dashboard offline cache
  * ────────────────────────────────────────────────────────────────────────
@@ -26,7 +27,7 @@ export function saveMdaCache(formId: string, rows: any[], questions: any[]): voi
       questions,
       cachedAt: Date.now(),
     };
-    localStorage.setItem(PREFIX + formId, JSON.stringify(payload));
+    localStorage.setItem(userCacheKey(PREFIX + formId), JSON.stringify(payload));
   } catch {
     // storage full / unavailable — caching is best-effort
   }
@@ -35,7 +36,7 @@ export function saveMdaCache(formId: string, rows: any[], questions: any[]): voi
 export function loadMdaCache(formId: string): MdaCachePayload | null {
   if (!formId) return null;
   try {
-    const raw = localStorage.getItem(PREFIX + formId);
+    const raw = localStorage.getItem(userCacheKey(PREFIX + formId));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as MdaCachePayload;
     if (!parsed || !Array.isArray(parsed.rows)) return null;
@@ -48,7 +49,7 @@ export function loadMdaCache(formId: string): MdaCachePayload | null {
 export function clearMdaCache(formId: string): void {
   if (!formId) return;
   try {
-    localStorage.removeItem(PREFIX + formId);
+    localStorage.removeItem(userCacheKey(PREFIX + formId));
     localStorage.removeItem(LEGACY_PREFIX + formId);
   } catch {
     // storage unavailable — clearing is best-effort
