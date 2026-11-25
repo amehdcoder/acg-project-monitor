@@ -67,7 +67,7 @@ describe("safe, responsive app updates", () => {
     document.cookie = "__dpl=old-release; Path=/";
     const mgr = await import("@/lib/appUpdateManager");
     await mgr.checkForAppUpdate({ force: true });
-    expect(fetcher.mock.calls.every(([, init]) => (init as RequestInit).credentials === "omit")).toBe(true);
+    expect((fetcher.mock.calls as unknown as [string, RequestInit][]).every(([, init]) => init.credentials === "omit")).toBe(true);
     await mgr.hardReloadToLatest();
     expect(document.cookie).not.toContain("__dpl=old-release");
   });
