@@ -250,13 +250,14 @@ const ProgrammeModuleWorkspace = ({
   const scopedBeneficiaries = useMemo(() => {
     let rows = beneficiaries;
     if (viewAs) rows = rows.filter((b) => viewAsRecordVisible(viewAs, b as unknown as { state?: string; facility_id?: string }));
+    if (memberPerms?.record_only) rows = rows.filter((b) => (b as { created_by?: string }).created_by === user?.id);
     const onlyIds = memberPerms?.beneficiary_ids;
     if (onlyIds?.length) { const ok = new Set(onlyIds); rows = rows.filter((b) => ok.has((b as { id: string }).id) || (b as { created_by?: string }).created_by === user?.id); }
     if (!isFocalPerson) return rows;
     return rows.filter((b) =>
       Boolean(facilityLevels[(b as unknown as { facility_id?: string }).facility_id || ""]));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [beneficiaries, facilityLevels, isFocalPerson, viewAs, (memberPerms?.beneficiary_ids || []).join(",")]);
+  }, [beneficiaries, facilityLevels, isFocalPerson, viewAs, (memberPerms?.beneficiary_ids || []).join(","), memberPerms?.record_only, user?.id]);
   // The open record must follow fresh saved data, not the object captured on click.
   useEffect(() => {
     if (loadingBeneficiaries) return;

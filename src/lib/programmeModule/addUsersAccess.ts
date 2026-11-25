@@ -9,7 +9,7 @@ export type AccessLevel = "view" | "view_record" | "record";
 export const ACCESS_LEVELS: { key: AccessLevel; label: string; hint: string }[] = [
   { key: "view", label: "View only", hint: "Can open records and dashboards. Cannot add or change anything." },
   { key: "view_record", label: "View & record", hint: "Can open records, register people and record services and follow-ups." },
-  { key: "record", label: "Record only", hint: "Can register people and record services, but cannot browse records or dashboards." },
+  { key: "record", label: "Record only", hint: "Can register people and record services, and sees only the records they added. No dashboards." },
 ];
 
 export interface AccessScope {
@@ -33,6 +33,7 @@ export const buildAccessPermissions = (level: AccessLevel, scope: AccessScope): 
     edit_records: write || undefined,
     record_services: write || undefined,
     home_visits: write || undefined,
+    record_only: !view || undefined,
   };
   let hidden: string[] = [];
   if (scope.pages.length) hidden = ALL_PAGE_KEYS.filter((k) => !scope.pages.includes(k));

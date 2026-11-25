@@ -19,6 +19,8 @@ describe("add users access", () => {
     expect(p.view_records).toBeUndefined();
     expect(p.record_services).toBe(true);
     expect(p.hidden_views).toContain("dashboard");
+    expect(p.record_only).toBe(true);
+    expect(buildAccessPermissions("view_record", all).record_only).toBeUndefined();
   });
   it("limits to chosen components, tabs and records", () => {
     const p = buildAccessPermissions("view", { components: ["mmdp"], pages: ["records"], beneficiaryIds: ["b1"] });

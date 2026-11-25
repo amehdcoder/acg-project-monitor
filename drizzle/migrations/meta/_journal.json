@@ -575,6 +575,20 @@
       "when": 1795628967446,
       "tag": "0081_limit_members_to_selected_records",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1795629661654,
+      "tag": "0082_record_only_members_see_own_records",
+      "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "7",
+      "when": 1795629692361,
+      "tag": "0083_member_record_scope_on_related_tables",
+      "breakpoints": true
     }
   ]
 }

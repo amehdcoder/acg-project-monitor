@@ -15740,6 +15740,10 @@ export type Database = {
       }
       mda_lens_geo_key: { Args: { _v: string }; Returns: string }
       mda_lens_write_allowed: { Args: { _user_id: string }; Returns: boolean }
+      member_record_scope_ok: {
+        Args: { _beneficiary: string; _project: string; _uid: string }
+        Returns: boolean
+      }
       merge_beneficiaries: {
         Args: { _drop: string; _keep: string; _profile?: Json }
         Returns: undefined

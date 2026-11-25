@@ -76,7 +76,9 @@ export default function AddUsersWizard({ open, onOpenChange, projectId, moduleId
           user_id: uid, full_name: existing?.full_name || u.full_name, email: existing?.email || u.email, phone: existing?.phone || u.phone,
           team_type: existing?.team_type || "partner", is_active: true,
           permissions: { ...(existing?.permissions || {}), ...permissions, access_category: undefined,
-            hidden_views: permissions.hidden_views, components: permissions.components, beneficiary_ids: permissions.beneficiary_ids },
+            hidden_views: permissions.hidden_views, components: permissions.components, beneficiary_ids: permissions.beneficiary_ids,
+            record_only: permissions.record_only, view_records: permissions.view_records, view_dashboards: permissions.view_dashboards,
+            edit_records: permissions.edit_records, record_services: permissions.record_services, home_visits: permissions.home_visits },
         });
       }
       for (const i of invites) {

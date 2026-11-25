@@ -103,6 +103,8 @@ export interface TeamPermissions {
   hidden_sections?: string[];
   /** Individual beneficiary records this member is limited to (empty = all in scope). */
   beneficiary_ids?: string[];
+  /** Record only: may add and update, but sees only records they registered. */
+  record_only?: boolean;
   /** Access studio category this member follows. */
   access_category?: string;
 }
