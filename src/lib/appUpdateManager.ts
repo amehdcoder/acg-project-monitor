@@ -35,8 +35,8 @@ let shellProbe: { at: number; promise: Promise<string> } | null = null;
 
 // Share only a recent network-fetched shell, never cached page/data content.
 // Manual checks and installation must not download the same HTML twice.
-const fetchLatestShell = (): Promise<string> => {
-  if (shellProbe && Date.now() - shellProbe.at < 15_000) return shellProbe.promise;
+const fetchLatestShell = (maxAgeMs = 15_000): Promise<string> => {
+  if (shellProbe && Date.now() - shellProbe.at < maxAgeMs) return shellProbe.promise;
   const promise = probe(`/?__probe=${Date.now()}`, res => res.text());
   shellProbe = { at: Date.now(), promise };
   void promise.catch(() => { if (shellProbe?.promise === promise) shellProbe = null; });
@@ -182,6 +182,19 @@ const fetchHtmlBuildId = async (): Promise<string | null> => {
   }
 };
 
+// Download the new release in the background as soon as it is detected, so a
+// tap on Update only has to activate it and reload (near-instant).
+let prewarmedBuild: string | null = null;
+const prewarmUpdate = (buildId: string) => {
+  if (prewarmedBuild === buildId) return;
+  prewarmedBuild = buildId;
+  void fetchLatestShell().catch(() => {});
+  if (shouldSkipServiceWorker || typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+  void navigator.serviceWorker.getRegistration()
+    .then(reg => (reg && !reg.waiting && !reg.installing ? reg.update() : undefined))
+    .catch(() => { prewarmedBuild = null; });
+};
+
 export const markServiceWorkerUpdateAvailable = () => {
   void checkForAppUpdate({ force: true });
 };
@@ -246,6 +259,7 @@ const runUpdateCheck = async (opts: { force?: boolean; source?: "version" | "htm
     }
     const changed = latestBuildId !== currentBuildId;
     if (generation !== operationGeneration) return state;
+    if (changed) prewarmUpdate(latestBuildId);
     setState({
       status: changed ? "available" : "current",
       updateAvailable: changed,
@@ -323,7 +337,8 @@ const applyLatest = async (): Promise<boolean> => {
     // Even a manual/forced request must not strand an offline user. Validate
     // the actual HTML shell, not merely a reachable JSON/404 fallback page.
     if (!navigator.onLine) throw new Error("Connect to the internet to update. Your saved work is still available.");
-    const html = await fetchLatestShell();
+    // A release verified moments ago does not need its shell downloaded again.
+    const html = await fetchLatestShell(state.updateAvailable ? 120_000 : 15_000);
     if (!/<script[^>]+src=/i.test(html) || !/id=["']root["']/i.test(html)) {
       throw new Error("The latest app couldn't be loaded. Your current app and saved work are unchanged.");
     }
