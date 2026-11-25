@@ -1,0 +1,3 @@
+ALTER TABLE public.integration_connections ADD COLUMN api_key_id uuid;
+CREATE INDEX integration_connections_api_key_idx ON public.integration_connections(api_key_id);
+CREATE INDEX integration_connections_webhook_idx ON public.integration_connections(webhook_endpoint_id);

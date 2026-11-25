@@ -32,7 +32,7 @@ describe("API key helpers", () => {
     expect(hasScope([], "records:read")).toBe(false);
   });
 
-  it("exposes the three supported scopes", () => {
-    expect(API_SCOPES).toEqual(["records:read", "aggregates:read", "reports:read"]);
+  it("exposes the four supported scopes", () => {
+    expect(API_SCOPES).toEqual(["records:read", "records:write", "aggregates:read", "reports:read"]);
   });
 });

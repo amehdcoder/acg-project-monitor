@@ -10,6 +10,7 @@
 //   /external-api/v1/reports
 //   /external-api/v1/components
 // Routes (POST, records:write): /v1/beneficiaries (upsert by case_id), /v1/services
+import { inbound, outbound, cleanMaps } from '../_shared/connectionTransform.ts'
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { parseCursor } from './cursor.ts'
@@ -66,6 +67,7 @@ Deno.serve(async (req) => {
   const needScope = (scope: string) => key.scopes.includes(scope) || key.scopes.includes('*')
 
   try {
+    if (parts[1] === 'connection' && parts[2] === 'records' && parts.length === 3) return await handleConnection(supabase, key, req, q)
     if (req.method === 'POST') return await handleWrite(supabase, key, parts, req)
     if (parts.length === 2 && parts[1] === 'components') {
       const { data, error } = await supabase.from('programme_modules').select('id, name, config').eq('project_id', key.project_id)
@@ -229,6 +231,8 @@ Deno.serve(async (req) => {
         'GET /external-api/v1/components',
         'POST /external-api/v1/beneficiaries',
         'POST /external-api/v1/services',
+        'GET /external-api/v1/connection/records  (your field names)',
+        'POST /external-api/v1/connection/records (your field names)',
       ],
     }, 404)
   } catch (e) {
@@ -247,56 +251,120 @@ async function handleWrite(supabase: any, key: ApiKey, parts: string[], req: Req
   if (parts.length !== 2 || !['beneficiaries', 'services'].includes(parts[1])) return json({ error: 'Unknown route' }, 404)
   let body: Record<string, unknown>
   try { const b = await req.json(); if (!isObj(b)) throw 0; body = b } catch { return json({ error: 'Body must be a JSON object' }, 400) }
+  const r = await writeRecord(supabase, key, parts[1] as 'beneficiaries' | 'services', body)
+  return json(r.body, r.status)
+}
+
+type WriteResult = { status: number; body: Record<string, unknown> }
+const res = (body: Record<string, unknown>, status = 200): WriteResult => ({ status, body })
+
+// deno-lint-ignore no-explicit-any
+async function writeRecord(supabase: any, key: ApiKey, kind: 'beneficiaries' | 'services', body: Record<string, unknown>): Promise<WriteResult> {
   const { data: keyRow } = await supabase.from('api_keys').select('created_by').eq('id', key.key_id).maybeSingle()
-  if (!keyRow?.created_by) return json({ error: 'Key has no responsible issuer; reissue the key' }, 403)
+  if (!keyRow?.created_by) return res({ error: 'Key has no responsible issuer; reissue the key' }, 403)
   const { data: modules } = await supabase.from('programme_modules').select('id').eq('project_id', key.project_id)
   const wanted = str(body.module_id, 40)
   const mod = wanted ? (modules ?? []).find((m: { id: string }) => m.id === wanted) : (modules ?? []).length === 1 ? modules[0] : null
-  if (!mod) return json({ error: (modules ?? []).length > 1 ? 'module_id required (see GET /v1/components)' : 'Unknown module_id' }, 400)
+  if (!mod) return res({ error: (modules ?? []).length > 1 ? 'module_id required (see GET /v1/components)' : 'Unknown module_id' }, 400)
   const caseId = str(body.case_id, 64)
-  if (!caseId) return json({ error: 'case_id is required' }, 400)
+  if (!caseId) return res({ error: 'case_id is required' }, 400)
 
-  if (parts[1] === 'beneficiaries') {
+  if (kind === 'beneficiaries') {
     const fullName = str(body.full_name, 200)
     const status = body.status == null ? undefined : String(body.status)
-    if (status && !STATUSES.includes(status)) return json({ error: 'Invalid status' }, 400)
-    if (body.profile != null && !isObj(body.profile)) return json({ error: 'profile must be an object' }, 400)
+    if (status && !STATUSES.includes(status)) return res({ error: 'Invalid status' }, 400)
+    if (body.profile != null && !isObj(body.profile)) return res({ error: 'profile must be an object' }, 400)
     const { data: existing } = await supabase.from('beneficiaries').select('id, version, profile').eq('module_id', mod.id).eq('case_id', caseId).maybeSingle()
     const fields: Record<string, unknown> = {}
     for (const f of ['state', 'lga', 'ward', 'village']) { const v = str(body[f], 120); if (v) fields[f] = v }
-    if (body.risk_level != null) { if (!['low', 'medium', 'high'].includes(String(body.risk_level))) return json({ error: 'Invalid risk_level' }, 400); fields.risk_level = body.risk_level }
-    if (body.next_follow_up_date != null) { if (Number.isNaN(Date.parse(String(body.next_follow_up_date)))) return json({ error: 'Invalid next_follow_up_date' }, 400); fields.next_follow_up_date = String(body.next_follow_up_date).slice(0, 10) }
+    if (body.risk_level != null) { if (!['low', 'medium', 'high'].includes(String(body.risk_level))) return res({ error: 'Invalid risk_level' }, 400); fields.risk_level = body.risk_level }
+    if (body.next_follow_up_date != null) { if (Number.isNaN(Date.parse(String(body.next_follow_up_date)))) return res({ error: 'Invalid next_follow_up_date' }, 400); fields.next_follow_up_date = String(body.next_follow_up_date).slice(0, 10) }
     if (status) fields.status = status
     if (fullName) fields.full_name = fullName
     if (existing) {
       if (body.profile) fields.profile = { ...(existing.profile ?? {}), ...(body.profile as object) }
       fields.version = (existing.version ?? 1) + 1; fields.updated_at = new Date().toISOString()
       const { data, error } = await supabase.from('beneficiaries').update(fields).eq('id', existing.id).select('id, case_id, version, updated_at').single()
-      if (error) return json({ error: 'Could not update beneficiary' }, 400)
-      return json({ data, operation: 'updated' })
+      if (error) return res({ error: 'Could not update beneficiary' }, 400)
+      return res({ data, operation: 'updated' })
     }
-    if (!fullName) return json({ error: 'full_name is required for new beneficiaries' }, 400)
+    if (!fullName) return res({ error: 'full_name is required for new beneficiaries' }, 400)
     const { data, error } = await supabase.from('beneficiaries').insert({ ...fields, profile: body.profile ?? {}, case_id: caseId, module_id: mod.id, project_id: key.project_id, created_by: keyRow.created_by }).select('id, case_id, version, updated_at').single()
-    if (error) return json({ error: 'Could not create beneficiary' }, 400)
-    return json({ data, operation: 'created' }, 201)
+    if (error) return res({ error: 'Could not create beneficiary' }, 400)
+    return res({ data, operation: 'created' }, 201)
   }
 
   const componentKey = str(body.component_key, 80); const serviceName = str(body.service_name, 200)
-  if (!componentKey || !serviceName) return json({ error: 'component_key and service_name are required' }, 400)
+  if (!componentKey || !serviceName) return res({ error: 'component_key and service_name are required' }, 400)
   const status = body.status == null ? 'on_track' : String(body.status)
-  if (!SERVICE_STATUSES.includes(status)) return json({ error: 'Invalid status' }, 400)
+  if (!SERVICE_STATUSES.includes(status)) return res({ error: 'Invalid status' }, 400)
   const serviceDate = body.service_date == null ? new Date().toISOString().slice(0, 10) : String(body.service_date).slice(0, 10)
-  if (Number.isNaN(Date.parse(serviceDate))) return json({ error: 'Invalid service_date' }, 400)
-  if (body.data != null && !isObj(body.data)) return json({ error: 'data must be an object' }, 400)
+  if (Number.isNaN(Date.parse(serviceDate))) return res({ error: 'Invalid service_date' }, 400)
+  if (body.data != null && !isObj(body.data)) return res({ error: 'data must be an object' }, 400)
   const { data: ben } = await supabase.from('beneficiaries').select('id').eq('module_id', mod.id).eq('case_id', caseId).maybeSingle()
-  if (!ben) return json({ error: 'Beneficiary not found for case_id' }, 404)
+  if (!ben) return res({ error: 'Beneficiary not found for case_id' }, 404)
   const ext = str(body.external_id, 120)
   const row = { beneficiary_id: ben.id, module_id: mod.id, project_id: key.project_id, component_key: componentKey, service_name: serviceName, service_date: serviceDate, result: str(body.result, 2000), status, data: { ...((body.data as object) ?? {}), ...(ext ? { external_id: ext } : {}) }, recorded_by: keyRow.created_by }
   if (ext) {
     const { data: dup } = await supabase.from('beneficiary_services').select('id, created_at').eq('beneficiary_id', ben.id).eq('data->>external_id', ext).maybeSingle()
-    if (dup) return json({ data: dup, operation: 'duplicate' })
+    if (dup) return res({ data: dup, operation: 'duplicate' })
   }
   const { data, error } = await supabase.from('beneficiary_services').insert(row).select('id, beneficiary_id, component_key, created_at').single()
-  if (error) return json({ error: 'Could not record service' }, 400)
-  return json({ data, operation: 'created' }, 201)
+  if (error) return res({ error: 'Could not record service' }, 400)
+  return res({ data, operation: 'created' }, 201)
+}
+
+// Connection-mapped exchange: records travel in the other system's own field names,
+// translated with the saved field matching of the connection that issued this key.
+// deno-lint-ignore no-explicit-any
+async function handleConnection(supabase: any, key: ApiKey, req: Request, q: URLSearchParams) {
+  const { data: conn } = await supabase.from('integration_connections')
+    .select('id, project_id, target_type, target_id, mappings, is_active, direction')
+    .eq('api_key_id', key.key_id).eq('project_id', key.project_id).maybeSingle()
+  if (!conn) return json({ error: 'This key is not linked to a connection. Create one under Integrations → Connect any app.' }, 404)
+  if (!conn.is_active) return json({ error: 'This connection is switched off in Amehnities' }, 403)
+  if (conn.target_type !== 'records') return json({ error: 'This connection is linked to a form; mapped exchange supports beneficiary records' }, 400)
+  const maps = cleanMaps(conn.mappings)
+  if (!maps.length) return json({ error: 'The connection has no matched fields yet' }, 400)
+
+  if (req.method === 'GET') {
+    if (!(key.scopes.includes('records:read') || key.scopes.includes('*'))) return json({ error: 'Key lacks records:read scope' }, 403)
+    const limit = Math.min(Math.max(parseInt(q.get('limit') ?? '100', 10) || 100, 1), 100)
+    let query = supabase.from('beneficiaries')
+      .select('id, case_id, full_name, status, risk_level, state, lga, ward, village, profile, next_follow_up_date, updated_at')
+      .eq('project_id', key.project_id).eq('module_id', conn.target_id)
+      .order('updated_at', { ascending: true }).order('id', { ascending: true }).limit(limit + 1)
+    const since = q.get('updated_since'); if (since && !Number.isNaN(Date.parse(since))) query = query.gte('updated_at', since)
+    const cursor = q.get('cursor')
+    if (cursor) { const p = parseCursor(cursor); if (!p) return json({ error: 'Invalid cursor' }, 400); query = query.or(`updated_at.gt.${p.timestamp},and(updated_at.eq.${p.timestamp},id.gt.${p.id})`) }
+    const { data, error } = await query
+    if (error) return json({ error: 'Could not load records' }, 500)
+    const rows = data ?? []; const more = rows.length > limit; const page = more ? rows.slice(0, limit) : rows
+    const last = page[page.length - 1]
+    return json({ data: page.map((b: Record<string, unknown>) => outbound(b, null, maps)), next_cursor: more && last ? `${last.updated_at}|${last.id}` : null })
+  }
+
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
+  if (!(key.scopes.includes('records:write') || key.scopes.includes('*'))) return json({ error: 'Key lacks records:write scope' }, 403)
+  let raw: unknown
+  try { raw = await req.json() } catch { return json({ error: 'Body must be JSON' }, 400) }
+  const list = Array.isArray(raw) ? raw : isObj(raw) && Array.isArray(raw.records) ? raw.records : [raw]
+  if (list.length === 0 || list.length > 100) return json({ error: 'Send between 1 and 100 records' }, 400)
+  const results: Record<string, unknown>[] = []
+  for (const [index, rec] of list.entries()) {
+    if (!isObj(rec)) { results.push({ index, ok: false, error: 'Record must be an object' }); continue }
+    const { beneficiary, service } = inbound(rec, maps)
+    if (!beneficiary.case_id) { results.push({ index, ok: false, error: 'No value for the field matched to Case ID' }); continue }
+    const out: Record<string, unknown> = { index, case_id: beneficiary.case_id }
+    const b = await writeRecord(supabase, key, 'beneficiaries', { ...beneficiary, module_id: conn.target_id })
+    out.beneficiary = b.body.operation ?? b.body.error
+    let ok = b.status < 300
+    if (ok && service) {
+      const s = await writeRecord(supabase, key, 'services', { ...service, case_id: beneficiary.case_id, module_id: conn.target_id })
+      out.service = s.body.operation ?? s.body.error; ok = s.status < 300
+    }
+    results.push({ ...out, ok })
+  }
+  const failed = results.filter((r) => !r.ok).length
+  return json({ received: list.length, saved: list.length - failed, failed, results }, failed === list.length ? 400 : 200)
 }

@@ -7478,6 +7478,7 @@ export type Database = {
       }
       integration_connections: {
         Row: {
+          api_key_id: string | null
           app_kind: string
           auto_detect: boolean
           base_url: string | null
@@ -7497,6 +7498,7 @@ export type Database = {
           webhook_endpoint_id: string | null
         }
         Insert: {
+          api_key_id?: string | null
           app_kind?: string
           auto_detect?: boolean
           base_url?: string | null
@@ -7516,6 +7518,7 @@ export type Database = {
           webhook_endpoint_id?: string | null
         }
         Update: {
+          api_key_id?: string | null
           app_kind?: string
           auto_detect?: boolean
           base_url?: string | null

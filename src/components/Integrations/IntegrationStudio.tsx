@@ -220,6 +220,7 @@ function ConnectionWizard({ projects, onClose, onSaved }: { projects: Project[];
     const { data: { user } } = await supabase.auth.getUser();
     const out: { key?: string; secret?: string } = {};
     let webhookId: string | null = null;
+    let apiKeyId: string | null = null;
     try {
       if ((direction === "push" || direction === "both") && target.type === "records" && baseUrl.trim()) {
         const secret = generateWebhookSecret();
@@ -232,18 +233,19 @@ function ConnectionWizard({ projects, onClose, onSaved }: { projects: Project[];
       }
       if (direction === "pull" || direction === "both") {
         const { raw, prefix } = generateApiKey();
-        const { error } = await supabase.from("api_keys").insert({
+        const { data: k, error } = await supabase.from("api_keys").insert({
           project_id: target.projectId, name: `${name.trim()} (connection)`, key_prefix: prefix, key_hash: await sha256Hex(raw),
           scopes: ["records:read", "records:write"], created_by: user?.id,
-        });
+        }).select("id").single();
         if (error) throw error;
+        apiKeyId = k.id;
         out.key = raw;
       }
       const { error } = await supabase.from("integration_connections").insert({
         project_id: target.projectId, name: name.trim(), app_kind: app, direction, base_url: baseUrl.trim() || null,
         target_type: target.type, target_id: target.id, target_label: target.name,
         external_fields: external as never, mappings: maps as never, auto_detect: autoDetect,
-        webhook_endpoint_id: webhookId, created_by: user?.id,
+        webhook_endpoint_id: webhookId, api_key_id: apiKeyId, created_by: user?.id,
       });
       if (error) throw error;
       setIssued(out); onSaved();
@@ -405,6 +407,10 @@ function ConnectionWizard({ projects, onClose, onSaved }: { projects: Project[];
                 <div className="flex items-center gap-2 text-foreground"><Check className="h-5 w-5 text-primary" /><b>Connected.</b> Share these with the other app's team — they are shown only once.</div>
                 {issued.key && <Secret label="Access key (lets their app send and read data)" value={issued.key} tag="k" copied={copied} copy={copy} />}
                 {issued.secret && <Secret label="Signing secret (lets their app confirm data came from Amehnities)" value={issued.secret} tag="s" copied={copied} copy={copy} />}
+                {issued.key && target?.type === "records" && (
+                  <Secret label="Their app sends and reads entries here, using its own field names" value={`https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co/functions/v1/external-api/v1/connection/records`} tag="u" copied={copied} copy={copy} />
+                )}
+                {issued.secret && <p className="text-xs text-muted-foreground">New and updated records in “{target?.name}” are sent to {baseUrl} using their field names.</p>}
                 {!issued.key && !issued.secret && <p className="text-sm text-muted-foreground">The field matching is saved.</p>}
               </div>
             )}

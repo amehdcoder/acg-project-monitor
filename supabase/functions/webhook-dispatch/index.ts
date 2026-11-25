@@ -1,6 +1,7 @@
 // webhook-dispatch: delivers queued webhook events to subscribed endpoints.
 // Woken on enqueue by the emit_webhook_event trigger and hourly as a retry
 // backstop. Also serves admin "test event" sends.
+import { outbound, cleanMaps } from '../_shared/connectionTransform.ts'
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { guardRequest } from '../_shared/authGuard.ts'
@@ -38,12 +39,15 @@ async function deliver(
 ) {
   const deliveryId = retry?.id ?? crypto.randomUUID()
   const timestamp = new Date().toISOString()
+  const mapped = await mapForConnection(supabase, endpoint, event)
+  if (mapped === 'skip') return true
   const body = JSON.stringify({
     id: deliveryId,
     event: event.event,
     project_id: event.project_id,
     created_at: timestamp,
-    data: event.payload,
+    data: mapped ?? event.payload,
+    ...(mapped ? { mapped: true } : {}),
   })
   const signature = await hmacSha256(endpoint.secret, body)
 
@@ -180,3 +184,31 @@ Deno.serve(async (req) => {
     { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
   )
 })
+
+// Endpoints created by a saved connection receive records in that system's own field
+// names, and only for the beneficiary records programme the connection is linked to.
+async function mapForConnection(
+  supabase: ReturnType<typeof createClient>, endpoint: Endpoint,
+  event: { event: string; payload: unknown; project_id: string },
+): Promise<Record<string, unknown> | 'skip' | null> {
+  const { data: conn } = await supabase.from('integration_connections')
+    .select('target_type, target_id, mappings, is_active').eq('webhook_endpoint_id', endpoint.id).maybeSingle()
+  if (!conn || conn.target_type !== 'records') return null
+  if (!/^(beneficiary\.|service\.)/.test(event.event)) return null
+  if (!conn.is_active) return 'skip'
+  const maps = cleanMaps(conn.mappings)
+  const p = (event.payload ?? {}) as Record<string, unknown>
+  const benId = typeof p.beneficiary_id === 'string' ? p.beneficiary_id : null
+  if (!benId || !maps.length) return 'skip'
+  const { data: ben } = await supabase.from('beneficiaries')
+    .select('case_id, full_name, status, risk_level, state, lga, ward, village, profile, next_follow_up_date, module_id')
+    .eq('id', benId).eq('project_id', event.project_id).maybeSingle()
+  if (!ben || ben.module_id !== conn.target_id) return 'skip'
+  let service: Record<string, unknown> | null = null
+  if (event.event === 'service.recorded' && typeof p.service_id === 'string') {
+    const { data } = await supabase.from('beneficiary_services')
+      .select('component_key, service_name, service_date, result, status, data').eq('id', p.service_id).maybeSingle()
+    service = data ?? null
+  }
+  return { ...outbound(ben, service, maps), _amehnities: { event: event.event, case_id: ben.case_id } }
+}
