@@ -1,3 +1,4 @@
+import { grid3Features, osmFeatures, mergeCatalogue, readCatalogue, saveCatalogue, type CatalogueFeature } from "@/lib/microplanning/landCatalogue";
 import { useEffect, useMemo, useState } from 'react';
 import L from 'leaflet';
 import { MapPinned, Download, Loader2, RefreshCw } from 'lucide-react';
@@ -37,6 +38,14 @@ export default function AreaEvidenceInspector({entries,scopeKey,allowReference}:
           try {const response=await fetch(`https://overpass-api.de/api/interpreter?${new URLSearchParams({data:query})}`,{signal:abort.signal});if(!response.ok)throw Error(`Public lookup unavailable (${response.status})`);const result=await response.json();if(result.remark)throw Error('Public lookup incomplete');evidence=parseLandEvidence(result);lookup+='OpenStreetMap returned up to 300 nearby features; incomplete coverage.';}finally{clearTimeout(timer);}
         }catch{lookup+='Public land-feature lookup unavailable; not evidence of an empty area.';}
       }else lookup+='Offline: public imagery and land-feature lookup need connectivity.';
+      // Shared catalogue: GRID3 first, OpenStreetMap fills gaps; offline uses previously catalogued features.
+      const grid=grid3Features(refs,scope.properties.state,point.lat,point.lng);
+      let stored:CatalogueFeature[]=[];try{stored=await readCatalogue(point.lat,point.lng);}catch{/* catalogue unavailable */}
+      const fresh=mergeCatalogue(grid,osmFeatures(evidence,scope.properties.state,scope.properties.lga||''));
+      const merged=mergeCatalogue([...fresh.filter(f=>f.kind==='grid3'),...stored.filter(f=>f.kind==='grid3')],[...fresh.filter(f=>f.kind==='osm'),...stored.filter(f=>f.kind==='osm')]);
+      evidence=merged;
+      if(navigator.onLine&&fresh.length)saveCatalogue(fresh).then(()=>{if(live)setStatus(s=>s+` Catalogue updated (${fresh.length} features, GRID3 first).`);}).catch(()=>{});
+      if(!navigator.onLine&&stored.length)lookup+=` Showing ${stored.length} previously catalogued features.`;
       if(!live)return;setFeatures(evidence);setStatus(lookup);
       const nearby=nearbyAreaRows(list,point.lat,point.lng);
       const bytes=await buildAreaWorkbook(scope.properties.state,scope.properties.lga||'',point.lat,point.lng,list,evidence,evidenceVerdict(nearby,evidence),lookup).xlsx.writeBuffer();

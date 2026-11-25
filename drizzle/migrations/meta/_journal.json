@@ -526,6 +526,13 @@
       "when": 1795610232648,
       "tag": "0074_restrict_stock_movements_and_route_reward",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1795610634429,
+      "tag": "0075_land_feature_catalogue",
+      "breakpoints": true
     }
   ]
 }

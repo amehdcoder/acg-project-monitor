@@ -7969,6 +7969,57 @@ export type Database = {
         }
         Relationships: []
       }
+      land_features: {
+        Row: {
+          created_at: string
+          feature: string
+          first_seen_by: string | null
+          id: string
+          latitude: number
+          lga: string | null
+          longitude: number
+          name: string
+          population: number | null
+          source_kind: string
+          source_ref: string
+          source_url: string | null
+          state: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          feature: string
+          first_seen_by?: string | null
+          id?: string
+          latitude: number
+          lga?: string | null
+          longitude: number
+          name: string
+          population?: number | null
+          source_kind: string
+          source_ref: string
+          source_url?: string | null
+          state?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          feature?: string
+          first_seen_by?: string | null
+          id?: string
+          latitude?: number
+          lga?: string | null
+          longitude?: number
+          name?: string
+          population?: number | null
+          source_kind?: string
+          source_ref?: string
+          source_url?: string | null
+          state?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       learning_log_entries: {
         Row: {
           author_name: string | null
@@ -15226,6 +15277,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      catalogue_land_features: { Args: { _rows: Json }; Returns: number }
       claim_brain_for_training: {
         Args: { _limit: number; _min_steps: number }
         Returns: {
