@@ -1,3 +1,4 @@
+import { useAuth } from "@/hooks/useAuth";
 import { useState, useEffect, useCallback } from "react";
 import { Send, Users, FolderOpen, MapPin, CheckCircle, Activity } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -67,13 +68,15 @@ const fetchAllSubmissions = async (selectColumns: string, filters?: { projectFor
 
 
 const DashboardKPIStrip = ({ onDataReady, selectedProjectId, isSyncing }: Props) => {
+  const { user } = useAuth();
+  const cacheScope = `${user?.id || 'anon'}_${selectedProjectId || 'global'}`;
 
   const [data, setData] = useState<KPIData | null>(() => {
-    const cached = localStorage.getItem(`kpi_cache_${selectedProjectId || 'global'}`);
+    const cached = localStorage.getItem(`kpi_cache_v2_${cacheScope}`);
     return cached ? JSON.parse(cached) : null;
   });
   const [detail, setDetail] = useState<DetailData | null>(() => {
-    const cached = localStorage.getItem(`detail_cache_${selectedProjectId || 'global'}`);
+    const cached = localStorage.getItem(`detail_cache_v2_${cacheScope}`);
     return cached ? JSON.parse(cached) : null;
   });
   const [loading, setLoading] = useState(!data);
@@ -396,15 +399,24 @@ const DashboardKPIStrip = ({ onDataReady, selectedProjectId, isSyncing }: Props)
       onDataReady?.(kpiData);
       
       // Persist to cache
-      localStorage.setItem(`kpi_cache_${selectedProjectId || 'global'}`, JSON.stringify(kpiData));
-      localStorage.setItem(`detail_cache_${selectedProjectId || 'global'}`, JSON.stringify(detailData));
+      localStorage.setItem(`kpi_cache_v2_${cacheScope}`, JSON.stringify(kpiData));
+      localStorage.setItem(`detail_cache_v2_${cacheScope}`, JSON.stringify(detailData));
 
     } catch (err) {
       console.error("KPI fetch error:", err);
     } finally {
       setLoading(false);
     }
-  }, [onDataReady, selectedProjectId]);
+  }, [onDataReady, selectedProjectId, cacheScope]);
+
+  useEffect(() => {
+    try {
+      const k = localStorage.getItem(`kpi_cache_v2_${cacheScope}`);
+      const d = localStorage.getItem(`detail_cache_v2_${cacheScope}`);
+      setData(k ? JSON.parse(k) : null);
+      setDetail(d ? JSON.parse(d) : null);
+    } catch { setData(null); setDetail(null); }
+  }, [cacheScope]);
 
   useEffect(() => {
     fetchKPIs();
