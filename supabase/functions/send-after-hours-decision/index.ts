@@ -2,6 +2,7 @@
 // original requester. Callable only by reviewers (admins/owners). Uses the
 // service role to resolve the requester's email + name from the request row,
 // then dispatches via the existing send-email-smtp function.
+import { invokeSmtp } from "../_shared/sendSmtp.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { renderBrandEmail } from "../_shared/amehnitiesEmail.ts";
 import { guardRequest } from "../_shared/authGuard.ts";
@@ -102,7 +103,7 @@ Deno.serve(async (req) => {
       ? "Your after-hours submission was approved"
       : "Update on your after-hours submission";
 
-    const { error: sendErr } = await admin.functions.invoke("send-email-smtp", {
+    const { error: sendErr } = await invokeSmtp( {
       body: { to: email, subject, html },
     });
     if (sendErr) throw sendErr;

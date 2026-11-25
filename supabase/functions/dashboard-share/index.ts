@@ -513,6 +513,7 @@ Deno.serve(async (req) => {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${SERVICE_KEY}`,
+          "x-worker-secret": Deno.env.get("CRON_SECRET") ?? "",
         },
         body: JSON.stringify({
           to: email,

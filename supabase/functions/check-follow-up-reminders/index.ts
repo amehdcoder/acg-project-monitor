@@ -1,3 +1,4 @@
+import { invokeSmtp } from "../_shared/sendSmtp.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { renderBrandEmail } from "../_shared/amehnitiesEmail.ts";
 import { guardRequest } from "../_shared/authGuard.ts";
@@ -159,7 +160,7 @@ Deno.serve(async (req) => {
         });
 
         try {
-          await supabase.functions.invoke("send-email-smtp", {
+          await invokeSmtp( {
             body: {
               to: profile.email,
               subject: isOverdue ? `Overdue follow-up: ${c.name}` : `Follow-up due today: ${c.name}`,

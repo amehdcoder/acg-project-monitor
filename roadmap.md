@@ -255,4 +255,4 @@
 
 - [x] Eye Health dashboard totals count only from 2 November 2026 (`EYE_COUNTING_WINDOW_START` in `src/lib/eyeReport/definition.ts`); the map, monthly trend, visual acuity trajectory, WHO milestone scorecard, daily-report list, facility editor and DHIS2 exchange keep all dates per the user's "dashboard totals only" answer. Verified signed in as the real account on live BMZ data: KPIs read 3,537 consulted (1,789 M · 1,748 F), WG-SS 1,635 screened / 328 with a disability, reporting days 18 with 101 reports — exactly the on/after-2-Nov totals — while the report list still shows all 102 reports; database check agrees (102 reports, 20 consulted and 7 screenings before the window). Three new counting-window tests plus all 125 Eye Health tests pass, build OK, no page errors.
 # Roadmap
-- [ ] Email the project owner when a form submission arrives — waiting on the sender email domain setup
+- [x] Email the project owner when a form submission arrives (info@amehnities.org)

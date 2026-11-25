@@ -1,5 +1,6 @@
 // Sends a professional notification email to a user when they are assigned
 // to a new project or form(s). Delegates actual delivery to send-email-smtp.
+import { invokeSmtp } from "../_shared/sendSmtp.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { guardRequest } from "../_shared/authGuard.ts";
 
@@ -152,7 +153,7 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    const { error } = await supabase.functions.invoke("send-email-smtp", {
+    const { error } = await invokeSmtp( {
       body: { to: email, subject, html, text: `${subject}: ${items.join(", ")}` },
     });
     if (error) throw error;

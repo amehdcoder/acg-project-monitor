@@ -6339,6 +6339,30 @@ export type Database = {
           },
         ]
       }
+      form_submission_email_alerts: {
+        Row: {
+          created_at: string
+          error: string | null
+          recipient: string | null
+          status: string
+          submission_id: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          recipient?: string | null
+          status?: string
+          submission_id: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          recipient?: string | null
+          status?: string
+          submission_id?: string
+        }
+        Relationships: []
+      }
       form_submissions: {
         Row: {
           client_submitted_at: string | null

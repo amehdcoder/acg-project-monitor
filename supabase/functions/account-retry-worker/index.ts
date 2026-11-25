@@ -5,6 +5,7 @@
 // Runs on a schedule (cron) and can also be invoked on demand by an
 // Owner/Co-owner/admin ("Retry now" button). Every outcome is written to
 // account_audit_log.
+import { invokeSmtp } from "../_shared/sendSmtp.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { renderBrandEmail } from "../_shared/amehnitiesEmail.ts";
 import { guardRequest } from "../_shared/authGuard.ts";
@@ -117,7 +118,7 @@ Deno.serve(async (req) => {
             ctaUrl: APP_URL,
             closing: "We are delighted to have you on board.",
           });
-          const { error: mailErr } = await admin.functions.invoke("send-email-smtp", {
+          const { error: mailErr } = await invokeSmtp( {
             body: { to: email, subject: "Your Amehnities account is ready", html },
           });
           emailSent = !mailErr;

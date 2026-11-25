@@ -1,4 +1,5 @@
 // Sends a branded welcome email to a newly signed-up user via Hostinger SMTP.
+import { invokeSmtp } from "../_shared/sendSmtp.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { renderBrandEmail } from "../_shared/amehnitiesEmail.ts";
 import { guardRequest } from "../_shared/authGuard.ts";
@@ -71,7 +72,7 @@ Deno.serve(async (req) => {
     });
 
     const supabase = createClient(supabaseUrl, serviceKey);
-    const { error } = await supabase.functions.invoke("send-email-smtp", {
+    const { error } = await invokeSmtp( {
       body: {
         to: email,
         subject: "Welcome to Amehnities",

@@ -5,6 +5,7 @@
 //   3. Approve the profile and set the chosen designation.
 //   4. Email the new user their credentials, app link and Owner contact.
 //   5. Report back per-account status incl. whether the email was delivered.
+import { invokeSmtp } from "../_shared/sendSmtp.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { renderBrandEmail } from "../_shared/amehnitiesEmail.ts";
 
@@ -259,7 +260,7 @@ Deno.serve(async (req) => {
         // (send-email-smtp also retries the SMTP connection internally.)
         let mailLastError: string | undefined;
         for (let attempt = 1; attempt <= 3; attempt++) {
-          const { error: mailErr } = await admin.functions.invoke("send-email-smtp", {
+          const { error: mailErr } = await invokeSmtp( {
             body: { to: email, subject: emailSubject, html },
           });
           if (!mailErr) { emailSent = true; mailLastError = undefined; break; }

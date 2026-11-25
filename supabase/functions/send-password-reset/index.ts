@@ -1,5 +1,6 @@
 // Sends a branded password-reset email from info@amehnities.org via Hostinger SMTP.
 // Uses Supabase admin API to generate a recovery link, then dispatches via SMTP.
+import { invokeSmtp } from "../_shared/sendSmtp.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { renderBrandEmail } from "../_shared/amehnitiesEmail.ts";
 
@@ -59,7 +60,7 @@ Deno.serve(async (req) => {
         "If the button does not work, copy and paste this link into your browser:<br/><span style=\"word-break:break-all;color:#0F766E;font-size:12px;\">" + actionLink + "</span>",
     });
 
-    const { error: sendError } = await admin.functions.invoke("send-email-smtp", {
+    const { error: sendError } = await invokeSmtp( {
       body: {
         to: email,
         subject: "Reset your Amehnities password",
