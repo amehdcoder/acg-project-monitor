@@ -39,6 +39,9 @@ import BeneficiaryRecord from "./BeneficiaryRecord";
 import RecordQualityBar from "./RecordQualityBar";
 import BeneficiaryFormDialog from "./BeneficiaryFormDialog";
 import ProjectTeamPanel from "./ProjectTeamPanel";
+import AddUsersWizard from "./AddUsersWizard";
+import { useTeamMembers } from "@/lib/programmeModule/projectTeam";
+import { UserPlus } from "lucide-react";
 import DonorAccessPanel from "./DonorAccessPanel";
 import { useMyTeamPermissions, isHealthWorkerComponent, componentInAreas, memberComponentFilter, memberDashboardAllowed } from "@/lib/programmeModule/projectTeam";
 import ModuleConfigurator from "./ModuleConfigurator";
@@ -113,6 +116,7 @@ const ProgrammeModuleWorkspace = ({
   const isSuperAdmin = viewAs ? false : realIsSuperAdmin;
   const { toast } = useToast();
   const { user } = useAuth();
+  const [addUsersOpen, setAddUsersOpen] = useState(false);
   const { modules, loading, reload } = useProgrammeModules(projectId);
   const [activeId, setActiveId] = useState<string>("");
   const [galleryOpen, setGalleryOpen] = useState(false);
@@ -527,6 +531,8 @@ const ProgrammeModuleWorkspace = ({
       {canViewAs && <ViewAsDialog key={viewAsOpen ? "o" : "c"} open={viewAsOpen} onOpenChange={(o) => { setViewAsOpen(o); if (!o) setViewAsSeed(null); }} initial={viewAsSeed || viewAs}
         components={normalizeConfig(active?.config || {}).components.filter((c) => !c.hidden).map((c) => ({ key: c.key, label: c.label }))}
         facilities={viewAsFacilities} states={viewAsStates} onApply={setViewAs} />}
+      {projectId && (canConfigure || can("manage_team")) && <WorkspaceAddUsers open={addUsersOpen} onOpenChange={setAddUsersOpen} projectId={projectId} moduleId={active?.id}
+        components={(normalizeConfig(active?.config).components || []).filter((c) => !c.hidden).map((c) => ({ key: c.key, label: c.label }))} />}
       {canViewAs && <AccessStudio open={accessStudioOpen} onOpenChange={setAccessStudioOpen} projectId={projectId}
         onPreview={(role) => { setAccessStudioOpen(false); setViewAsSeed({ role, components: [] }); setViewAsOpen(true); }} />}
       {viewAs && <ViewAsBanner config={viewAs} facilityName={viewAsFacilities.find((f) => f.id === viewAs.facilityId)?.name} onChange={() => setViewAsOpen(true)} onExit={() => setViewAs(null)} />}
@@ -537,6 +543,8 @@ const ProgrammeModuleWorkspace = ({
       )}
 
       {!accessLoading && !isSide(view) && <WorkspaceNavigation groups={navGroups} view={view} onViewChange={setView} administration={isFocalPerson ? <Button variant="outline" size="sm" onClick={() => openWorkflowTour()}><Compass className="mr-2 h-4 w-4" /> Guided tour</Button> :
+        <div className="flex items-center gap-2">
+        {(canConfigure || can("manage_team")) && <Button size="sm" className="gap-2" onClick={() => setAddUsersOpen(true)}><UserPlus className="h-4 w-4" /> Add users</Button>}
         <DropdownMenu>
           <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="gap-2"><SlidersHorizontal className="h-4 w-4" /> Manage<ChevronDown className="h-3.5 w-3.5" /></Button></DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64">
@@ -547,6 +555,7 @@ const ProgrammeModuleWorkspace = ({
             <DropdownMenuItem onSelect={() => setRegistryOpen(true)}><Building2 className="mr-2 h-4 w-4" /> Health facilities</DropdownMenuItem>
             {canConfigure && <DropdownMenuItem onSelect={() => setDevicePreviewOpen(true)}><Layers className="mr-2 h-4 w-4" /> Device preview</DropdownMenuItem>}
             {canConfigure && <DropdownMenuItem onSelect={() => { setFocalFacilityId(undefined); setFocalOpen(true); }}><Users className="mr-2 h-4 w-4" /> Facility teams</DropdownMenuItem>}
+            {(canConfigure || can("manage_team")) && <DropdownMenuItem onSelect={() => setAddUsersOpen(true)}><UserPlus className="mr-2 h-4 w-4" /> Add users</DropdownMenuItem>}
             {(canConfigure || can("manage_team") || onTeamRegister) && <DropdownMenuItem onSelect={() => setView("team")}><Users className="mr-2 h-4 w-4" /> Project team</DropdownMenuItem>}
             {(canConfigure || can("manage_team")) && <DropdownMenuItem onSelect={() => setView("donors")}><Globe className="mr-2 h-4 w-4" /> Donor portal</DropdownMenuItem>}
             {canConfigure && <DropdownMenuItem onSelect={() => setDrugsOpen(true)}><Settings2 className="mr-2 h-4 w-4" /> mhGAP medicines</DropdownMenuItem>}
@@ -558,6 +567,7 @@ const ProgrammeModuleWorkspace = ({
             {canConfigure && <DropdownMenuItem onSelect={() => setDeleteRequestsOpen(true)} className="text-destructive"><ShieldAlert className="mr-2 h-4 w-4" /> Deletion requests</DropdownMenuItem>}
           </DropdownMenuContent>
         </DropdownMenu>
+        </div>
       } />}
 
 
@@ -953,3 +963,8 @@ const ProgrammeModuleWorkspace = ({
 };
 
 export default ProgrammeModuleWorkspace;
+
+function WorkspaceAddUsers(props: { open: boolean; onOpenChange: (o: boolean) => void; projectId: string; moduleId?: string; components: { key: string; label: string }[] }) {
+  const { members, reload } = useTeamMembers(props.open ? props.projectId : undefined);
+  return <AddUsersWizard {...props} members={members} onSaved={() => { void reload(); window.dispatchEvent(new Event("programme-team-changed")); }} />;
+}

@@ -589,6 +589,27 @@
       "when": 1795629692361,
       "tag": "0083_member_record_scope_on_related_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1795629922655,
+      "tag": "0084_enforce_member_component_access",
+      "breakpoints": true
+    },
+    {
+      "idx": 85,
+      "version": "7",
+      "when": 1795629986896,
+      "tag": "0085_fix_member_record_scope_null",
+      "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "7",
+      "when": 1795630003861,
+      "tag": "0086_member_scope_follows_visible_records",
+      "breakpoints": true
     }
   ]
 }
