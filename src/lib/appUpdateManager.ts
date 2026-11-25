@@ -60,7 +60,7 @@ const probe = async <T>(url: string, read: (res: Response) => Promise<T>): Promi
   try {
     return await withTimeout((async () => {
       const res = await fetch(url, {
-        cache: "no-store", credentials: "same-origin",
+        cache: "no-store", credentials: "omit", // never send the host's deployment-pinning cookie: it would keep returning the version this tab loaded
         headers: { "Cache-Control": "no-cache" }, signal: controller.signal,
       });
       if (!res.ok) throw new Error("The update service is unavailable. Please try again.");
