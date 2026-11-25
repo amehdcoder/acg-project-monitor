@@ -28,4 +28,12 @@ describe("LBR integration spec", () => {
   it("offers push endpoints that need records:write", () => {
     expect(spec.endpoints.filter((e) => e.method === "POST").every((e) => e.scope === "records:write")).toBe(true);
   });
+  it("includes a JSON Schema limited to the selected components", () => {
+    const one = buildLbrApiSpec({ config: CISKULA_PRESET, moduleName: "M", projectName: "T", supabaseUrl: "https://x.supabase.co", components: ["eye_health"] });
+    const defs = one.schema.jsonSchema.$defs as Record<string, { required?: string[] }>;
+    expect(one.schema.jsonSchema.$schema).toBe("https://json-schema.org/draft/2020-12/schema");
+    expect(Object.keys(defs).filter((k) => k.startsWith("ServiceData_"))).toEqual(["ServiceData_eye_health"]);
+    expect(defs.Beneficiary.required).toContain("case_id");
+    expect(specToText(one)).toContain("SCHEMA: SERVICE");
+  });
 });

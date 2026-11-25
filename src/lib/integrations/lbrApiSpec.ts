@@ -3,6 +3,7 @@
 // so the formats can never disagree. Routes, scopes and events mirror
 // supabase/functions/external-api and webhook-dispatch — update both together.
 import type { ProgrammeModuleConfig } from "@/lib/programmeModule/types";
+import { buildLbrSchema, type LbrSchema } from "./lbrApiSchema";
 
 export type SpecField = { key: string; label: string; type: string; required: boolean; options?: string[]; location: string };
 export type SpecEndpoint = {
@@ -30,6 +31,7 @@ export type LbrApiSpec = {
   serviceFields: SpecField[];
   webhook: { headers: { name: string; description: string }[]; envelope: string; verification: string[]; retries: string[]; events: SpecEvent[] };
   errors: { status: number; meaning: string; action: string }[];
+  schema: LbrSchema;
   checklist: string[];
   contacts: string[];
 };
@@ -192,6 +194,7 @@ export function buildLbrApiSpec(input: {
       { id: "reports", method: "GET", path: "/reports", scope: "reports:read", summary: "Latest 100 submitted or resolved programme reports with indicator entries.", params: [], returns: "{ data: [ { id, period_label, report_year, status, notes, created_at, reviewed_at, resolution_note, entries: [ { indicator_code, value, disaggregation, risk, over_target_comment } ] } ] }", example: ex("/reports") },
     ],
     components, coreFields: BENEFICIARY_CORE, profileFields, serviceFields: SERVICE_FIELDS,
+    schema: buildLbrSchema({ baseUrl, core: BENEFICIARY_CORE, profile: profileFields, service: SERVICE_FIELDS, components }),
     webhook: {
       headers: [
         { name: "Content-Type", description: "application/json" },

@@ -1,5 +1,6 @@
 // Renders the LBR integration specification into PDF, Word, PowerPoint, TXT and JSON.
 import type { LbrApiSpec } from "./lbrApiSpec";
+import type { SchemaEntity, SchemaProp } from "./lbrApiSchema";
 import amehnitiesLogo from "@/assets/logo-amehnities.png";
 import fmohLogo from "@/assets/logo-fmoh.png";
 import cbmLogo from "@/assets/cbm-logo.png";
@@ -34,6 +35,8 @@ const fileBase = (s: LbrApiSpec) => `Amehnities_LBR_API_Integration_Spec_${s.sel
 const scopeText = (s: LbrApiSpec) => s.selection.mode === "all" ? "All components" : s.selection.labels.join(", ");
 const fmtDate = (iso: string) => new Date(iso).toUTCString().replace(" GMT", " UTC");
 
+export const typeText = (p: SchemaProp) => `${p.type}${p.format ? ` <${p.format}>` : ""}${p.enum?.length && p.type !== "array" ? " (enum)" : p.type === "array" ? "[]" : ""}`;
+
 function fieldRows(fields: LbrApiSpec["coreFields"]) {
   return fields.map((f) => [f.key, f.label, f.type, f.required ? "Yes" : "No", f.options?.join(", ") || "—"]);
 }
@@ -57,6 +60,11 @@ export function specSections(s: LbrApiSpec) {
     { n: "7.1", title: "Profile fields (beneficiary.profile)", table: { head: ["Key", "Label", "Type", "Required", "Allowed values"], rows: fieldRows(s.profileFields) } },
     { n: "7.2", title: "Service record", table: { head: ["Field", "Description", "Type", "Always present", "Allowed values"], rows: fieldRows(s.serviceFields) } },
     { n: "7.3", title: "Component-specific service fields (service.data)", table: { head: ["Key", "Label", "Type", "Required", "Component"], rows: s.components.flatMap((c) => c.extraFields.map((f) => [f.key, f.label, f.type, f.required ? "Yes" : "No", c.key])) } },
+    { n: "7.4", title: "Data schema — entity model", paras: [`Standard: ${s.schema.standard}.`, "Each card is one object exchanged with Amehnities. A filled marker and bold name indicate a required field; types follow JSON Schema."], entities: s.schema.entities,
+      table: { head: ["From", "To", "Cardinality", "Join / embedding"], rows: s.schema.relations.map((r) => [r.from, r.to, r.cardinality, r.via]) } },
+    ...s.schema.entities.map((e, i) => ({ n: `7.4.${i + 1}`, title: `Schema: ${e.title}`, paras: [e.description],
+      table: { head: ["Property", "Type", "Required", "Description", "Allowed values"], rows: e.props.length ? e.props.map((p) => [p.name, typeText(p), p.required ? "Yes" : "No", p.description, p.enum?.join(", ") || "—"]) : [["—", "object", "No", "No additional fields configured", "—"]] } })),
+    { n: "7.5", title: "JSON Schema (Draft 2020-12)", paras: [`Canonical machine-readable schema for this selection. Validate payloads before POSTing; $id: ${String(s.schema.jsonSchema.$id)}.`], code: JSON.stringify(s.schema.jsonSchema, null, 2) },
     { n: "8", title: "Webhooks", paras: [`Amehnities sends HTTPS POST requests to the endpoint you register. Delivery service: ${s.webhookOrigin}/functions/v1/webhook-dispatch.`, ...(s.selection.mode === "all" ? [] : [`For this selection, subscribe to service.recorded and keep only events whose component_key is ${s.selection.componentKeys.join(", ")}.`])],
       table: { head: ["Header", "Meaning"], rows: s.webhook.headers.map((h) => [h.name, h.description]) }, code: s.webhook.envelope },
     { n: "8.1", title: "Webhook event catalogue", table: { head: ["Event", "When", "Payload fields"], rows: s.webhook.events.map((e) => [e.id, e.summary, Object.entries(e.payload).map(([k, v]) => `${k}: ${v}`).join(", ")]) } },
@@ -65,7 +73,7 @@ export function specSections(s: LbrApiSpec) {
     { n: "8.3", title: "Delivery and retries", bullets: s.webhook.retries },
     { n: "9", title: "Errors", table: { head: ["HTTP", "Meaning", "Action"], rows: s.errors.map((e) => [String(e.status), e.meaning, e.action]) } },
     { n: "10", title: "Onboarding checklist", bullets: s.checklist },
-  ] as { n: string; title: string; paras?: string[]; bullets?: string[]; table?: { head: string[]; rows: string[][] }; code?: string }[];
+  ] as { n: string; title: string; paras?: string[]; bullets?: string[]; table?: { head: string[]; rows: string[][] }; code?: string; entities?: SchemaEntity[] }[];
 }
 
 export function specToText(s: LbrApiSpec): string {
@@ -118,6 +126,40 @@ async function toPdf(s: LbrApiSpec, logos: Logo[]): Promise<Blob> {
     doc.setFont("helvetica", "normal"); doc.setFontSize(9.5); doc.setTextColor(...hex(INK));
     for (const p of sec.paras || []) { const t = doc.splitTextToSize(p, W - 2 * M); ensure(t.length * 4.6); doc.text(t, M, y); y += t.length * 4.6 + 1.5; }
     for (const b of sec.bullets || []) { const t = doc.splitTextToSize(b, W - 2 * M - 6); ensure(t.length * 4.6); doc.setFillColor(...hex(GOLD)); doc.circle(M + 1.5, y - 1.3, 0.9, "F"); doc.text(t, M + 5, y); y += t.length * 4.6 + 1; }
+    if (sec.entities?.length) {
+      const ACC = { navy: NAVY, teal: TEAL, gold: GOLD } as const;
+      const gap = 5, cw = (W - 2 * M - gap) / 2, rh = 4.4, MAXR = 9;
+      for (let i = 0; i < sec.entities.length; i += 2) {
+        const pair = sec.entities.slice(i, i + 2);
+        const rows = (e: SchemaEntity) => Math.min(e.props.length, MAXR) + (e.props.length > MAXR ? 1 : 0) || 1;
+        const ch = 15 + Math.max(...pair.map(rows)) * rh + 3;
+        ensure(ch + 4);
+        pair.forEach((e, j) => {
+          const x = M + j * (cw + gap), acc = hex(ACC[e.accent]);
+          doc.setFillColor(...hex("E3E9F0")); doc.roundedRect(x + 0.8, y + 0.8, cw, ch, 2, 2, "F");
+          doc.setFillColor(255, 255, 255); doc.setDrawColor(...acc); doc.setLineWidth(0.4); doc.roundedRect(x, y, cw, ch, 2, 2, "FD");
+          doc.setFillColor(...acc); doc.roundedRect(x, y, cw, 9, 2, 2, "F"); doc.rect(x, y + 5, cw, 4, "F");
+          doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(e.accent === "gold" ? 20 : 255, e.accent === "gold" ? 30 : 255, e.accent === "gold" ? 50 : 255);
+          doc.text(doc.splitTextToSize(e.title, cw - 6)[0], x + 3, y + 6);
+          doc.setFont("helvetica", "italic"); doc.setFontSize(6.8); doc.setTextColor(...hex(MUTED));
+          doc.text(doc.splitTextToSize(e.description, cw - 6)[0], x + 3, y + 13);
+          let ry = y + 17.5;
+          const list = e.props.slice(0, MAXR);
+          if (!list.length) { doc.setFont("helvetica", "normal"); doc.text("No additional fields configured", x + 3, ry); }
+          list.forEach((p, k) => {
+            if (k % 2) { doc.setFillColor(...hex(BAND)); doc.rect(x + 0.5, ry - 3.1, cw - 1, rh, "F"); }
+            doc.setFont("courier", "bold"); doc.setFontSize(7.2); doc.setTextColor(...hex(p.required ? NAVY : INK));
+            doc.setDrawColor(...acc); doc.setFillColor(...(p.required ? acc : hex("FFFFFF"))); doc.circle(x + 3.6, ry - 1.1, 0.9, "FD");
+            doc.text(p.name.slice(0, 30), x + 6, ry);
+            doc.setFont("courier", "normal"); doc.setTextColor(...hex(TEAL)); doc.text(typeText(p).slice(0, 22), x + cw - 3, ry, { align: "right" });
+            ry += rh;
+          });
+          if (e.props.length > MAXR) { doc.setFont("helvetica", "italic"); doc.setFontSize(6.8); doc.setTextColor(...hex(MUTED)); doc.text(`+ ${e.props.length - MAXR} more — see full table below`, x + 3, ry); }
+        });
+        y += ch + 5;
+      }
+      doc.setFont("helvetica", "normal"); doc.setFontSize(9.5); doc.setTextColor(...hex(INK));
+    }
     if (sec.table && sec.table.rows.length) {
       autoTable(doc, { startY: y + 1, head: [sec.table.head], body: sec.table.rows, margin: { left: M, right: M, top: 24, bottom: 18 },
         styles: { fontSize: 8, cellPadding: 1.8, textColor: hex(INK), lineColor: hex("D5DEE7"), lineWidth: 0.15, overflow: "linebreak" },
