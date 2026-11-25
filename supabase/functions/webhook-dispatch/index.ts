@@ -151,6 +151,9 @@ Deno.serve(async (req) => {
     const original = (d as Record<string, unknown>).webhook_events as { payload: unknown } | null
     const event = retryEvent(d, original, ep.project_id)
     if (!event) continue
+    const { data: mine } = await supabase.from('webhook_deliveries').update({ status: 'pending' })
+      .eq('id', d.id).eq('status', 'failed').select('id')
+    if (!mine?.length) continue
     await deliver(supabase, ep, event, { id: d.id, attempts: d.attempts })
   }
 
@@ -164,6 +167,10 @@ Deno.serve(async (req) => {
 
   let delivered = 0
   for (const ev of events ?? []) {
+    // Claim atomically: concurrent wake-ups must never deliver the same event twice.
+    const { data: claimed } = await supabase.from('webhook_events').update({ processed: true })
+      .eq('id', ev.id).eq('processed', false).select('id')
+    if (!claimed?.length) continue
     const { data: endpoints } = await supabase
       .from('webhook_endpoints')
       .select('*')
@@ -176,7 +183,6 @@ Deno.serve(async (req) => {
       await deliver(supabase, ep as Endpoint, ev)
       delivered++
     }
-    await supabase.from('webhook_events').update({ processed: true }).eq('id', ev.id)
   }
 
   return new Response(

@@ -11,7 +11,12 @@ export function getPath(o: unknown, path: string): unknown {
   // Kobo/ODK send flat group paths such as "respondent/name" — exact keys win.
   if (isObj(o) && !BLOCKED.has(path) && Object.prototype.hasOwnProperty.call(o, path)) return o[path]
   let cur: unknown = o
-  for (const p of path.split('.')) { if (!isObj(cur) || BLOCKED.has(p)) return undefined; cur = cur[p] }
+  for (const p of path.split('.')) {
+    if (BLOCKED.has(p)) return undefined
+    // DHIS2-style lists: attributes.First name → item whose attribute/code/displayName matches.
+    if (Array.isArray(cur)) { const hit = cur.find((x) => isObj(x) && [x.attribute, x.code, x.displayName, x.dataElement].includes(p)); cur = isObj(hit) ? hit.value : undefined; continue }
+    if (!isObj(cur)) return undefined; cur = cur[p]
+  }
   return cur
 }
 export function setPath(o: Obj, path: string, v: unknown) {

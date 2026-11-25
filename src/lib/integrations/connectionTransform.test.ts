@@ -29,3 +29,8 @@ it2("keeps Kobo/ODK group paths like respondent/name", () => {
   ex2(maps).toHaveLength(1);
   ex2(JSON.stringify(inb2({ "respondent/name": "Amina" }, maps))).toContain("Amina");
 });
+
+it2("reads DHIS2 attribute lists by display name", () => {
+  const maps = cm2([{ external: "attributes.First name", internal: "full_name" }]);
+  ex2(JSON.stringify(inb2({ attributes: [{ displayName: "First name", value: "John" }] }, maps))).toContain("John");
+});

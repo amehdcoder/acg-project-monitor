@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Plug, Plus, Search, FileText, Users, ArrowRight, ArrowLeft, ArrowLeftRight, Upload, Download,
-  Sparkles, Check, Copy, Trash2, Loader2, Wand2, Globe, Database, Sheet, Building2, Smartphone, Cloud, X,
+  Sparkles, Check, Copy, Trash2, Loader2, Wand2, Globe, Database, Sheet, Building2, Smartphone, Cloud, X, BarChart3, Info,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,8 +35,23 @@ const APPS = [
   { id: "sheets", name: "Spreadsheet / Airtable", icon: Sheet, hint: "Tables and lists" },
   { id: "crm", name: "CRM / Salesforce", icon: Cloud, hint: "Partners and donors" },
   { id: "database", name: "Database / Data warehouse", icon: Database, hint: "Analytics stores" },
+  { id: "supabase", name: "Supabase", icon: Database, hint: "Postgres app backend" },
+  { id: "metabase", name: "Metabase", icon: BarChart3, hint: "Dashboards & BI" },
   { id: "custom", name: "Any other app", icon: Globe, hint: "Anything with a web address" },
 ];
+const GUIDES: Record<string, string> = {
+  kobo: "In KoboToolbox open your form → Settings → REST Services, and paste the connection address shown at the end. Field names like group/question are understood.",
+  odk: "In Ona or ODK Central add a webhook (REST service) with the connection address and key shown at the end.",
+  dhis2: "Use a DHIS2 route or scheduler to send tracked-entity data to the connection address; Amehnities sends updates back to the DHIS2 address you enter above.",
+  commcare: "In CommCare go to Project Settings → Data Forwarding, add a JSON case forwarder pointing to the connection address with the key as a header.",
+  sheets: "For Google Sheets or Airtable use an automation (Apps Script, Airtable Automations, Zapier or Make) to send rows to the connection address; updates can be sent back to a webhook address.",
+  crm: "In Salesforce or another CRM create an outbound flow/HTTP callout to the connection address, and point Amehnities at your inbound endpoint to receive updates.",
+  database: "Run a small scheduled job that reads the connection address (pull) or sends rows to it (push). Any SQL warehouse works.",
+  supabase: "In your Supabase project add a Database Webhook (or Edge Function) that sends new rows to the connection address; enter your Edge Function address above to receive Amehnities updates.",
+  metabase: "Metabase reads databases, not live feeds: send Amehnities updates into a Supabase/Postgres table using this connection, then add that database in Metabase → Admin → Databases to build dashboards.",
+  custom: "Any app that can send or receive a web request (JSON over https) can connect using the address and key shown at the end.",
+};
+
 const DIRECTIONS: { id: Direction; label: string; text: string; icon: typeof Upload }[] = [
   { id: "push", label: "Send from Amehnities", text: "New and updated entries go to the other app automatically.", icon: Upload },
   { id: "pull", label: "Receive into Amehnities", text: "The other app sends its entries into Amehnities.", icon: Download },
@@ -279,6 +294,7 @@ function ConnectionWizard({ projects, onClose, onSaved }: { projects: Project[];
                 </button>
               ))}
             </div>
+            {app && GUIDES[app] && <p className="flex gap-2 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm text-foreground"><Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><span><b>How to set this up: </b>{GUIDES[app]}</span></p>}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5"><Label>Connection name</Label>
                 <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. State eye clinic system" /></div>
