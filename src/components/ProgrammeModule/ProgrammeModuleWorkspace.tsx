@@ -5,6 +5,7 @@ import { useAccessProfiles, pageAllowed } from "@/lib/programmeModule/accessStud
 import BeneficiaryBrainPanel from "./BeneficiaryBrainPanel";
 import { Brain, BookOpenCheck } from "lucide-react";
 import FieldGuidePanel from "./FieldGuidePanel";
+import IntegrationSpecDownload from "./IntegrationSpecDownload";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -485,6 +486,7 @@ const ProgrammeModuleWorkspace = ({
             <CloudOff className="h-4 w-4" /> {pending} queued — sync now
           </Button>
         )}
+        {!viewAs && active && <IntegrationSpecDownload config={normalizeConfig(active.config || {})} moduleName={active.name} projectId={projectId} />}
         <Button variant="outline" size="sm" onClick={() => void reload()} aria-label="Reload modules">
           <RefreshCw className="h-4 w-4" />
         </Button>

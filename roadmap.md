@@ -251,3 +251,4 @@
 - [x] Real-account checks (2026-11-25): Geo Microplanning text readable (0 low-contrast items, signed in as Super Admin); 32 saved banking records all valid 10-digit, 0 invalid; facility-name merging and boundary tests pass (402).
 - [ ] Move to own database — blocked: needs separate destination-connected project + verified export.
 - [x] Land-feature catalogue: GRID3 first, OpenStreetMap fills gaps; saved on each area inspection, usable offline.
+- [x] Owner-only LBR API & webhook integration document (PDF, Word, PowerPoint, TXT, JSON)

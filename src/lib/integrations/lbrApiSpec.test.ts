@@ -1,0 +1,21 @@
+import { describe, expect, it } from "vitest";
+import { buildLbrApiSpec } from "./lbrApiSpec";
+import { specToText } from "./lbrApiExport";
+import { CISKULA_PRESET } from "@/lib/programmeModule/defaults";
+
+const spec = buildLbrApiSpec({ config: CISKULA_PRESET, moduleName: "CiSKuLA 2", projectName: "Test", supabaseUrl: "https://x.supabase.co/", now: new Date("2026-11-25T00:00:00Z") });
+
+describe("LBR integration spec", () => {
+  it("documents every live API route under the external-api base", () => {
+    expect(spec.baseUrl).toBe("https://x.supabase.co/functions/v1/external-api/v1");
+    expect(spec.endpoints.map((e) => e.path)).toEqual(["/projects", "/beneficiaries", "/beneficiaries/{case_id}", "/services", "/aggregates", "/reports"]);
+  });
+  it("lists every webhook event the platform emits", () => {
+    expect(spec.webhook.events.map((e) => e.id)).toEqual(expect.arrayContaining(["beneficiary.created", "beneficiary.updated", "service.recorded", "home_visit.reported", "feedback.submitted", "programme_report.submitted", "programme_report.monthly_sync"]));
+  });
+  it("includes the module's components and profile fields", () => {
+    expect(spec.components.map((c) => c.key)).toContain("eye_health");
+    expect(spec.profileFields.map((f) => f.key)).toEqual(expect.arrayContaining(["full_name", "consent_obtained", "gps"]));
+    expect(specToText(spec)).toContain("X-Amehnities-Signature");
+  });
+});
