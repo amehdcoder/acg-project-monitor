@@ -617,6 +617,13 @@
       "when": 1795631811876,
       "tag": "0087_case_id_without_date",
       "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1795631975155,
+      "tag": "0088_case_id_per_facility_serial",
+      "breakpoints": true
     }
   ]
 }
