@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FileCode2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -36,30 +36,70 @@ export default function IntegrationSpecDownload({ config, moduleName, projectId,
     return () => { live = false; };
   }, [user?.id]);
 
+  // Prepare the file in the background as soon as the window opens or the choice changes,
+  // so clicking Download saves it instantly (browsers block downloads after long waits).
+  const selKey = `${format}|${allOn ? "*" : [...picked].sort().join(",")}`;
+  const [ready, setReady] = useState<{ key: string; blob: Blob; filename: string } | null>(null);
+  const [prepError, setPrepError] = useState<string | null>(null);
+  const projectNameRef = useRef<Promise<string> | null>(null);
+  const pendingClick = useRef(false);
+  const [nonce, setNonce] = useState(0);
+  const doSave = (f: { blob: Blob; filename: string }) => {
+    const url = URL.createObjectURL(f.blob);
+    const a = document.createElement("a"); a.href = url; a.download = f.filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    toast({ title: "Download started", description: f.filename });
+    setOpen(false);
+  };
+
+  useEffect(() => {
+    if (!owner || !open) return;
+    let live = true;
+    setPrepError(null);
+    if (ready?.key === selKey) return;
+    setBusy(format);
+    (async () => {
+      projectNameRef.current ??= (async () => {
+        if (!projectId) return "Project";
+        const { data } = await supabase.from("projects").select("name").eq("id", projectId).maybeSingle();
+        return data?.name || "Project";
+      })();
+      const [projectName, { buildLbrApiSpec }, { buildSpecFile }] = await Promise.all([projectNameRef.current, import("@/lib/integrations/lbrApiSpec"), import("@/lib/integrations/lbrApiExport")]);
+      const spec = buildLbrApiSpec({ config, moduleName, projectName, supabaseUrl: import.meta.env.VITE_SUPABASE_URL, components: allOn ? [] : picked, moduleId: moduleId || undefined });
+      const file = await buildSpecFile(spec, format);
+      if (!live) return;
+      setReady({ key: selKey, ...file });
+      if (pendingClick.current) { pendingClick.current = false; doSave(file); }
+    })().catch((e) => { if (live) { pendingClick.current = false; const msg = String((e as Error)?.message || e).slice(0, 160); setPrepError(msg); toast({ title: "Could not create the document", description: msg, variant: "destructive" }); } })
+      .finally(() => { if (live) setBusy(null); });
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [owner, open, selKey, nonce]);
+
+  // Warm the generators and logos before the window is even opened.
+  useEffect(() => {
+    if (!owner) return;
+    const t = setTimeout(() => { void import("@/lib/integrations/lbrApiSpec"); void import("@/lib/integrations/lbrApiExport").then((m) => m.loadLogos()); void import("jspdf"); void import("jspdf-autotable"); }, 1500);
+    return () => clearTimeout(t);
+  }, [owner]);
+
   if (!owner) return null;
 
-  const download = async () => {
-    setBusy(format);
-    try {
-      let projectName = "Project";
-      if (projectId) { const { data } = await supabase.from("projects").select("name").eq("id", projectId).maybeSingle(); if (data?.name) projectName = data.name; }
-      const [{ buildLbrApiSpec }, { buildSpecFile, downloadBlob }] = await Promise.all([import("@/lib/integrations/lbrApiSpec"), import("@/lib/integrations/lbrApiExport")]);
-      const spec = buildLbrApiSpec({ config, moduleName, projectName, supabaseUrl: import.meta.env.VITE_SUPABASE_URL, components: allOn ? [] : picked, moduleId: moduleId || undefined });
-      const { blob, filename } = await buildSpecFile(spec, format);
-      downloadBlob(blob, filename);
-      setOpen(false);
-    } catch (e) {
-      toast({ title: "Could not create the document", description: String((e as Error)?.message || e).slice(0, 160), variant: "destructive" });
-    } finally { setBusy(null); }
+  const isReady = ready?.key === selKey;
+  const download = () => {
+    if (prepError) { pendingClick.current = true; setNonce((n) => n + 1); return; }
+    if (isReady && ready) { doSave(ready); return; }
+    pendingClick.current = true; // saves automatically the moment preparation finishes
   };
 
   const selLabel = allOn ? "All components" : picked.length === 1 ? "Single component" : `${picked.length} components`;
   return (
     <>
-      <Button variant="outline" size="sm" className="gap-1" disabled={busy !== null} onClick={() => setOpen(true)} aria-label="Download API integration document">
-        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCode2 className="h-4 w-4" />} API spec
+      <Button variant="outline" size="sm" className="gap-1" onClick={() => setOpen(true)} aria-label="Download API integration document">
+        <FileCode2 className="h-4 w-4" /> API spec
       </Button>
-      <Dialog open={open} onOpenChange={(o) => !busy && setOpen(o)}>
+      <Dialog open={open} onOpenChange={(o) => { if (!o) pendingClick.current = false; setOpen(o); }}>
         <DialogContent className="z-[1200] max-w-lg max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Integration requirements</DialogTitle>
@@ -91,8 +131,8 @@ export default function IntegrationSpecDownload({ config, moduleName, projectId,
             </RadioGroup>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)} disabled={busy !== null}>Cancel</Button>
-            <Button onClick={() => void download()} disabled={busy !== null}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Download</Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button onClick={download} aria-label="Download document">{!isReady && busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{isReady ? "Download" : prepError ? "Retry" : "Preparing…"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

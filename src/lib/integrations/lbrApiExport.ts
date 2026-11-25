@@ -15,7 +15,9 @@ const LOGO_SOURCES: [string, string][] = [
   ["Amehnities", amehnitiesLogo], ["Federal Ministry of Health", fmohLogo], ["CBM", cbmLogo],
   ["ECWA", ecwaLogo], ["ACG", acgLogo],
 ];
-async function loadLogos(): Promise<Logo[]> {
+let logoCache: Promise<Logo[]> | null = null;
+export function loadLogos(): Promise<Logo[]> { return (logoCache ??= loadLogosNow()); }
+async function loadLogosNow(): Promise<Logo[]> {
   const out = await Promise.all(LOGO_SOURCES.map(async ([name, src]) => {
     try {
       const img = new Image(); img.src = src; await img.decode();
