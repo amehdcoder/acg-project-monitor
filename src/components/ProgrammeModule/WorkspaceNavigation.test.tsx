@@ -82,4 +82,43 @@ describe("WorkspaceNavigation", () => {
     expect(onViewChange).toHaveBeenCalledWith("protection");
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
+
+  it("names the screen a record-only member lands on instead of asking to select a workspace", () => {
+    // Record-only access hides every section, so no navigation entry is visible.
+    render(
+      <WorkspaceNavigation
+        groups={[]}
+        view="records"
+        onViewChange={vi.fn()}
+        fallback={{
+          label: "Record entry",
+          description: "Register people and record services. You see only the records you added.",
+          icon: Users,
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Record entry")).toBeInTheDocument();
+    expect(screen.getByText("Register people and record services. You see only the records you added.")).toBeInTheDocument();
+    expect(screen.queryByText("Select workspace")).not.toBeInTheDocument();
+  });
+
+  it("still asks to select a workspace when the screen cannot be named", () => {
+    render(<WorkspaceNavigation groups={[]} view="records" onViewChange={vi.fn()} />);
+    expect(screen.getByText("Select workspace")).toBeInTheDocument();
+  });
+
+  it("keeps naming the open section when a navigation entry exists", () => {
+    render(
+      <WorkspaceNavigation
+        groups={groups}
+        view="dashboard"
+        onViewChange={vi.fn()}
+        fallback={{ label: "Record entry", description: "Should not be shown" }}
+      />,
+    );
+    expect(screen.getByText("General dashboard")).toBeInTheDocument();
+    expect(screen.queryByText("Record entry")).not.toBeInTheDocument();
+    expect(screen.queryByText("Should not be shown")).not.toBeInTheDocument();
+  });
 });

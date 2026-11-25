@@ -323,6 +323,12 @@ const ProgrammeModuleWorkspace = ({
   const navGroups = allNavGroups.map((group) => ({ ...group,
     items: group.items.map((item) => ({ ...item, show: item.show && (!isFocalPerson || FACILITY_WORKSPACE_VIEWS.has(item.key)) && pageAllowed(memberPerms, item.key) })),
   }));
+  // The screen a person is standing on must always name itself. A record-only
+  // member holds no dashboard and no records-list grant, so every section is
+  // hidden and the open screen has no navigation entry to read a title from.
+  const openViewTitle = view === "records" && memberPerms?.record_only
+    ? { label: "Record entry", description: "Register people and record services. You see only the records you added.", icon: UserPlus }
+    : allNavGroups.flatMap((group) => group.items).find((item) => item.key === view);
   // Background permission refreshes (focus, polling, reconnect) must not blank
   // the workspace: once access resolves for this project, keep the screen,
   // open record and scroll position mounted while fresh grants arrive.
@@ -542,7 +548,7 @@ const ProgrammeModuleWorkspace = ({
         <WorkspaceMajorTabs selected={isSide(view) ? view as MajorTab : "records"} canReport={canReport} canBrain={canBrain} canRecords={canRecords} canGuide={canGuide} canAssessments={canAssessments} onSelect={openTab} />
       )}
 
-      {!accessLoading && !isSide(view) && <WorkspaceNavigation groups={navGroups} view={view} onViewChange={setView} administration={isFocalPerson ? <Button variant="outline" size="sm" onClick={() => openWorkflowTour()}><Compass className="mr-2 h-4 w-4" /> Guided tour</Button> :
+      {!accessLoading && !isSide(view) && <WorkspaceNavigation groups={navGroups} view={view} onViewChange={setView} fallback={openViewTitle} administration={isFocalPerson ? <Button variant="outline" size="sm" onClick={() => openWorkflowTour()}><Compass className="mr-2 h-4 w-4" /> Guided tour</Button> :
         <div className="flex items-center gap-2">
         {(canConfigure || can("manage_team")) && <Button size="sm" className="gap-2" onClick={() => setAddUsersOpen(true)}><UserPlus className="h-4 w-4" /> Add users</Button>}
         <DropdownMenu>

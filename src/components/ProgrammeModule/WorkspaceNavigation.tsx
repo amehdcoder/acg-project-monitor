@@ -34,24 +34,36 @@ interface Props {
   view: WorkspaceView;
   onViewChange: (view: WorkspaceView) => void;
   administration?: React.ReactNode;
+  /**
+   * Names the screen the person is actually on when no navigation entry matches
+   * it — e.g. a record-only member, who holds no dashboard and no records-list
+   * grant, so every section is hidden and the heading would otherwise read
+   * "Select workspace" while they are already standing in their workspace.
+   */
+  fallback?: { label: string; description: string; icon?: LucideIcon };
 }
 
-const WorkspaceNavigation = ({ groups, view, onViewChange, administration }: Props) => {
+const WorkspaceNavigation = ({ groups, view, onViewChange, administration, fallback }: Props) => {
   const visibleGroups = groups
     .map((group) => ({ ...group, items: group.items.filter((item) => item.show) }))
     .filter((group) => group.items.length > 0);
   const active = visibleGroups.flatMap((group) => [...(group.hub ? [group.hub] : []), ...group.items]).find((item) => item.key === view);
+  // The heading must always name the screen the person is on: an open section
+  // first, then the workspace-supplied name, and only then the prompt.
+  const headingLabel = active?.label || fallback?.label || "Select workspace";
+  const headingDescription = active?.description || fallback?.description || "";
+  const HeadingIcon = active?.icon || fallback?.icon || SlidersHorizontal;
 
   return (
     <div className="overflow-hidden rounded-lg border border-health-blue/20 bg-card shadow-soft">
       <div className="flex min-h-16 flex-col gap-3 border-b border-health-blue/15 bg-health-surface px-3 py-3 lg:flex-row lg:items-center">
         <div className="flex min-w-0 items-center gap-3 lg:w-[260px]">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-health-blue text-primary-foreground">
-            {active ? <active.icon className="h-5 w-5" /> : <SlidersHorizontal className="h-5 w-5" />}
+            <HeadingIcon className="h-5 w-5" />
           </span>
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase text-muted-foreground">Current workspace</p>
-            <p className="truncate font-report-display text-sm font-bold text-health-ink">{active?.label || "Select workspace"}</p>
+            <p className="truncate font-report-display text-sm font-bold text-health-ink">{headingLabel}</p>
           </div>
         </div>
 
@@ -106,7 +118,7 @@ const WorkspaceNavigation = ({ groups, view, onViewChange, administration }: Pro
         </nav>
         {administration}
       </div>
-      {active && <p className="px-4 py-2 text-xs text-muted-foreground">{active.description}</p>}
+      {headingDescription && <p className="px-4 py-2 text-xs text-muted-foreground">{headingDescription}</p>}
     </div>
   );
 };
