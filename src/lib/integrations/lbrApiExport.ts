@@ -118,7 +118,7 @@ async function toPdf(s: LbrApiSpec, logos: Logo[]): Promise<Blob> {
   doc.setFontSize(9); doc.setTextColor(180, 192, 204); doc.text("Amehnities · HANDS Nigeria Decision Support Platform · www.amehnities.org", M + 4, H - 14);
 
   // Body
-  const diagram = renderErDiagram(s.schema);
+  const diagram = renderErDiagram(s.schema, (H - 26 - 22) / (W - 2 * M));
   doc.addPage(); let y = 26;
   const ensure = (need: number) => { if (y + need > H - 20) { doc.addPage(); y = 26; } };
   for (const sec of specSections(s)) {
@@ -131,9 +131,8 @@ async function toPdf(s: LbrApiSpec, logos: Logo[]): Promise<Blob> {
     for (const p of sec.paras || []) { const t = doc.splitTextToSize(p, W - 2 * M); ensure(t.length * 4.6); doc.text(t, M, y); y += t.length * 4.6 + 1.5; }
     for (const b of sec.bullets || []) { const t = doc.splitTextToSize(b, W - 2 * M - 6); ensure(t.length * 4.6); doc.setFillColor(...hex(GOLD)); doc.circle(M + 1.5, y - 1.3, 0.9, "F"); doc.text(t, M + 5, y); y += t.length * 4.6 + 1; }
     if (sec.diagram && diagram) {
-      const maxW = W - 2 * M, maxH = H - 26 - 22;
-      let w = maxW, h = (w * diagram.h) / diagram.w; if (h > maxH) { h = maxH; w = (h * diagram.w) / diagram.h; }
-      ensure(h + 4); doc.addImage(diagram.data, "PNG", M + (maxW - w) / 2, y, w, h); y += h + 5;
+      const maxW = W - 2 * M;
+      for (const pg of diagram.pages) { const h = (maxW * pg.h) / pg.w; ensure(h + 4); doc.addImage(pg.data, "PNG", M, y, maxW, h); y += h + 5; }
     }
     if (sec.entities?.length) {
       const ACC = { navy: NAVY, teal: TEAL, gold: GOLD } as const;
@@ -226,7 +225,7 @@ async function toDocx(s: LbrApiSpec, logos: Logo[]): Promise<Blob> {
     body.push(new Paragraph({ heading: top ? HeadingLevel.HEADING_1 : HeadingLevel.HEADING_2, children: [new TextRun(`${sec.n}  ${sec.title}`)] }));
     sec.paras?.forEach((p) => body.push(new Paragraph({ spacing: { after: 100 }, children: [new TextRun(p)] })));
     sec.bullets?.forEach((b) => body.push(new Paragraph({ numbering: { reference: "bullets", level: 0 }, children: [new TextRun(b)] })));
-    if (sec.diagram) { const dg = renderErDiagram(s.schema); if (dg) { const w = Math.min(600, Math.round((860 * dg.w) / dg.h)); body.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 160 }, children: [new ImageRun({ type: "png", data: bytes(dg.data), transformation: { width: w, height: Math.round((w * dg.h) / dg.w) }, altText: { title: "Entity-relationship diagram", description: "Entity-relationship diagram of the selected components", name: "ER diagram" } })] })); } }
+    if (sec.diagram) { const dg = renderErDiagram(s.schema, 1.4); if (dg) dg.pages.forEach((pg, i) => body.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 160 }, pageBreakBefore: i > 0, children: [new ImageRun({ type: "png", data: bytes(pg.data), transformation: { width: 600, height: Math.round((600 * pg.h) / pg.w) }, altText: { title: "Entity-relationship diagram", description: `Entity-relationship diagram of the selected components, part ${i + 1} of ${dg.pages.length}`, name: "ER diagram" } })] }))); }
     if (sec.table?.rows.length) { body.push(table(sec.table.head, sec.table.rows)); body.push(new Paragraph({ children: [] })); }
     if (sec.code) sec.code.split("\n").forEach((l) => body.push(new Paragraph({ shading: { fill: "0F1B2D", type: ShadingType.CLEAR }, children: [new TextRun({ text: l || " ", font: "Consolas", size: 16, color: "C9F2EC" })] })));
   }
@@ -295,7 +294,7 @@ async function toPptx(s: LbrApiSpec, logos: Logo[]): Promise<Blob> {
       sl.addText(it.t, { x: X, y, w: CWI, h, fontSize: pt, color: INK, valign: "top", bullet: it.bullet ? { code: "25A0" } : undefined, margin: 2 });
       y += h + 0.04;
     }
-    if (sec.diagram) { const dg = renderErDiagram(s.schema); if (dg) { sl = brand(sec.title, sec.n); const maxH = BOTTOM - TOP + 0.4; let w = CWI, h = (w * dg.h) / dg.w; if (h > maxH) { h = maxH; w = (h * dg.w) / dg.h; } sl.addImage({ data: dg.data, x: X + (CWI - w) / 2, y: TOP - 0.2, w, h }); y = BOTTOM; } }
+    if (sec.diagram) { const maxH = BOTTOM - TOP + 0.4; const dg = renderErDiagram(s.schema, maxH / CWI); if (dg) { dg.pages.forEach((pg, i) => { sl = brand(i ? `${sec.title} (cont.)` : sec.title, sec.n); let w = CWI, h = (w * pg.h) / pg.w; if (h > maxH) { h = maxH; w = (h * pg.w) / pg.h; } sl.addImage({ data: pg.data, x: X + (CWI - w) / 2, y: TOP - 0.2, w, h }); }); y = BOTTOM; } }
     if (sec.table?.rows.length) {
       const head = sec.table.head; const weights = head.map((h) => /description|how|url|payload|grants|action|services|label|purpose|allowed/i.test(h) ? 2.4 : /method|in$|required|http|always/i.test(h) ? 0.7 : 1);
       const tot = weights.reduce((a, b) => a + b, 0); const colW = weights.map((x) => (CWI * x) / tot);
