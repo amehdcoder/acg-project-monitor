@@ -8,7 +8,7 @@ const spec = buildLbrApiSpec({ config: CISKULA_PRESET, moduleName: "CiSKuLA 2", 
 describe("LBR integration spec", () => {
   it("documents every live API route under the external-api base", () => {
     expect(spec.baseUrl).toBe("https://x.supabase.co/functions/v1/external-api/v1");
-    expect(spec.endpoints.map((e) => e.path)).toEqual(["/projects", "/beneficiaries", "/beneficiaries/{case_id}", "/services", "/aggregates", "/reports"]);
+    expect(spec.endpoints.map((e) => e.path)).toEqual(["/projects", "/beneficiaries", "/beneficiaries/{case_id}", "/services", "/components", "/beneficiaries", "/services", "/aggregates", "/reports"]);
   });
   it("lists every webhook event the platform emits", () => {
     expect(spec.webhook.events.map((e) => e.id)).toEqual(expect.arrayContaining(["beneficiary.created", "beneficiary.updated", "service.recorded", "home_visit.reported", "feedback.submitted", "programme_report.submitted", "programme_report.monthly_sync"]));
@@ -17,5 +17,15 @@ describe("LBR integration spec", () => {
     expect(spec.components.map((c) => c.key)).toContain("eye_health");
     expect(spec.profileFields.map((f) => f.key)).toEqual(expect.arrayContaining(["full_name", "consent_obtained", "gps"]));
     expect(specToText(spec)).toContain("X-Amehnities-Signature");
+  });
+  it("documents only the selected components and their service filter", () => {
+    const one = buildLbrApiSpec({ config: CISKULA_PRESET, moduleName: "M", projectName: "T", supabaseUrl: "https://x.supabase.co", components: ["eye_health"] });
+    expect(one.selection.mode).toBe("single");
+    expect(one.components.map((c) => c.key)).toEqual(["eye_health"]);
+    expect(one.endpointsForSelection.some((e) => e.url.endsWith("/services?component_key=eye_health"))).toBe(true);
+    expect(specToText(one)).not.toMatch(/owner/i);
+  });
+  it("offers push endpoints that need records:write", () => {
+    expect(spec.endpoints.filter((e) => e.method === "POST").every((e) => e.scope === "records:write")).toBe(true);
   });
 });

@@ -6,8 +6,8 @@ import type { ProgrammeModuleConfig } from "@/lib/programmeModule/types";
 
 export type SpecField = { key: string; label: string; type: string; required: boolean; options?: string[]; location: string };
 export type SpecEndpoint = {
-  id: string; method: "GET"; path: string; scope: string; summary: string;
-  params: { name: string; in: "query" | "path"; type: string; required: boolean; description: string }[];
+  id: string; method: "GET" | "POST"; path: string; scope: string; summary: string;
+  params: { name: string; in: "query" | "path" | "body"; type: string; required: boolean; description: string }[];
   returns: string; example: string;
 };
 export type SpecEvent = { id: string; summary: string; trigger: string; payload: Record<string, string> };
@@ -16,6 +16,8 @@ export type LbrApiSpec = {
   documentId: string; title: string; subtitle: string; version: string; generatedAt: string;
   classification: string; moduleName: string; projectName: string;
   baseUrl: string; webhookOrigin: string;
+  selection: { mode: "all" | "single" | "multiple"; componentKeys: string[]; labels: string[] };
+  endpointsForSelection: { purpose: string; method: string; url: string }[];
   overview: string[];
   connectionModes: { mode: string; use: string; how: string }[];
   auth: { header: string; keyFormat: string; rules: string[] };
@@ -69,28 +71,57 @@ const toField = (q: Q, location: string): SpecField => ({
 
 export function buildLbrApiSpec(input: {
   config: ProgrammeModuleConfig; moduleName: string; projectName: string; supabaseUrl: string; now?: Date;
+  /** Component keys to document; empty or omitted = all components. */
+  components?: string[]; moduleId?: string;
 }): LbrApiSpec {
   const now = input.now ?? new Date();
   const origin = input.supabaseUrl.replace(/\/+$/, "");
   const baseUrl = `${origin}/functions/v1/external-api/v1`;
-  const components = (input.config.components || []).filter((c) => !c.hidden).sort((a, b) => a.order - b.order)
+  const all = (input.config.components || []).filter((c) => !c.hidden).sort((a, b) => a.order - b.order);
+  const want = new Set(input.components || []);
+  const picked = want.size ? all.filter((c) => want.has(c.key)) : all;
+  const mode: "all" | "single" | "multiple" = !want.size || picked.length === all.length ? "all" : picked.length === 1 ? "single" : "multiple";
+  const keys = picked.map((c) => c.key);
+  const compQ = mode === "all" ? "" : `component_key=${keys.join(",")}`;
+  const components = picked
     .map((c) => ({ key: c.key, label: c.label, services: c.services || [], extraFields: (c.questions || []).filter((q) => q.name).map((q) => toField(q as Q, `service.data (${c.key})`)) }));
   const profileFields = (input.config.sections || []).flatMap((s) =>
     (s.questions || []).filter((q) => q.name).map((q) => toField(q as Q, `profile — ${s.label}`)));
   const ex = (path: string) => `curl -H "Authorization: Bearer amk_YOUR_KEY" "${baseUrl}${path}"`;
+  const post = (path: string, body: object) => `curl -X POST -H "Authorization: Bearer amk_YOUR_KEY" -H "Content-Type: application/json" \\\n  "${baseUrl}${path}" \\\n  -d '${JSON.stringify(body)}'`;
+  const firstComp = picked[0];
+  const sampleData = Object.fromEntries((firstComp?.questions || []).filter((q) => q.name).slice(0, 3).map((q) => [q.name as string, "…"]));
+  const mod = input.moduleId ? { module_id: input.moduleId } : {};
+  const scopeLabel = mode === "all" ? "All components" : picked.map((c) => c.label).join(", ");
 
   return {
     documentId: `AMH-LBR-API-${now.toISOString().slice(0, 10).replace(/-/g, "")}`,
     title: "Longitudinal Beneficiary Records — API & Webhook Integration Specification",
     subtitle: "Developer requirements for connecting external software to Amehnities",
     version: "1.0", generatedAt: now.toISOString(),
-    classification: "Restricted — Owner distribution only",
+    classification: "Confidential — authorised integration partners",
     moduleName: input.moduleName, projectName: input.projectName,
     baseUrl, webhookOrigin: origin,
+    selection: { mode, componentKeys: keys, labels: picked.map((c) => c.label) },
+    endpointsForSelection: [
+      { purpose: "REST API base URL", method: "—", url: baseUrl },
+      { purpose: "Confirm project and connectivity", method: "GET", url: `${baseUrl}/projects` },
+      { purpose: "List modules and component keys", method: "GET", url: `${baseUrl}/components` },
+      { purpose: "Pull beneficiaries (incremental)", method: "GET", url: `${baseUrl}/beneficiaries?updated_since=` },
+      { purpose: "Pull one beneficiary", method: "GET", url: `${baseUrl}/beneficiaries/{case_id}` },
+      { purpose: `Pull services — ${scopeLabel}`, method: "GET", url: `${baseUrl}/services${compQ ? `?${compQ}` : ""}` },
+      { purpose: "Pull monthly aggregates", method: "GET", url: `${baseUrl}/aggregates?period=YYYY-MM` },
+      { purpose: "Pull programme reports / indicators", method: "GET", url: `${baseUrl}/reports` },
+      { purpose: "Push beneficiary (create or update by case_id)", method: "POST", url: `${baseUrl}/beneficiaries` },
+      { purpose: `Push service — ${scopeLabel}`, method: "POST", url: `${baseUrl}/services` },
+      { purpose: "Webhook delivery service (sender)", method: "POST →", url: `${origin}/functions/v1/webhook-dispatch` },
+      { purpose: "Your webhook receiver (register in Amehnities)", method: "POST ←", url: "https://<your-system>/amehnities/webhooks" },
+    ],
     overview: [
+      `This edition covers: ${scopeLabel} (${mode === "all" ? "all components" : mode === "single" ? "single component" : `${picked.length} components`}). Only the fields, services and filters for this selection are included.`,
       "Amehnities keeps one longitudinal record per person, identified by a unique Case ID, with integrated services delivered across programme components.",
       "External systems connect through two channels: a read-only REST API (pull) and signed webhooks (push). Both are scoped to exactly one project per credential.",
-      "Integrations may consume all components, a single component or any combination, by filtering on component_key and subscribing to the relevant events.",
+      mode === "all" ? "Use component_key to narrow any request to fewer components later." : `Always send component_key=${keys.join(",")} on GET /services and only push services with these component_key values.`,
       "Data is personal health information. Integrators must apply data minimisation, encryption in transit and at rest, and the project's data-sharing agreement.",
     ],
     connectionModes: [
@@ -110,7 +141,8 @@ export function buildLbrApiSpec(input: {
       ],
     },
     scopes: [
-      { scope: "records:read", grants: "Beneficiary records and services (personal data)." },
+      { scope: "records:read", grants: "Pull beneficiary records and services (personal data)." },
+      { scope: "records:write", grants: "Push beneficiaries (create/update by case_id) and services into the selected components." },
       { scope: "aggregates:read", grants: "Monthly totals: registrations, services by component/name, home visits, referrals." },
       { scope: "reports:read", grants: "Submitted and resolved programme reports with indicator entries." },
       { scope: "*", grants: "All of the above. Use only for fully trusted institutional systems." },
@@ -131,11 +163,29 @@ export function buildLbrApiSpec(input: {
         { name: "case_id", in: "path", type: "string ≤64", required: true, description: "URL-encoded Unique Case ID." },
       ], returns: "{ data: Beneficiary }  ·  404 when not found", example: ex("/beneficiaries/CISKULA-2026-000123") },
       { id: "services", method: "GET", path: "/services", scope: "records:read", summary: "Lists services delivered, ascending by created_at, with keyset pagination.", params: [
+        { name: "component_key", in: "query", type: "comma list", required: mode !== "all", description: mode === "all" ? "Optional: restrict to one or more component keys." : `Use ${keys.join(",")} for this selection.` },
         { name: "from", in: "query", type: "date", required: false, description: "service_date on or after." },
         { name: "to", in: "query", type: "date", required: false, description: "service_date on or before." },
         { name: "cursor", in: "query", type: "string", required: false, description: "next_cursor from the previous page (created_at|id)." },
         { name: "limit", in: "query", type: "integer 1–100", required: false, description: "Page size, default 100." },
-      ], returns: "{ data: Service[], next_cursor: string | null }", example: ex("/services?from=2026-01-01&to=2026-03-31") },
+      ], returns: "{ data: Service[], next_cursor: string | null }", example: ex(`/services?${compQ ? compQ + "&" : ""}from=2026-01-01&to=2026-03-31`) },
+      { id: "components", method: "GET", path: "/components", scope: "any valid key", summary: "Lists the project's modules (module_id) and their component keys and services.", params: [], returns: "{ data: [ { module_id, module_name, components: [ { key, label, services } ] } ] }", example: ex("/components") },
+      { id: "push-beneficiary", method: "POST", path: "/beneficiaries", scope: "records:write", summary: "Creates a beneficiary or updates the existing one with the same case_id. Profile keys are merged; version increases on update.", params: [
+        { name: "case_id", in: "body", type: "string ≤64", required: true, description: "Unique Case ID — the idempotency key." },
+        { name: "full_name", in: "body", type: "string", required: true, description: "Required when creating." },
+        { name: "module_id", in: "body", type: "uuid", required: false, description: "Required only when the project has more than one module." },
+        { name: "status / risk_level / state / lga / ward / village / next_follow_up_date", in: "body", type: "see Section 7", required: false, description: "Core fields." },
+        { name: "profile", in: "body", type: "object", required: false, description: "Any profile field keys from Section 7.1." },
+      ], returns: "201 { data: { id, case_id, version, updated_at }, operation: created }  ·  200 operation: updated", example: post("/beneficiaries", { ...mod, case_id: "EXT-000123", full_name: "Jane Doe", state: "Kano", lga: "Gabasawa", profile: {} }) },
+      { id: "push-service", method: "POST", path: "/services", scope: "records:write", summary: `Records a service against an existing beneficiary for ${scopeLabel}.`, params: [
+        { name: "case_id", in: "body", type: "string", required: true, description: "Beneficiary Case ID (must exist)." },
+        { name: "component_key", in: "body", type: "string", required: true, description: mode === "all" ? "Any component_key in Section 6." : `One of: ${keys.join(", ")}.` },
+        { name: "service_name", in: "body", type: "string", required: true, description: "A service listed in Section 6." },
+        { name: "service_date", in: "body", type: "YYYY-MM-DD", required: false, description: "Defaults to today." },
+        { name: "status / result", in: "body", type: "enum / string", required: false, description: "See Section 7.2." },
+        { name: "data", in: "body", type: "object", required: false, description: "Component-specific fields from Section 7.3." },
+        { name: "external_id", in: "body", type: "string", required: false, description: "Your record ID; repeats return operation: duplicate instead of a second service." },
+      ], returns: "201 { data: { id, beneficiary_id, component_key, created_at }, operation: created }", example: post("/services", { ...mod, case_id: "EXT-000123", component_key: firstComp?.key || "component", service_name: firstComp?.services?.[0] || "Service", service_date: "2026-11-25", status: "completed", external_id: "SRV-9981", data: sampleData }) },
       { id: "aggregates", method: "GET", path: "/aggregates", scope: "aggregates:read", summary: "Monthly totals for the project.", params: [
         { name: "period", in: "query", type: "YYYY-MM", required: false, description: "Month to summarise; defaults to the current month." },
       ], returns: "{ data: { project_id, period, registrations, home_visits_completed, referrals, services_total, services_by_component, services_by_name } }", example: ex("/aggregates?period=2026-10") },
@@ -178,7 +228,8 @@ export function buildLbrApiSpec(input: {
     },
     errors: [
       { status: 200, meaning: "Success", action: "Process data; follow next_cursor until null." },
-      { status: 400, meaning: "Invalid parameter (cursor, period, case id)", action: "Fix the request; do not retry unchanged." },
+      { status: 201, meaning: "Created (push)", action: "Store the returned id against your record." },
+      { status: 400, meaning: "Invalid parameter or body (cursor, period, case id, status, missing required field)", action: "Fix the request; do not retry unchanged." },
       { status: 401, meaning: "Missing, invalid or revoked API key", action: "Check the Authorization header or request a new key." },
       { status: 403, meaning: "Key lacks the required scope", action: "Ask the project administrator to issue a key with the scope." },
       { status: 404, meaning: "Unknown route or record not found", action: "Check the path and Case ID." },
@@ -188,8 +239,10 @@ export function buildLbrApiSpec(input: {
       "Sign the project data-sharing agreement and confirm the components in scope.",
       "Receive a project-scoped amk_ key with the minimum scopes required.",
       "Call GET /projects to confirm connectivity and the project identity.",
+      "Call GET /components to confirm module_id and component keys for the selection.",
       "Run an initial full sync of /beneficiaries and /services, following next_cursor.",
       "Schedule incremental sync using updated_since (beneficiaries) and from/cursor (services).",
+      "Push records with POST /beneficiaries then POST /services, sending external_id so retries never duplicate.",
       "Register a public HTTPS webhook endpoint, store its secret securely, and verify signatures.",
       "Send test.ping, then confirm idempotent handling of duplicate deliveries.",
       "Use case_id as the cross-system person identifier; never create duplicates on your side.",

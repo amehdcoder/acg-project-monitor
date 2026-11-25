@@ -19,7 +19,7 @@ export const generateApiKey = (): { raw: string; prefix: string } => {
 
 export const generateWebhookSecret = (): string => `whs_${randomHex(24)}`;
 
-export const API_SCOPES = ["records:read", "aggregates:read", "reports:read"] as const;
+export const API_SCOPES = ["records:read", "records:write", "aggregates:read", "reports:read"] as const;
 export type ApiScope = (typeof API_SCOPES)[number];
 
 export const hasScope = (granted: string[], needed: string): boolean =>

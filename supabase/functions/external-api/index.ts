@@ -5,9 +5,11 @@
 //   /external-api/v1/projects
 //   /external-api/v1/beneficiaries?updated_since=&cursor=&limit=
 //   /external-api/v1/beneficiaries/{case_id}
-//   /external-api/v1/services?from=&to=&cursor=
+//   /external-api/v1/services?from=&to=&component_key=a,b&cursor=
 //   /external-api/v1/aggregates?period=YYYY-MM
 //   /external-api/v1/reports
+//   /external-api/v1/components
+// Routes (POST, records:write): /v1/beneficiaries (upsert by case_id), /v1/services
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { parseCursor } from './cursor.ts'
@@ -24,7 +26,7 @@ type ApiKey = { key_id: string; project_id: string; scopes: string[] }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
-  if (req.method !== 'GET') return json({ error: 'Method not allowed' }, 405)
+  if (req.method !== 'GET' && req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
   const auth = req.headers.get('Authorization') ?? ''
   const url = new URL(req.url)
@@ -64,6 +66,12 @@ Deno.serve(async (req) => {
   const needScope = (scope: string) => key.scopes.includes(scope) || key.scopes.includes('*')
 
   try {
+    if (req.method === 'POST') return await handleWrite(supabase, key, parts, req)
+    if (parts.length === 2 && parts[1] === 'components') {
+      const { data, error } = await supabase.from('programme_modules').select('id, name, config').eq('project_id', key.project_id)
+      if (error) return json({ error: 'Could not load components' }, 500)
+      return json({ data: (data ?? []).map((m: any) => ({ module_id: m.id, module_name: m.name, components: (m.config?.components ?? []).filter((c: any) => !c.hidden).map((c: any) => ({ key: c.key, label: c.label, services: c.services ?? [] })) })) })
+    }
     // /v1/projects
     if (parts.length === 2 && parts[1] === 'projects') {
       const { data, error } = await supabase
@@ -135,6 +143,8 @@ Deno.serve(async (req) => {
         .order('created_at', { ascending: true })
         .order('id', { ascending: true })
         .limit(limit + 1)
+      const comps = (q.get('component_key') ?? '').split(',').map((c) => c.trim()).filter(Boolean).slice(0, 50)
+      if (comps.length) query = query.in('component_key', comps)
       if (from && !Number.isNaN(Date.parse(from))) query = query.gte('service_date', from)
       if (to && !Number.isNaN(Date.parse(to))) query = query.lte('service_date', to)
       if (cursor) {
@@ -216,9 +226,77 @@ Deno.serve(async (req) => {
         'GET /external-api/v1/services?from=&to=&cursor=',
         'GET /external-api/v1/aggregates?period=YYYY-MM',
         'GET /external-api/v1/reports',
+        'GET /external-api/v1/components',
+        'POST /external-api/v1/beneficiaries',
+        'POST /external-api/v1/services',
       ],
     }, 404)
   } catch (e) {
     return json({ error: String(e).slice(0, 300) }, 500)
   }
 })
+
+const STATUSES = ['active', 'on_hold', 'exited', 'completed', 'deceased']
+const SERVICE_STATUSES = ['on_track', 'due', 'overdue', 'at_risk', 'needs_follow_up', 'completed', 'suspended', 'exited', 'not_applicable']
+const str = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null)
+const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
+
+// deno-lint-ignore no-explicit-any
+async function handleWrite(supabase: any, key: ApiKey, parts: string[], req: Request) {
+  if (!(key.scopes.includes('records:write') || key.scopes.includes('*'))) return json({ error: 'Key lacks records:write scope' }, 403)
+  if (parts.length !== 2 || !['beneficiaries', 'services'].includes(parts[1])) return json({ error: 'Unknown route' }, 404)
+  let body: Record<string, unknown>
+  try { const b = await req.json(); if (!isObj(b)) throw 0; body = b } catch { return json({ error: 'Body must be a JSON object' }, 400) }
+  const { data: keyRow } = await supabase.from('api_keys').select('created_by').eq('id', key.key_id).maybeSingle()
+  if (!keyRow?.created_by) return json({ error: 'Key has no responsible issuer; reissue the key' }, 403)
+  const { data: modules } = await supabase.from('programme_modules').select('id').eq('project_id', key.project_id)
+  const wanted = str(body.module_id, 40)
+  const mod = wanted ? (modules ?? []).find((m: { id: string }) => m.id === wanted) : (modules ?? []).length === 1 ? modules[0] : null
+  if (!mod) return json({ error: (modules ?? []).length > 1 ? 'module_id required (see GET /v1/components)' : 'Unknown module_id' }, 400)
+  const caseId = str(body.case_id, 64)
+  if (!caseId) return json({ error: 'case_id is required' }, 400)
+
+  if (parts[1] === 'beneficiaries') {
+    const fullName = str(body.full_name, 200)
+    const status = body.status == null ? undefined : String(body.status)
+    if (status && !STATUSES.includes(status)) return json({ error: 'Invalid status' }, 400)
+    if (body.profile != null && !isObj(body.profile)) return json({ error: 'profile must be an object' }, 400)
+    const { data: existing } = await supabase.from('beneficiaries').select('id, version, profile').eq('module_id', mod.id).eq('case_id', caseId).maybeSingle()
+    const fields: Record<string, unknown> = {}
+    for (const f of ['state', 'lga', 'ward', 'village']) { const v = str(body[f], 120); if (v) fields[f] = v }
+    if (body.risk_level != null) { if (!['low', 'medium', 'high'].includes(String(body.risk_level))) return json({ error: 'Invalid risk_level' }, 400); fields.risk_level = body.risk_level }
+    if (body.next_follow_up_date != null) { if (Number.isNaN(Date.parse(String(body.next_follow_up_date)))) return json({ error: 'Invalid next_follow_up_date' }, 400); fields.next_follow_up_date = String(body.next_follow_up_date).slice(0, 10) }
+    if (status) fields.status = status
+    if (fullName) fields.full_name = fullName
+    if (existing) {
+      if (body.profile) fields.profile = { ...(existing.profile ?? {}), ...(body.profile as object) }
+      fields.version = (existing.version ?? 1) + 1; fields.updated_at = new Date().toISOString()
+      const { data, error } = await supabase.from('beneficiaries').update(fields).eq('id', existing.id).select('id, case_id, version, updated_at').single()
+      if (error) return json({ error: 'Could not update beneficiary' }, 400)
+      return json({ data, operation: 'updated' })
+    }
+    if (!fullName) return json({ error: 'full_name is required for new beneficiaries' }, 400)
+    const { data, error } = await supabase.from('beneficiaries').insert({ ...fields, profile: body.profile ?? {}, case_id: caseId, module_id: mod.id, project_id: key.project_id, created_by: keyRow.created_by }).select('id, case_id, version, updated_at').single()
+    if (error) return json({ error: 'Could not create beneficiary' }, 400)
+    return json({ data, operation: 'created' }, 201)
+  }
+
+  const componentKey = str(body.component_key, 80); const serviceName = str(body.service_name, 200)
+  if (!componentKey || !serviceName) return json({ error: 'component_key and service_name are required' }, 400)
+  const status = body.status == null ? 'on_track' : String(body.status)
+  if (!SERVICE_STATUSES.includes(status)) return json({ error: 'Invalid status' }, 400)
+  const serviceDate = body.service_date == null ? new Date().toISOString().slice(0, 10) : String(body.service_date).slice(0, 10)
+  if (Number.isNaN(Date.parse(serviceDate))) return json({ error: 'Invalid service_date' }, 400)
+  if (body.data != null && !isObj(body.data)) return json({ error: 'data must be an object' }, 400)
+  const { data: ben } = await supabase.from('beneficiaries').select('id').eq('module_id', mod.id).eq('case_id', caseId).maybeSingle()
+  if (!ben) return json({ error: 'Beneficiary not found for case_id' }, 404)
+  const ext = str(body.external_id, 120)
+  const row = { beneficiary_id: ben.id, module_id: mod.id, project_id: key.project_id, component_key: componentKey, service_name: serviceName, service_date: serviceDate, result: str(body.result, 2000), status, data: { ...((body.data as object) ?? {}), ...(ext ? { external_id: ext } : {}) }, recorded_by: keyRow.created_by }
+  if (ext) {
+    const { data: dup } = await supabase.from('beneficiary_services').select('id, created_at').eq('beneficiary_id', ben.id).eq('data->>external_id', ext).maybeSingle()
+    if (dup) return json({ data: dup, operation: 'duplicate' })
+  }
+  const { data, error } = await supabase.from('beneficiary_services').insert(row).select('id, beneficiary_id, component_key, created_at').single()
+  if (error) return json({ error: 'Could not record service' }, 400)
+  return json({ data, operation: 'created' }, 201)
+}

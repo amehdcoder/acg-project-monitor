@@ -18,6 +18,7 @@ import { generateApiKey, generateWebhookSecret, sha256Hex } from "@/lib/integrat
 
 const API_SCOPES = [
   { id: "records:read", label: "Read beneficiary records" },
+  { id: "records:write", label: "Push beneficiaries and services" },
   { id: "aggregates:read", label: "Read monthly aggregates" },
   { id: "reports:read", label: "Read programme reports" },
 ];

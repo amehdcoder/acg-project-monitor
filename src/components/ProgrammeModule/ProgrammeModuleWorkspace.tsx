@@ -486,7 +486,7 @@ const ProgrammeModuleWorkspace = ({
             <CloudOff className="h-4 w-4" /> {pending} queued — sync now
           </Button>
         )}
-        {!viewAs && active && <IntegrationSpecDownload config={normalizeConfig(active.config || {})} moduleName={active.name} projectId={projectId} />}
+        {!viewAs && active && <IntegrationSpecDownload config={normalizeConfig(active.config || {})} moduleName={active.name} projectId={projectId} moduleId={active.id} />}
         <Button variant="outline" size="sm" onClick={() => void reload()} aria-label="Reload modules">
           <RefreshCw className="h-4 w-4" />
         </Button>
