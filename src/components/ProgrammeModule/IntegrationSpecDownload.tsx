@@ -24,7 +24,19 @@ export default function IntegrationSpecDownload({ config, moduleName, projectId,
   const [busy, setBusy] = useState<SpecFormat | null>(null);
   const [open, setOpen] = useState(false);
   const [format, setFormat] = useState<SpecFormat>("pdf");
-  const comps = (config.com  if (!owner) return null;
+  const comps = (config.components || []).filter((c) => !c.hidden).sort((a, b) => a.order - b.order);
+  const [picked, setPicked] = useState<string[]>([]);
+  const allOn = picked.length === 0 || picked.length === comps.length;
+  const toggle = (k: string) => setPicked((p) => (p.includes(k) ? p.filter((x) => x !== k) : [...p, k]));
+
+  useEffect(() => {
+    let live = true;
+    if (!user?.id) { setOwner(false); return; }
+    supabase.rpc("is_owner_level", { _user_id: user.id }).then(({ data }) => { if (live) setOwner(data === true); });
+    return () => { live = false; };
+  }, [user?.id]);
+
+  if (!owner) return null;
 
   const download = async () => {
     setBusy(format);

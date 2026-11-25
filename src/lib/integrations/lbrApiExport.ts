@@ -33,7 +33,7 @@ const scopeText = (s: LbrApiSpec) => s.selection.mode === "all" ? "All component
 const fmtDate = (iso: string) => new Date(iso).toUTCString().replace(" GMT", " UTC");
 
 function fieldRows(fields: LbrApiSpec["coreFields"]) {
-  return fields.map((f) => [f.key, f.label, f.type, f.required ? "Yes" : "No", f.options?.slice(0, 12).join(", ") || "—"]);
+  return fields.map((f) => [f.key, f.label, f.type, f.required ? "Yes" : "No", f.options?.join(", ") || "—"]);
 }
 
 /** Section list shared by every rich format. */
