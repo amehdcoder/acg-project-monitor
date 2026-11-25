@@ -116,6 +116,8 @@ const tryChunkRecover = async (msg: string) => {
     if (!(await canReachAppShell())) return;
     sessionStorage.setItem(CHUNK_RELOAD_KEY, "1");
     prepareSilentFormRestoreForUpdate();
+    // Drop the host's release pin so the reload receives the current release.
+    try { document.cookie = "__dpl=; Max-Age=0; Path=/; SameSite=Lax; Secure"; } catch {}
     const u = new URL(location.href);
     u.searchParams.set("__chunk_retry", String(Date.now()));
     location.replace(u.toString());

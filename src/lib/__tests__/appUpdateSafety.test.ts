@@ -61,6 +61,17 @@ describe("safe, responsive app updates", () => {
     expect(replace).toHaveBeenCalledTimes(1);
   });
 
+  it("version checks ignore the release pin and applying drops it", async () => {
+    const fetcher = vi.fn(async () => response());
+    vi.stubGlobal("fetch", fetcher);
+    document.cookie = "__dpl=old-release; Path=/";
+    const mgr = await import("@/lib/appUpdateManager");
+    await mgr.checkForAppUpdate({ force: true });
+    expect(fetcher.mock.calls.every(([, init]) => (init as RequestInit).credentials === "omit")).toBe(true);
+    await mgr.hardReloadToLatest();
+    expect(document.cookie).not.toContain("__dpl=old-release");
+  });
+
   it("hung probes abort and return a retryable failure within a bounded time", async () => {
     vi.useFakeTimers();
     const fetcher = vi.fn(() => new Promise<Response>(() => {}));

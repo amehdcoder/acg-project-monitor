@@ -71,6 +71,19 @@ const probe = async <T>(url: string, read: (res: Response) => Promise<T>): Promi
   }
 };
 
+/**
+ * The host pins each tab to the release it first loaded via the `__dpl`
+ * cookie. Applying an update must drop that pin, otherwise the reload (and the
+ * service-worker refresh) is served the old release again.
+ */
+export const releaseDeploymentPin = () => {
+  try {
+    if (typeof document === "undefined") return;
+    document.cookie = "__dpl=; Max-Age=0; Path=/; SameSite=Lax; Secure";
+    document.cookie = "__dpl=; Max-Age=0; Path=/";
+  } catch { /* cookies unavailable */ }
+};
+
 const emit = () => listeners.forEach((listener) => listener());
 
 export const getAppUpdateState = () => state;
@@ -343,6 +356,7 @@ const applyLatest = async (): Promise<boolean> => {
       throw new Error("The latest app couldn't be loaded. Your current app and saved work are unchanged.");
     }
     prepareSilentFormRestoreForUpdate();
+    releaseDeploymentPin();
     if (swUpdater && !shouldSkipServiceWorker) {
       await withTimeout(swUpdater(controller.signal), 12000, "The update couldn't finish downloading. Please try again.");
     }
