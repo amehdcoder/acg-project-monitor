@@ -10,7 +10,7 @@
 //   /external-api/v1/reports
 //   /external-api/v1/components
 // Routes (POST, records:write): /v1/beneficiaries (upsert by case_id), /v1/services
-import { inbound, outbound, cleanMaps } from '../_shared/connectionTransform.ts'
+import { inbound, outbound, cleanMaps, inboundForm, outboundForm } from '../_shared/connectionTransform.ts'
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { parseCursor } from './cursor.ts'
@@ -323,9 +323,9 @@ async function handleConnection(supabase: any, key: ApiKey, req: Request, q: URL
     .eq('api_key_id', key.key_id).eq('project_id', key.project_id).maybeSingle()
   if (!conn) return json({ error: 'This key is not linked to a connection. Create one under Integrations → Connect any app.' }, 404)
   if (!conn.is_active) return json({ error: 'This connection is switched off in Amehnities' }, 403)
-  if (conn.target_type !== 'records') return json({ error: 'This connection is linked to a form; mapped exchange supports beneficiary records' }, 400)
   const maps = cleanMaps(conn.mappings)
   if (!maps.length) return json({ error: 'The connection has no matched fields yet' }, 400)
+  if (conn.target_type === 'form') return handleFormConnection(supabase, key, req, q, conn, maps)
 
   if (req.method === 'GET') {
     if (!(key.scopes.includes('records:read') || key.scopes.includes('*'))) return json({ error: 'Key lacks records:read scope' }, 403)
@@ -364,6 +364,59 @@ async function handleConnection(supabase: any, key: ApiKey, req: Request, q: URL
       out.service = s.body.operation ?? s.body.error; ok = s.status < 300
     }
     results.push({ ...out, ok })
+  }
+  const failed = results.filter((r) => !r.ok).length
+  return json({ received: list.length, saved: list.length - failed, failed, results }, failed === list.length ? 400 : 200)
+}
+
+// Form-linked connections: entries arrive as form submissions (attributed to the
+// connection owner) and leave in the other system's field names.
+// deno-lint-ignore no-explicit-any
+async function handleFormConnection(supabase: any, key: ApiKey, req: Request, q: URLSearchParams, conn: any, maps: ReturnType<typeof cleanMaps>) {
+  const { data: form } = await supabase.from('forms').select('id, project_id').eq('id', conn.target_id).maybeSingle()
+  if (!form || form.project_id !== key.project_id) return json({ error: 'The linked form is no longer in this project' }, 404)
+  if (req.method === 'GET') {
+    if (!(key.scopes.includes('records:read') || key.scopes.includes('*'))) return json({ error: 'Key lacks records:read scope' }, 403)
+    const limit = Math.min(Math.max(parseInt(q.get('limit') ?? '100', 10) || 100, 1), 100)
+    let query = supabase.from('form_submissions').select('id, data, submitted_at, updated_at')
+      .eq('form_id', form.id).neq('status', 'draft')
+      .order('updated_at', { ascending: true }).order('id', { ascending: true }).limit(limit + 1)
+    const since = q.get('updated_since'); if (since && !Number.isNaN(Date.parse(since))) query = query.gte('updated_at', since)
+    const cursor = q.get('cursor')
+    if (cursor) { const p = parseCursor(cursor); if (!p) return json({ error: 'Invalid cursor' }, 400); query = query.or(`updated_at.gt.${p.timestamp},and(updated_at.eq.${p.timestamp},id.gt.${p.id})`) }
+    const { data, error } = await query
+    if (error) return json({ error: 'Could not load entries' }, 500)
+    const rows = data ?? []; const more = rows.length > limit; const page = more ? rows.slice(0, limit) : rows
+    const last = page[page.length - 1]
+    return json({ data: page.map((r: Record<string, unknown>) => outboundForm(r, maps)), next_cursor: more && last ? `${last.updated_at}|${last.id}` : null })
+  }
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
+  if (!(key.scopes.includes('records:write') || key.scopes.includes('*'))) return json({ error: 'Key lacks records:write scope' }, 403)
+  let raw: unknown
+  try { raw = await req.json() } catch { return json({ error: 'Body must be JSON' }, 400) }
+  const list = Array.isArray(raw) ? raw : isObj(raw) && Array.isArray(raw.records) ? raw.records : [raw]
+  if (list.length === 0 || list.length > 100) return json({ error: 'Send between 1 and 100 records' }, 400)
+  const { data: owner } = await supabase.from('api_keys').select('created_by').eq('id', key.key_id).maybeSingle()
+  if (!owner?.created_by) return json({ error: 'This key has no owner; recreate the connection' }, 403)
+  const results: Record<string, unknown>[] = []
+  for (const [index, rec] of list.entries()) {
+    if (!isObj(rec)) { results.push({ index, ok: false, error: 'Record must be an object' }); continue }
+    const { data, externalId } = inboundForm(rec, maps)
+    if (!Object.keys(data).filter((k) => k !== '_external_id').length) { results.push({ index, ok: false, error: 'No answers matched this form' }); continue }
+    if (JSON.stringify(data).length > 200_000) { results.push({ index, ok: false, error: 'Entry too large' }); continue }
+    const now = new Date().toISOString()
+    if (externalId) {
+      const { data: dup } = await supabase.from('form_submissions').select('id').eq('form_id', form.id).eq('data->>_external_id', externalId).maybeSingle()
+      if (dup) {
+        const { error } = await supabase.from('form_submissions').update({ data, updated_at: now }).eq('id', dup.id)
+        results.push({ index, ok: !error, external_id: externalId, entry: error ? 'Could not update entry' : 'updated', id: dup.id }); continue
+      }
+    }
+    const { data: row, error } = await supabase.from('form_submissions').insert({
+      form_id: form.id, user_id: owner.created_by, data, status: 'sent', submitted_at: now, synced_at: now,
+      collector_label: 'External connection',
+    }).select('id').single()
+    results.push({ index, ok: !error, external_id: externalId, entry: error ? 'Could not save entry' : 'created', id: row?.id })
   }
   const failed = results.filter((r) => !r.ok).length
   return json({ received: list.length, saved: list.length - failed, failed, results }, failed === list.length ? 400 : 200)

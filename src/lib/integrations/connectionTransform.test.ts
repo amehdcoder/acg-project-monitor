@@ -34,3 +34,11 @@ it2("reads DHIS2 attribute lists by display name", () => {
   const maps = cm2([{ external: "attributes.First name", internal: "full_name" }]);
   ex2(JSON.stringify(inb2({ attributes: [{ displayName: "First name", value: "John" }] }, maps))).toContain("John");
 });
+
+import { inboundForm, outboundForm } from "./connectionTransform";
+it2("maps form entries both ways and keeps their record ID", () => {
+  const maps = cm2([{ external: "_uuid", internal: "_external_id" }, { external: "grp/age", internal: "age" }, { external: "when", internal: "_submitted_at" }]);
+  const { data, externalId } = inboundForm({ _uuid: "K-1", "grp/age": 34 }, maps);
+  ex2(externalId).toBe("K-1"); ex2(data).toEqual({ age: 34, _external_id: "K-1" });
+  ex2(outboundForm({ id: "s1", submitted_at: "2026-11-25", data }, maps)).toEqual({ _uuid: "K-1", "grp/age": 34, when: "2026-11-25" });
+});

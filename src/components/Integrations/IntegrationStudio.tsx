@@ -52,6 +52,19 @@ const GUIDES: Record<string, string> = {
   custom: "Any app that can send or receive a web request (JSON over https) can connect using the address and key shown at the end.",
 };
 
+const RECOMMEND: Record<string, string> = {
+  kobo: "Best linked to a matching Amehnities form — each survey submission becomes a form entry.",
+  odk: "Best linked to a matching Amehnities form — each submission becomes a form entry.",
+  dhis2: "Best linked to Longitudinal Beneficiary Records — DHIS2 tracked entities become beneficiaries.",
+  commcare: "Best linked to Longitudinal Beneficiary Records — CommCare cases become beneficiaries.",
+  crm: "Best linked to Longitudinal Beneficiary Records — contacts become beneficiaries.",
+  sheets: "Link to a form for survey-style rows, or to Beneficiary Records for people lists.",
+  database: "Link to Beneficiary Records or a form, depending on what the table holds.",
+  supabase: "Link to Beneficiary Records or a form, depending on what the table holds.",
+  metabase: "Link to the Beneficiary Records or form you want to chart in Metabase.",
+  custom: "Link to a form for entries, or to Beneficiary Records for people and services.",
+};
+
 const DIRECTIONS: { id: Direction; label: string; text: string; icon: typeof Upload }[] = [
   { id: "push", label: "Send from Amehnities", text: "New and updated entries go to the other app automatically.", icon: Upload },
   { id: "pull", label: "Receive into Amehnities", text: "The other app sends its entries into Amehnities.", icon: Download },
@@ -209,7 +222,7 @@ function ConnectionWizard({ projects, onClose, onSaved }: { projects: Project[];
     const q = query.trim().toLowerCase();
     return targets.filter((t) => !q || t.name.toLowerCase().includes(q) || pName(t.projectId).toLowerCase().includes(q)).slice(0, 60);
   }, [targets, query, projects]);
-  const internal = useMemo(() => !target ? [] : target.type === "form" ? formFields(target.raw) : recordFields(target.raw, target.name), [target]);
+  const internal = useMemo(() => !target ? [] : target.type === "form" ? [{ key: "_external_id", label: "Their record ID (prevents duplicates)", type: "text", group: "Entry details" }, { key: "_submitted_at", label: "Submitted at", type: "datetime", group: "Entry details" }, ...formFields(target.raw)] : recordFields(target.raw, target.name), [target]);
   const external = useMemo(() => discoverFields(sample), [sample]);
 
   useEffect(() => { if (autoDetect) setMaps((cur) => autoMap(external, internal, cur)); }, [external, internal, autoDetect]);
@@ -237,11 +250,11 @@ function ConnectionWizard({ projects, onClose, onSaved }: { projects: Project[];
     let webhookId: string | null = null;
     let apiKeyId: string | null = null;
     try {
-      if ((direction === "push" || direction === "both") && target.type === "records" && baseUrl.trim()) {
+      if ((direction === "push" || direction === "both") && baseUrl.trim()) {
         const secret = generateWebhookSecret();
         const { data, error } = await supabase.from("webhook_endpoints").insert({
           project_id: target.projectId, url: baseUrl.trim(), description: `${name.trim()} (connection)`,
-          secret, events: ["beneficiary.created", "beneficiary.updated", "service.recorded"], created_by: user?.id,
+          secret, events: target.type === "form" ? ["form.submitted"] : ["beneficiary.created", "beneficiary.updated", "service.recorded"], created_by: user?.id,
         }).select("id").single();
         if (error) throw error;
         webhookId = data.id; out.secret = secret;
@@ -317,6 +330,7 @@ function ConnectionWizard({ projects, onClose, onSaved }: { projects: Project[];
 
         {step === 1 && (
           <div className="space-y-3">
+            {RECOMMEND[app] && <p className="flex gap-2 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm text-foreground"><Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><span>{RECOMMEND[app]}</span></p>}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input autoFocus className="pl-9" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search all forms and beneficiary records by name or project…" />

@@ -27,6 +27,7 @@ const EVENT_CATALOGUE = [
   { id: "beneficiary.created", label: "Beneficiary registered" },
   { id: "beneficiary.updated", label: "Beneficiary updated" },
   { id: "service.recorded", label: "Service recorded" },
+  { id: "form.submitted", label: "Form entry submitted" },
   { id: "home_visit.reported", label: "Home visit reported" },
   { id: "feedback.submitted", label: "Community feedback submitted" },
   { id: "programme_report.submitted", label: "Programme report submitted (full report, instant)" },

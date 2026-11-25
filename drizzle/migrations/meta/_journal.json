@@ -561,6 +561,13 @@
       "when": 1795625005885,
       "tag": "0079_eye_server_updated_at",
       "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1795626986015,
+      "tag": "0080_migration",
+      "breakpoints": true
     }
   ]
 }

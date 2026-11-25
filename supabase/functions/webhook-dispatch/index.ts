@@ -1,7 +1,7 @@
 // webhook-dispatch: delivers queued webhook events to subscribed endpoints.
 // Woken on enqueue by the emit_webhook_event trigger and hourly as a retry
 // backstop. Also serves admin "test event" sends.
-import { outbound, cleanMaps } from '../_shared/connectionTransform.ts'
+import { outbound, outboundForm, cleanMaps } from '../_shared/connectionTransform.ts'
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { guardRequest } from '../_shared/authGuard.ts'
@@ -199,6 +199,16 @@ async function mapForConnection(
 ): Promise<Record<string, unknown> | 'skip' | null> {
   const { data: conn } = await supabase.from('integration_connections')
     .select('target_type, target_id, mappings, is_active').eq('webhook_endpoint_id', endpoint.id).maybeSingle()
+  if (conn?.target_type === 'form') {
+    if (event.event !== 'form.submitted') return null
+    if (!conn.is_active) return 'skip'
+    const maps = cleanMaps(conn.mappings)
+    const p = (event.payload ?? {}) as Record<string, unknown>
+    if (p.form_id !== conn.target_id || typeof p.submission_id !== 'string' || !maps.length) return 'skip'
+    const { data: sub } = await supabase.from('form_submissions').select('id, data, submitted_at, form_id').eq('id', p.submission_id).maybeSingle()
+    if (!sub || sub.form_id !== conn.target_id) return 'skip'
+    return { ...outboundForm(sub as Record<string, unknown>, maps), _amehnities: { event: event.event, submission_id: sub.id, operation: p.operation } }
+  }
   if (!conn || conn.target_type !== 'records') return null
   if (!/^(beneficiary\.|service\.)/.test(event.event)) return null
   if (!conn.is_active) return 'skip'

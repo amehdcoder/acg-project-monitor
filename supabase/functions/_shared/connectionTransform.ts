@@ -63,3 +63,29 @@ export function outbound(ben: Obj, service: Obj | null, maps: ConnMap[]): Obj {
   }
   return out
 }
+
+const META: Record<string, string> = { _submission_id: 'id', _submitted_at: 'submitted_at' }
+const answerKey = (k: string) => k.startsWith('data.') ? k.slice(5) : k
+
+/** External record → form answers keyed by question name (+ their record ID for de-duplication). */
+export function inboundForm(record: Obj, maps: ConnMap[]): { data: Obj; externalId: string | null } {
+  const data: Obj = {}; let externalId: string | null = null
+  for (const m of maps) {
+    const v = getPath(record, m.external); if (v === undefined || v === null || v === '') continue
+    if (m.internal === '_external_id') { externalId = String(v).slice(0, 120); continue }
+    if (META[m.internal]) continue
+    setPath(data, answerKey(m.internal), v)
+  }
+  if (externalId) data._external_id = externalId
+  return { data, externalId }
+}
+
+/** Amehnities form submission → external system's shape. */
+export function outboundForm(sub: Obj, maps: ConnMap[]): Obj {
+  const out: Obj = {}; const answers = isObj(sub.data) ? sub.data : {}
+  for (const m of maps) {
+    const v = META[m.internal] ? sub[META[m.internal]] : getPath(answers, answerKey(m.internal))
+    if (v !== undefined && v !== null) setPath(out, m.external, v)
+  }
+  return out
+}
