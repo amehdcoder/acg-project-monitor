@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { LIVE_SESSION_RESTORED } from "@/lib/auth/liveSessionGuard";
 import {
   FolderOpen,
   Plus,
@@ -174,6 +175,14 @@ const ProjectsView = ({ onSelectProject, onOpenRecords }: ProjectsViewProps) => 
     fetchProjects();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, user?.id, role, isSuperAdmin, isOwnerLevel]);
+
+  // Reload once a lost session is restored, so the list never stays empty.
+  useEffect(() => {
+    const reload = () => fetchProjects();
+    window.addEventListener(LIVE_SESSION_RESTORED, reload);
+    return () => window.removeEventListener(LIVE_SESSION_RESTORED, reload);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Fetch forms when chat project is selected
   useEffect(() => {

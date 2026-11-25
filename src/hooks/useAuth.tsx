@@ -5,6 +5,9 @@ import { toast } from "@/hooks/use-toast";
 import { warmCacheUserForms } from "@/lib/offlineFormCache";
 import { prewarmBloombergOffline } from "@/lib/bloomberg/offlineSchoolCache";
 import { prefetchProjects } from "@/lib/prefetchProjects";
+import { setExpectedUser, LIVE_SESSION_NEEDED, LIVE_SESSION_RESTORED } from "@/lib/auth/liveSessionGuard";
+import { ToastAction } from "@/components/ui/toast";
+import { createElement } from "react";
 import { startTimer } from "@/lib/metrics";
 import {
   getLatestOfflineCredential,
@@ -126,6 +129,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // treated as spurious so we never bounce a working field user to /auth.
   const userSignOutRef = useRef(false);
   const activeUserRef = useRef<User | null>(null);
+  // Password typed for an offline unlock, kept in memory only, so the live
+  // session can be restored silently once the backend is reachable again.
+  const pendingLiveAuthRef = useRef<{ email: string; password: string } | null>(null);
+  const signOutRef = useRef<(() => Promise<unknown>) | null>(null);
   const offlineUnlockedRef = useRef(false);
   const authGenerationRef = useRef(0);
   const [isOfflineMode, setIsOfflineMode] = useState(!navigator.onLine);
@@ -776,7 +783,54 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     };
 
+    const announceRestored = () => {
+      setIsOfflineMode(false);
+      window.dispatchEvent(new Event(LIVE_SESSION_RESTORED));
+      // Screens refresh on focus; re-read everything that loaded while signed out.
+      window.dispatchEvent(new Event("focus"));
+    };
+    let restoring = false;
+    let promptedExpired = false;
+    const restoreLiveSession = async () => {
+      if (restoring || !navigator.onLine || userSignOutRef.current || !activeUserRef.current) return;
+      restoring = true;
+      const generation = authGenerationRef.current;
+      try {
+        const { data: current } = await supabase.auth.getSession();
+        if (current.session?.user?.id === activeUserRef.current?.id) { announceRestored(); return; }
+        const refreshed = await withTimeout(supabase.auth.refreshSession(), 8000, "refresh_timeout").catch(() => null);
+        if (generation !== authGenerationRef.current || userSignOutRef.current) return;
+        let live = refreshed && !refreshed.error ? refreshed.data?.session ?? null : null;
+        const creds = pendingLiveAuthRef.current;
+        if (!live && creds && creds.email === activeUserRef.current?.email?.toLowerCase()) {
+          const res = await withTimeout(supabase.auth.signInWithPassword(creds), 12000, "sign_in_timeout").catch(() => null);
+          if (generation !== authGenerationRef.current || userSignOutRef.current) return;
+          live = res && !res.error ? res.data?.session ?? null : null;
+        }
+        if (live?.user && live.user.id === activeUserRef.current?.id) {
+          pendingLiveAuthRef.current = null;
+          offlineUnlockedRef.current = false;
+          setSession(live); setUser(live.user); activeUserRef.current = live.user;
+          offlineAuthLog("Live session restored after it was lost");
+          void fetchProfile(live.user.id, { silent: true });
+          announceRestored();
+          return;
+        }
+        if (!promptedExpired) {
+          promptedExpired = true;
+          toast({
+            title: "Please sign in again",
+            description: "Your session has expired, so live projects and tools can't load. Saved data on this device is kept.",
+            duration: 60000,
+            action: createElement(ToastAction, { altText: "Sign in again", onClick: () => { void signOutRef.current?.(); } }, "Sign in again") as unknown as import("@/components/ui/toast").ToastActionElement,
+          });
+        }
+      } finally { restoring = false; }
+    };
+    window.addEventListener(LIVE_SESSION_NEEDED, restoreLiveSession);
+
     const handleOnline = () => {
+      void restoreLiveSession();
       offlineAuthLog("Connectivity change: ONLINE — flushing queues and retrying token refresh with backoff");
       setIsOfflineMode(false);
       syncAuditQueue();
@@ -789,7 +843,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const handleVisibility = () => {
-      if (document.visibilityState === "visible") void refreshSessionWithRetry();
+      if (document.visibilityState === "visible") { void refreshSessionWithRetry(); if (offlineUnlockedRef.current) void restoreLiveSession(); }
     };
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
@@ -798,8 +852,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
       document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener(LIVE_SESSION_NEEDED, restoreLiveSession);
     };
   }, []);
+
+  useEffect(() => { setExpectedUser(user?.id ?? null); }, [user?.id]);
 
   // Keep each user's offline form library fresh: whenever we have an
   // authenticated user and we're online (session restore, token refresh, or
@@ -858,6 +915,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       const result = await hydrateOfflineCredential(cache, reason);
       if (!result.error) {
+        pendingLiveAuthRef.current = { email, password };
         await clearOfflineFailures(email);
         void logOfflineAuditEvent("offline_login_success", { email: cache.email, userId: cache.user_id, success: true, details: { reason } });
         toast({ title: "Offline Login Successful", description: "You are logged in using this device's encrypted offline profile." });
@@ -1064,6 +1122,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
+    pendingLiveAuthRef.current = null;
     // Mark this as an explicit, user-initiated sign-out so the auth listener
     // does NOT treat the resulting SIGNED_OUT as a spurious network drop.
     userSignOutRef.current = true;
@@ -1107,6 +1166,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setProfile(null);
     setRole(null);
   };
+  signOutRef.current = signOut;
 
 
 

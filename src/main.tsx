@@ -2,6 +2,8 @@
 // APIs (e.g. crypto.randomUUID on old Android WebViews) are patched before any
 // component renders and crashes.
 import { installCompatPolyfills } from "./lib/compat/polyfills";
+// Must load before the backend client captures window.fetch.
+import "./lib/auth/liveSessionGuard";
 import { installStorageQuotaGuard } from "./lib/storageGuard";
 import "@fontsource/libre-baskerville/400.css";
 import "@fontsource/libre-baskerville/700.css";

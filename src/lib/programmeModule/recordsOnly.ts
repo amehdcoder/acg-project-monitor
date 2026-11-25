@@ -1,5 +1,6 @@
 import { userCacheKey } from "@/lib/cacheUser";
 import { useEffect, useState } from "react";
+import { LIVE_SESSION_RESTORED } from "@/lib/auth/liveSessionGuard";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -32,6 +33,13 @@ export function useRecordsOnlyProjects() {
   });
   const [totalProjects, setTotalProjects] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const [reloadKey, setReloadKey] = useState(0);
+  useEffect(() => {
+    const bump = () => setReloadKey((k) => k + 1);
+    window.addEventListener(LIVE_SESSION_RESTORED, bump);
+    return () => window.removeEventListener(LIVE_SESSION_RESTORED, bump);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,7 +74,7 @@ export function useRecordsOnlyProjects() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, user?.id]);
+  }, [authLoading, user?.id, reloadKey]);
 
   const lockedIds = new Set(locked.map((p) => p.id));
   /** Every project this user can reach is locked → lock the entire shell. */
