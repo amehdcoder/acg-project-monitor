@@ -88,13 +88,13 @@ export function drawFlhfCatchments(map: L.Map, entries: readonly CatchmentEntry[
   for (const c of catchments) {
     const outline = catchmentOutline(c);
     if (outline.length >= 3) {
-      L.polygon(outline, { pane: "flhfAreas", color: c.color, weight: 1.4, opacity: 0.85, dashArray: "4 3", fill: true, fillOpacity: 0, smoothFactor: 1.5 })
+      L.polygon(outline, { pane: "flhfAreas", color: c.color, weight: 1, opacity: 0.55, dashArray: "3 4", fill: true, fillOpacity: 0, smoothFactor: 1.5 })
         .bindTooltip(`<b>${esc(c.name)}</b><br/>${escapeHtmlText(c.communities.length)} communities / settlements`, { sticky: true, className: "flhf-catchment-tip" })
         .addTo(group);
       outline.forEach(p => bounds.extend(p));
     }
     if (points) for (const p of c.communities) {
-      L.circleMarker([p.lat, p.lng], { pane: "flhfMarks", radius: 4.5, color: "#ffffff", weight: 1.2, fillColor: "#B3261E", fillOpacity: 0.95 })
+      L.circleMarker([p.lat, p.lng], { pane: "flhfMarks", radius: 3.5, color: "#ffffff", weight: 1, fillColor: "#B3261E", fillOpacity: 0.95 })
         .bindTooltip(`${esc(p.name || "Community")} · ${esc(c.name)}`, { direction: "top" }).addTo(group);
     }
     if (c.facility) {
@@ -108,7 +108,7 @@ export function drawFlhfCatchments(map: L.Map, entries: readonly CatchmentEntry[
     const s = ok(e.settlement_latitude, e.settlement_longitude);
     const lat = s ? e.settlement_latitude : e.community_latitude, lng = s ? e.settlement_longitude : e.community_longitude;
     if (!ok(lat, lng)) continue;
-    L.circleMarker([lat!, lng!], { pane: "flhfMarks", radius: 4.5, color: "#ffffff", weight: 1.2, fillColor: "#B3261E", fillOpacity: 0.95 })
+    L.circleMarker([lat!, lng!], { pane: "flhfMarks", radius: 3.5, color: "#ffffff", weight: 1, fillColor: "#B3261E", fillOpacity: 0.95 })
       .bindTooltip(`${esc(String((s && e.settlement_name) || e.community_name || "Community"))} · FLHF not recorded`, { direction: "top" }).addTo(group);
   }
   group.addTo(map);

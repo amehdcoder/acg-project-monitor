@@ -127,7 +127,7 @@ function StateMap({ group, lgas, states, espen }: { group: StateGroup; lgas: Adm
   useEffect(() => {
     const m = map.current;
     if (!m || !wards) return;
-    const layer = L.geoJSON(wards as never, { pane: "bounds", style: { color: "#455A64", weight: 0.8, dashArray: "4 3", fill: false, opacity: 0.9 } }).addTo(m);
+    const layer = L.geoJSON(wards as never, { pane: "bounds", style: { color: "#263238", weight: 1.1, fill: false, opacity: 0.95 } }).addTo(m);
     return () => { layer.remove(); };
   }, [wards, visible]);
 
@@ -151,7 +151,7 @@ function StateMap({ group, lgas, states, espen }: { group: StateGroup; lgas: Adm
         fill = a == null ? "#C3C9CF" : (b.density >= lo ? BIVARIATE.high : BIVARIATE.low)[a];
         label = `${categoryOf(e, "accessibility").label} · ${b.density >= lo ? "High" : "Low"} population`;
       } else { const c = categoryOf(e, view); fill = c.color; label = c.label; }
-      L.geoJSON({ type: "MultiPolygon", coordinates: b.rings } as never, { pane: "blocks", style: { color: "#ffffff", weight: 0.6, fillColor: fill, fillOpacity: 0.82 } })
+      L.geoJSON({ type: "MultiPolygon", coordinates: b.rings } as never, { pane: "blocks", style: { color: "#5F6B73", weight: 0.4, opacity: 0.7, fillColor: fill, fillOpacity: 0.9 } })
         .bindPopup(`<div style="font:12px system-ui;min-width:200px"><div style="font-weight:700;font-size:13px">${esc(e.community_name || "Community")}</div><div style="color:hsl(var(--muted-foreground))">${esc(e.ward)} · ${esc(e.lga)}</div><div style="margin:6px 0;padding:4px 6px;border-left:4px solid ${escapeHtmlText(fill)};background:hsl(var(--muted))">${esc(label)}</div><table style="width:100%;font-size:11px"><tr><td>Population</td><td style="text-align:right"><b>${escapeHtmlText(pop.toLocaleString())}</b></td></tr><tr><td>Landblock area</td><td style="text-align:right">${escapeHtmlText(b.areaKm2.toFixed(1))} km²</td></tr><tr><td>Density</td><td style="text-align:right">${escapeHtmlText(Math.round(b.density).toLocaleString())} /km²</td></tr><tr><td>Accessibility</td><td style="text-align:right">${esc(categoryOf(e, "accessibility").label)}</td></tr><tr><td>Security</td><td style="text-align:right">${esc(categoryOf(e, "security").label)}</td></tr><tr><td>Terrain</td><td style="text-align:right">${esc(categoryOf(e, "terrain").label)}</td></tr><tr><td>GPS</td><td style="text-align:right">${escapeHtmlText(p.lat.toFixed(5))}, ${escapeHtmlText(p.lng.toFixed(5))}</td></tr></table></div>`)
         .addTo(g);
     }
