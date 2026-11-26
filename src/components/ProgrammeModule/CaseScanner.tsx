@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Camera, CheckCircle2, Flashlight, Keyboard, Loader2, RefreshCw, ScanLine, ShieldCheck, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { decodeLowLight } from "@/lib/programmeModule/lowLightDecode";
 import { caseIdFromScan } from "@/lib/programmeModule/dedupe";
 import { cameraErrorMessage, preferredCamera } from "@/lib/programmeModule/scannerCamera";
 import type { BeneficiaryRow } from "@/lib/programmeModule/types";
@@ -34,7 +35,9 @@ const CaseScanner = ({ open, onOpenChange, beneficiaries, onFound }: Props) => {
   const callbacks = useRef({ beneficiaries, onFound, onOpenChange });
   callbacks.current = { beneficiaries, onFound, onOpenChange };
 
+  const backup = useRef<number | null>(null);
   const stop = useCallback(async () => {
+    if (backup.current) { window.clearInterval(backup.current); backup.current = null; }
     const s = scanner.current;
     scanner.current = null;
     if (!s) return;
@@ -109,6 +112,13 @@ const CaseScanner = ({ open, onOpenChange, beneficiaries, onFound }: Props) => {
           qrbox: (w, h) => ({ width: Math.max(50, Math.round(w * 0.96)), height: Math.max(50, Math.round(h * 0.96)) }) },
           (text) => { if (token === session.current && !handled.current) void lookup(text); }, () => {});
         if (token !== session.current) { await stop(); return; }
+        // Poor light: every half second, brighten and sharpen a copy of the picture and try again.
+        backup.current = window.setInterval(() => {
+          if (token !== session.current || handled.current) return;
+          const video = document.querySelector<HTMLVideoElement>(`#${regionId.current} video`);
+          if (!video) return;
+          try { const text = decodeLowLight(video); if (text) void lookup(text); } catch { /* next frame */ }
+        }, 500);
         try { setTorchSupported(s.getRunningTrackCameraCapabilities().torchFeature().isSupported()); } catch { setTorchSupported(false); }
         setStatus("scanning");
       } catch (error) {
