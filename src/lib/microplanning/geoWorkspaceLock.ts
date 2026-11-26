@@ -23,7 +23,7 @@ export function useGeoWorkspaceLock() {
   const [rows, setRows] = useState<GeoLockRow[]>([]);
   const [myProjects, setMyProjects] = useState<Set<string>>(new Set());
   const [ownerMode, setOwnerModeState] = useState<boolean>(() => {
-    try { return localStorage.getItem(MODE_KEY) === "1"; } catch { return false; }
+    try { return sessionStorage.getItem(MODE_KEY) === "1"; } catch { return false; }
   });
 
   const load = useCallback(async () => {
@@ -48,7 +48,7 @@ export function useGeoWorkspaceLock() {
 
   const setOwnerMode = (on: boolean) => {
     setOwnerModeState(on);
-    try { localStorage.setItem(MODE_KEY, on ? "1" : "0"); } catch { /* ignore */ }
+    try { sessionStorage.setItem(MODE_KEY, on ? "1" : "0"); localStorage.removeItem(MODE_KEY); } catch { /* ignore */ }
   };
 
   // A user is locked when targeted directly, or when a whole project they belong to is locked.
