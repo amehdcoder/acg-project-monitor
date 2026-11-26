@@ -195,3 +195,20 @@ export async function insertWithDeadline(
     clearTimeout(timer);
   }
 }
+
+/**
+ * Edits saved in the last 30 s. A server read that started before the edit
+ * reached the server can arrive afterwards on a patchy connection; laying
+ * these over it stops the screen flicking back to the old values.
+ */
+const recentEdits = new Map<string, { values: Record<string, unknown>; at: number }>();
+export const rememberLocalEdit = (id: string, values: Record<string, unknown>) => {
+  const prev = recentEdits.get(id);
+  recentEdits.set(id, { values: { ...(prev?.values || {}), ...values }, at: Date.now() });
+};
+export const recentLocalEdit = (id: string): Record<string, unknown> | null => {
+  const hit = recentEdits.get(id);
+  if (!hit) return null;
+  if (Date.now() - hit.at > 30_000) { recentEdits.delete(id); return null; }
+  return hit.values;
+};

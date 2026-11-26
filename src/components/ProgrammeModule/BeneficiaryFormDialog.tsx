@@ -2,6 +2,28 @@ import { useMemo, useState } from "react";
 
 /** Longest a single server step may hold the Save button. */
 const SAVE_STEP_TIMEOUT_MS = SAVE_DEADLINE_MS;
+/**
+ * Ends a server step at the deadline even when the request is still waiting
+ * for the sign-in to renew (an abort signal alone only cancels the network call).
+ */
+function within<T extends { error: unknown }>(req: PromiseLike<T>, ctl: AbortController, ms: number): Promise<T> {
+  return Promise.race([
+    Promise.resolve(req),
+    new Promise<T>((r) => setTimeout(() => { ctl.abort(); r({ data: null, error: { message: "timeout" } } as unknown as T); }, ms)),
+  ]);
+}
+/** Signed-in user from the stored session, without waiting on the network. */
+const cachedSessionUser = (): { id: string } | undefined => {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i) || "";
+      if (!/^sb-.*-auth-token$/.test(k)) continue;
+      const id = JSON.parse(localStorage.getItem(k) || "null")?.user?.id;
+      if (id) return { id };
+    }
+  } catch { /* storage unavailable */ }
+  return undefined;
+};
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -138,18 +160,25 @@ const BeneficiaryFormDialog = ({
         // server step gets a short deadline, then the record is kept on the
         // device and sent by the queue (same id + submission_uuid, so a late
         // server insert and the replay can never create a duplicate).
-        const sessionRes = await supabase.auth.getSession();
-        const auth = { user: sessionRes.data.session?.user };
+        // One shared 8 s budget for every server step. Reading the session can wait
+        // on a sign-in renewal over a patchy connection, so it is bounded too.
+        const deadline = Date.now() + SAVE_STEP_TIMEOUT_MS;
+        const left = () => Math.max(500, deadline - Date.now());
+        const sessionRes = await Promise.race([
+          supabase.auth.getSession(),
+          new Promise<null>((r) => setTimeout(() => r(null), 2000)),
+        ]);
+        const auth = { user: sessionRes?.data.session?.user ?? cachedSessionUser() };
         let caseId: string | null = null;
         let online = navigator.onLine;
         if (online) {
           const ctl = new AbortController();
-          const timer = setTimeout(() => ctl.abort(), SAVE_STEP_TIMEOUT_MS);
+          const timer = setTimeout(() => ctl.abort(), left());
           try {
-            const res = await supabase.rpc("next_beneficiary_case_id", {
+            const res = await within(supabase.rpc("next_beneficiary_case_id", {
               _module_id: moduleId,
               _facility_id: facilityId || null,
-            } as never).abortSignal(ctl.signal);
+            } as never).abortSignal(ctl.signal), ctl, left());
             caseId = (res.data as unknown as string) || null;
             if (res.error && ctl.signal.aborted) online = false;
           } catch { online = false; } finally { clearTimeout(timer); }
@@ -164,12 +193,12 @@ const BeneficiaryFormDialog = ({
         let sent = false;
         if (online && caseId) {
           const ctl = new AbortController();
-          const timer = setTimeout(() => ctl.abort(), SAVE_STEP_TIMEOUT_MS);
+          const timer = setTimeout(() => ctl.abort(), left());
           try {
             // No read-back: building the row locally skips a second
             // permission-checked select on the server.
-            const { error } = await supabase.from("beneficiaries")
-              .insert(payload as never).abortSignal(ctl.signal);
+            const { error } = await within(supabase.from("beneficiaries")
+              .insert(payload as never).abortSignal(ctl.signal), ctl, left());
             if (error && !ctl.signal.aborted && error.code !== "23505") throw error;
             sent = !error || error.code === "23505";
           } finally { clearTimeout(timer); }

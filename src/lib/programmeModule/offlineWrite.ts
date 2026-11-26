@@ -4,6 +4,7 @@
 // flushQueue when connectivity returns. Inserts carry a client-generated id so
 // a replay can never create a duplicate.
 
+import { rememberLocalEdit } from "./offlineQueue";
 import { supabase } from "@/integrations/supabase/client";
 import { enqueue, flushQueue, mergeIntoQueued, newUuid, SAVE_DEADLINE_MS } from "./offlineQueue";
 import { cachePatchRows } from "./offlineReadCache";
@@ -73,6 +74,7 @@ export async function offlineMutate(op: OpPayload & { forceQueue?: boolean }): P
     prepared.values = Array.isArray(op.values) ? op.values.map(add) : add(op.values || {});
   }
   const id = op.action === "insert" && !Array.isArray(prepared.values) ? (prepared.values as Record<string, unknown>).id as string : op.id;
+  if (op.action === "update" && op.id && op.values && !Array.isArray(op.values)) rememberLocalEdit(op.id, op.values);
   const patchCache = async () => {
     const prefix = CACHE_PREFIX[op.table];
     if (prefix && id) await cachePatchRows(prefix, id, op.action === "delete" ? null : op.action === "graduation" ? { profile: { graduation: prepared.values } } : prepared.values as Record<string, unknown>, op.action === "insert");

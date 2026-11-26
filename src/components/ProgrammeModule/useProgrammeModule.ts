@@ -11,7 +11,7 @@ import type {
   ProgrammeModuleRow,
 } from "@/lib/programmeModule/types";
 import { cachedRead } from "@/lib/programmeModule/offlineReadCache";
-import { bindQueueAutoFlush, flushQueue, listQueued, pendingFor } from "@/lib/programmeModule/offlineQueue";
+import { bindQueueAutoFlush, flushQueue, listQueued, pendingFor, recentLocalEdit } from "@/lib/programmeModule/offlineQueue";
 
 /** Programme modules configured on a project. */
 export const useProgrammeModules = (projectId?: string) => {
@@ -72,9 +72,10 @@ export const useBeneficiaries = (moduleId?: string) => {
     for (const op of pendingFor("op", (p) => p.table === "beneficiaries" && p.action === "update" && !!p.id)) {
       pendingEdits.set(op.id as string, { ...(pendingEdits.get(op.id as string) || {}), ...((op.values as Record<string, unknown>) || {}) });
     }
-    const serverWithEdits = pendingEdits.size
-      ? server.map((r) => (pendingEdits.has(r.id) ? ({ ...r, ...pendingEdits.get(r.id) } as BeneficiaryRow) : r))
-      : server;
+    const serverWithEdits = server.map((r) => {
+      const edit = pendingEdits.get(r.id) || recentLocalEdit(r.id);
+      return edit ? ({ ...r, ...edit } as BeneficiaryRow) : r;
+    });
     const next = [...queued, ...serverWithEdits];
     setRows((prev) => {
       const before = new Map(prev.map((r) => [r.id, r]));
