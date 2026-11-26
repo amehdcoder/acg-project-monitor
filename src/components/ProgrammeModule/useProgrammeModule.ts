@@ -67,7 +67,15 @@ export const useBeneficiaries = (moduleId?: string) => {
         __pending: true,
       }));
     if (!data && rowsFor.current === moduleId) { setLoading(false); return; }
-    const next = [...queued, ...server];
+    // Edits still waiting to send stay on screen even when a fresh server copy arrives.
+    const pendingEdits = new Map<string, Record<string, unknown>>();
+    for (const op of pendingFor("op", (p) => p.table === "beneficiaries" && p.action === "update" && !!p.id)) {
+      pendingEdits.set(op.id as string, { ...(pendingEdits.get(op.id as string) || {}), ...((op.values as Record<string, unknown>) || {}) });
+    }
+    const serverWithEdits = pendingEdits.size
+      ? server.map((r) => (pendingEdits.has(r.id) ? ({ ...r, ...pendingEdits.get(r.id) } as BeneficiaryRow) : r))
+      : server;
+    const next = [...queued, ...serverWithEdits];
     setRows((prev) => {
       const before = new Map(prev.map((r) => [r.id, r]));
       const merged = next.map((r) => {
@@ -147,8 +155,17 @@ export const useBeneficiaryRecord = (beneficiaryId?: string) => {
       .map((p) => ({ ...(p as unknown as BeneficiaryServiceRow), id: p.submission_uuid as string, __pending: true }));
     const queuedReferrals = pendingFor("referral", (p) => p.beneficiary_id === beneficiaryId)
       .map((p) => ({ ...(p as unknown as BeneficiaryReferralRow), id: p.submission_uuid as string, __pending: true }));
-    setServices([...queuedServices, ...((s.data as unknown as BeneficiaryServiceRow[]) || [])]);
-    setReferrals([...queuedReferrals, ...((r.data as unknown as BeneficiaryReferralRow[]) || [])]);
+    // Services/referrals saved through the general offline queue stay visible until they are sent.
+    const queuedOps = <T,>(table: string) => pendingFor("op", (p) => p.table === table && p.action === "insert")
+      .flatMap((p) => (Array.isArray(p.values) ? p.values : [p.values]) as Record<string, unknown>[])
+      .filter((v) => v && v.beneficiary_id === beneficiaryId)
+      .map((v) => ({ ...(v as unknown as T), __pending: true }));
+    const withPending = <T extends { id: string }>(pending: T[], server: T[]) => {
+      const seen = new Set(server.map((x) => x.id));
+      return [...pending.filter((x) => !seen.has(x.id)), ...server];
+    };
+    setServices(withPending([...queuedServices, ...queuedOps<BeneficiaryServiceRow>("beneficiary_services")], (s.data as unknown as BeneficiaryServiceRow[]) || []));
+    setReferrals(withPending([...queuedReferrals, ...queuedOps<BeneficiaryReferralRow>("beneficiary_referrals")], (r.data as unknown as BeneficiaryReferralRow[]) || []));
     setAudit((a.data as unknown as BeneficiaryAuditRow[]) || []);
     setLoading(false);
   }, [beneficiaryId]);
