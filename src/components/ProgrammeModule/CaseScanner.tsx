@@ -51,6 +51,11 @@ const CaseScanner = ({ open, onOpenChange, beneficiaries, onFound }: Props) => {
     setStatus("looking"); setMessage("");
     try {
       let hit = callbacks.current.beneficiaries.find((b) => (b.case_id || "").toLowerCase() === id.toLowerCase());
+      // Offline: the records saved on this device are the only ones we can check.
+      if (!hit && !navigator.onLine) {
+        if (token === session.current) setMessage(`${id} is not among the records saved on this device. Connect to the internet to search all records.`);
+        return;
+      }
       if (!hit) {
         // Escape pattern characters: scanned IDs are exact IDs, not search patterns.
         const exact = id.replace(/[\\%_]/g, (c) => `\\${c}`);
@@ -70,7 +75,7 @@ const CaseScanner = ({ open, onOpenChange, beneficiaries, onFound }: Props) => {
       }
       setMessage(`No accessible beneficiary record found for ${id}.`);
     } catch {
-      if (token === session.current) setMessage("Could not check this Case ID. Check your connection and try again; loaded records remain available.");
+      if (token === session.current) setMessage(`${id} is not among the records saved on this device, and the server could not be reached. Try again when the connection is better.`);
     } finally {
       lookupBusy.current = false;
       if (token === session.current) {
