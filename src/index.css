@@ -1920,3 +1920,14 @@ html[data-lbr-fit="on"][data-lbr-device="ios"] .lbr-type button { min-height: 44
   .overview-card .relative.mt-4 { padding-right: 0; padding-bottom: 46px; }
 }
 @media (prefers-reduced-motion: reduce) { .overview-card, .overview-art img, .overview-arrow { transition: none; } .overview-card:hover { transform: none; } .overview-card:hover .overview-art img { transform: none; } }
+
+/* Longitudinal Beneficiary Records — professional workspace polish */
+.lbr-hero { position: relative; overflow: hidden; background: linear-gradient(120deg, hsl(var(--card)) 55%, hsl(var(--primary) / .06)); border-color: hsl(var(--primary) / .16); box-shadow: 0 1px 2px hsl(var(--foreground) / .04), 0 12px 28px -18px hsl(var(--primary) / .35); }
+.lbr-hero::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: linear-gradient(180deg, hsl(var(--primary)), hsl(var(--accent))); }
+.lbr-hero-mark { background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent))); box-shadow: 0 8px 18px -8px hsl(var(--primary) / .6); }
+.lbr-type [role="tablist"] { border-radius: 12px; padding: 4px; background: hsl(var(--muted) / .55); border: 1px solid hsl(var(--border)); }
+.lbr-type [role="tab"][data-state="active"] { box-shadow: 0 1px 3px hsl(var(--foreground) / .1); font-weight: 600; }
+.lbr-type table thead th { font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: hsl(var(--muted-foreground)); background: hsl(var(--muted) / .5); }
+.lbr-type table tbody tr { transition: background-color .15s ease; }
+.lbr-type table tbody tr:hover { background: hsl(var(--primary) / .04); }
+.lbr-type .rounded-lg.border.bg-card { box-shadow: 0 1px 2px hsl(var(--foreground) / .04); }

@@ -479,12 +479,12 @@ const ProgrammeModuleWorkspace = ({
   return (
     <div className="lbr-type space-y-3 font-report">
       {canConfigure && <DevicePreviewDialog open={devicePreviewOpen} onOpenChange={setDevicePreviewOpen} projectId={projectId} />}
-      <div className="flex flex-col gap-3 rounded-lg border border-health-blue/15 bg-card p-3 shadow-soft lg:flex-row lg:items-center">
+      <div className="lbr-hero flex flex-col gap-3 rounded-xl border p-4 lg:flex-row lg:items-center">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-health-blue text-primary-foreground"><Layers className="h-5 w-5" /></span>
+          <span className="lbr-hero-mark flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-primary-foreground"><Layers className="h-5 w-5" /></span>
           <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase text-health-blue">Integrated case and beneficiary management</p>
-            <h2 className="truncate font-report-display text-lg font-bold text-health-ink">Longitudinal Beneficiary Records</h2>
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-health-blue">Integrated case and beneficiary management</p>
+            <h2 className="truncate font-report-display text-xl font-bold tracking-tight text-health-ink">Longitudinal Beneficiary Records</h2>
           </div>
         </div>
         {modules.length > 0 && (

@@ -128,11 +128,11 @@ const Index = () => {
   const recordsLock = useRecordsOnlyProjects();
   const geoLock = useGeoWorkspaceLock();
   const [ownerRecordsMode, setOwnerRecordsModeState] = useState<boolean>(() => {
-    try { return localStorage.getItem("amehnities:owner-records-mode") === "1"; } catch { return false; }
+    try { return sessionStorage.getItem("amehnities:owner-records-mode") === "1"; } catch { return false; }
   });
   const setOwnerRecordsMode = (on: boolean) => {
     setOwnerRecordsModeState(on);
-    try { localStorage.setItem("amehnities:owner-records-mode", on ? "1" : "0"); } catch { /* ignore */ }
+    try { sessionStorage.setItem("amehnities:owner-records-mode", on ? "1" : "0"); localStorage.removeItem("amehnities:owner-records-mode"); } catch { /* ignore */ }
   };
   const ownerCanSwitch = recordsLock.isOwnerLevel && recordsLock.locked.length > 0;
   const recordsLockActive =
