@@ -1,6 +1,7 @@
 # Roadmap
 
-- [ ] Automatically download every server-authorized project form after first online sign-in, replace only new/changed offline definitions on realtime/reconnect/focus/polling updates, keep Download form and Ready to send fully functional offline, and verify offline capture → Ready to send → reconnect database/dashboard sync without duplicates or cross-account leakage.
+- [x] Automatically download server-authorized forms after online sign-in and replace only changed/new definitions on realtime/reconnect/focus/polling. Account-scoped encrypted library, Download form and Ready to send retained. All 33 focused checks pass; signed-in browser verified 17 definitions, unchanged no-rewrite, realtime replacement, offline capture, automatic reconnect delivery, one server row, live queue clearing and Sent readback. All temporary server records removed; preview build OK.
+- [ ] Finish dashboard-count verification for automatically synced forms: the test's independently imported generated client returns PGRST202 for visible_form_submission_counts despite the function existing with authenticated grants. Recreating the existing function and backend restart did not resolve that test call; database recovered and diagnostic records were removed. Actual submission storage and Sent readback passed. Do not alter managed client configuration or weaken access to bypass this signal; installed-device cold offline reopening also remains unverified.
 
 - [x] Make QR/reopening, shared offline forms, Dashboard and Records caches consistently account-scoped; preserve pending submissions, reject stale account completions and verify restricted/all-project access.
 
