@@ -94,6 +94,16 @@ describe("savedFormAutoSync exactly-once", () => {
     expect(store.get("e1").status).toBe("sent");
   });
 
+  it("notifies an open Ready to send view after background syncing", async () => {
+    store.set("e1", makeEntry("e1"));
+    const listener = vi.fn();
+    window.addEventListener("saved-forms-sync-completed", listener);
+    await syncFinalizedSavedForms();
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect((listener.mock.calls[0][0] as CustomEvent).detail).toMatchObject({ userId: "u1", synced: 1, failed: 0 });
+    window.removeEventListener("saved-forms-sync-completed", listener);
+  });
+
   it("never duplicates when the same batch runs multiple times", async () => {
     store.set("e1", makeEntry("e1"));
     await syncFinalizedSavedForms();

@@ -28,6 +28,7 @@ import { installGlobalErrorReporter, recordError } from "./lib/errorReporter";
 import { initOfflineMedia } from "./lib/offlineMedia";
 import { initOfflineSubmissions } from "./lib/offlineSubmissions";
 import { initSavedFormAutoSync } from "./lib/savedFormAutoSync";
+import { initOfflineFormAutoSync } from "./lib/offlineFormAutoSync";
 import { initGeographyCache } from "./lib/geographyCache";
 import { initSpecialFormReconcile } from "./lib/specialFormReconcile";
 import { prepareSilentFormRestoreForUpdate } from "./lib/formProgressPersistence";
@@ -52,6 +53,7 @@ if (!publicFeedbackBoot) {
   initOfflineMedia();
   initOfflineSubmissions();
   initSavedFormAutoSync();
+  initOfflineFormAutoSync();
 }
 // Seed the offline-first State→LGA→Ward geography lookup table into IndexedDB
 // once (skips the write entirely if a current copy already exists). The pickers

@@ -652,6 +652,13 @@
       "when": 1795653870270,
       "tag": "0092_full_unique_submission_uuid",
       "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1795673563580,
+      "tag": "0093_restore_visible_form_submission_counts_api",
+      "breakpoints": true
     }
   ]
 }

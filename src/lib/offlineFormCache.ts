@@ -1,21 +1,18 @@
 // Warm-cache the current user's accessible forms into the offline store right
-// after login, so a freshly-authenticated user can collect data offline even
-// if they never opened the Forms page while online.
-//
-// Writes into the SAME IndexedDB database/store that `useOfflineForms` reads
-// from (`acg_monitor_offline` → `offline_forms`), so cached forms appear
-// wherever the offline reader is used.
+// after login. New and changed definitions are written; unchanged definitions
+// keep their existing encrypted copy. A complete successful authorization read
+// also prunes definitions whose access has been revoked, without touching saved
+// drafts, finalized submissions, media, or any other account's library.
 
-import { supabase } from "@/integrations/supabase/client";
-import { sealRecord } from "@/lib/deviceCrypto";
-import { withTimeoutFallback } from "@/lib/withTimeout";
+import { sealRecord, unsealAll } from "@/lib/deviceCrypto";
 import { fetchAuthorizedForms } from "./authorizedForms";
-import { ownedOfflineForm } from "./offlineFormAccess";
+import { planOfflineFormChanges } from "./offlineFormPlan";
 
 const DB_NAME = "acg_monitor_offline";
 const DB_VERSION = 4;
 const FORMS_STORE = "offline_forms";
 const PENDING_STORE = "pending_submissions";
+export const OFFLINE_FORMS_UPDATED_EVENT = "offline-forms-updated";
 
 const openDB = (): Promise<IDBDatabase> =>
   new Promise((resolve, reject) => {
@@ -47,13 +44,35 @@ const openDB = (): Promise<IDBDatabase> =>
     };
   });
 
-const putForm = (db: IDBDatabase, form: any): Promise<void> =>
-  new Promise((resolve, reject) => {
-    const tx = db.transaction(FORMS_STORE, "readwrite");
-    const req = tx.objectStore(FORMS_STORE).put(form);
+const readAllForms = async (db: IDBDatabase): Promise<Record<string, any>[]> => {
+  const rows: any[] = await new Promise((resolve, reject) => {
+    const tx = db.transaction(FORMS_STORE, "readonly");
+    const req = tx.objectStore(FORMS_STORE).getAll();
     req.onerror = () => reject(req.error);
-    req.onsuccess = () => resolve();
+    req.onsuccess = () => resolve(req.result || []);
   });
+  return unsealAll<Record<string, any>>(rows);
+};
+
+const applyPlan = async (
+  db: IDBDatabase,
+  plan: ReturnType<typeof planOfflineFormChanges>,
+): Promise<void> => {
+  if (!plan.puts.length && !plan.removeKeys.length) return;
+  const sealed = [];
+  for (const form of plan.puts) {
+    sealed.push(await sealRecord(form, ["id", "project_id", "downloaded_at"]));
+  }
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(FORMS_STORE, "readwrite");
+    const store = tx.objectStore(FORMS_STORE);
+    for (const form of sealed) store.put(form);
+    for (const key of plan.removeKeys) store.delete(key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error("offline_form_transaction_aborted"));
+  });
+};
 
 interface WarmCacheCtx {
   userId: string;
@@ -61,60 +80,112 @@ interface WarmCacheCtx {
   role?: string | null;
 }
 
-/**
- * Resolve which form rows the user can access, then persist a complete,
- * re-renderable snapshot of each into the offline store.
- */
 export interface WarmCacheResult {
+  /** Total authorized forms available offline after the completed refresh. */
   count: number;
   forms: { id: string; name: string; project_id: string }[];
-  /** True when the cached set was strictly scoped to explicit access grants. */
   scopedToGrants: boolean;
+  ok: boolean;
+  userId: string;
+  added: number;
+  updated: number;
+  unchanged: number;
+  removed: number;
+  addedForms: { id: string; name: string; project_id: string }[];
+  updatedForms: { id: string; name: string; project_id: string }[];
+  syncedAt: string | null;
+  error?: string;
 }
+
+const emptyResult = (ctx: WarmCacheCtx, error?: string): WarmCacheResult => ({
+  count: 0,
+  forms: [],
+  scopedToGrants: !ctx.isAdmin,
+  ok: false,
+  userId: ctx.userId,
+  added: 0,
+  updated: 0,
+  unchanged: 0,
+  removed: 0,
+  addedForms: [],
+  updatedForms: [],
+  syncedAt: null,
+  error,
+});
+
+const inFlight = new Map<string, Promise<WarmCacheResult>>();
+const syncStateKey = (userId: string) => `amehnities:forms:offline-sync:v1:${userId}`;
 
 export const warmCacheUserForms = async (ctx: WarmCacheCtx): Promise<number> => {
   return (await warmCacheUserFormsDetailed(ctx)).count;
 };
 
 /**
- * Like warmCacheUserForms, but returns exactly which forms were cached so the
- * UI can confirm on-screen what was downloaded. For non-admins the set is
- * strictly limited to their explicit access grants (direct form assignments,
- * SARMAAN grants, and forms in assigned projects) — nothing else is cached.
+ * Fetch and persist all currently authorized form definitions. Calls for the
+ * same account share one in-flight refresh, so auth callbacks, realtime,
+ * reconnect, focus and a manual tap cannot duplicate work or writes.
  */
-export const warmCacheUserFormsDetailed = async (ctx: WarmCacheCtx): Promise<WarmCacheResult> => {
-  const empty: WarmCacheResult = { count: 0, forms: [], scopedToGrants: !ctx.isAdmin };
-  if (!navigator.onLine || !ctx.userId) return empty;
-  try {
-    const formsData = await fetchAuthorizedForms(ctx.userId);
+export const warmCacheUserFormsDetailed = (ctx: WarmCacheCtx): Promise<WarmCacheResult> => {
+  if (!ctx.userId) return Promise.resolve(emptyResult(ctx, "no_user"));
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    return Promise.resolve(emptyResult(ctx, "offline"));
+  }
+  const running = inFlight.get(ctx.userId);
+  if (running) return running;
 
-    const db = await openDB();
-    const cachedForms: { id: string; name: string; project_id: string }[] = [];
-    for (const form of formsData) {
-      const allItems = ((form.questions as unknown as any[]) || []);
-      const offlineForm = {
-        id: form.id,
-        name: form.name,
-        description: form.description ?? null,
-        status: form.status,
-        project_id: form.project_id,
-        // Keep grouped + ungrouped items together so the offline copy is complete.
-        questions: allItems,
-        geofence: (form.geofence as any) ?? null,
-        settings: (form.settings as any) ?? {},
-        downloaded_at: new Date().toISOString(),
-        updated_at: (form as any).updated_at || new Date().toISOString(),
+  const promise = (async (): Promise<WarmCacheResult> => {
+    let db: IDBDatabase | null = null;
+    try {
+      const formsData = await fetchAuthorizedForms(ctx.userId);
+      db = await openDB();
+      const existing = await readAllForms(db);
+      const syncedAt = new Date().toISOString();
+      const plan = planOfflineFormChanges(existing, formsData, ctx.userId, { prune: true, now: syncedAt });
+      await applyPlan(db, plan);
+      const forms = formsData.map((form: any) => ({
+        id: String(form.id),
+        name: String(form.name || "Untitled form"),
+        project_id: String(form.project_id || ""),
+      }));
+      const result: WarmCacheResult = {
+        count: forms.length,
+        forms,
+        scopedToGrants: !ctx.isAdmin,
+        ok: true,
+        userId: ctx.userId,
+        added: plan.addedForms.length,
+        updated: plan.updatedForms.length,
+        unchanged: plan.unchangedForms.length,
+        removed: plan.removeKeys.length,
+        addedForms: plan.addedForms,
+        updatedForms: plan.updatedForms,
+        syncedAt,
       };
       try {
-        await putForm(db, await sealRecord(ownedOfflineForm(offlineForm, ctx.userId), ["id", "project_id", "downloaded_at"]));
-        cachedForms.push({ id: form.id, name: form.name, project_id: form.project_id });
-      } catch {
-        /* skip a single bad row */
+        localStorage.setItem(syncStateKey(ctx.userId), JSON.stringify({
+          userId: ctx.userId,
+          count: result.count,
+          added: result.added,
+          updated: result.updated,
+          unchanged: result.unchanged,
+          removed: result.removed,
+          syncedAt,
+        }));
+      } catch { /* storage may be unavailable; IndexedDB remains authoritative */ }
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent(OFFLINE_FORMS_UPDATED_EVENT, { detail: result }));
       }
+      return result;
+    } catch (error) {
+      console.warn("warmCacheUserForms failed:", error);
+      return emptyResult(ctx, String((error as Error)?.message || error || "offline_form_sync_failed"));
+    } finally {
+      db?.close();
     }
-    return { count: cachedForms.length, forms: cachedForms, scopedToGrants: !ctx.isAdmin };
-  } catch (e) {
-    console.warn("warmCacheUserForms failed:", e);
-    return empty;
-  }
+  })();
+  inFlight.set(ctx.userId, promise);
+  void promise.finally(() => {
+    if (inFlight.get(ctx.userId) === promise) inFlight.delete(ctx.userId);
+  });
+  return promise;
 };

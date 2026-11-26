@@ -45,7 +45,7 @@ import {
 } from "@/lib/savedForms";
 import { isBloombergSavedEntry, isSpecialBridgeEntry } from "@/lib/specialFormBridge";
 import { captureAndUploadDeviceAuditSnapshots } from "@/lib/bloomberg/deviceAuditSnapshot";
-import { syncSavedFormEntry } from "@/lib/savedFormAutoSync";
+import { syncSavedFormEntry, SAVED_FORMS_SYNC_EVENT } from "@/lib/savedFormAutoSync";
 import { syncDeviceRecords } from "@/lib/deviceSync";
 import SeeClearFormFiller from "@/components/SeeClear/SeeClearFormFiller";
 
@@ -159,6 +159,12 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
 
   useEffect(() => {
     load();
+    const handleBackgroundSync = (event: Event) => {
+      const detail = (event as CustomEvent<{ userId?: string }>).detail;
+      if (detail?.userId === userId) void load();
+    };
+    window.addEventListener(SAVED_FORMS_SYNC_EVENT, handleBackgroundSync);
+    return () => window.removeEventListener(SAVED_FORMS_SYNC_EVENT, handleBackgroundSync);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, userId, projectId]);
 

@@ -13,6 +13,7 @@ import { stampSyncContract } from "@/lib/syncContract";
 import { withQueueLock, backoffDelay, isRetryable, runCapped } from "@/lib/syncLock";
 
 let started = false;
+export const SAVED_FORMS_SYNC_EVENT = "saved-forms-sync-completed";
 
 // Per-entry in-flight guard. Overlapping triggers (online event + interval +
 // visibilitychange firing near-simultaneously) must never process the same
@@ -114,6 +115,11 @@ async function drain(userId: string): Promise<{ synced: number; failed: number }
   }
   if (synced > 0 || failed > 0) {
     recordMetric("saved_form_sync_result", 0, failed === 0, { synced, failed });
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(SAVED_FORMS_SYNC_EVENT, {
+        detail: { userId, synced, failed, completedAt: new Date().toISOString() },
+      }));
+    }
   }
   return { synced, failed };
 }

@@ -4,6 +4,8 @@ import type { Question, GeofenceArea } from "@/components/FormBuilder/types";
 import { sealRecord, unsealRecord, unsealAll } from "@/lib/deviceCrypto";
 import { useAuth } from "@/hooks/useAuth";
 import { offlineFormKey, ownedOfflineForm, visibleOfflineForms } from "@/lib/offlineFormAccess";
+import { OFFLINE_FORMS_UPDATED_EVENT } from "@/lib/offlineFormCache";
+import { planOfflineFormChanges } from "@/lib/offlineFormPlan";
 
 const DB_NAME = "acg_monitor_offline";
 // Keep this version in lockstep with useOfflineStorage/offlineFormCache.
@@ -82,7 +84,10 @@ const FORM_PLAIN_FIELDS = ["id", "project_id", "downloaded_at"];
 // Save a form for offline use (encrypted at rest)
 const saveFormOffline = async (form: OfflineForm, userId: string): Promise<void> => {
   const db = await initDB();
-  const sealed = await sealRecord(ownedOfflineForm(form, userId), FORM_PLAIN_FIELDS);
+  const owned = (form as any).owner_user_id === userId && (form as any).form_id
+    ? form
+    : ownedOfflineForm(form, userId);
+  const sealed = await sealRecord(owned, FORM_PLAIN_FIELDS);
   return new Promise((resolve, reject) => {
     const tx = db.transaction(FORMS_STORE_NAME, "readwrite");
     const store = tx.objectStore(FORMS_STORE_NAME);
@@ -182,7 +187,12 @@ export const useOfflineForms = () => {
     };
     void refresh().catch(() => { if (!cancelled) setLoading(false); });
     window.addEventListener("forms-project-access", refresh);
-    return () => { cancelled = true; window.removeEventListener("forms-project-access", refresh); };
+    window.addEventListener(OFFLINE_FORMS_UPDATED_EVENT, refresh);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("forms-project-access", refresh);
+      window.removeEventListener(OFFLINE_FORMS_UPDATED_EVENT, refresh);
+    };
   }, [userId]);
 
   // Download a form for offline use
@@ -199,27 +209,20 @@ export const useOfflineForms = () => {
   }): Promise<boolean> => {
     if (!userId) return false;
     try {
-      const offlineForm: OfflineForm = {
-        id: form.id,
-        name: form.name,
-        description: form.description,
-        status: form.status,
-        project_id: form.project_id,
-        questions: form.questions,
-        geofence: form.geofence,
-        settings: form.settings,
-        downloaded_at: new Date().toISOString(),
-        updated_at: form.updated_at || new Date().toISOString(),
-      };
-
-      await saveFormOffline(offlineForm, userId);
+      const existing = await getOfflineForm(offlineFormKey(userId, form.id));
+      const plan = planOfflineFormChanges(existing ? [existing] : [], [form], userId);
+      if (plan.puts.length === 0) {
+        toast({ title: "Form is up to date", description: `"${form.name}" is already available offline.` });
+        return true;
+      }
+      await saveFormOffline(plan.puts[0] as OfflineForm, userId);
       await loadOfflineForms();
-      
+
       toast({
-        title: "Form Downloaded",
+        title: existing ? "Form updated offline" : "Form downloaded",
         description: `"${form.name}" is now available offline.`,
       });
-      
+
       return true;
     } catch (error) {
       console.error("Error downloading form:", error);
@@ -248,27 +251,19 @@ export const useOfflineForms = () => {
   }>): Promise<void> => {
     if (!userId || !forms || forms.length === 0) return;
     try {
-      for (const form of forms) {
+      const completeForms = forms.map((form) => ({
+        ...form,
         // Recombine grouped + ungrouped items so the offline copy is complete.
-        const combinedQuestions = [
+        questions: [
           ...((form.groups as any[]) || []),
           ...((form.questions as any[]) || []),
-        ];
-        const offlineForm: OfflineForm = {
-          id: form.id,
-          name: form.name,
-          description: form.description ?? null,
-          status: form.status,
-          project_id: form.project_id,
-          questions: combinedQuestions as Question[],
-          geofence: form.geofence ?? null,
-          settings: form.settings ?? {},
-          downloaded_at: new Date().toISOString(),
-          updated_at: form.updated_at || new Date().toISOString(),
-        };
-        await saveFormOffline(offlineForm, userId);
+        ],
+      }));
+      const plan = planOfflineFormChanges(await getOfflineForms(), completeForms, userId);
+      for (const offlineForm of plan.puts) {
+        await saveFormOffline(offlineForm as OfflineForm, userId);
       }
-      await loadOfflineForms();
+      if (plan.puts.length > 0) await loadOfflineForms();
     } catch (error) {
       console.error("Error auto-caching forms for offline:", error);
     }
