@@ -1,0 +1,1 @@
+/nix/store/rcwprzzfhcm29j39p3gbfzkz2x77shpn-sandbox-python-env/bin/python3.13: can't open file '/dev-server/qr_small.py': [Errno 2] No such file or directory
