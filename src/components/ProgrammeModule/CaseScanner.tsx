@@ -105,7 +105,8 @@ const CaseScanner = ({ open, onOpenChange, beneficiaries, onFound }: Props) => {
           experimentalFeatures: { useBarCodeDetectorIfSupported: true } });
         scanner.current = s;
         await s.start(preferredCamera(cameras) ?? { facingMode: "environment" },
-          { fps: 12, qrbox: (w, h) => ({ width: Math.round(w * 0.82), height: Math.round(Math.min(h * 0.65, w * 0.65)) }) },
+          { fps: 12, // Read almost the whole picture so a card held close to the lens still decodes.
+          qrbox: (w, h) => ({ width: Math.max(50, Math.round(w * 0.96)), height: Math.max(50, Math.round(h * 0.96)) }) },
           (text) => { if (token === session.current && !handled.current) void lookup(text); }, () => {});
         if (token !== session.current) { await stop(); return; }
         try { setTorchSupported(s.getRunningTrackCameraCapabilities().torchFeature().isSupported()); } catch { setTorchSupported(false); }
