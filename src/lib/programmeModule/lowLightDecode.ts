@@ -1,5 +1,17 @@
 import jsQR from "jsqr";
 
+/** 3×3 average of the grey channel, in place (RGBA): removes the grain of dark camera pictures. */
+export function smoothGrain(px: Uint8ClampedArray, w: number, h: number): void {
+  const g = new Float32Array(w * h);
+  for (let i = 0; i < g.length; i++) g[i] = (px[i * 4] * 77 + px[i * 4 + 1] * 150 + px[i * 4 + 2] * 29) / 256;
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+    let s = 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) s += g[(y + dy) * w + x + dx];
+    const i = (y * w + x) * 4;
+    px[i] = px[i + 1] = px[i + 2] = s / 9;
+  }
+}
+
 /** Stretches the darkest 2% to black and brightest 2% to white, in place (RGBA). */
 export function stretchContrast(px: Uint8ClampedArray): void {
   const hist = new Uint32Array(256);
@@ -32,6 +44,26 @@ export function decodeLowLight(video: HTMLVideoElement): string | null {
   if (!ctx) return null;
   ctx.drawImage(video, 0, 0, w, h);
   const img = ctx.getImageData(0, 0, w, h);
+  smoothGrain(img.data, w, h);
   stretchContrast(img.data);
   return jsQR(img.data, w, h, { inversionAttempts: "attemptBoth" })?.data || null;
+}
+
+/** Scan area covering almost the whole camera picture, so codes held close to the lens still read. */
+export const wideQrBox = (w: number, h: number) => ({ width: Math.max(50, Math.round(w * 0.96)), height: Math.max(50, Math.round(h * 0.96)) });
+
+/**
+ * Runs the poor-light reader beside an html5-qrcode scanner in `containerId`.
+ * Fires `onText` once, and stops by itself once the camera picture is removed.
+ */
+export function startLowLightBackup(containerId: string, onText: (text: string) => void): () => void {
+  let seen = false;
+  const timer = window.setInterval(() => {
+    const video = document.querySelector<HTMLVideoElement>(`#${CSS.escape(containerId)} video`);
+    if (!video) { if (seen) stop(); return; }
+    seen = true;
+    try { const text = decodeLowLight(video); if (text) { stop(); onText(text); } } catch { /* next frame */ }
+  }, 500);
+  function stop() { window.clearInterval(timer); }
+  return stop;
 }

@@ -1,3 +1,4 @@
+import { startLowLightBackup, wideQrBox } from "@/lib/programmeModule/lowLightDecode";
 /**
  * Offline Form Share — peer-to-peer transfer of finalized forms between two
  * devices over a local WiFi / hotspot link, with ZERO internet required.
@@ -180,13 +181,14 @@ export default function OfflineFormShare() {
         scannerRef.current = scanner;
         await scanner.start(
           { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 240, height: 240 } },
+          { fps: 10, qrbox: wideQrBox },
           (decoded) => {
             stopScan();
             onResult(decoded);
           },
           () => {},
         );
+        startLowLightBackup(el, (decoded) => { if (scannerRef.current !== scanner) return; stopScan(); onResult(decoded); });
       } catch (e: any) {
         setScanning(false);
         toast({ title: "Camera error", description: e?.message ?? "Could not start the camera.", variant: "destructive" });

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Camera, CheckCircle2, Flashlight, Keyboard, Loader2, RefreshCw, ScanLine, ShieldCheck, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { decodeLowLight } from "@/lib/programmeModule/lowLightDecode";
+import { decodeLowLight, wideQrBox } from "@/lib/programmeModule/lowLightDecode";
 import { caseIdFromScan } from "@/lib/programmeModule/dedupe";
 import { cameraErrorMessage, preferredCamera } from "@/lib/programmeModule/scannerCamera";
 import type { BeneficiaryRow } from "@/lib/programmeModule/types";
@@ -109,7 +109,7 @@ const CaseScanner = ({ open, onOpenChange, beneficiaries, onFound }: Props) => {
         scanner.current = s;
         await s.start(preferredCamera(cameras) ?? { facingMode: "environment" },
           { fps: 12, // Read almost the whole picture so a card held close to the lens still decodes.
-          qrbox: (w, h) => ({ width: Math.max(50, Math.round(w * 0.96)), height: Math.max(50, Math.round(h * 0.96)) }) },
+          qrbox: wideQrBox },
           (text) => { if (token === session.current && !handled.current) void lookup(text); }, () => {});
         if (token !== session.current) { await stop(); return; }
         // Poor light: every half second, brighten and sharpen a copy of the picture and try again.

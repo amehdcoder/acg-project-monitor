@@ -1,3 +1,4 @@
+import { startLowLightBackup, wideQrBox } from "@/lib/programmeModule/lowLightDecode";
 import { useRef, useState, useCallback, useEffect } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { Button } from "@/components/ui/button";
@@ -66,6 +67,12 @@ const BarcodeScanner = ({
       );
 
       setIsScanning(true);
+      // Poor light backup (QR codes only; line barcodes still use the main reader).
+      startLowLightBackup(scannerContainerId.current, (text) => {
+        if (scannerRef.current !== html5QrCode) return;
+        onChange(text);
+        stopScanning();
+      });
     } catch (err) {
       console.error("Error starting scanner:", err);
       setError("Unable to access camera. Please check permissions or use manual entry.");

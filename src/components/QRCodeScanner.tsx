@@ -1,3 +1,4 @@
+import { startLowLightBackup, wideQrBox } from "@/lib/programmeModule/lowLightDecode";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -173,11 +174,12 @@ const QRCodeScanner = ({ open, onOpenChange, onFormReady, onExternalXlsform }: Q
 
       await html5QrCode.start(
         { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1 },
+        { fps: 10, qrbox: wideQrBox, aspectRatio: 1 },
         (decodedText) => handleScan(decodedText),
         () => {}
       );
       setIsScanning(true);
+      startLowLightBackup(containerId.current, (text) => handleScan(text));
     } catch (err) {
       console.error("Scanner error:", err);
       toast({

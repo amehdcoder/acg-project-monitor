@@ -1,3 +1,4 @@
+import { startLowLightBackup, wideQrBox } from "@/lib/programmeModule/lowLightDecode";
 import { useEffect, useId, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { Camera, ImagePlus, Loader2, X } from 'lucide-react';
@@ -26,7 +27,7 @@ export default function ProjectQrScanner({ onScan }: { onScan: (details: {code: 
       try {
         await scanner.start({ facingMode: 'environment' }, {
           fps: 12,
-          qrbox: (width, height) => { const side = Math.floor(Math.min(width, height) * .75); return {width: side, height: side}; },
+          qrbox: wideQrBox,
           aspectRatio: 1,
         }, decoded => {
           if (cancelled || accepted) return;
@@ -36,7 +37,16 @@ export default function ProjectQrScanner({ onScan }: { onScan: (details: {code: 
           onScanRef.current(result);
           setOpen(false);
         }, () => {});
-        if (!cancelled) setReady(true);
+        if (!cancelled) {
+          setReady(true);
+          // Poor light backup reader; shares the same acceptance rules as the main reader.
+          startLowLightBackup(id, decoded => {
+            if (cancelled || accepted) return;
+            const result = parseProjectQr(decoded);
+            if (!result) { setError('This is not a project QR code.'); return; }
+            accepted = true; onScanRef.current(result); setOpen(false);
+          });
+        }
       } catch (cause) {
         if (!cancelled) {
           const message = String(cause);
