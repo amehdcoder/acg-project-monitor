@@ -117,6 +117,13 @@ const flushInner = async (): Promise<{ sent: number; failed: number }> => {
           const { runOp } = await import("./offlineWrite");
           await runOp(item.payload as never);
         } else {
+          // People registered offline get their real Patient ID when they first reach the server.
+          const pl = item.payload as Record<string, unknown>;
+          if (item.kind === "beneficiary" && typeof pl.case_id === "string" && pl.case_id.startsWith("PENDING-") && pl.module_id) {
+            const { data: cid, error: cidErr } = await supabase.rpc("next_beneficiary_case_id", { _module_id: pl.module_id, _facility_id: pl.facility_id || null } as never);
+            if (cidErr) throw cidErr;
+            if (cid) pl.case_id = cid as unknown as string;
+          }
           const { error } = await supabase
             .from(TABLES[item.kind])
             .upsert(item.payload as never, { onConflict: "submission_uuid" });
