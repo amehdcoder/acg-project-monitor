@@ -746,6 +746,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         return;
       }
+      // A still-valid access token needs no refresh. Refreshing anyway spends the
+      // single-use refresh token on every reconnect, and a race with another
+      // tab or device copy can then sign the person out mid-sync.
+      try {
+        const { data: cur } = await supabase.auth.getSession();
+        const exp = cur.session?.expires_at ? cur.session.expires_at * 1000 : 0;
+        if (cur.session?.user?.id === activeUserRef.current?.id && exp - Date.now() > 5 * 60_000) return;
+      } catch { /* fall through to a refresh */ }
       refreshing = true;
       const generation = authGenerationRef.current;
       offlineAuthLog("Token refresh: starting with exponential backoff", { attempts });
