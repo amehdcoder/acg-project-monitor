@@ -113,7 +113,7 @@ const RecordsOnlyShell = ({ projects, initialProjectId, onExit, onSwitchToFullAp
             </Button>
           </div>
         </div>
-        <div className="grid divide-y divide-primary-foreground/15 bg-primary/90 px-4 py-2 text-[11px] text-primary-foreground/85 sm:grid-cols-3 sm:divide-x sm:divide-y-0 sm:px-6">
+        <div className="hidden divide-y divide-primary-foreground/15 bg-primary/90 sm:grid px-4 py-2 text-[11px] text-primary-foreground/85 sm:grid-cols-3 sm:divide-x sm:divide-y-0 sm:px-6">
           <p className="py-1.5 sm:pr-4">
             <span className="font-bold text-primary-foreground">One record per person</span><br />
             Every service, visit and outcome on a single Case ID

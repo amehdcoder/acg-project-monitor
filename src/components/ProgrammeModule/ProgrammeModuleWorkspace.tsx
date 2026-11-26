@@ -484,7 +484,7 @@ const ProgrammeModuleWorkspace = ({
           <span className="lbr-hero-mark flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-primary-foreground"><Layers className="h-5 w-5" /></span>
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-health-blue">Integrated case and beneficiary management</p>
-            <h2 className="truncate font-report-display text-xl font-bold tracking-tight text-health-ink">Longitudinal Beneficiary Records</h2>
+            <h2 className="break-words font-report-display text-lg leading-tight sm:truncate sm:text-xl font-bold tracking-tight text-health-ink">Longitudinal Beneficiary Records</h2>
           </div>
         </div>
         {modules.length > 0 && (
