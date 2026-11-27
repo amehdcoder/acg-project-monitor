@@ -90,6 +90,7 @@ import MicroplanRolesDialog from "./MicroplanRolesDialog";
 import { useMicroplanProjectAccess } from "@/hooks/useMicroplanProjectAccess";
 import { scopedProjectAccess } from "@/lib/microplanning/projectRoles";
 
+import { countSettlementUnits } from "@/lib/microplanning/settlementUnits";
 import { parseMedicineUploadFile, exportMedicineUploadTemplate, parseAllocationPlanFile, exportAllocationPlanTemplate, type UploadedMedicineEntry } from "@/lib/microplanning/medicineUpload";
 
 // Exact template column headers matching the NTDs Microplan Template
@@ -2558,7 +2559,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
           {/* Primary project metrics */}
           <div className="geo-primary-metrics grid grid-cols-2 sm:grid-cols-3 2xl:grid-cols-6 gap-3" aria-label="Project indicators">
             {[
-              { label: "Communities", value: new Set(filtered.map(e => [e.state, e.lga, e.ward, e.flhf_name, e.community_name].join("||"))).size.toLocaleString(), icon: Building2, tone: "geo-metric-blue", detail: "Recorded communities" },
+              (() => { const u = countSettlementUnits(filtered); return { label: "Communities & settlements", value: u.total.toLocaleString(), icon: Building2, tone: "geo-metric-blue", detail: `${u.uniqueSettlements.toLocaleString()} settlements + ${u.communitiesWithoutSettlements.toLocaleString()} communities without settlements` }; })(),
               { label: "Total Population", value: totalPop.toLocaleString(), icon: Users, tone: "geo-metric-blue", detail: "Population in selected area" },
               { label: "Target Population", value: targetPop.toLocaleString(), icon: Target, tone: "geo-metric-teal", detail: targetPopulationLabel },
               { label: "Health Facilities", value: String(uniqueFLHFs), icon: Heart, tone: "geo-metric-teal", detail: "Frontline health facilities" },
