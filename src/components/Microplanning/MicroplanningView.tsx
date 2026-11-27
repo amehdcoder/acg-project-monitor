@@ -2902,6 +2902,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
             scopeLabel={filterScopeLabel(exportFilterContext)}
             campaignLabel={(exportFilterContext as any).campaign}
             exclusions={projectTableExclusions}
+            ageMode={trachomaMode ? "trachoma" : "standard"}
           />
           <div className="geo-navigation">
             {/* Analytics/dashboard tabs are admin-only. Non-admin project members

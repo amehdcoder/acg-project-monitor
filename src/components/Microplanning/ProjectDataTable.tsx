@@ -17,6 +17,7 @@ interface Props {
   projectName?: string;
   scopeLabel?: string;
   campaignLabel?: string;
+  ageMode?: "standard" | "trachoma";
   exclusions?: { level: "LGA" | "Ward"; state: string; lga: string; ward?: string }[];
 }
 
@@ -38,7 +39,7 @@ const KPIS = [
  * dashboard: LGA rollups that expand into wards, with a one-click complete
  * project data export (multi-sheet, print-ready workbook).
  */
-const ProjectDataTable = ({ entries, projectName = "All projects", scopeLabel = "All data", campaignLabel, exclusions }: Props) => {
+const ProjectDataTable = ({ entries, projectName = "All projects", scopeLabel = "All data", campaignLabel, exclusions, ageMode }: Props) => {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
@@ -63,6 +64,7 @@ const ProjectDataTable = ({ entries, projectName = "All projects", scopeLabel = 
         scope: scopeLabel,
         campaign: campaignLabel,
         exclusions,
+        ageMode,
       });
       toast.success(`Exported ${file}`);
     } catch (err) {

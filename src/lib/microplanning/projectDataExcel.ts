@@ -36,7 +36,29 @@ export interface ProjectDataMeta {
   scope: string;
   campaign?: string;
   exclusions?: { level: "LGA" | "Ward"; state: string; lga: string; ward?: string }[];
+  /** "trachoma" when the project's target population uses the Trachoma age groups. */
+  ageMode?: "standard" | "trachoma";
 }
+
+export interface AgeBand { label: string; field: string }
+export const STANDARD_AGE_BANDS: AgeBand[] = [
+  { label: "0–4 yrs", field: "estimated_children_0_4" },
+  { label: "5–14 yrs", field: "estimated_children_5_14" },
+  { label: "15+ yrs", field: "estimated_adults_15_plus" },
+];
+export const TRACHOMA_AGE_BANDS: AgeBand[] = [
+  { label: "0–5 months", field: "trachoma_0_5_months" },
+  { label: "6 months–6 yrs", field: "trachoma_6m_6y" },
+  { label: "7–14 yrs", field: "trachoma_7_14y" },
+  { label: "15+ yrs", field: "trachoma_15_plus" },
+];
+/** Separate, overlapping children cohort: shown beside the bands, never added to them. */
+export const TRACHOMA_CHILD_BANDS: AgeBand[] = [
+  { label: "Children 5–9 yrs (male)", field: "trachoma_1_9_male" },
+  { label: "Children 5–9 yrs (female)", field: "trachoma_1_9_female" },
+];
+export const ageBandsFor = (mode?: "standard" | "trachoma") =>
+  mode === "trachoma" ? [...TRACHOMA_AGE_BANDS, ...TRACHOMA_CHILD_BANDS] : STANDARD_AGE_BANDS;
 
 function titleBlock(ws: ExcelJS.Worksheet, title: string, subtitle: string, span: number) {
   ws.mergeCells(1, 1, 1, span);
@@ -119,6 +141,8 @@ export interface AggRow {
   age5_14: number;
   age15p: number;
   pwd: number;
+  /** Values for each band of ageBandsFor(mode), in order. */
+  ages: number[];
   avgDistanceKm: number | null;
 }
 
@@ -126,14 +150,14 @@ interface Bucket {
   state: string; lga: string; ward?: string;
   wards: Set<string>; flhfs: Set<string>; communities: Set<string>; settlements: Set<string>;
   records: number; households: number; population: number;
-  age0_4: number; age5_14: number; age15p: number; pwd: number;
+  age0_4: number; age5_14: number; age15p: number; pwd: number; ages: number[];
   dist: number[];
 }
 
-const emptyBucket = (state: string, lga: string, ward?: string): Bucket => ({
+const emptyBucket = (state: string, lga: string, ward: string | undefined, bands: number): Bucket => ({
   state, lga, ward,
   wards: new Set(), flhfs: new Set(), communities: new Set(), settlements: new Set(),
-  records: 0, households: 0, population: 0, age0_4: 0, age5_14: 0, age15p: 0, pwd: 0, dist: [],
+  records: 0, households: 0, population: 0, age0_4: 0, age5_14: 0, age15p: 0, pwd: 0, ages: new Array(bands).fill(0), dist: [],
 });
 
 const finalise = (key: string, b: Bucket): AggRow => ({
@@ -152,11 +176,13 @@ const finalise = (key: string, b: Bucket): AggRow => ({
   age5_14: b.age5_14,
   age15p: b.age15p,
   pwd: b.pwd,
+  ages: b.ages,
   avgDistanceKm: b.dist.length ? b.dist.reduce((s, d) => s + d, 0) / b.dist.length : null,
 });
 
 /** Per-LGA and per-Ward rollups computed with the dashboard's composite keys. */
-export function buildProjectAggregates(entries: ProjectDataRow[]) {
+export function buildProjectAggregates(entries: ProjectDataRow[], ageMode: "standard" | "trachoma" = "standard") {
+  const bands = ageBandsFor(ageMode);
   const lgaMap = new Map<string, Bucket>();
   const wardMap = new Map<string, Bucket>();
 
@@ -183,13 +209,14 @@ export function buildProjectAggregates(entries: ProjectDataRow[]) {
       b.age0_4 += n((e as any).estimated_children_0_4);
       b.age5_14 += n((e as any).estimated_children_5_14);
       b.age15p += n((e as any).estimated_adults_15_plus);
+      bands.forEach((band, i) => { b.ages[i] += n((e as any)[band.field]); });
       b.pwd += pwdTotalFor(e as any);
       const d = effectiveDistanceKm(e as any);
       if (typeof d === "number" && Number.isFinite(d)) b.dist.push(d);
     };
 
-    if (l) push(lgaMap, lKey, () => emptyBucket(String(e?.state ?? "").trim(), String(e?.lga ?? "").trim()));
-    if (l && w) push(wardMap, wKey, () => emptyBucket(String(e?.state ?? "").trim(), String(e?.lga ?? "").trim(), String(e?.ward ?? "").trim()));
+    if (l) push(lgaMap, lKey, () => emptyBucket(String(e?.state ?? "").trim(), String(e?.lga ?? "").trim(), undefined, bands.length));
+    if (l && w) push(wardMap, wKey, () => emptyBucket(String(e?.state ?? "").trim(), String(e?.lga ?? "").trim(), String(e?.ward ?? "").trim(), bands.length));
   }
 
   const byName = (a: AggRow, b: AggRow) =>
@@ -211,8 +238,9 @@ export function buildProjectAggregates(entries: ProjectDataRow[]) {
       age5_14: t.age5_14 + r.age5_14,
       age15p: t.age15p + r.age15p,
       pwd: t.pwd + r.pwd,
+      ages: t.ages.map((v, i) => v + r.ages[i]),
     }),
-    { records: 0, wards: 0, flhfs: 0, communities: 0, settlements: 0, households: 0, population: 0, age0_4: 0, age5_14: 0, age15p: 0, pwd: 0 },
+    { records: 0, wards: 0, flhfs: 0, communities: 0, settlements: 0, households: 0, population: 0, age0_4: 0, age5_14: 0, age15p: 0, pwd: 0, ages: new Array(bands.length).fill(0) as number[] },
   );
 
   return { lgas, wards, totals };
@@ -225,7 +253,10 @@ const HIDDEN = new Set(["user_id", "project_id", "created_by", "updated_by", "id
 
 export async function exportProjectDataWorkbook(entries: ProjectDataRow[], meta: ProjectDataMeta) {
   const rows = (entries || []).map((r) => withRecomputedDistances(r as any));
-  const { lgas, wards, totals } = buildProjectAggregates(rows as ProjectDataRow[]);
+  const bands = ageBandsFor(meta.ageMode);
+  const trachoma = meta.ageMode === "trachoma";
+  const sumBands = trachoma ? TRACHOMA_AGE_BANDS : STANDARD_AGE_BANDS;
+  const { lgas, wards, totals } = buildProjectAggregates(rows as ProjectDataRow[], meta.ageMode);
   const stamp = new Date().toLocaleString();
   const subtitle = `${meta.project} · ${meta.scope}${meta.campaign ? ` · ${meta.campaign}` : ""} · Generated ${stamp}`;
 
@@ -243,7 +274,9 @@ export async function exportProjectDataWorkbook(entries: ProjectDataRow[], meta:
     ["Campaign type", meta.campaign || "All campaigns"],
     ["Programme standard", "WHO PC-NTD guidance & Nigeria NTD Programme MDA microplanning norms"],
     ["Geography counting rule", "Blank-excluding composite keys (State ‖ LGA ‖ Ward ‖ Facility ‖ Community ‖ Settlement)"],
-    ["Age disaggregation", "0–4 years, 5–14 years, 15+ years as captured in the microplan"],
+    ["Age disaggregation", trachoma
+      ? "Trachoma age groups: 0–5 months, 6 months–6 years, 7–14 years, 15+ years; children 5–9 years by sex reported separately (overlapping cohort, not added to the age groups)"
+      : "0–4 years, 5–14 years, 15+ years as captured in the microplan"],
     ["Disability disaggregation", DISABILITY_TYPES.map((d) => d.label).join(", ")],
     ["Distance metric", "Haversine great-circle distance, recomputed from current GPS at export time"],
     ["Records exported", rows.length],
@@ -287,7 +320,7 @@ export async function exportProjectDataWorkbook(entries: ProjectDataRow[], meta:
   }
 
   /* LGA Summary */
-  const lgaHeaders = ["State", "LGA", "Records", "Wards", "Health Facilities", "Communities", "Settlements", "Households", "Total Population", "0–4 yrs", "5–14 yrs", "15+ yrs", "Persons with Disability", "Avg. Distance to FLHF (km)"];
+  const lgaHeaders = ["State", "LGA", "Records", "Wards", "Health Facilities", "Communities", "Settlements", "Households", "Total Population", ...bands.map((b) => b.label), "Persons with Disability", "Avg. Distance to FLHF (km)"];
   const lgaWs = wb.addWorksheet("LGA Summary", { properties: { tabColor: { argb: WHO_BLUE } } });
   lgaWs.columns = lgaHeaders.map((h, i) => ({ width: i < 2 ? 22 : Math.max(12, Math.min(24, h.length + 4)) }));
   titleBlock(lgaWs, "Coverage & Population Summary by LGA", subtitle, lgaHeaders.length);
@@ -295,7 +328,7 @@ export async function exportProjectDataWorkbook(entries: ProjectDataRow[], meta:
   lgas.forEach((row, i) => {
     lgaWs.getRow(5 + i).values = [
       row.state, row.lga, row.records, row.wards, row.flhfs, row.communities, row.settlements,
-      row.households, row.population, row.age0_4, row.age5_14, row.age15p, row.pwd,
+      row.households, row.population, ...row.ages, row.pwd,
       row.avgDistanceKm == null ? "" : Number(row.avgDistanceKm.toFixed(1)),
     ];
   });
@@ -305,11 +338,11 @@ export async function exportProjectDataWorkbook(entries: ProjectDataRow[], meta:
   }
   totalRow(lgaWs, 5 + lgas.length, [
     "TOTAL", "", totals.records, totals.wards, totals.flhfs, totals.communities, totals.settlements,
-    totals.households, totals.population, totals.age0_4, totals.age5_14, totals.age15p, totals.pwd, "",
+    totals.households, totals.population, ...totals.ages, totals.pwd, "",
   ]);
 
   /* Ward Summary */
-  const wardHeaders = ["State", "LGA", "Ward", "Records", "Health Facilities", "Communities", "Settlements", "Households", "Total Population", "0–4 yrs", "5–14 yrs", "15+ yrs", "Persons with Disability", "Avg. Distance to FLHF (km)"];
+  const wardHeaders = ["State", "LGA", "Ward", "Records", "Health Facilities", "Communities", "Settlements", "Households", "Total Population", ...bands.map((b) => b.label), "Persons with Disability", "Avg. Distance to FLHF (km)"];
   const wardWs = wb.addWorksheet("Ward Summary", { properties: { tabColor: { argb: GREEN } } });
   wardWs.columns = wardHeaders.map((h, i) => ({ width: i < 3 ? 22 : Math.max(12, Math.min(24, h.length + 4)) }));
   titleBlock(wardWs, "Coverage & Population Summary by Ward", subtitle, wardHeaders.length);
@@ -317,7 +350,7 @@ export async function exportProjectDataWorkbook(entries: ProjectDataRow[], meta:
   wards.forEach((row, i) => {
     wardWs.getRow(5 + i).values = [
       row.state, row.lga, row.ward, row.records, row.flhfs, row.communities, row.settlements,
-      row.households, row.population, row.age0_4, row.age5_14, row.age15p, row.pwd,
+      row.households, row.population, ...row.ages, row.pwd,
       row.avgDistanceKm == null ? "" : Number(row.avgDistanceKm.toFixed(1)),
     ];
   });
@@ -329,13 +362,12 @@ export async function exportProjectDataWorkbook(entries: ProjectDataRow[], meta:
     "TOTAL", "", "", wards.reduce((s, x) => s + x.records, 0),
     wards.reduce((s, x) => s + x.flhfs, 0), wards.reduce((s, x) => s + x.communities, 0),
     wards.reduce((s, x) => s + x.settlements, 0), wards.reduce((s, x) => s + x.households, 0),
-    wards.reduce((s, x) => s + x.population, 0), wards.reduce((s, x) => s + x.age0_4, 0),
-    wards.reduce((s, x) => s + x.age5_14, 0), wards.reduce((s, x) => s + x.age15p, 0),
+    wards.reduce((s, x) => s + x.population, 0), ...bands.map((_, b) => wards.reduce((s, x) => s + x.ages[b], 0)),
     wards.reduce((s, x) => s + x.pwd, 0), "",
   ], GREEN);
 
   /* Age & Disability disaggregation */
-  const disHeaders = ["State", "LGA", "Ward", "Community / Settlement", "Total Population", "0–4 yrs", "5–14 yrs", "15+ yrs", ...DISABILITY_TYPES.map((d) => d.label), "Total PWD"];
+  const disHeaders = ["State", "LGA", "Ward", "Community / Settlement", "Total Population", ...bands.map((b) => b.label), ...DISABILITY_TYPES.map((d) => d.label), "Total PWD"];
   const disWs = wb.addWorksheet("Age & Disability", { properties: { tabColor: { argb: PURPLE } } });
   disWs.columns = disHeaders.map((h, i) => ({ width: i < 4 ? 24 : Math.max(12, Math.min(22, h.length + 3)) }));
   titleBlock(disWs, "Age & Disability Disaggregation — Inclusive MDA Planning", subtitle, disHeaders.length);
@@ -344,7 +376,7 @@ export async function exportProjectDataWorkbook(entries: ProjectDataRow[], meta:
     disWs.getRow(5 + i).values = [
       e.state ?? "", e.lga ?? "", e.ward ?? "",
       e.settlement_name || e.community_name || "",
-      n(e.estimated_total_population), n(e.estimated_children_0_4), n(e.estimated_children_5_14), n(e.estimated_adults_15_plus),
+      n(e.estimated_total_population), ...bands.map((b) => n(e[b.field])),
       ...DISABILITY_TYPES.map((d) => n(e[d.field])),
       pwdTotalFor(e),
     ];
@@ -395,7 +427,7 @@ export async function exportProjectDataWorkbook(entries: ProjectDataRow[], meta:
     ["Households greater than estimated population", missing((e) => n(e.number_of_households) > n(e.estimated_total_population) && n(e.estimated_total_population) > 0)],
     ["Age bands do not sum to total population", missing((e) => {
       const tot = n(e.estimated_total_population);
-      const sum = n(e.estimated_children_0_4) + n(e.estimated_children_5_14) + n(e.estimated_adults_15_plus);
+      const sum = sumBands.reduce((t, b) => t + n(e[b.field]), 0);
       return tot > 0 && sum > 0 && Math.abs(sum - tot) > 1;
     })],
     ["No GPS coordinates for community or settlement", missing((e) => !e.community_latitude && !e.settlement_latitude)],
