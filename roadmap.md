@@ -260,4 +260,4 @@
 # Roadmap
 - [x] Email the project owner when a form submission arrives (info@amehnities.org)
 
-- [ ] Add scoped duplicate-settlement KPI and confirmed, server-validated safe cleanup within the same FLHF/community; verify counts, evidence preservation and signed-in flow.
+- [x] Add scoped duplicate-settlement KPI and confirmed, server-validated safe cleanup within the same FLHF/community; counts, evidence preservation and signed-in flow verified. Cleanup implementation saved; all six focused regression tests pass and preview build is clean.
