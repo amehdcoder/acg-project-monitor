@@ -80,6 +80,11 @@ const TABLES: Record<Exclude<QueueKind, "op">, "beneficiaries" | "beneficiary_se
 };
 
 let flushing = false;
+export const deleteQueuedFormOperations = (userId: string, ids: string[]): void => {
+  if (flushing) throw new Error("Forms are being sent. Wait for sending to finish before deleting.");
+  if (!userId) throw new Error("Sign in before deleting forms.");
+  write(read().filter(item => !(item.user_id === userId && isFormCollectionQueueItem(item) && ids.includes(item.submission_uuid))));
+};
 const ORDER: Record<QueueKind, number> = { beneficiary: 0, service: 1, referral: 2, op: 3 };
 /** Exponential backoff per item (max 15 min) so failing rows don't hammer the server. */
 const readyToRetry = (item: QueuedItem & { next_try_at?: number }) => !item.next_try_at || item.next_try_at <= Date.now();

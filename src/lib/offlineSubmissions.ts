@@ -378,3 +378,22 @@ export const pendingInsertOwner = (record: PendingInsert): string | undefined =>
 export async function listReadyPendingInserts(userId: string): Promise<PendingInsert[]> {
   return (await getAllRecords()).filter(record => pendingInsertOwner(record) === userId && record.row.status !== "draft");
 }
+
+export async function listDeletionPendingInserts(userId: string): Promise<PendingInsert[]> {
+  return (await getAllRecords()).filter(record => pendingInsertOwner(record) === userId);
+}
+
+export async function deleteSelectedPendingInserts(userId: string, ids: string[], isCurrentAccount: () => boolean): Promise<void> {
+  if (flushing) throw new Error("Forms are being sent. Wait for sending to finish before deleting.");
+  const rows = (await listDeletionPendingInserts(userId)).filter(row => ids.includes(row.id));
+  if (!userId || !isCurrentAccount()) throw new Error("Your account changed. Select forms again.");
+  if (flushing) throw new Error("Forms are being sent. Wait for sending to finish before deleting.");
+  const db = await openDB();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE, "readwrite");
+      rows.forEach(row => tx.objectStore(STORE).delete(row.id));
+      tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error);
+    });
+  } finally { db.close(); }
+}

@@ -214,14 +214,23 @@ export const listSavedEntries = async (
   });
 };
 
-export const deleteSavedEntries = async (ids: string[]): Promise<void> => {
+export const deleteSavedEntries = async (ids: string[], userId?: string, isCurrentAccount: () => boolean = () => true): Promise<void> => {
+  if (!isCurrentAccount()) throw new Error("Your account changed. Select forms again.");
   const db = await initDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, "readwrite");
     const store = tx.objectStore(STORE);
-    ids.forEach((id) => store.delete(id));
+    ids.forEach((id) => {
+      const request = store.get(id);
+      request.onsuccess = () => {
+        const row = request.result as SavedFormEntry | undefined;
+        if (!isCurrentAccount() || (row && hasActiveSyncLease(row))) { tx.abort(); return; }
+        if (row && (!userId || row.userId === userId)) store.delete(id);
+      };
+    });
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(new Error("A selected form is being sent or your account changed. Try again when sending finishes."));
   });
 };
 

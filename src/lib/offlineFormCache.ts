@@ -6,6 +6,7 @@ import { fetchProjectFormCatalogue } from "./projectFormCatalogue";
 import { planOfflineFormChanges } from "./offlineFormPlan";
 import type { FormDownloadResult } from "./offlineFormDownload";
 import { visibleOfflineForms } from "./offlineFormAccess";
+import { offlineFormKey } from "./offlineFormAccess";
 
 const DB_NAME = "acg_monitor_offline";
 const DB_VERSION = 4;
@@ -57,6 +58,53 @@ export async function readDownloadedForm(userId: string, collector: string): Pro
   const db = await openDB();
   try { return visibleOfflineForms((await readAllForms(db)) as Array<Record<string, any> & { id: string; project_id: string }>, userId).find(form => form.settings?.specialCollector === collector) || null; }
   finally { db.close(); }
+}
+
+/** Delete only this account's selected definitions; answer stores are untouched. */
+export async function deleteDownloadedForms(userId: string, ids: string[], isCurrentAccount: () => boolean = () => true): Promise<number> {
+  if (!userId || !isCurrentAccount()) throw new Error("Your account changed. Select forms again.");
+  const db = await openDB();
+  try {
+    const selected = new Set(ids);
+    const rows = (await readAllForms(db)).filter(row => row.owner_user_id === userId && selected.has(row.form_id));
+    if (!isCurrentAccount()) throw new Error("Your account changed. Select forms again.");
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(FORMS_STORE, "readwrite");
+      for (const row of rows) tx.objectStore(FORMS_STORE).delete(offlineFormKey(userId, row.form_id));
+      tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error);
+    });
+    window.dispatchEvent(new CustomEvent(OFFLINE_FORMS_UPDATED_EVENT, { detail: { userId } }));
+    return rows.length;
+  } finally { db.close(); }
+}
+
+export async function listLocalAnswerRows(userId: string): Promise<{ pending: Record<string, any>[]; drafts: Record<string, any>[] }> {
+  const db = await openDB();
+  try {
+    const read = async (store: string) => {
+      const rows = await new Promise<Record<string, any>[]>((resolve, reject) => {
+        const req = db.transaction(store).objectStore(store).getAll();
+        req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error);
+      });
+      return (await unsealAll<Record<string, any>>(rows)).filter(row => row.user_id === userId);
+    };
+    const [pending, drafts] = await Promise.all([read(PENDING_STORE), read("autosave_drafts")]);
+    return { pending, drafts };
+  } finally { db.close(); }
+}
+
+export async function deleteLocalAnswerRows(userId: string, pendingIds: string[], draftIds: string[], isCurrentAccount: () => boolean): Promise<void> {
+  const owned = await listLocalAnswerRows(userId);
+  if (!userId || !isCurrentAccount()) throw new Error("Your account changed. Select forms again.");
+  const db = await openDB();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction([PENDING_STORE, "autosave_drafts"], "readwrite");
+      owned.pending.filter(row => pendingIds.includes(row.id)).forEach(row => tx.objectStore(PENDING_STORE).delete(row.id));
+      owned.drafts.filter(row => draftIds.includes(row.id)).forEach(row => tx.objectStore("autosave_drafts").delete(row.id));
+      tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error);
+    });
+  } finally { db.close(); }
 }
 
 const applyPlan = async (

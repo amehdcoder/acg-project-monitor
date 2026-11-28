@@ -144,6 +144,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
 import { useOfflineForms } from "@/hooks/useOfflineForms";
 import FormDownloadDialog from "@/components/FormsView/FormDownloadDialog";
+import FormDeletionScreen from "@/components/FormsView/FormDeletionScreen";
 import FormQRCode from "@/components/FormQRCode";
 import QRCodeScanner from "@/components/QRCodeScanner";
 import { Question, GeofenceArea } from "@/components/FormBuilder/types";
@@ -214,7 +215,7 @@ const formActions = [
   { id: "edit",     label: "Draft",            icon: FileEdit, description: "Continue drafts",    tile: "bg-[#22A55A]" },
   { id: "send",     label: "Ready to send",    icon: Send,     description: "Sync to server",     tile: "bg-[#23B5AE]" },
   { id: "view",     label: "Sent",             icon: Eye,      description: "Review submissions", tile: "bg-[#7C5CFF]" },
-  { id: "delete",   label: "Delete Saved",     icon: Trash2,   description: "Remove drafts",      tile: "bg-[#E25555]" },
+  { id: "delete",   label: "Delete form",     icon: Trash2,   description: "Remove local forms",      tile: "bg-[#E25555]" },
 ];
 
 // Rotating soft tints for the Available Forms list icon chips
@@ -1242,35 +1243,9 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   };
 
   const deleteSavedSubmissions = async (formId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("form_submissions")
-        .delete()
-        .eq("form_id", formId)
-        .eq("user_id", user?.id)
-        .eq("status", "draft")
-        .select();
-
-      if (error) throw error;
-
-      if (data && data.length > 0) {
-        toast({
-          title: "Saved Forms Deleted",
-          description: `${data.length} saved submission(s) have been deleted.`,
-        });
-      } else {
-        toast({
-          title: "No Saved Forms",
-          description: "There are no draft submissions to delete for this form.",
-        });
-      }
-    } catch (error: any) {
-      toast({
-        title: "Delete Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
+    // Device cleanup always requires instance selection and confirmation.
+    void formId;
+    setSavedFormsMode("delete");
   };
 
   // Always merge cached forms, even when navigator.onLine is true. Field devices
@@ -1834,6 +1809,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   }
 
   if (savedFormsMode) {
+    if (savedFormsMode === "delete") return <FormDeletionScreen key={user?.id || "signed-out"} userId={user?.id || ""} offlineForms={offlineForms} projects={projects} onClose={() => setSavedFormsMode(null)} onRefresh={refreshOfflineForms} />;
     return (
       <SavedFormsManager
         mode={savedFormsMode}
@@ -4462,14 +4438,14 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
             <span className="flex-1 text-left text-base font-semibold text-foreground">Download form</span>
             <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
           </Button>
-          <button
+          <Button variant="outline"
             onClick={() => handleQuickAction("delete")}
-            className="flex w-full items-center gap-4 rounded-full bg-white px-5 py-4 text-left shadow-sm ring-1 ring-border/60 transition-colors hover:bg-[#F4F6F8]"
+            className="h-auto w-full justify-start gap-4 rounded-full bg-background px-5 py-4 text-left shadow-sm"
           >
-            <Trash2 className="h-6 w-6 shrink-0 text-[#0F172A]" strokeWidth={2} />
+            <Trash2 className="h-6 w-6 shrink-0 text-foreground" strokeWidth={2} />
             <span className="flex-1 text-base font-semibold text-foreground">Delete form</span>
             <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
-          </button>
+          </Button>
 
           <p className="pt-2 pb-1 text-center text-sm font-medium text-muted-foreground">
             Amehnities Forms
