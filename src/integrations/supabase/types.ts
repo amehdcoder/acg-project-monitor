@@ -15980,6 +15980,10 @@ export type Database = {
         Args: { p_id: string; p_note?: string }
         Returns: undefined
       }
+      remove_duplicate_settlements: {
+        Args: { _pairs: Json; _project_id: string }
+        Returns: string[]
+      }
       request_after_hours_submission: {
         Args: {
           p_form_label?: string

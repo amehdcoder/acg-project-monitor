@@ -91,6 +91,7 @@ import { useMicroplanProjectAccess } from "@/hooks/useMicroplanProjectAccess";
 import { scopedProjectAccess } from "@/lib/microplanning/projectRoles";
 
 import { countSettlementUnits } from "@/lib/microplanning/settlementUnits";
+import SettlementDuplicateKpi from "./SettlementDuplicateKpi";
 import { parseMedicineUploadFile, exportMedicineUploadTemplate, parseAllocationPlanFile, exportAllocationPlanTemplate, type UploadedMedicineEntry } from "@/lib/microplanning/medicineUpload";
 
 // Exact template column headers matching the NTDs Microplan Template
@@ -1032,6 +1033,8 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
   // and a slower, older request can never overwrite the newly selected project.
   const entriesReqRef = useRef(0);
   const entriesKey = selectedProjectId ? `${user?.id}|${selectedProjectId}|${entryOnly ? "own" : "all"}` : "";
+  const activeEntriesKey = useRef(entriesKey);
+  activeEntriesKey.current = entriesKey;
   useEffect(() => {
     if (!entriesKey) return;
     const cached = microplanEntriesCache.get(entriesKey);
@@ -1569,6 +1572,21 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
   const deferredFiltered = useDeferredValue(filterSnapshot);
   // Only defer user filters within the same current access-scoped source.
   const filtered = deferredFiltered.source === displayEntries ? deferredFiltered.rows : filteredNow;
+  // Use original stored evidence, not presentation-normalized GPS/choice fields.
+  const duplicateSettlementRows = useMemo(() => {
+    const visibleIds = new Set(filtered.map(row => row.id));
+    return entries.filter(row => visibleIds.has(row.id));
+  }, [entries, filtered]);
+  const onSettlementCopiesRemoved = async (ids: string[]) => {
+    const removed = new Set(ids);
+    const rows = entries.filter(row => !removed.has(row.id));
+    microplanEntriesCache.set(entriesKey, rows);
+    await cacheSet(`microplan-entries:${entriesKey}`, rows);
+    if (activeEntriesKey.current !== entriesKey) return;
+    ++entriesReqRef.current;
+    setEntries(current => current.filter(row => !removed.has(row.id)));
+    void fetchEntries();
+  };
 
   // Filter context used by the breadcrumb trail and the "export any level" button.
   const exportFilterContext = useMemo(() => ({
@@ -2575,6 +2593,7 @@ const MicroplanningView = ({ entryOnly: forceEntryOnly = false, allowedProjectId
                 <p className="geo-metric-detail">{kpi.detail}</p>
               </div>
             ))}
+            {selectedProjectId && <SettlementDuplicateKpi key={`${user?.id}|${selectedProjectId}`} rows={duplicateSettlementRows} projectId={selectedProjectId} readOnly={dashboardReadOnly} loading={loading} onRemoved={onSettlementCopiesRemoved} />}
           </div>
 
           {isTrachomaTarget(targetPopulationFields) && <TrachomaChildrenKpi entries={filtered} />}
