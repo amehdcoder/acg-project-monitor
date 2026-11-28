@@ -1,12 +1,10 @@
-// Warm-cache the current user's accessible forms into the offline store right
-// after login. New and changed definitions are written; unchanged definitions
-// keep their existing encrypted copy. A complete successful authorization read
-// also prunes definitions whose access has been revoked, without touching saved
-// drafts, finalized submissions, media, or any other account's library.
+// Persist only explicitly selected, freshly authorized form definitions.
+// Updates never touch drafts, submissions or another account's library.
 
 import { sealRecord, unsealAll } from "@/lib/deviceCrypto";
 import { fetchAuthorizedForms } from "./authorizedForms";
 import { planOfflineFormChanges } from "./offlineFormPlan";
+import type { FormDownloadResult } from "./offlineFormDownload";
 
 const DB_NAME = "acg_monitor_offline";
 const DB_VERSION = 4;
@@ -57,12 +55,14 @@ const readAllForms = async (db: IDBDatabase): Promise<Record<string, any>[]> => 
 const applyPlan = async (
   db: IDBDatabase,
   plan: ReturnType<typeof planOfflineFormChanges>,
+  isCurrentAccount: () => boolean,
 ): Promise<void> => {
   if (!plan.puts.length && !plan.removeKeys.length) return;
   const sealed = [];
   for (const form of plan.puts) {
     sealed.push(await sealRecord(form, ["id", "project_id", "downloaded_at"]));
   }
+  if (!isCurrentAccount()) throw new Error("Your account changed. Select forms again.");
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(FORMS_STORE, "readwrite");
     const store = tx.objectStore(FORMS_STORE);
@@ -74,118 +74,28 @@ const applyPlan = async (
   });
 };
 
-interface WarmCacheCtx {
-  userId: string;
-  isAdmin?: boolean;
-  role?: string | null;
-}
-
-export interface WarmCacheResult {
-  /** Total authorized forms available offline after the completed refresh. */
-  count: number;
-  forms: { id: string; name: string; project_id: string }[];
-  scopedToGrants: boolean;
-  ok: boolean;
-  userId: string;
-  added: number;
-  updated: number;
-  unchanged: number;
-  removed: number;
-  addedForms: { id: string; name: string; project_id: string }[];
-  updatedForms: { id: string; name: string; project_id: string }[];
-  syncedAt: string | null;
-  error?: string;
-}
-
-const emptyResult = (ctx: WarmCacheCtx, error?: string): WarmCacheResult => ({
-  count: 0,
-  forms: [],
-  scopedToGrants: !ctx.isAdmin,
-  ok: false,
-  userId: ctx.userId,
-  added: 0,
-  updated: 0,
-  unchanged: 0,
-  removed: 0,
-  addedForms: [],
-  updatedForms: [],
-  syncedAt: null,
-  error,
-});
-
-const inFlight = new Map<string, Promise<WarmCacheResult>>();
-const syncStateKey = (userId: string) => `amehnities:forms:offline-sync:v1:${userId}`;
-
-export const warmCacheUserForms = async (ctx: WarmCacheCtx): Promise<number> => {
-  return (await warmCacheUserFormsDetailed(ctx)).count;
-};
-
-/**
- * Fetch and persist all currently authorized form definitions. Calls for the
- * same account share one in-flight refresh, so auth callbacks, realtime,
- * reconnect, focus and a manual tap cannot duplicate work or writes.
- */
-export const warmCacheUserFormsDetailed = (ctx: WarmCacheCtx): Promise<WarmCacheResult> => {
-  if (!ctx.userId) return Promise.resolve(emptyResult(ctx, "no_user"));
-  if (typeof navigator !== "undefined" && !navigator.onLine) {
-    return Promise.resolve(emptyResult(ctx, "offline"));
+export async function downloadSelectedUserForms(
+  userId: string,
+  selectedIds: string[],
+  isCurrentAccount: () => boolean = () => true,
+): Promise<FormDownloadResult> {
+  if (!userId || !isCurrentAccount()) throw new Error("Sign in before downloading forms.");
+  if (!selectedIds.length) return { added: 0, updated: 0, unchanged: 0 };
+  if (!navigator.onLine) throw new Error("Connect to download new forms or updates.");
+  const authorized = await fetchAuthorizedForms(userId);
+  const ids = new Set(selectedIds);
+  const chosen = authorized.filter(form => ids.has(form.id));
+  if (chosen.length !== ids.size) throw new Error("Your form access has changed. Refresh the list and select again.");
+  if (!isCurrentAccount()) throw new Error("Your account changed. Select forms again.");
+  const db = await openDB();
+  try {
+    const existing = await readAllForms(db);
+    const plan = planOfflineFormChanges(existing, chosen, userId);
+    await applyPlan(db, plan, isCurrentAccount);
+    const result = { added: plan.addedForms.length, updated: plan.updatedForms.length, unchanged: plan.unchangedForms.length };
+    window.dispatchEvent(new CustomEvent(OFFLINE_FORMS_UPDATED_EVENT, { detail: { ...result, userId } }));
+    return result;
+  } finally {
+    db.close();
   }
-  const running = inFlight.get(ctx.userId);
-  if (running) return running;
-
-  const promise = (async (): Promise<WarmCacheResult> => {
-    let db: IDBDatabase | null = null;
-    try {
-      const formsData = await fetchAuthorizedForms(ctx.userId);
-      db = await openDB();
-      const existing = await readAllForms(db);
-      const syncedAt = new Date().toISOString();
-      const plan = planOfflineFormChanges(existing, formsData, ctx.userId, { prune: true, now: syncedAt });
-      await applyPlan(db, plan);
-      const forms = formsData.map((form: any) => ({
-        id: String(form.id),
-        name: String(form.name || "Untitled form"),
-        project_id: String(form.project_id || ""),
-      }));
-      const result: WarmCacheResult = {
-        count: forms.length,
-        forms,
-        scopedToGrants: !ctx.isAdmin,
-        ok: true,
-        userId: ctx.userId,
-        added: plan.addedForms.length,
-        updated: plan.updatedForms.length,
-        unchanged: plan.unchangedForms.length,
-        removed: plan.removeKeys.length,
-        addedForms: plan.addedForms,
-        updatedForms: plan.updatedForms,
-        syncedAt,
-      };
-      try {
-        localStorage.setItem(syncStateKey(ctx.userId), JSON.stringify({
-          userId: ctx.userId,
-          count: result.count,
-          added: result.added,
-          updated: result.updated,
-          unchanged: result.unchanged,
-          removed: result.removed,
-          syncedAt,
-        }));
-      } catch { /* storage may be unavailable; IndexedDB remains authoritative */ }
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent(OFFLINE_FORMS_UPDATED_EVENT, { detail: result }));
-      }
-      return result;
-    } catch (error) {
-      console.warn("warmCacheUserForms failed:", error);
-      return emptyResult(ctx, String((error as Error)?.message || error || "offline_form_sync_failed"));
-    } finally {
-      db?.close();
-    }
-  })();
-  inFlight.set(ctx.userId, promise);
-  void promise.finally(() => {
-    if (inFlight.get(ctx.userId) === promise) inFlight.delete(ctx.userId);
-  });
-  return promise;
-};
+}

@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, createContext, useContext, ReactNode } fro
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { warmCacheUserForms } from "@/lib/offlineFormCache";
 import { prewarmBloombergOffline } from "@/lib/bloomberg/offlineSchoolCache";
 import { prefetchProjects } from "@/lib/prefetchProjects";
 import { setExpectedUser, LIVE_SESSION_NEEDED, LIVE_SESSION_RESTORED } from "@/lib/auth/liveSessionGuard";
@@ -866,19 +865,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => { setExpectedUser(user?.id ?? null); }, [user?.id]);
 
-  // Keep each user's offline form library fresh: whenever we have an
-  // authenticated user and we're online (session restore, token refresh, or
-  // regaining connectivity), warm-cache their accessible forms so offline data
-  // collection always has the latest definitions available.
+  // Prepare the separate school workspace, without downloading Forms definitions.
   useEffect(() => {
     if (!user?.id || isOfflineMode) return;
-    const isAdminRole =
-      role === "super_admin" ||
-      role === "systems_admin" ||
-      profile?.is_owner === true ||
-      user.email === "amehjoey1@gmail.com";
     const t = setTimeout(() => {
-      void warmCacheUserForms({ userId: user.id, isAdmin: isAdminRole, role });
       void prewarmBloombergOffline(user.id);
     }, 30000);
     return () => clearTimeout(t);
@@ -1043,15 +1033,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }, 0);
       }
 
-      // Warm-cache this user's accessible forms so they can collect data offline
-      // immediately, even without opening the Forms page while online.
-      const isAdminRole =
-        roleRes.data?.role === "super_admin" ||
-        roleRes.data?.role === "systems_admin" ||
-        profileRes.data?.is_owner === true ||
-        email.toLowerCase() === "amehjoey1@gmail.com";
+      // The separate school workspace keeps its existing offline preparation.
       window.setTimeout(() => {
-        void warmCacheUserForms({ userId: data.user.id, isAdmin: isAdminRole, role: roleRes.data?.role });
         void prewarmBloombergOffline(data.user.id);
       }, 30000);
     }

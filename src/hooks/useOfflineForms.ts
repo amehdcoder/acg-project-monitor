@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "@/hooks/use-toast";
 import type { Question, GeofenceArea } from "@/components/FormBuilder/types";
 import { sealRecord, unsealRecord, unsealAll } from "@/lib/deviceCrypto";
 import { useAuth } from "@/hooks/useAuth";
 import { offlineFormKey, ownedOfflineForm, visibleOfflineForms } from "@/lib/offlineFormAccess";
-import { OFFLINE_FORMS_UPDATED_EVENT } from "@/lib/offlineFormCache";
-import { planOfflineFormChanges } from "@/lib/offlineFormPlan";
+import { downloadSelectedUserForms, OFFLINE_FORMS_UPDATED_EVENT } from "@/lib/offlineFormCache";
+import type { FormDownloadForm, FormDownloadResult } from "@/lib/offlineFormDownload";
 
 const DB_NAME = "acg_monitor_offline";
 // Keep this version in lockstep with useOfflineStorage/offlineFormCache.
@@ -144,6 +144,8 @@ const isFormOffline = async (formId: string): Promise<boolean> => {
 export const useOfflineForms = () => {
   const { user } = useAuth();
   const userId = user?.id;
+  const activeUserRef = useRef(userId);
+  activeUserRef.current = userId;
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [offlineForms, setOfflineForms] = useState<OfflineForm[]>([]);
   const [offlineFormIds, setOfflineFormIds] = useState<Set<string>>(new Set());
@@ -168,6 +170,7 @@ export const useOfflineForms = () => {
     try {
       setLoading(true);
       const forms = visibleOfflineForms(await getOfflineForms(), userId);
+      if (activeUserRef.current !== userId) return;
       setOfflineForms(forms);
       setOfflineFormIds(new Set(forms.map(f => f.id)));
     } catch (error) {
@@ -195,79 +198,24 @@ export const useOfflineForms = () => {
     };
   }, [userId]);
 
-  // Download a form for offline use
-  const downloadForm = useCallback(async (form: {
-    id: string;
-    name: string;
-    description: string | null;
-    status: string;
-    project_id: string;
-    questions: Question[];
-    geofence: GeofenceArea | null;
-    settings: FormSettings;
-    updated_at?: string;
-  }): Promise<boolean> => {
-    if (!userId) return false;
+  // No mount, reconnect or list event writes definitions. Only explicit choices do.
+  const downloadForms = useCallback(async (forms: FormDownloadForm[]): Promise<FormDownloadResult> => {
+    if (!userId) throw new Error("Sign in before downloading forms.");
+    const result = await downloadSelectedUserForms(userId, forms.map(form => form.id), () => activeUserRef.current === userId);
+    if (activeUserRef.current === userId) await loadOfflineForms();
+    return result;
+  }, [loadOfflineForms, userId]);
+
+  const downloadForm = useCallback(async (form: FormDownloadForm): Promise<boolean> => {
     try {
-      const existing = await getOfflineForm(offlineFormKey(userId, form.id));
-      const plan = planOfflineFormChanges(existing ? [existing] : [], [form], userId);
-      if (plan.puts.length === 0) {
-        toast({ title: "Form is up to date", description: `"${form.name}" is already available offline.` });
-        return true;
-      }
-      await saveFormOffline(plan.puts[0] as OfflineForm, userId);
-      await loadOfflineForms();
-
-      toast({
-        title: existing ? "Form updated offline" : "Form downloaded",
-        description: `"${form.name}" is now available offline.`,
-      });
-
+      const result = await downloadForms([form]);
+      toast({ title: result.updated ? "Form updated offline" : result.added ? "Form downloaded" : "Form is up to date", description: `"${form.name}" is available offline.` });
       return true;
     } catch (error) {
-      console.error("Error downloading form:", error);
-      toast({
-        title: "Download Failed",
-        description: "Could not save form for offline use.",
-        variant: "destructive",
-      });
+      toast({ title: "Download failed", description: error instanceof Error ? error.message : "Could not save form for offline use.", variant: "destructive" });
       return false;
     }
-  }, [loadOfflineForms, userId]);
-
-  // Silently cache many forms for offline use (no toasts). Called automatically
-  // whenever forms are fetched while online, so every form opens offline later.
-  const cacheFormsForOffline = useCallback(async (forms: Array<{
-    id: string;
-    name: string;
-    description: string | null;
-    status: string;
-    project_id: string;
-    questions: Question[];
-    groups?: any[];
-    geofence: GeofenceArea | null;
-    settings: FormSettings;
-    updated_at?: string;
-  }>): Promise<void> => {
-    if (!userId || !forms || forms.length === 0) return;
-    try {
-      const completeForms = forms.map((form) => ({
-        ...form,
-        // Recombine grouped + ungrouped items so the offline copy is complete.
-        questions: [
-          ...((form.groups as any[]) || []),
-          ...((form.questions as any[]) || []),
-        ],
-      }));
-      const plan = planOfflineFormChanges(await getOfflineForms(), completeForms, userId);
-      for (const offlineForm of plan.puts) {
-        await saveFormOffline(offlineForm as OfflineForm, userId);
-      }
-      if (plan.puts.length > 0) await loadOfflineForms();
-    } catch (error) {
-      console.error("Error auto-caching forms for offline:", error);
-    }
-  }, [loadOfflineForms, userId]);
+  }, [downloadForms]);
 
   // Prune stale cached forms. Removes any offline form whose id is NOT in the
   // authoritative server set. This eliminates "ghost" duplicates left behind
@@ -339,7 +287,7 @@ export const useOfflineForms = () => {
     offlineFormIds,
     loading,
     downloadForm,
-    cacheFormsForOffline,
+    downloadForms,
     removeForm,
     pruneStaleForms,
     getForm,

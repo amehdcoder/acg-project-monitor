@@ -23,7 +23,6 @@ vi.mock("@/lib/offlineAuthCache", () => ({
 }));
 vi.mock("@/lib/offlineAuthThrottle", () => ({ checkOfflineLock: async () => ({ locked: false }), registerOfflineFailure: async () => ({ locked: false }), clearOfflineFailures: vi.fn() }));
 vi.mock("@/lib/offlineAuditLog", () => ({ logOfflineAuditEvent: vi.fn(), flushOfflineAuditQueue: vi.fn() }));
-vi.mock("@/lib/offlineFormCache", () => ({ warmCacheUserForms: vi.fn() }));
 vi.mock("@/lib/bloomberg/offlineSchoolCache", () => ({ prewarmBloombergOffline: vi.fn() }));
 vi.mock("@/lib/prefetchProjects", () => ({ prefetchProjects: vi.fn() }));
 vi.mock("@/lib/metrics", () => ({ startTimer: () => vi.fn() }));

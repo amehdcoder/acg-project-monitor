@@ -142,8 +142,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
 import { useOfflineForms } from "@/hooks/useOfflineForms";
-import { warmCacheUserFormsDetailed } from "@/lib/offlineFormCache";
-import { startTimer } from "@/lib/metrics";
+import FormDownloadDialog from "@/components/FormsView/FormDownloadDialog";
 import FormQRCode from "@/components/FormQRCode";
 import QRCodeScanner from "@/components/QRCodeScanner";
 import { Question, GeofenceArea } from "@/components/FormBuilder/types";
@@ -313,20 +312,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showCopyMda, setShowCopyMda] = useState(false);
   const [geofenceManagerForm, setGeofenceManagerForm] = useState<Form | null>(null);
   const [accessManagerForm, setAccessManagerForm] = useState<Form | null>(null);
-  // On-screen confirmation of exactly which forms were cached for offline use,
-  // strictly scoped to the signed-in user's access grants.
-  const [downloadConfirm, setDownloadConfirm] = useState<{
-    forms: { id: string; name: string }[];
-    scopedToGrants: boolean;
-    added: number;
-    updated: number;
-    unchanged: number;
-    removed: number;
-    offline?: boolean;
-    syncedAt?: string | null;
-    changes: Record<string, "New" | "Updated">;
-  } | null>(null);
-  const [downloadingForms, setDownloadingForms] = useState(false);
+  const [showFormDownloads, setShowFormDownloads] = useState(false);
   const [qrCodeForm, setQrCodeForm] = useState<Form | null>(null);
   const [dailyTargetForm, setDailyTargetForm] = useState<Form | null>(null);
   const [showQRScanner, setShowQRScanner] = useState(false);
@@ -703,7 +689,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
 
   const { canBulk } = useBulkDataAccess();
-  const { isOnline, downloadForm, cacheFormsForOffline, removeForm, pruneStaleForms, refreshOfflineForms, isFormAvailableOffline, offlineForms } = useOfflineForms();
+  const { isOnline, downloadForm, downloadForms, removeForm, pruneStaleForms, refreshOfflineForms, isFormAvailableOffline, offlineForms } = useOfflineForms();
   const { logAction } = useAdminSurveillance();
   const [, setSearchParams] = useSearchParams();
 
@@ -987,7 +973,6 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       if (activeProjectUserRef.current !== userId) return;
       const rows = allowed.filter(f => !projectId || f.project_id === projectId).map(toRenderableForm);
       setForms(rows);
-      await cacheFormsForOffline(rows);
       await pruneStaleForms(allowed.map(f => f.id));
     } catch (error) {
       console.error("Error refreshing accessible forms:", error);
@@ -996,7 +981,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     }
   };
 
-  // Reflect background first-login downloads and realtime definition updates in
+  // Reflect explicitly selected downloads and updates in
   // an already-open Forms page. The active form being filled is deliberately
   // left untouched; its saved draft retains the definition it started with.
   useEffect(() => {
@@ -1282,76 +1267,6 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         description: error.message,
         variant: "destructive",
       });
-    }
-  };
-
-  const handleDownloadAccessibleForms = async () => {
-    if (!user?.id || downloadingForms) return;
-    const visibleCache = mergedForms;
-    if (!isOnline) {
-      setDownloadConfirm({
-        forms: visibleCache.map((f) => ({ id: f.id, name: f.name })),
-        scopedToGrants: true,
-        added: 0,
-        updated: 0,
-        unchanged: visibleCache.length,
-        removed: 0,
-        offline: true,
-        changes: {},
-      });
-      toast({
-        title: "Offline forms ready",
-        description: visibleCache.length > 0
-          ? `${visibleCache.length} cached form${visibleCache.length === 1 ? " is" : "s are"} available on this device.`
-          : "No cached forms are available yet. Connect once to download your assigned forms.",
-      });
-      return;
-    }
-    setDownloadingForms(true);
-    try {
-      const isAdminRole = isSuperAdmin || isOwnerLevel || role === "systems_admin" || user.email === "amehjoey1@gmail.com";
-      const stop = startTimer("forms_download_accessible");
-      const result = await withTimeout(
-        warmCacheUserFormsDetailed({ userId: user.id, isAdmin: isAdminRole, role }),
-        45000,
-        "download_accessible_forms_timeout",
-      );
-      if (!result.ok) throw new Error(result.error || "Could not verify your form access");
-      stop(true, { count: result.count, scopedToGrants: result.scopedToGrants, added: result.added, updated: result.updated });
-      setDownloadConfirm({
-        forms: result.forms.map((f) => ({ id: f.id, name: f.name })),
-        scopedToGrants: result.scopedToGrants,
-        added: result.added,
-        updated: result.updated,
-        unchanged: result.unchanged,
-        removed: result.removed,
-        syncedAt: result.syncedAt,
-        changes: Object.fromEntries([
-          ...result.addedForms.map((f) => [f.id, "New"] as const),
-          ...result.updatedForms.map((f) => [f.id, "Updated"] as const),
-        ]),
-      });
-      await refreshOfflineForms();
-      toast({
-        title: result.added + result.updated > 0 ? "Offline forms updated" : "Offline forms ready",
-        description: `${result.count} accessible form${result.count === 1 ? " is" : "s are"} ready for complete offline use. ${result.added} new, ${result.updated} updated, ${result.unchanged} already current.`,
-      });
-    } catch (error: any) {
-      if (visibleCache.length > 0) {
-        await cacheFormsForOffline(visibleCache);
-        toast({
-          title: "Saved forms remain available",
-          description: "The server was slow, so the complete forms already visible on this device remain available offline. Try again to check for newer versions.",
-        });
-      } else {
-        toast({
-          title: "Download delayed",
-          description: error?.message || "The connection is too slow. Try again once the server responds.",
-          variant: "destructive",
-        });
-      }
-    } finally {
-      setDownloadingForms(false);
     }
   };
 
@@ -1642,7 +1557,6 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         submissions_count: 0,
       } as Form;
       setForms((prev) => (prev.some((f) => f.id === createdForm.id) ? prev : [createdForm, ...prev]));
-      cacheFormsForOffline([createdForm]);
       toast({ title: "Added to SARMAAN forms", description: "The checklist and dashboard are now visible as separate entries." });
       fetchForms(currentProjectId);
       return createdForm;
@@ -4535,23 +4449,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
             <span className="flex-1 text-base font-semibold text-foreground">Sent</span>
             <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
           </button>
-          <button
-            onClick={() => {
-              void handleDownloadAccessibleForms();
-            }}
-            disabled={downloadingForms}
-            className="flex w-full items-center gap-4 rounded-full bg-white px-5 py-4 text-left shadow-sm ring-1 ring-border/60 transition-colors hover:bg-[#F4F6F8] disabled:cursor-wait disabled:opacity-70"
+          <Button
+            variant="outline"
+            onClick={() => setShowFormDownloads(true)}
+            className="h-auto w-full justify-start gap-4 rounded-full bg-background px-5 py-4 shadow-sm"
           >
-            {downloadingForms ? (
-              <Loader2 className="h-6 w-6 shrink-0 animate-spin text-[#0F172A]" />
-            ) : (
-              <Download className="h-6 w-6 shrink-0 text-[#0F172A]" strokeWidth={2} />
-            )}
-            <span className="flex-1 text-base font-semibold text-foreground">
-              {downloadingForms ? "Updating offline forms…" : "Download form"}
-            </span>
+            <Download className="h-6 w-6 shrink-0 text-foreground" strokeWidth={2} />
+            <span className="flex-1 text-left text-base font-semibold text-foreground">Download form</span>
             <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
-          </button>
+          </Button>
           <button
             onClick={() => handleQuickAction("delete")}
             className="flex w-full items-center gap-4 rounded-full bg-white px-5 py-4 text-left shadow-sm ring-1 ring-border/60 transition-colors hover:bg-[#F4F6F8]"
@@ -4638,60 +4544,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Complete account-scoped offline library and its latest update result. */}
-      <AlertDialog open={!!downloadConfirm} onOpenChange={(open) => !open && setDownloadConfirm(null)}>
-        <AlertDialogContent className="max-h-[85dvh] overflow-y-auto">
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {downloadConfirm?.offline
-                ? "Your offline forms"
-                : downloadConfirm?.added || downloadConfirm?.updated
-                  ? "Offline forms updated"
-                  : "Offline forms are ready"}
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-2">
-                <p>
-                  {downloadConfirm?.forms.length
-                    ? `${downloadConfirm.forms.length} form${downloadConfirm.forms.length === 1 ? " is" : "s are"} available for complete offline use${downloadConfirm.scopedToGrants ? " and match your verified access" : ""}.`
-                    : "You have no forms granted for offline use yet. Connect once after being assigned a form."}
-                </p>
-                {downloadConfirm?.offline ? (
-                  <p>You are offline. These saved forms can be completed now; finalized entries will wait in Ready to send.</p>
-                ) : downloadConfirm ? (
-                  <p>
-                    {downloadConfirm.added} new · {downloadConfirm.updated} updated · {downloadConfirm.unchanged} already current
-                    {downloadConfirm.removed > 0 ? ` · ${downloadConfirm.removed} no longer granted` : ""}
-                  </p>
-                ) : null}
-                <p>Finished forms are saved on this device and sent automatically when a connection returns.</p>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          {downloadConfirm?.forms.length ? (
-            <div className="max-h-64 overflow-y-auto rounded-md border border-border divide-y divide-border">
-              {downloadConfirm.forms.map((f) => (
-                <div key={f.id} className="flex items-center gap-2 px-3 py-2 text-sm">
-                  {downloadConfirm.offline ? (
-                    <CheckCircle className="h-4 w-4 text-primary shrink-0" />
-                  ) : (
-                    <Download className="h-4 w-4 text-muted-foreground shrink-0" />
-                  )}
-                  <span className="min-w-0 flex-1 break-words">{f.name}</span>
-                  <Badge variant={downloadConfirm.changes[f.id] ? "default" : "secondary"} className="shrink-0 text-[10px]">
-                    {downloadConfirm.changes[f.id] || (downloadConfirm.offline ? "Offline" : "Current")}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          ) : null}
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setDownloadConfirm(null)}>Done</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-
+      <FormDownloadDialog
+        key={user?.id || "signed-out"}
+        open={showFormDownloads}
+        onOpenChange={setShowFormDownloads}
+        online={isOnline}
+        userId={user?.id}
+        offlineForms={offlineForms}
+        projects={projects}
+        onDownload={downloadForms}
+      />
 
       {/* Copy MDA Supervisory Checklist from another project */}
       <CopyMdaChecklistDialog

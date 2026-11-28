@@ -73,10 +73,11 @@ export default function FormDownloadDialog({
   }, [online, userId]);
 
   useEffect(() => {
+    requestId.current += 1;
     if (!open) {
-      requestId.current += 1;
       return;
     }
+    setAuthorizedForms(null);
     setSelected(new Set());
     setResult(null);
     setSearch("");
@@ -132,6 +133,7 @@ export default function FormDownloadDialog({
       setSelected(new Set());
       await refresh();
     } catch (cause: any) {
+      setAuthorizedForms(null);
       setError(cause?.message || "The selected forms could not be downloaded. Please try again.");
     } finally {
       setDownloading(false);
@@ -266,7 +268,7 @@ export default function FormDownloadDialog({
                     <div
                       key={item.form.id}
                       role="listitem"
-                      className={`flex min-h-[76px] items-start gap-3 rounded-xl border bg-card p-3.5 transition-colors sm:items-center ${selected.has(item.form.id) ? "border-primary bg-primary/5" : item.status === "update" && verified ? "border-[hsl(var(--status-warning)/0.35)]" : ""}`}
+                      className={`grid min-h-[76px] grid-cols-[20px_40px_minmax(0,1fr)] items-start gap-3 rounded-lg border bg-card p-3.5 transition-colors sm:flex sm:items-center ${selected.has(item.form.id) ? "border-primary bg-primary/5" : item.status === "update" && verified ? "border-[hsl(var(--status-warning)/0.35)]" : ""}`}
                     >
                       <Checkbox
                         id={id}
@@ -284,7 +286,7 @@ export default function FormDownloadDialog({
                         <span className="mt-1 block text-xs text-muted-foreground">{item.projectName}</span>
                         {item.form.description && <span className="mt-1 line-clamp-2 block text-xs leading-relaxed text-muted-foreground">{item.form.description}</span>}
                       </label>
-                      <Badge variant="outline" className={`max-w-[124px] shrink-0 whitespace-normal text-center leading-tight ${status.className}`}>{status.label}</Badge>
+                      <Badge variant="outline" className={`col-start-3 max-w-[124px] justify-self-start shrink-0 whitespace-normal text-center leading-tight ${status.className}`}>{status.label}</Badge>
                     </div>
                   );
                 })}
