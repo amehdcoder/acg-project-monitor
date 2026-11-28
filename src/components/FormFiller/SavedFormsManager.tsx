@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { readyQueuedForms, sendQueuedForm } from "@/lib/readyToSend";
+import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -38,6 +41,7 @@ import SentFormViewer from "@/components/FormFiller/SentFormViewer";
 import BloombergFormFiller from "@/components/Bloomberg/BloombergFormFiller";
 import {
   listSavedEntries,
+  saveSavedEntry,
   deleteSavedEntries,
   setSavedEntryStatus,
   type SavedFormEntry,
@@ -45,7 +49,7 @@ import {
 } from "@/lib/savedForms";
 import { isBloombergSavedEntry, isSpecialBridgeEntry } from "@/lib/specialFormBridge";
 import { captureAndUploadDeviceAuditSnapshots } from "@/lib/bloomberg/deviceAuditSnapshot";
-import { syncSavedFormEntry, SAVED_FORMS_SYNC_EVENT } from "@/lib/savedFormAutoSync";
+import { syncFinalizedSavedForms, SAVED_FORMS_SYNC_EVENT } from "@/lib/savedFormAutoSync";
 import { syncDeviceRecords } from "@/lib/deviceSync";
 import SeeClearFormFiller from "@/components/SeeClear/SeeClearFormFiller";
 
@@ -71,7 +75,7 @@ const MODE_CONFIG: Record<
   },
   send: {
     title: "Ready to send",
-    subtitle: "Finalized forms waiting to sync",
+    subtitle: "Completed forms saved on this device",
     status: "finalized",
     icon: Send,
     accent: "#23B5AE",
@@ -112,6 +116,13 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [search, setSearch] = useState("");
+  const [online, setOnline] = useState(navigator.onLine);
+  const { getPending, syncPendingSubmissions } = useOfflineStorage();
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    window.addEventListener("online", update); window.addEventListener("offline", update);
+    return () => { window.removeEventListener("online", update); window.removeEventListener("offline", update); };
+  }, []);
 
   const selectable = mode === "send" || mode === "delete";
 
@@ -137,6 +148,14 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
     setLoading(true);
     try {
       let rows = await listSavedEntries(userId, cfg.status);
+      if (mode === "send") {
+        const queued = await readyQueuedForms(userId);
+        const pending = (await getPending()).filter(row => row.user_id === userId);
+        const legacy: SavedFormEntry[] = pending.map(row => ({ id: row.id, userId, formId: row.form_id, formName: row.form_name || "Completed form", formDescription: "", projectId: "", questions: [], groups: [], geofence: null, settings: { readyQueue: "legacy" }, responses: row.data, gps: row.location, status: "finalized", createdAt: row.created_at, updatedAt: row.created_at, finalizedAt: row.created_at }));
+        // Dedicated-table queue is authoritative; hide its old queued Sent mirror.
+        const pendingServerIds = new Set(queued.map(row => row.submissionId).filter(Boolean));
+        rows = [...rows.filter(row => !pendingServerIds.has(row.submissionId)), ...queued, ...legacy];
+      }
       // Scope to the active project when one is selected, but NEVER hide an
       // entry the field worker collected on this device: keep matches, special
       // bridge mirrors, and any entry without a project tag (e.g. saved while
@@ -148,7 +167,7 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
         );
       }
       setEntries(rows);
-      setSelected(new Set());
+      setSelected(previous => new Set(Array.from(previous).filter(id => rows.some(row => row.id === id))));
     } catch {
       toast({ title: "Could not load forms", variant: "destructive" });
     } finally {
@@ -168,7 +187,7 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, userId, projectId]);
 
-  const allSelected = entries.length > 0 && selected.size === entries.length;
+  const allSelected = visibleEntries.length > 0 && visibleEntries.every(entry => selected.has(entry.id));
 
   const toggle = (id: string) => {
     setSelected((prev) => {
@@ -179,14 +198,14 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
   };
 
   const toggleAll = () => {
-    setSelected(allSelected ? new Set() : new Set(entries.map((e) => e.id)));
+    setSelected(previous => { const next = new Set(previous); visibleEntries.forEach(entry => allSelected ? next.delete(entry.id) : next.add(entry.id)); return next; });
   };
 
   const handleSync = async () => {
     const targets = entries.filter((e) => selected.has(e.id));
     if (targets.length === 0) return;
     if (!navigator.onLine) {
-      toast({ title: "You're offline", description: "Ready-to-send forms will be sent automatically when the device is online." });
+      toast({ title: "You're offline", description: "Your forms stay here. Connect, select them and tap Send selected." });
       return;
     }
     setSyncing(true);
@@ -196,20 +215,25 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
       // Account-free collectors have no database session: their records must
       // go through the device channel, not the signed-in submissions path.
       if (targets.some((e) => (e.userId || "").startsWith("device:"))) {
-        const result = await syncDeviceRecords();
+        const result = await syncDeviceRecords(targets.map(entry => entry.id));
         synced = result.synced;
         failed = result.failed;
         if (synced === 0 && failed === 0) {
           toast({
             title: "Nothing sent yet",
-            description: "These records stay queued and will be sent automatically.",
+            description: "These forms stay in Ready to send. Try sending again when connected.",
           });
         }
       } else {
         for (const entry of targets) {
           try {
-            const ok = await syncSavedFormEntry(entry);
+            const ok = entry.settings.readyQueue === "legacy"
+              ? (await syncPendingSubmissions([entry.id])).synced === 1
+              : entry.settings.readyQueue
+                ? await sendQueuedForm(entry)
+                : (await syncFinalizedSavedForms([entry.id])).synced === 1;
             if (ok) {
+              if (entry.settings.readyQueue === "legacy") await saveSavedEntry({ ...entry, status: "sent", sentAt: new Date().toISOString(), offline: false });
               synced++;
             } else {
               failed++;
@@ -221,8 +245,8 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
       }
       if (synced > 0) {
         toast({
-          title: "Sync Complete",
-          description: `${synced} form${synced > 1 ? "s" : ""} sent. Find them under “View Sent Forms”.`,
+          title: "Forms sent",
+          description: `${synced} selected form${synced > 1 ? "s" : ""} sent successfully.`,
         });
       }
       if (failed > 0) {
@@ -232,6 +256,7 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
           variant: "destructive",
         });
       }
+      setSelected(new Set());
       await load();
       // If any synced entry was a Bloomberg validation form, refresh this
       // device's uploaded Drafts / Ready-to-Send snapshots for the dashboard.
@@ -327,7 +352,7 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
     <div className="flex min-h-full flex-col bg-background">
       {/* Header */}
       <div className="flex items-center gap-3 border-b border-border bg-card px-4 py-3 sticky top-0 z-20">
-        <Button variant="ghost" size="icon" onClick={onClose}>
+        <Button variant="ghost" size="icon" onClick={onClose} aria-label="Back to Forms">
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div
@@ -345,7 +370,7 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
       </div>
 
       {/* Offline search — view (Sent) history only */}
-      {mode === "view" && entries.length > 0 && (
+      {(mode === "view" || mode === "send") && entries.length > 0 && (
         <div className="bg-card px-4 py-2.5 border-b border-border/60">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -354,6 +379,7 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by community, medicine, name…"
               className="pl-9 h-10"
+              aria-label="Search saved forms"
               inputMode="search"
             />
           </div>
@@ -362,8 +388,9 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
 
       {selectable && entries.length > 0 && (
         <div className="flex items-center justify-between bg-card px-4 py-2 border-b border-border/60">
-          <button
+          <Button variant="ghost" size="sm"
             onClick={toggleAll}
+            disabled={syncing}
             className="inline-flex items-center gap-2 text-sm font-semibold text-foreground"
           >
             {allSelected ? (
@@ -372,12 +399,14 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
               <Square className="h-4 w-4 text-muted-foreground" />
             )}
             {allSelected ? "Deselect all" : "Select all"}
-          </button>
+          </Button>
           <Badge variant="outline" className="text-xs">
             {selected.size} selected
           </Badge>
         </div>
       )}
+
+      {mode === "send" && <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/30 px-4 py-3 text-sm"><span className="font-semibold">{entries.length} ready to send</span><Badge variant="outline">{online ? "Online" : "Offline · saved safely"}</Badge></div>}
 
       {/* List */}
       <ScrollArea className="flex-1">
@@ -445,11 +474,7 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
                 >
                   {selectable && (
                     <div className="shrink-0">
-                      {isSel ? (
-                        <CheckCircle2 className="h-6 w-6" style={{ color: cfg.accent }} />
-                      ) : (
-                        <Circle className="h-6 w-6 text-muted-foreground/40" />
-                      )}
+                      <Checkbox checked={isSel} disabled={syncing} aria-label={`Select ${entry.formName}`} onCheckedChange={() => toggle(entry.id)} onClick={event => event.stopPropagation()} className="h-5 w-5" />
                     </div>
                   )}
                   <div
@@ -491,6 +516,7 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
                         </Badge>
                       )}
                     </div>
+                    {mode === "send" && entry.lastSyncError && <p className="mt-1 break-words text-xs text-destructive">Not sent: {entry.lastSyncError}</p>}
                   </div>
                   {mode === "edit" && (
                     <FileEdit className="h-4 w-4 text-muted-foreground group-hover:text-foreground shrink-0" />
@@ -510,7 +536,7 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
         <motion.div
           initial={{ y: 80, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 backdrop-blur px-4 pt-3"
+          className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-[60] border-t border-border bg-card/95 backdrop-blur px-4 pt-3 lg:bottom-0"
           style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
         >
           {mode === "send" ? (
@@ -519,7 +545,7 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
               size="lg"
               className="w-full min-h-[54px] text-base font-semibold shadow-lg"
               onClick={handleSync}
-              disabled={syncing}
+              disabled={syncing || !online}
             >
               {syncing ? (
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
@@ -528,7 +554,7 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
               )}
               {syncing
                 ? "Syncing..."
-                : `Sync to Server (${selected.size})`}
+                : `Send selected (${selected.size})`}
             </Button>
           ) : (
             <Button

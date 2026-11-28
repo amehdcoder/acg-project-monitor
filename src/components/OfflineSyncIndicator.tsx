@@ -152,8 +152,8 @@ const OfflineSyncIndicator = () => {
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-acg-gold" />
                 <p className="text-xs text-muted-foreground">
                   {isOnline
-                    ? "Click sync to upload pending submissions now."
-                    : "Submissions are saved locally and will automatically sync when you're back online."}
+                    ? "Open Forms → Ready to send to select and send completed forms."
+                    : "Submissions stay on this device until you select and send them from Ready to send."}
                 </p>
               </div>
             </div>

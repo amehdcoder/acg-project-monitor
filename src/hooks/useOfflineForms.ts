@@ -229,7 +229,9 @@ export const useOfflineForms = () => {
         const valid = new Set(validIds);
         const existing = visibleOfflineForms(await getOfflineForms(), userId);
         const stale = existing.filter(
-          (f) => (!scopeProjectId || f.project_id === scopeProjectId) && !valid.has(f.id),
+          // A regular forms-table response cannot establish special-form staleness.
+          // Revoked special grants hide these copies; only explicit removal deletes them.
+          (f) => !f.id.startsWith("special:") && (!scopeProjectId || f.project_id === scopeProjectId) && !valid.has(f.id),
         );
         if (stale.length === 0) return 0;
         for (const f of stale) {

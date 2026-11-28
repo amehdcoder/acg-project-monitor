@@ -84,21 +84,22 @@ describe("savedFormAutoSync exactly-once", () => {
     store.clear();
     insertCalls = 0;
     failNextN = 0;
+    Object.defineProperty(navigator, "onLine", { value: true, configurable: true });
   });
 
   it("moves a finalized entry to sent exactly once with no duplicate rows", async () => {
     store.set("e1", makeEntry("e1"));
-    const res = await syncFinalizedSavedForms();
+    const res = await syncFinalizedSavedForms(["e1"]);
     expect(res.synced).toBe(1);
     expect(serverRows.size).toBe(1);
     expect(store.get("e1").status).toBe("sent");
   });
 
-  it("notifies an open Ready to send view after background syncing", async () => {
+  it("notifies an open Ready to send view after selected sending", async () => {
     store.set("e1", makeEntry("e1"));
     const listener = vi.fn();
     window.addEventListener("saved-forms-sync-completed", listener);
-    await syncFinalizedSavedForms();
+    await syncFinalizedSavedForms(["e1"]);
     expect(listener).toHaveBeenCalledTimes(1);
     expect((listener.mock.calls[0][0] as CustomEvent).detail).toMatchObject({ userId: "u1", synced: 1, failed: 0 });
     window.removeEventListener("saved-forms-sync-completed", listener);
@@ -106,9 +107,9 @@ describe("savedFormAutoSync exactly-once", () => {
 
   it("never duplicates when the same batch runs multiple times", async () => {
     store.set("e1", makeEntry("e1"));
-    await syncFinalizedSavedForms();
-    await syncFinalizedSavedForms();
-    await syncFinalizedSavedForms();
+    await syncFinalizedSavedForms(["e1"]);
+    await syncFinalizedSavedForms(["e1"]);
+    await syncFinalizedSavedForms(["e1"]);
     // Entry is already "sent" so it is no longer re-fetched; server has one row.
     expect(serverRows.size).toBe(1);
   });
@@ -117,7 +118,7 @@ describe("savedFormAutoSync exactly-once", () => {
     store.set("e1", makeEntry("e1"));
     // First attempt fails mid-flight, entry stays finalized and retries.
     failNextN = 1;
-    const first = await syncFinalizedSavedForms();
+    const first = await syncFinalizedSavedForms(["e1"]);
     expect(first.failed).toBe(1);
     expect(store.get("e1").status).toBe("finalized");
     expect(store.get("e1").syncState).toBe("error");
@@ -125,7 +126,7 @@ describe("savedFormAutoSync exactly-once", () => {
     // The failed entry waits out its jittered backoff window before retrying.
     const waitUntil = new Date(store.get("e1").nextAttemptAt).getTime();
     vi.setSystemTime(new Date(waitUntil + 1));
-    const second = await syncFinalizedSavedForms();
+    const second = await syncFinalizedSavedForms(["e1"]);
     expect(second.synced).toBe(1);
     // Despite multiple write attempts, the deterministic id keeps it to one row.
     expect(serverRows.size).toBe(1);
@@ -137,5 +138,17 @@ describe("savedFormAutoSync exactly-once", () => {
     expect(submissionIdForEntry(e)).toBe("abc");
     e.submissionId = "fixed-id";
     expect(submissionIdForEntry(e)).toBe("fixed-id");
+  });
+  it("does not send finalized forms without an explicit selection", async () => {
+    store.set("e1", makeEntry("e1"));
+    expect(await syncFinalizedSavedForms()).toEqual({ synced: 0, failed: 0 });
+    expect(insertCalls).toBe(0); expect(store.get("e1").status).toBe("finalized");
+  });
+  it("sends only selected forms for the authenticated account", async () => {
+    store.set("e1", makeEntry("e1")); store.set("e2", makeEntry("e2"));
+    store.set("other", { ...makeEntry("other"), userId: "u2" });
+    expect(await syncFinalizedSavedForms(["e1", "other"])).toEqual({ synced: 1, failed: 0 });
+    expect(Array.from(serverRows.keys())).toEqual(["e1"]);
+    expect(store.get("e2").status).toBe("finalized"); expect(store.get("other").status).toBe("finalized");
   });
 });

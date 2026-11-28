@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, createContext, useContext, ReactNode } fro
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { prewarmBloombergOffline } from "@/lib/bloomberg/offlineSchoolCache";
 import { prefetchProjects } from "@/lib/prefetchProjects";
 import { setExpectedUser, LIVE_SESSION_NEEDED, LIVE_SESSION_RESTORED } from "@/lib/auth/liveSessionGuard";
 import { ToastAction } from "@/components/ui/toast";
@@ -865,15 +864,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => { setExpectedUser(user?.id ?? null); }, [user?.id]);
 
-  // Prepare the separate school workspace, without downloading Forms definitions.
-  useEffect(() => {
-    if (!user?.id || isOfflineMode) return;
-    const t = setTimeout(() => {
-      void prewarmBloombergOffline(user.id);
-    }, 30000);
-    return () => clearTimeout(t);
-  }, [user?.id, isOfflineMode, role, profile?.is_owner, user?.email]);
-
   // Warm the projects cache right after sign-in / session restore so the Forms
   // page "All projects" dropdown and the Projects grid render instantly from
   // cache, then update in the background once the fresh read lands.
@@ -1033,10 +1023,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }, 0);
       }
 
-      // The separate school workspace keeps its existing offline preparation.
-      window.setTimeout(() => {
-        void prewarmBloombergOffline(data.user.id);
-      }, 30000);
+
     }
 
     return { error: error as Error | null };

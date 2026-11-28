@@ -1,7 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { withTimeout } from "./withTimeout";
 import { fetchFormsMemberProjects, writeFormsMemberProjects } from "./formsProjectMembership";
-import { isMdaChecklistLike } from "./mdaFollowUp";
 import { writeOfflineFormGrants } from "./offlineFormAccess";
 
 /** One server-verified resolver for list, download, Dashboard and QR opening. */
@@ -17,14 +16,9 @@ export async function fetchAuthorizedForms(userId: string) {
     supabase.from("forms").select("*").in("project_id", ids).order("created_at", { ascending: false }),
   ]), 18000, "forms_access_timeout");
   for (const result of [owner, roles, direct, sarmaan, forms]) if (result.error) throw result.error;
-  const admin = owner.data === true || (roles.data || []).some(r => r.role === "super_admin" || r.role === "systems_admin");
-  const assigned = new Set([...(direct.data || []), ...(sarmaan.data || [])].map(a => a.form_id));
-  const allowed = (forms.data || []).filter(f => {
-    const settings = f.settings as Record<string, unknown> | null;
-    const items = Array.isArray(f.questions) ? f.questions : [];
-    return admin || assigned.has(f.id) || settings?.sarmaan_acsm === true || f.name === "SARMAAN ACSM Supervision Checklist" ||
-      isMdaChecklistLike({ settings: settings || {}, formName: f.name, groups: items.filter(q => q && typeof q === "object" && "questions" in q) as never });
-  });
+  // RLS already resolves accessible_form_ids, including all accessible project
+  // forms. A second assignment-only filter dropped legitimate special forms.
+  const allowed = forms.data || [];
   writeFormsMemberProjects(userId, projects);
   writeOfflineFormGrants(userId, allowed.map(f => f.id));
   return allowed;

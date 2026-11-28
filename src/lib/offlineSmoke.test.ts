@@ -2,7 +2,7 @@
 //
 // Simulates the KoboCollect-style offline field workflow end to end WITHOUT a
 // network: a draft is saved offline, finalized into "Ready to send", stays put
-// while offline, then syncs to "Sent" exactly once when connectivity returns.
+// while offline, then syncs to "Sent" exactly once after explicit selection online.
 // Mirrors the manual checklist in docs/offline-test-checklist.md.
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
@@ -85,7 +85,7 @@ describe("offline smoke — draft → ready → sent lifecycle", () => {
 
   it("keeps a draft local and unsynced while offline", async () => {
     store.set("rec-1", mkEntry({ status: "draft" }));
-    const res = await syncFinalizedSavedForms();
+    const res = await syncFinalizedSavedForms(["rec-1"]);
     expect(res.synced).toBe(0);
     expect(serverRows.size).toBe(0);
     expect(store.get("rec-1").status).toBe("draft");
@@ -93,23 +93,23 @@ describe("offline smoke — draft → ready → sent lifecycle", () => {
 
   it("does not sync finalized items while offline", async () => {
     store.set("rec-1", mkEntry({ status: "finalized", finalizedAt: new Date().toISOString() }));
-    const res = await syncFinalizedSavedForms();
+    const res = await syncFinalizedSavedForms(["rec-1"]);
     expect(res.synced).toBe(0);
     expect(serverRows.size).toBe(0);
     expect(store.get("rec-1").status).toBe("finalized");
   });
 
-  it("syncs finalized → sent exactly once when connectivity returns", async () => {
+  it("syncs finalized → sent exactly once after explicit selection online", async () => {
     store.set("rec-1", mkEntry({ status: "finalized", finalizedAt: new Date().toISOString() }));
     setOnline(true);
-    const res = await syncFinalizedSavedForms();
+    const res = await syncFinalizedSavedForms(["rec-1"]);
     expect(res.synced).toBe(1);
     expect(res.failed).toBe(0);
     expect(store.get("rec-1").status).toBe("sent");
     expect(serverRows.size).toBe(1);
 
     // Re-run (e.g. overlapping online + interval triggers) must not duplicate.
-    const again = await syncFinalizedSavedForms();
+    const again = await syncFinalizedSavedForms(["rec-1"]);
     expect(again.synced).toBe(0);
     expect(serverRows.size).toBe(1);
   });
@@ -119,14 +119,14 @@ describe("offline smoke — draft → ready → sent lifecycle", () => {
     // First reconnect attempt still effectively offline → fails cleanly.
     online = false;
     Object.defineProperty(navigator, "onLine", { value: true, configurable: true });
-    const flaky = await syncFinalizedSavedForms();
+    const flaky = await syncFinalizedSavedForms(["rec-1"]);
     expect(serverRows.size).toBe(0);
     expect(flaky.synced).toBe(0);
     // Stable connection → syncs once, after the jittered backoff window.
     const retryAt = store.get("rec-1").nextAttemptAt;
     if (retryAt) vi.setSystemTime(new Date(new Date(retryAt).getTime() + 1));
     setOnline(true);
-    const ok = await syncFinalizedSavedForms();
+    const ok = await syncFinalizedSavedForms(["rec-1"]);
     expect(ok.synced).toBe(1);
     expect(serverRows.size).toBe(1);
   });

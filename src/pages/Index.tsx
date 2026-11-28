@@ -14,7 +14,6 @@ import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { useCallNotifications } from "@/hooks/useCallNotifications";
 import { useAppUpdateNotifications } from "@/hooks/useAppUpdateNotifications";
 import { useSurveillanceTracking } from "@/hooks/useSurveillanceTracking";
-import { runReadyToSendMigrationOnce } from "@/lib/bloomberg/readyToSendMigration";
 import { IncomingCallManager } from "@/components/ProjectChat/IncomingCallManager";
 
 import Header from "@/components/Header";
@@ -238,12 +237,6 @@ const Index = () => {
     }
   }, [loading, user, isAdhoc, lensEnabled, activeTab]);
 
-  // Rescue Bloomberg validations stuck in this device's "Ready to send" tab
-  // (collected with the old draft/finalize form) and push them to the server.
-  useEffect(() => {
-    if (loading || !user?.id) return;
-    void runReadyToSendMigrationOnce(user.id);
-  }, [loading, user?.id]);
 
   useEffect(() => {
     if (loading || !user) return;

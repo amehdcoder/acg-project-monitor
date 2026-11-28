@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import acgLogo from "@/assets/acg-logo.png";
 import UserGeofenceManager from "@/components/FormBuilder/UserGeofenceManager";
 import FormAccessManager from "@/components/FormsView/FormAccessManager";
+import SpecialDownloadedForm from "@/components/FormsView/SpecialDownloadedForm";
 import { MicroplanningView } from "@/components/Microplanning";
 import { StandardAssessmentView, MentalHealthAssessment } from "@/components/StandardAssessments";
 import { DigitalAttendanceView } from "@/components/DigitalAttendance";
@@ -163,6 +164,8 @@ import { fetchAuthorizedForms } from "@/lib/authorizedForms";
 import { canOpenOfflineForm } from "@/lib/offlineFormAccess";
 
 interface FormSettings {
+  specialCollector?: string;
+  onlineRequired?: boolean;
   requireLocation?: boolean;
   allowAnonymous?: boolean;
   offlineEnabled?: boolean;
@@ -973,7 +976,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       if (activeProjectUserRef.current !== userId) return;
       const rows = allowed.filter(f => !projectId || f.project_id === projectId).map(toRenderableForm);
       setForms(rows);
-      await pruneStaleForms(allowed.map(f => f.id));
+      await pruneStaleForms([...allowed.map(f => f.id), ...offlineForms.filter(f => f.id.startsWith("special:")).map(f => f.id)]);
     } catch (error) {
       console.error("Error refreshing accessible forms:", error);
     } finally {
@@ -1026,7 +1029,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       } else {
         await fetchAllForms();
       }
-      const validIds = forms.map((f) => f.id);
+      const validIds = [...(await fetchAuthorizedForms(user?.id || "")).map(f => f.id), ...offlineForms.filter(f => f.id.startsWith("special:")).map(f => f.id)];
       const removed = await pruneStaleForms(validIds, currentProjectId || undefined);
       await refreshOfflineForms();
       toast({
@@ -1842,6 +1845,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   }
 
   if (fillingForm && fillingForm.status === "active" && memberProjectIds.has(fillingForm.project_id) && canOpenOfflineForm(user?.id, fillingForm.id, fillingForm.project_id)) {
+    if (fillingForm.settings?.specialCollector) return <SpecialDownloadedForm form={fillingForm} userId={user?.id || ""} onClose={() => setFillingForm(null)} />;
     const fillerCommon = {
       formId: fillingForm.id,
       formName: fillingForm.name,

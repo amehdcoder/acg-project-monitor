@@ -58,6 +58,7 @@ export interface PendingInsert {
   // Id of the saved-forms mirror entry to reconcile (mark "sent", clear the
   // offline/queued flag) once this row lands on the server.
   mirrorEntryId?: string | null;
+  user_id?: string;
 }
 
 // Best-effort: flip the UI mirror entry from "queued" to a confirmed "sent"
@@ -258,11 +259,12 @@ export async function queueOrInsert(
     last_error: null,
     upsertOnId,
     mirrorEntryId: opts.mirrorEntryId ?? null,
+    user_id: (await supabase.auth.getSession()).data.session?.user?.id,
   });
   ensureListeners();
   // Kick an immediate background flush attempt so a transient failure while
   // online does not leave the row sitting "queued" for the whole interval.
-  scheduleFlush(500);
+
   return { queued: true, idempotencyKey };
 }
 
@@ -296,9 +298,9 @@ export async function getQuarantinedInsertCount(): Promise<number> {
 }
 
 export async function flushSubmissionQueue(
-  options: { force?: boolean } = {},
+  options: { force?: boolean; selectedIds?: string[]; userId?: string } = {},
 ): Promise<{ inserted: number; remaining: number }> {
-  if (flushing || !isOnline()) {
+  if (flushing || !isOnline() || !options.selectedIds?.length) {
     return { inserted: 0, remaining: await getPendingInsertCount() };
   }
   flushing = true;
@@ -315,7 +317,10 @@ export async function flushSubmissionQueue(
     } catch {
       /* offline / transient — payloads keep their local refs and retry later */
     }
-    const records = (await getAllRecords()).map((rec) => ({
+    const { data } = await supabase.auth.getSession();
+    const userId = data.session?.user.id;
+    if (!userId || userId !== options.userId) return { inserted: 0, remaining: await getPendingInsertCount() };
+    const records = (await getAllRecords()).filter(rec => options.selectedIds?.includes(rec.id) && pendingInsertOwner(rec) === userId && rec.row.status !== "draft").map((rec) => ({
       ...rec,
       row: resolveReferences(rec.row, idMap),
     }));
@@ -361,31 +366,15 @@ export async function flushSubmissionQueue(
     flushing = false;
   }
   const remaining = await getPendingInsertCount();
-  if (remaining > 0) scheduleFlush(5_000);
+
   return { inserted, remaining };
 }
 
-function ensureListeners() {
-  if (listenersBound || typeof window === "undefined") return;
-  listenersBound = true;
-  // A returning device may have been offline for days with a large backlog, so
-  // force a full drain (ignoring backoff) whenever connectivity is regained or
-  // the app is brought back to the foreground.
-  window.addEventListener("online", () => void flushSubmissionQueue({ force: true }));
-  // Drain again whenever the app returns to the foreground (mobile devices
-  // freeze background timers, so this guarantees a prompt retry on resume).
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && isOnline()) {
-      void flushSubmissionQueue({ force: true });
-    }
-  });
-  // Poll every 15s so a queued row is retried multiple times within a minute.
-  window.setInterval(() => {
-    if (isOnline()) void flushSubmissionQueue();
-  }, 15000);
-}
-
 export function initOfflineSubmissions() {
-  ensureListeners();
-  if (isOnline()) void flushSubmissionQueue({ force: true });
+  // No background sends: Ready to send supplies an explicit selection.
+}
+function ensureListeners() {}
+export const pendingInsertOwner = (record: PendingInsert): string | undefined => record.user_id || record.row.user_id || record.row.validator_id || record.row.created_by;
+export async function listReadyPendingInserts(userId: string): Promise<PendingInsert[]> {
+  return (await getAllRecords()).filter(record => pendingInsertOwner(record) === userId && record.row.status !== "draft");
 }

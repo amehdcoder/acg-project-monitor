@@ -9,7 +9,7 @@ const DB_VERSION = 4;
 const STORE_NAME = "pending_submissions";
 const CONFLICT_STORE = "edit_conflicts";
 
-interface PendingSubmission {
+export interface PendingSubmission {
   id: string;
   form_id: string;
   user_id: string;
@@ -300,7 +300,8 @@ export const useOfflineStorage = () => {
   }, []);
 
   // Core sync logic extracted to avoid stale closures
-  const doSync = useCallback(async (): Promise<{ synced: number; failed: number }> => {
+  const doSync = useCallback(async (selectedIds: string[] = []): Promise<{ synced: number; failed: number }> => {
+    if (!selectedIds.length) return { synced: 0, failed: 0 };
     // Double-check with a real connectivity test
     const reallyOnline = await checkConnectivity();
     if (!reallyOnline) {
@@ -325,7 +326,7 @@ export const useOfflineStorage = () => {
     let failed = 0;
 
     try {
-      const pending = await getPendingSubmissions();
+      const pending = (await getPendingSubmissions()).filter(row => selectedIds.includes(row.id) && row.user_id === sessionData.session?.user.id);
       console.log(`Starting sync of ${pending.length} pending submissions...`);
 
       if (pending.length === 0) {
@@ -489,7 +490,7 @@ export const useOfflineStorage = () => {
       setIsOnline(true);
       toast({
         title: "Back Online",
-        description: "Connection restored. Syncing pending submissions...",
+        description: "Connection restored. Select forms in Ready to send when you want to send.",
       });
       // Delay slightly to allow network to stabilize, then sync submissions
       // and pull any master-data changes since the last sync.
@@ -503,7 +504,7 @@ export const useOfflineStorage = () => {
       setIsOnline(false);
       toast({
         title: "You're Offline",
-        description: "Submissions will be saved locally and synced when you're back online.",
+        description: "Completed forms stay in Ready to send until you choose to send them.",
         variant: "destructive",
       });
     };
@@ -738,7 +739,7 @@ export const useOfflineStorage = () => {
 
 
   // Public sync function wrapping doSync
-  const syncPendingSubmissions = useCallback(async () => {
+  const syncPendingSubmissions = useCallback(async (selectedIds: string[] = []) => {
     if (!navigator.onLine) {
       toast({
         title: "You're Offline",
@@ -747,7 +748,7 @@ export const useOfflineStorage = () => {
       });
       return { synced: 0, failed: 0 };
     }
-    return doSync();
+    return doSync(selectedIds);
   }, [doSync]);
 
   const getPending = useCallback(async () => {

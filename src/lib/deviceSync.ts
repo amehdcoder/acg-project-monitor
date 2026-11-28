@@ -65,7 +65,7 @@ const toRecord = (entry: SavedFormEntry): DeviceSyncRecord => ({
   submittedAt: entry.finalizedAt || entry.updatedAt || new Date().toISOString(),
 });
 
-async function drain(): Promise<{ synced: number; failed: number }> {
+async function drain(selectedIds: Set<string>): Promise<{ synced: number; failed: number }> {
   const session = readDeviceSession();
   if (!session || !isOnline() || Date.now() < backoffUntil) return { synced: 0, failed: 0 };
 
@@ -73,7 +73,7 @@ async function drain(): Promise<{ synced: number; failed: number }> {
   let failed = 0;
   const owner = deviceUserId(session.deviceId);
   const entries = (await listAllSavedEntries("finalized")).filter(
-    (e) => deviceEntryBelongsToProject(e, session.deviceId, session.projectId) && !hasActiveSyncLease(e) && !isBackingOff(e),
+    (e) => selectedIds.has(e.id) && deviceEntryBelongsToProject(e, session.deviceId, session.projectId) && !hasActiveSyncLease(e),
   );
   if (entries.length === 0) return { synced: 0, failed: 0 };
 
@@ -147,18 +147,12 @@ async function drain(): Promise<{ synced: number; failed: number }> {
   return { synced, failed };
 }
 
-export async function syncDeviceRecords(): Promise<{ synced: number; failed: number }> {
-  const result = await withQueueLock("device_records", drain);
+export async function syncDeviceRecords(selectedIds: string[] = []): Promise<{ synced: number; failed: number }> {
+  if (!selectedIds.length) return { synced: 0, failed: 0 };
+  const result = await withQueueLock("device_records", () => drain(new Set(selectedIds)));
   return result ?? { synced: 0, failed: 0 };
 }
 
 export function initDeviceAutoSync() {
-  if (started || typeof window === "undefined") return;
-  started = true;
-  window.addEventListener("online", () => void syncDeviceRecords());
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") void syncDeviceRecords();
-  });
-  window.setInterval(() => void syncDeviceRecords(), 30_000);
-  void syncDeviceRecords();
+  // Account-free forms also require an explicit Ready to send selection.
 }

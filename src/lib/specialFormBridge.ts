@@ -61,7 +61,7 @@ export async function mirrorSpecialForm(args: MirrorArgs): Promise<void> {
       submissionLocation: args.gps ? { lat: args.gps.lat, lng: args.gps.lng } : null,
       withinGeofence: null,
       submissionType: args.formId,
-      status: args.status,
+      status: args.status === "sent" && args.offline ? "finalized" : args.status,
       createdAt: now,
       updatedAt: now,
       finalizedAt: args.status !== "draft" ? now : null,
@@ -139,5 +139,5 @@ export async function syncSpecialSavedForm(
       settings: { ...(entry.settings || {}), serverVerifiedAt: now },
     });
   }
-  return { success: true, offline: queued, id };
+  return { success: !queued, offline: queued, id };
 }

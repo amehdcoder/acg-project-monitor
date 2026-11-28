@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { fetchAuthorizedForms } from "@/lib/authorizedForms";
+import { fetchProjectFormCatalogue } from "@/lib/projectFormCatalogue";
 import {
   buildFormDownloadItems,
   downloadableFormIds,
@@ -59,7 +59,7 @@ export default function FormDownloadDialog({
     setLoading(true);
     setError(null);
     try {
-      const rows = await fetchAuthorizedForms(userId);
+      const rows = await fetchProjectFormCatalogue(userId);
       if (request !== requestId.current) return;
       setAuthorizedForms(rows as FormDownloadForm[]);
       setSelected((current) => new Set(Array.from(current).filter((id) => rows.some((form) => form.id === id))));
@@ -190,7 +190,7 @@ export default function FormDownloadDialog({
               <div className="flex gap-3 rounded-xl border border-[hsl(var(--status-success)/0.3)] bg-[hsl(var(--status-success)/0.08)] p-4 text-sm" role="status">
                 <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-[hsl(var(--status-success-light))]" />
                 <div>
-                  <p className="font-semibold">Selected forms are ready offline</p>
+                  <p className="font-semibold">Selected forms saved on this device</p>
                   <p className="mt-1 text-muted-foreground">{result.added} downloaded · {result.updated} updated{result.unchanged ? ` · ${result.unchanged} already current` : ""}</p>
                 </div>
               </div>
@@ -284,6 +284,7 @@ export default function FormDownloadDialog({
                       <label htmlFor={id} className={`min-w-0 flex-1 ${selectable ? "cursor-pointer" : "cursor-default"}`}>
                         <span className="block break-words text-sm font-semibold leading-snug">{item.form.name}</span>
                         <span className="mt-1 block text-xs text-muted-foreground">{item.projectName}</span>
+                        {item.form.settings?.specialCollector && <span className="mt-1 block text-xs text-muted-foreground">Special form{item.form.settings.onlineRequired ? " · Internet required to submit" : ""}</span>}
                         {item.form.description && <span className="mt-1 line-clamp-2 block text-xs leading-relaxed text-muted-foreground">{item.form.description}</span>}
                       </label>
                       <Badge variant="outline" className={`col-start-3 max-w-[124px] justify-self-start shrink-0 whitespace-normal text-center leading-tight ${status.className}`}>{status.label}</Badge>

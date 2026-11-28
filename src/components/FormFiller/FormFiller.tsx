@@ -60,7 +60,6 @@ import {
   buildSavedEntryDisplayName,
   type SavedFormEntry,
 } from "@/lib/savedForms";
-import { syncFinalizedSavedForms } from "@/lib/savedFormAutoSync";
 import useGeolocation, { GeolocationPosition } from "@/hooks/useGeolocation";
 import useGeofenceValidation from "@/hooks/useGeofenceValidation";
 import { supabase } from "@/integrations/supabase/client";
@@ -2080,9 +2079,8 @@ const FormFiller = ({
       markResponsesSaved();
       toast({
         title: "Form Finalized",
-        description: "Send it from “Send Finalized” when you're ready to sync.",
+        description: "Saved in Ready to send. Select it there and send when online.",
       });
-      if (navigator.onLine) void syncFinalizedSavedForms();
       onSavedLocally?.();
     } catch (e) {
       toast({ title: "Finalize Failed", description: "Could not finalize the form.", variant: "destructive" });

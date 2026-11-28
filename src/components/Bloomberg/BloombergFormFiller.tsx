@@ -394,7 +394,7 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
         submissionLocation: gps ? { lat: gps.lat, lng: gps.lng } : null,
         withinGeofence: null,
         submissionType: BLOOMBERG_FORM_ID,
-        status: "sent",
+        status: queued ? "finalized" : "sent",
         createdAt: savedEntry?.createdAt || now,
         updatedAt: now,
         finalizedAt: now,
@@ -404,7 +404,7 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
       });
       toast.success(
         queued
-          ? "Saved offline — it will submit automatically when you're back online."
+          ? "Saved in Ready to send — select it there and send when online."
           : "Validation submitted — it's now on the dashboard.",
       );
       clearDraft();

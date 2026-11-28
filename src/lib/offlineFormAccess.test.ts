@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
 import { writeFormsMemberProjects } from "./formsProjectMembership";
-import { canOpenOfflineForm, ownedOfflineForm, visibleOfflineForms, writeOfflineFormGrants } from "./offlineFormAccess";
+import { canOpenOfflineForm, ownedOfflineForm, visibleOfflineForms, writeOfflineFormGrants, writeSpecialFormGrants } from "./offlineFormAccess";
 
 describe("offline form authorization", () => {
   const form = { id: "form-a", project_id: "project-a" };
@@ -34,5 +34,13 @@ describe("offline form authorization", () => {
   it("hides saved definitions when project membership is removed", () => {
     writeFormsMemberProjects("alice", []);
     expect(visibleOfflineForms([ownedOfflineForm(form, "alice")], "alice")).toEqual([]);
+  });
+  it("retains verified special-form access when the regular server list refreshes", () => {
+    const special = { id: "special:project-a:seeclear_form", project_id: "project-a" };
+    writeSpecialFormGrants("alice", [special.id]);
+    writeOfflineFormGrants("alice", ["form-a"]);
+    expect(visibleOfflineForms([ownedOfflineForm(special, "alice")], "alice")[0]?.id).toBe(special.id);
+    writeSpecialFormGrants("alice", []);
+    expect(visibleOfflineForms([ownedOfflineForm(special, "alice")], "alice")).toEqual([]);
   });
 });

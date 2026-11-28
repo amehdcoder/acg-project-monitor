@@ -1,6 +1,8 @@
 # Offline authentication
 
 - Forms definition writes go through `downloadSelectedUserForms` only after explicit selection, with fresh authorization and account-guarded atomic writes; boot/auth/list/reconnect never download definitions, while submission workers remain independent — why: user-selected versions and queued answers must survive offline updates without disabling delivery.
+- Download catalogue composes RLS-visible project forms with project-qualified special collector descriptors and separate verified special grants; dispatch specialized collectors to their original tools, mark online-only recording honestly, and preserve selected live-schema snapshots — why: complete downloads must not bypass access or reroute programme evidence into generic submissions.
+- Ready to send is the sole outbound form action: signed-in, legacy, dedicated-table, device and collection-operation drains require selected IDs; background record operations remain separate, recovery only reads server state — why: reconnect, timers and app restarts must never send unselected offline forms.
 
 - Heartbeat IP lookup uses a bounded public-key request to the exact public `get-client-ip` endpoint; private writes still require a live session — why: optional connection metadata must not trigger session errors or bypass record protection.
 

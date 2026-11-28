@@ -4,7 +4,7 @@ import { ownedOfflineForm } from "./offlineFormAccess";
 import { normalizeOfflineForm } from "./offlineFormPlan";
 
 const mocks = vi.hoisted(() => ({ fetch: vi.fn() }));
-vi.mock("./authorizedForms", () => ({ fetchAuthorizedForms: mocks.fetch }));
+vi.mock("./projectFormCatalogue", () => ({ fetchProjectFormCatalogue: mocks.fetch }));
 vi.mock("@/lib/deviceCrypto", () => ({ sealRecord: async (row: unknown) => row, unsealAll: async (rows: unknown[]) => rows }));
 import { downloadSelectedUserForms } from "./offlineFormCache";
 

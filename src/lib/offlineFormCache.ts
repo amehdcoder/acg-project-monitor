@@ -2,9 +2,10 @@
 // Updates never touch drafts, submissions or another account's library.
 
 import { sealRecord, unsealAll } from "@/lib/deviceCrypto";
-import { fetchAuthorizedForms } from "./authorizedForms";
+import { fetchProjectFormCatalogue } from "./projectFormCatalogue";
 import { planOfflineFormChanges } from "./offlineFormPlan";
 import type { FormDownloadResult } from "./offlineFormDownload";
+import { visibleOfflineForms } from "./offlineFormAccess";
 
 const DB_NAME = "acg_monitor_offline";
 const DB_VERSION = 4;
@@ -52,6 +53,12 @@ const readAllForms = async (db: IDBDatabase): Promise<Record<string, any>[]> => 
   return unsealAll<Record<string, any>>(rows);
 };
 
+export async function readDownloadedForm(userId: string, collector: string): Promise<Record<string, any> | null> {
+  const db = await openDB();
+  try { return visibleOfflineForms((await readAllForms(db)) as Array<Record<string, any> & { id: string; project_id: string }>, userId).find(form => form.settings?.specialCollector === collector) || null; }
+  finally { db.close(); }
+}
+
 const applyPlan = async (
   db: IDBDatabase,
   plan: ReturnType<typeof planOfflineFormChanges>,
@@ -82,11 +89,15 @@ export async function downloadSelectedUserForms(
   if (!userId || !isCurrentAccount()) throw new Error("Sign in before downloading forms.");
   if (!selectedIds.length) return { added: 0, updated: 0, unchanged: 0 };
   if (!navigator.onLine) throw new Error("Connect to download new forms or updates.");
-  const authorized = await fetchAuthorizedForms(userId);
+  const authorized = await fetchProjectFormCatalogue(userId);
   const ids = new Set(selectedIds);
   const chosen = authorized.filter(form => ids.has(form.id));
   if (chosen.length !== ids.size) throw new Error("Your form access has changed. Refresh the list and select again.");
   if (!isCurrentAccount()) throw new Error("Your account changed. Select forms again.");
+  if (chosen.some(form => form.settings?.specialCollector === "bloomberg_form")) {
+    const { prewarmBloombergOffline } = await import("./bloomberg/offlineSchoolCache");
+    if (await prewarmBloombergOffline(userId) === 0) throw new Error("The school register could not be saved. Reconnect and try downloading again.");
+  }
   const db = await openDB();
   try {
     const existing = await readAllForms(db);

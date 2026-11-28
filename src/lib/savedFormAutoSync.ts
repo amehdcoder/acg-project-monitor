@@ -12,7 +12,6 @@ import { recordMetric, startTimer } from "@/lib/metrics";
 import { stampSyncContract } from "@/lib/syncContract";
 import { withQueueLock, backoffDelay, isRetryable, runCapped } from "@/lib/syncLock";
 
-let started = false;
 export const SAVED_FORMS_SYNC_EVENT = "saved-forms-sync-completed";
 
 // Per-entry in-flight guard. Overlapping triggers (online event + interval +
@@ -37,7 +36,10 @@ export function submissionIdForEntry(entry: SavedFormEntry): string {
 
 export async function syncSavedFormEntry(entry: SavedFormEntry): Promise<boolean> {
   const special = isSpecialBridgeEntry(entry) ? await syncSpecialSavedForm(entry) : null;
-  if (special?.success) return true;
+  if (special) {
+    if (!special.success) throw new Error("This form was not sent. It remains in Ready to send.");
+    return true;
+  }
 
   const submissionId = submissionIdForEntry(entry);
   const sentAt = new Date().toISOString();
@@ -77,13 +79,13 @@ export async function syncSavedFormEntry(entry: SavedFormEntry): Promise<boolean
 }
 
 
-async function drain(userId: string): Promise<{ synced: number; failed: number }> {
+async function drain(userId: string, selectedIds: Set<string>): Promise<{ synced: number; failed: number }> {
   const stop = startTimer("saved_form_sync_batch");
   let synced = 0;
   let failed = 0;
   try {
     const entries = (await listAllSavedEntries("finalized")).filter(
-      (e) => e.userId === userId && !hasActiveSyncLease(e) && !isBackingOff(e),
+      (e) => e.userId === userId && selectedIds.has(e.id) && !hasActiveSyncLease(e),
     );
     // At most two uploads in flight so a large backlog drains steadily without
     // opening a burst of concurrent connections from every device at once.
@@ -124,23 +126,17 @@ async function drain(userId: string): Promise<{ synced: number; failed: number }
   return { synced, failed };
 }
 
-export async function syncFinalizedSavedForms(): Promise<{ synced: number; failed: number }> {
+export async function syncFinalizedSavedForms(selectedIds: string[] = []): Promise<{ synced: number; failed: number }> {
+  if (!selectedIds.length) return { synced: 0, failed: 0 };
   if (!isOnline()) return { synced: 0, failed: 0 };
   const { data } = await supabase.auth.getSession().catch(() => ({ data: { session: null } } as any));
   const userId = data?.session?.user?.id;
   if (!userId) return { synced: 0, failed: 0 };
   // Cross-tab mutex: only one worker anywhere may drain the queue at a time.
-  const result = await withQueueLock("saved_forms", () => drain(userId));
+  const result = await withQueueLock("saved_forms", () => drain(userId, new Set(selectedIds)));
   return result ?? { synced: 0, failed: 0 };
 }
 
 export function initSavedFormAutoSync() {
-  if (started || typeof window === "undefined") return;
-  started = true;
-  window.addEventListener("online", () => void syncFinalizedSavedForms());
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") void syncFinalizedSavedForms();
-  });
-  window.setInterval(() => void syncFinalizedSavedForms(), 20000);
-  void syncFinalizedSavedForms();
+  // Compatibility entry point. Finalized forms now wait for Ready to send.
 }

@@ -51,17 +51,18 @@ export interface MigrationResult {
 
 export async function migrateReadyToSendBloomberg(
   userId: string,
+  selectedIds: string[] = [],
 ): Promise<MigrationResult> {
   const result: MigrationResult = {
     migrated: 0,
     skippedDuplicate: 0,
     queued: 0,
   };
-  if (!userId) return result;
+  if (!userId || !selectedIds.length) return result;
 
   // 1) Finalized Bloomberg entries waiting in "Ready to send".
   const finalized = (await listSavedEntries(userId, "finalized")).filter(
-    isBloombergSavedEntry,
+    entry => isBloombergSavedEntry(entry) && selectedIds.includes(entry.id),
   );
   if (finalized.length === 0) return result;
 
@@ -150,18 +151,6 @@ export async function migrateReadyToSendBloomberg(
 export async function runReadyToSendMigrationOnce(
   userId: string | null | undefined,
 ): Promise<void> {
-  if (!userId || migrationRan) return;
-  migrationRan = true;
-  try {
-    const r = await migrateReadyToSendBloomberg(userId);
-    if (r.migrated > 0) {
-      // Let any open dashboards/forms know fresh data landed.
-      window.dispatchEvent(
-        new CustomEvent("bloomberg:ready-to-send-migrated", { detail: r }),
-      );
-    }
-  } catch (err) {
-    console.warn("Bloomberg ready-to-send migration failed (non-fatal):", err);
-    migrationRan = false; // allow a retry next mount
-  }
+  // Compatibility wrapper: boot recovery never sends finalized forms.
+  void userId;
 }

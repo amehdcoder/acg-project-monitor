@@ -51,6 +51,8 @@ export const mergeIntoQueued = (uuid: string, patch: Record<string, unknown>): b
 };
 
 export const listQueued = (): QueuedItem[] => read();
+export const isFormCollectionQueueItem = (item: QueuedItem): boolean => item.kind === "op" && ["microplan_entries", "eye_daily_reports", "eye_daily_patients"].includes(String(item.payload.table));
+
 
 export const queueCount = (): number => read().length;
 
@@ -86,20 +88,20 @@ const readyToRetry = (item: QueuedItem & { next_try_at?: number }) => !item.next
  * Sends every queued item. Only one tab per device flushes at a time (Web
  * Locks), parents are sent before children, and failed items back off.
  */
-export const flushQueue = async (): Promise<{ sent: number; failed: number }> => {
+export const flushQueue = async (selectedFormIds: string[] = []): Promise<{ sent: number; failed: number }> => {
   if (flushing || !navigator.onLine) return { sent: 0, failed: 0 };
   const locks = (navigator as Navigator & { locks?: { request: (n: string, o: { ifAvailable: boolean }, cb: (l: unknown) => Promise<unknown>) => Promise<unknown> } }).locks;
   if (locks) {
     let result = { sent: 0, failed: 0 };
     await locks.request("amehnities-records-flush", { ifAvailable: true }, async (lock) => {
-      if (lock) result = await flushInner();
+      if (lock) result = await flushInner(selectedFormIds);
     });
     return result;
   }
-  return flushInner();
+  return flushInner(selectedFormIds);
 };
 
-const flushInner = async (): Promise<{ sent: number; failed: number }> => {
+const flushInner = async (selectedFormIds: string[]): Promise<{ sent: number; failed: number }> => {
   if (flushing) return { sent: 0, failed: 0 };
   flushing = true;
   let sent = 0;
@@ -111,7 +113,9 @@ const flushInner = async (): Promise<{ sent: number; failed: number }> => {
     const remaining: QueuedItem[] = [];
     for (const item of items) {
       if (item.user_id && item.user_id !== userId) { remaining.push(item); continue; }
-      if (!readyToRetry(item)) { remaining.push(item); continue; }
+      if (isFormCollectionQueueItem(item) && !selectedFormIds.includes(item.submission_uuid)) { remaining.push(item); continue; }
+      if (selectedFormIds.length && !selectedFormIds.includes(item.submission_uuid)) { remaining.push(item); continue; }
+      if (!selectedFormIds.length && !readyToRetry(item)) { remaining.push(item); continue; }
       try {
         if (item.kind === "op") {
           const { runOp } = await import("./offlineWrite");

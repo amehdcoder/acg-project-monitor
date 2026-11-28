@@ -9,6 +9,8 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { readDownloadedForm } from "@/lib/offlineFormCache";
 
 export interface SchemaField {
   name: string;
@@ -44,6 +46,7 @@ export interface SeeClearSchema {
 const EMPTY_DRIFT: SchemaDrift = { added: [], removed: [], changed: [] };
 
 export function useSeeClearKoboSchema(enabled = true) {
+  const { user } = useAuth();
   const [schema, setSchema] = useState<SeeClearSchema | null>(null);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -52,6 +55,14 @@ export function useSeeClearKoboSchema(enabled = true) {
   const load = useCallback(async () => {
     if (!enabled) return;
     setLoading(true);
+    // A selected version wins over live changes until the user downloads an update.
+    if (user?.id) {
+      const saved = await readDownloadedForm(user.id, "seeclear_form");
+      if (saved?.specialContext?.schema) {
+        setSchema(saved.specialContext.schema as SeeClearSchema);
+        setError(null); setLoading(false); return;
+      }
+    }
     const { data, error: err } = await supabase
       .from("seeclear_kobo_schema" as any)
       .select("*")
@@ -64,7 +75,7 @@ export function useSeeClearKoboSchema(enabled = true) {
       setError(null);
     }
     setLoading(false);
-  }, [enabled]);
+  }, [enabled, user?.id]);
 
   const sync = useCallback(async () => {
     setSyncing(true);

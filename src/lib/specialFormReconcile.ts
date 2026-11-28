@@ -15,7 +15,6 @@ import {
   SEECLEAR_FORM_ID,
   BMZ_FORM_ID,
   isBloombergSavedEntry,
-  syncSpecialSavedForm,
 } from "@/lib/specialFormBridge";
 
 // Map a mirror entry's synthetic form id to its authoritative server table.
@@ -42,7 +41,7 @@ export async function reconcileQueuedSpecialForms(): Promise<{ reconciled: numbe
   let reconciled = 0;
   try {
     // First make sure anything still pending is pushed up.
-    await flushSubmissionQueue({ force: true }).catch(() => {});
+
 
     const { data: auth } = await supabase.auth.getSession().catch(() => ({ data: null as any }));
     const currentUserId = auth?.session?.user?.id || null;
@@ -71,7 +70,7 @@ export async function reconcileQueuedSpecialForms(): Promise<{ reconciled: numbe
         continue;
       }
       if (!byTable.has(table)) byTable.set(table, new Map());
-      byTable.get(table)!.set(e.submissionId, e.id);
+      byTable.get(table)?.set(e.submissionId, e.id);
     }
 
     for (const [table, idMap] of byTable) {
@@ -101,38 +100,9 @@ export async function reconcileQueuedSpecialForms(): Promise<{ reconciled: numbe
         }
       }
 
-      // If the mirror says "queued" but the row is not on the server, rebuild
-      // and resend from the local saved snapshot. This repairs older app builds
-      // where the visual mirror was created but the insert queue was never
-      // linked, so the dashboard/accountability count stayed short.
-      for (const [missingSubmissionId, mirrorId] of idMap) {
-        const entry = queued.find((e) => e.id === mirrorId);
-        if (!entry || !isBloombergSavedEntry(entry)) continue;
-        try {
-          const result = await syncSpecialSavedForm({ ...entry, submissionId: missingSubmissionId });
-          if (result?.success && !result.offline) reconciled++;
-        } catch {
-          // keep queued; the normal queue/reconcile cadence will retry
-        }
-      }
+      // Missing server rows remain local until selected in Ready to send.
     }
 
-    for (const entry of needsResend) {
-      try {
-        const result = await syncSpecialSavedForm(entry);
-        if (result?.success) {
-          await setSavedEntryStatus(entry.id, "sent", {
-            submissionId: result.id,
-            sentAt: result.offline ? null : new Date().toISOString(),
-            offline: result.offline,
-            settings: result.offline ? entry.settings : { ...(entry.settings || {}), serverVerifiedAt: new Date().toISOString() },
-          });
-          if (!result.offline) reconciled++;
-        }
-      } catch {
-        // keep queued/finalized; the next cadence will retry
-      }
-    }
     return { reconciled };
   } finally {
     running = false;

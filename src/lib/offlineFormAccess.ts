@@ -2,13 +2,18 @@ import { readFormsMemberProjects } from "./formsProjectMembership";
 
 export const offlineFormKey = (userId: string, formId: string) => `user:${userId}:form:${formId}`;
 const grantKey = (userId: string) => `amehnities:forms:verified-form-ids:v1:${userId}`;
+const specialGrantKey = (userId: string) => `amehnities:forms:verified-special-ids:v1:${userId}`;
+export function writeSpecialFormGrants(userId: string, formIds: string[]) {
+  localStorage.setItem(specialGrantKey(userId), JSON.stringify(formIds));
+  window.dispatchEvent(new Event("forms-project-access"));
+}
 export function writeOfflineFormGrants(userId: string, formIds: string[]) {
   try { localStorage.setItem(grantKey(userId), JSON.stringify(formIds)); window.dispatchEvent(new Event("forms-project-access")); } catch { /* unavailable storage */ }
 }
 export function canOpenOfflineForm(userId: string | null | undefined, formId: string, projectId: string): boolean {
   if (!userId || !readFormsMemberProjects(userId).some(p => p.id === projectId)) return false;
   try {
-    const ids = JSON.parse(localStorage.getItem(grantKey(userId)) || "null");
+    const ids = JSON.parse(localStorage.getItem(formId.startsWith("special:") ? specialGrantKey(userId) : grantKey(userId)) || "null");
     return Array.isArray(ids) && ids.includes(formId);
   } catch { return false; }
 }

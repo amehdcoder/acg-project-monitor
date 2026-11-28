@@ -228,7 +228,7 @@ export default function BmzFormFiller({ onClose }: Props) {
 
       toast.success(
         queued
-          ? (asDraft ? "Draft saved offline — will sync automatically" : "Submitted offline — will sync automatically")
+          ? (asDraft ? "Draft saved on this device" : "Saved in Ready to send — select it there and send when online")
           : (asDraft ? "Draft saved" : "Checklist submitted"),
       );
       onClose();
